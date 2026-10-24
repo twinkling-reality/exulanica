@@ -13,7 +13,7 @@ import { galleryItems, runnerRows } from './character-group.mjs';
 import type { ModelCard, RunnerModel } from '../../../web/packages/app/src/society-models-api.ts';
 import { PERSONALITY_LIMITS, PERSONALITY_WORDS, counter, length, notRead, readsEach, savedNote, writtenWords } from './personality-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
-import { PATH_WORDS, byParts, plural } from './history-words.mjs';
+import { PATH_WORDS, byParts, plural, unansweredParts } from './history-words.mjs';
 import { DAY_LAYOUTS, dayLayout, dayView, stepChoice } from './day-rows.mjs';
 import './character-page.css';
 import './world-ui-record-day.css';
@@ -47,6 +47,8 @@ export interface DidRow {
   readonly decisions?: number | null;
   /** Who decided where no model did (T7): a person playing, or an outside program. */
   readonly decider?: 'person' | 'external' | null;
+  /** A model's choice was not taken (U3): no usable answer, or a choice its minute found the world had moved past; the routine acted. */
+  readonly unanswered?: 'none' | 'late' | null;
 }
 
 export interface ModelChoice {
@@ -383,12 +385,14 @@ function decidesBlock(state: CharacterPageState): HTMLElement[] {
 }
 
 /** A card's who line (r06): "By Nemotron 3 Nano 30B · 7 choices", "By a person playing", "Routine", or a routine row's
- * own words in a run ("Routine, between Nemotron 3 Super 120B's choices", P2). */
+ * own words in a run ("Routine, between Nemotron 3 Super 120B's choices", P2); where a model's choice was not taken,
+ * "Routine · no usable answer from Nemotron 3 Ultra 550B" (U3). */
 function decidedBy(row: DidRow): Parts | string | null {
   if (row.decider === 'person') return PATH_WORDS.personPlaying;
   if (row.decider === 'external') return PATH_WORDS.outsideProgram;
   if (row.model === undefined) return row.sub || null;
   if (!row.model) return row.sub || CHARACTER_WORDS.routine;
+  if (row.unanswered) return unansweredParts(row.model, row.unanswered === 'late') as Parts;
   const by: Parts = byParts({ kind: 'model', model: { name: row.model } });
   // A folded row counts its decisions ("· 23 decisions", R5e), else the one decision's choices.
   if (Number.isSafeInteger(row.decisions) && (row.decisions ?? 0) > 1) return [...by, ` · ${plural(row.decisions, 'decision')}`];

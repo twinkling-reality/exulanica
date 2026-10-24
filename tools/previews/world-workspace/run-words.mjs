@@ -25,6 +25,11 @@ export const RUN_REFUSALS = Object.freeze({
   session_unknown: 'That run has already ended.',
 });
 
+/** Why a run cannot start while open models are not asked, by the control read's model minds code (U3). */
+export const MODEL_MINDS_REFUSALS = Object.freeze({
+  spending_cap_reached: 'The run did not start: the budget for AI models here is spent.',
+});
+
 /** Why a run is not offered before anything is sent, by the host's refusal code (spec 8.8). */
 export const NOT_CONNECTED = Object.freeze({
   provider_credential_absent: 'No AI model is connected here.',
@@ -39,6 +44,7 @@ export const notRunningRefusal = model => `${model || 'The model'} is not runnin
 export function runRefusalWords(code, model = null) {
   if (code === 'provider_not_running') return notRunningRefusal(model);
   if (Object.hasOwn(RUN_REFUSALS, code)) return RUN_REFUSALS[code];
+  if (Object.hasOwn(MODEL_MINDS_REFUSALS, code)) return MODEL_MINDS_REFUSALS[code];
   return Object.hasOwn(NOT_CONNECTED, code) ? NOT_CONNECTED[code] : 'The run did not start. Nothing was spent.';
 }
 

@@ -244,6 +244,16 @@ describe("Teo's day", () => {
     expect(all(root, '.wu-day-decided').slice(-1)).toEqual(['Routine']);
   });
 
+  it("says a row whose model's choice was not taken was the routine's, with the model and why, never By (U3)", async () => {
+    const { root, page } = await open();
+    page.draw(teoState({ did: [
+      { time: '07:12 · Day 1', what: 'Walked to the quay', sub: '', decision: true, model: NEMOTRON, choices: 9, unanswered: 'none' },
+      { time: '07:11 · Day 1', what: 'Waited by the bench', sub: '', decision: true, model: NEMOTRON, choices: 9, unanswered: 'late' },
+      { time: '07:10 · Day 1', what: 'Went to the lower pools', sub: '', decision: true, model: NEMOTRON, choices: 6 },
+    ], didFocus: 0 }));
+    expect(all(root, '.wu-day-decided')).toEqual([`Routine · no usable answer from ${NEMOTRON}`, `Routine · ${NEMOTRON} chose too late`, `By ${NEMOTRON} · 6 choices`]);
+  });
+
   it('draws the same choice folded into one row: its span of minutes and its decisions counted (R5e)', async () => {
     const { root, page } = await open();
     page.draw(teoState({ did: [

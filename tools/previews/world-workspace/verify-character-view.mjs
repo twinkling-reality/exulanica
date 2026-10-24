@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { called } from './character-words.mjs';
-import { askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, ownPeople, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords, timeRange } from './character-view.mjs';
+import { askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, ownPeople, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords, timeRange } from './character-view.mjs';
 import { defaultRunLimits } from './run-words.mjs';
 
 // Names: a being named only by its body is called by its kind; a thing by its own name or look.
@@ -86,6 +86,23 @@ assert.deepEqual(did.map(row => [row.time, row.what, row.sub]), [
   ['06:00', 'Leaving home', 'Routine'],
 ]);
 assert.equal(didRows({ events, subjectId: 't', wordGoal: () => null, modelName: () => null, limit: 1 }).length, 1);
+// U3: a model asked whose choice was not taken, with no usable answer or one that came after the world moved on, is a
+// row of what the routine did, marked so; an answered row and a routine row are not marked.
+const ultra = { provider: 'p', model_id: 'ultra' };
+const untaken = didRows({ events: [
+  { subject_id: 't', tick: 9, event_kind: 'decision_applied', document: { request_id: 'u9', chose: 'go to the bakery', disposition: 'stale', reason: 'decision_context_changed', model: ultra, origin: 'model' } },
+  { subject_id: 't', tick: 8, event_kind: 'decision_applied', document: { request_id: 'u8', chose: null, disposition: 'unavailable', reason: 'spending_limit_reached', model: ultra, origin: 'model' } },
+  { subject_id: 't', tick: 7, event_kind: 'decision_applied', document: { request_id: 'u7', chose: 'wait here', disposition: 'applied', model: ultra, origin: 'model' } },
+  { subject_id: 't', tick: 6, event_kind: 'decision_applied', document: { request_id: 'u6', chose: null, disposition: 'unavailable', reason: 'spending_limit_reached', model: null, origin: 'model' } },
+], subjectId: 't', wordGoal: () => 'Walking to the quay', modelName: () => 'Nemotron 3 Ultra 550B' });
+assert.deepEqual(untaken.map(row => [row.what, row.chose, row.unanswered, row.requestId]), [
+  ['Walking to the quay', null, 'late', 'u9'],
+  ['Walking to the quay', null, 'none', 'u8'],
+  ['Wait here', 'wait here', null, 'u7'],
+  ['Walking to the quay', null, null, 'u6'],
+]);
+// Compare asks again only a decision a model answered: a choice made too late was answered; no usable answer was not.
+assert.deepEqual(untaken.map(modelAnswered), [true, false, true, false]);
 // R5h: a goal the routine set that repeats Teo's goal just before it (a stand after a stand) is no row of its own; the
 // earlier goal's row spans to it where no row lies between, and keeps its own time where Teo's lines do. A routine goal
 // that changes what he does stays a row, in a line's minute too; a repeat of his model's stand hides behind its row.

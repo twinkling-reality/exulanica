@@ -27,13 +27,18 @@ interface DecisionPageState {
   readonly action?: string | null;
   readonly decider?: 'model' | 'person' | 'external' | null;
   readonly answered?: { readonly latencyMs: number | null; readonly costUsd: string | number | null; readonly costKnown: boolean } | null;
+  readonly unanswered?: {
+    readonly asks: number; readonly latencyMs: number | null; readonly costUsd: string | number | null; readonly costKnown: boolean;
+    readonly reason: string | null;
+  } | null;
+  readonly late?: boolean;
   readonly choicesHeading?: string | null;
   readonly picture?: string | null;
   readonly portraits?: readonly { readonly name: string; readonly url: string | null }[];
   readonly ground?: string | null;
   readonly personality?: { readonly name: string | null; readonly about: string | null } | null;
   readonly notes?: { readonly by: string | null; readonly told: string | null; readonly choices: string | null;
-    readonly happened: string | null; readonly compare: string | null } | null;
+    readonly happened: string | null; readonly compare: string | null; readonly ring?: string | null } | null;
 }
 interface DecisionPage { draw(state: DecisionPageState): void; close(): void; hide(hidden: boolean): void; notes(): void }
 // A joined path: the test runner still finds the file, and the type checker leaves the preview
@@ -380,6 +385,36 @@ describe('Under the ring, the answer and what it cost (D5)', () => {
     // The caption's words stand in a halo of the page's own ground, so the fan's curves break around them.
     const css = readFileSync(`${process.cwd()}/../tools/previews/world-workspace/world-ui-record-decision.css`, 'utf8');
     expect(css).toMatch(/\.wu-rd-caption > \* \{ text-shadow: [^}]*var\(--hr-ground\)/);
+  });
+});
+
+describe("A model's decision whose choice was not taken (U3)", () => {
+  const unanswered = { asks: 1, latencyMs: 2100, costUsd: '0.01214400', costKnown: true, reason: 'spending_limit_reached' };
+  const notes = { by: "Its answer was not one of the actions, and asking it again would have gone over the money left, so Teo's routine acted.",
+    ring: 'How long its one ask took and what it cost.', told: null,
+    choices: "The actions the world allowed Teo there. The model's answer was not one of them, so none was taken.", happened: null, compare: null };
+
+  it('says the model was asked with no usable answer, what the ask took and cost, and marks no choice taken', async () => {
+    const { root } = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, -1), answered: null, unanswered, notes, canCompare: false }));
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Asked Nemotron 3 Nano 30B · no usable answer · the routine acted');
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'no usable answer', 'asked once in 2.1\u00a0s · $0.0121']);
+    expect(all(root, '.wu-rd-hint')).toEqual(expect.arrayContaining([notes.by, notes.ring, notes.choices]));
+    expect(root.textContent).not.toMatch(/Decided by|chose 1 of|Chosen|picked/u);
+  });
+
+  it('says the model was not asked where nothing was sent, with why, and no cost or note under the ring', async () => {
+    const { root } = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, -1), answered: null, canCompare: false,
+      unanswered: { ...unanswered, asks: 0, latencyMs: null, costUsd: null }, notes: { ...notes, ring: null } }));
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Nemotron 3 Nano 30B not asked · the routine acted');
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'not asked: over the money left']);
+    expect(root.querySelector('.wu-rd-caption .wu-rd-hint')).toBeNull();
+  });
+
+  it('says a choice the world had moved past was made too late: marked Chosen, not done, its answer under the ring', async () => {
+    const { root } = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, 4), late: true }));
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Asked Nemotron 3 Nano 30B · chose too late · the routine acted');
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose too late', 'answered in 0.9\u00a0s · $0.0003']);
+    expect(all(root, '.wu-rd-choice .wu-hr-tag')).toEqual(['Chosen, not done']);
   });
 });
 

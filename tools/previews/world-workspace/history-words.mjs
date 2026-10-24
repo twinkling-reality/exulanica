@@ -321,6 +321,12 @@ export function byParts(decider) {
   return null;
 }
 
+/** A model's decision whose choice was not taken, as parts (U3, DESIGN 12:42): "Routine · no usable answer from Nemotron 3
+ * Ultra 550B"; one whose choice came after the world had moved on, "Routine · Qwen3 235B chose too late". */
+export function unansweredParts(modelName, late = false) {
+  return late ? ['Routine · ', modelPart(modelName), ' chose too late'] : ['Routine · no usable answer from ', modelPart(modelName)];
+}
+
 /** A line said, its speaker first: "Teo: “Morning, Ines.”" (quoted as said, never edited). */
 export function saidWords(speaker, line) {
   return `${speaker}: “${line}”`;

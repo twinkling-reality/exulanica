@@ -13,7 +13,9 @@ export function modelRunState(models, control, subjectId, selected = null) {
     : control.modelMinds ? control.modelMinds.reason
     : !control.hostPlayback?.running ? control.hostPlayback?.reason || 'Automatic world playback is unavailable.'
     : null;
-  return { ready: reason === null, reason, playing: control?.mode === 'playing', model: model || null };
+  // The code the reason came with, where the reads give one, so a refused start can name it (U3).
+  const code = !model ? null : refusal || (control?.playEligible && control.modelMinds ? control.modelMinds.code : null);
+  return { ready: reason === null, reason, code: reason === null ? null : code, playing: control?.mode === 'playing', model: model || null };
 }
 
 function assertExecutionBinding(models, control, entry) {
@@ -46,7 +48,7 @@ export async function startRun({ modelsClient, controlClient, entry, subjectId, 
   const actual = models.choices.find(choice => choice.subjectId === subjectId)?.model;
   if (!actual || actual.provider !== expectedModel.provider || actual.modelId !== expectedModel.modelId) throw Error('The selected model changed. Review it again.');
   const readiness = modelRunState(models, control, subjectId);
-  if (!readiness.ready) throw Error(readiness.reason);
+  if (!readiness.ready) throw Object.assign(Error(readiness.reason), readiness.code ? { code: readiness.code } : {});
   if (!current()) throw Error('The world changed. Open it again.');
   if (openRun(control)) return control;
   const opened = await controlClient.openSession(control, limitsFor(control, models), requestId);

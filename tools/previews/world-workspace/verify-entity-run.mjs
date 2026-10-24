@@ -55,10 +55,15 @@ const running = world({ control: { ...paused, mode: 'playing', livingSession: op
 assert.equal(openRun(await start(running)).sessionId, 'run-1');
 assert.deepEqual(running.sent, []);
 
-// Not connected: the readiness words, and nothing sent.
+// Not connected: the readiness words with their code, and nothing sent.
 const unplugged = world({ refusal: 'provider_credential_absent' });
-await assert.rejects(start(unplugged), /The AI service is not connected\./);
+await assert.rejects(start(unplugged), error => /The AI service is not connected\./.test(error.message) && error.code === 'provider_credential_absent');
 assert.deepEqual(unplugged.sent, []);
+
+// The allowance for open models used up (U3): the control read's sentence with its code, so R's line names it, and nothing sent.
+const capped = world({ control: { ...paused, modelMinds: { code: 'spending_cap_reached', reason: 'This workspace\u2019s allowance for open models is used up.' } } });
+await assert.rejects(start(capped), error => error.code === 'spending_cap_reached' && /allowance/.test(error.message));
+assert.deepEqual(capped.sent, []);
 
 // A playing world: one run opened on the playing read, and nothing else written.
 const playing = world({ control: { ...paused, mode: 'playing' } });

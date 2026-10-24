@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, answeredIn, askedAt, choiceRows, choicesLabel, choicesOver, choseOneOf, costWords, decidedByParts, ringPrint, decisionNotes, decisionTitle,
-  needLine, overLabel, resultLines, toldLabel, toldSections,
+  needLine, overLabel, resultLines, toldLabel, toldSections, DECISION_WORDS as WORDS, UNANSWERED_REASONS, askedPrint, lateNotes, notAskedWords, unansweredNotes, unansweredParts,
 } from './decision-words.mjs';
 import { called } from './character-words.mjs';
 
@@ -162,5 +162,66 @@ const said = [...Object.values(DECISION_WORDS), ...Object.values(DECISION_FLOW_W
 for (const words of said) {
   assert.doesNotMatch(words, /\u2014|_/, words);
   assert.doesNotMatch(words.replace('as you wrote it', '').replace(/\([^)]*\)/gu, ''), /\b(it|he|she)\b/i, words);
+}
+// A model's decision whose choice was not taken (U3, DESIGN's WORDS.md 12:57). Every reason the lines name is one a
+// receipt can state, and no reason is in two groups.
+const stated = new Set(repository('exulanica/world/decision_roles.py').match(/GENERIC_REASONS: Final = frozenset\(\s*\{([\s\S]*?)\}\s*\)/)[1].matchAll(/"([a-z_]+)"/g).map(match => match[1]));
+const grouped = Object.values(UNANSWERED_REASONS).flat();
+for (const reason of grouped) assert.ok(stated.has(reason), reason);
+assert.equal(new Set(grouped).size, grouped.length);
+// The head, the model's name its own part: asked, not asked where nothing was sent, or a choice made too late.
+const ultra = 'Nemotron 3 Ultra 550B', mara = called({ name: 'Mara Vale' });
+assert.deepEqual(unansweredParts({ model: ultra, asks: 1 }), ['Asked ', { model: ultra }, ' · no usable answer · the routine acted']);
+assert.deepEqual(unansweredParts({ model: ultra, asks: 0 }), [{ model: ultra }, ' not asked · the routine acted']);
+assert.deepEqual(unansweredParts({ model: ultra, asks: 1, late: true }), ['Asked ', { model: ultra }, ' · chose too late · the routine acted']);
+assert.deepEqual(unansweredParts({ model: null, asks: 1 }), []);
+// Under the ring: what the asks sent took and cost, to the hundredth of a cent; nothing sent says why in four words at
+// most, or "not asked" alone.
+assert.equal(askedPrint({ asks: 1, latencyMs: 2100, costUsd: '0.01214400', costKnown: true }), 'asked once in 2.1 s · $0.0121');
+assert.equal(askedPrint({ asks: 2, latencyMs: 4300, costUsd: '0.02420000', costKnown: true }), 'asked twice in 4.3 s · $0.0242');
+assert.equal(askedPrint({ asks: 1, latencyMs: 20, costUsd: '0.0121', costKnown: false }), 'asked once in under 0.1 s · at most $0.0121');
+assert.equal(notAskedWords('spending_limit_reached'), 'not asked: over the money left');
+assert.equal(notAskedWords('no_time_to_ask'), 'not asked: no time to ask');
+assert.equal(notAskedWords('provider_credential_absent'), 'not asked: its service not connected');
+assert.equal(notAskedWords('line_out_of_bounds'), 'not asked');
+assert.equal(notAskedWords('spending_unavailable'), 'not asked: spending check failed');
+for (const reason of stated) assert.ok(notAskedWords(reason).replace(/^not asked(: )?/u, '').split(' ').filter(Boolean).length <= 4, reason);
+// The notes by reason (DESIGN's list), each ending with the routine; none says the model chose.
+const by = (reason, asks = 1) => unansweredNotes({ who: mara, asks, reason }).by;
+assert.equal(by('spending_limit_reached'), "Its answer was not one of the actions, and asking it again would have gone over the money left, so Mara Vale's routine acted.");
+assert.equal(by('no_time_to_ask'), "Its answer was not one of the actions, and there was no time to ask it again, so Mara Vale's routine acted.");
+assert.equal(by('spending_suspended'), "Its answer was not one of the actions, and it could not be asked again just then, so Mara Vale's routine acted.");
+assert.equal(by('model_timed_out'), "It did not answer in time, so Mara Vale's routine acted.");
+assert.equal(by('answer_not_offered', 2), "Its answers were not among the actions, so Mara Vale's routine acted.");
+assert.equal(by('answer_not_offered'), "Its answer was not one of the actions, so Mara Vale's routine acted.");
+assert.equal(by('model_call_failed'), "Asking it failed, so Mara Vale's routine acted.");
+assert.equal(by('provider_configuration_changed'), "The model's settings changed while it was asked, so Mara Vale's routine acted.");
+assert.equal(by('decision_context_changed'), "The world had moved on while it was asked, so Mara Vale's routine acted.");
+assert.equal(by('line_out_of_bounds'), "Its answer could not be used, so Mara Vale's routine acted.");
+assert.equal(by('spending_limit_reached', 0), "Asking it would have gone over the money left, so Mara Vale's routine acted.");
+assert.equal(by('no_time_to_ask', 0), "There was no time to ask it, so Mara Vale's routine acted.");
+assert.equal(by('provider_credential_absent', 0), "It could not be asked just then, so Mara Vale's routine acted.");
+// The ring's note where it was asked, none where not; the choices' note by whether an answer was not an action.
+const money = unansweredNotes({ who: mara, asks: 1, reason: 'spending_limit_reached' });
+assert.equal(money.ring, 'How long its one ask took and what it cost.');
+assert.equal(unansweredNotes({ who: mara, asks: 2, reason: 'answer_not_offered' }).ring, 'How long its two asks took and what they cost.');
+assert.equal(unansweredNotes({ who: mara, asks: 0, reason: 'spending_limit_reached' }).ring, null);
+assert.equal(money.choices, "The actions the world allowed Mara Vale there. The model's answer was not one of them, so none was taken.");
+assert.equal(unansweredNotes({ who: mara, asks: 2, reason: 'answer_not_offered' }).choices, "The actions the world allowed Mara Vale there. The model's answers were not among them, so none was taken.");
+assert.equal(unansweredNotes({ who: mara, asks: 1, reason: 'model_timed_out' }).choices, 'The actions the world allowed Mara Vale there. No usable answer came back from the model, so none was taken.');
+assert.equal(unansweredNotes({ who: mara, asks: 0, reason: 'spending_limit_reached' }).choices, 'The actions the world allowed Mara Vale there. The model was not asked, so none was taken.');
+// A choice its minute found the world had moved past: made, not done.
+assert.deepEqual({ ...lateNotes({ who: mara }) }, {
+  by: "The world had moved on before its choice could be acted on, so Mara Vale's routine acted.",
+  choices: 'The actions the world allowed Mara Vale there. The model picked one, but the world had moved on before it could happen.',
+});
+assert.equal(WORDS.chosenNotDone, 'Chosen, not done');
+for (const reason of [...stated, null]) {
+  for (const asks of [0, 1, 2]) {
+    const notes = unansweredNotes({ who: resident, asks, reason });
+    for (const words of Object.values(notes).filter(Boolean)) assert.doesNotMatch(words, /\u2014|_|picked|Decided by|chose for/u, words);
+    assert.match(notes.by, /, so the resident's routine acted\.$/u, String(reason));
+    assert.match(notes.choices, /^The actions the world allowed the resident there\. .*so none was taken\.$/u);
+  }
 }
 console.log('decision words: ok');

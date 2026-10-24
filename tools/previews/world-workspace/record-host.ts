@@ -3,7 +3,7 @@
 // the pages draw from them: each moment's title in JOURNEY's moment words, its picture and its people's portraits
 // (MOTION's, through history-host.ts). contextual-world.ts opens the pages, asks and answers keys; this says what
 // each page shows.
-import { choiceRows, choicesLabel, choicesOver, decisionNotes, decisionTitle, overLabel, resultLines, toldLabel, toldSections } from './decision-words.mjs';
+import { choiceRows, choicesLabel, choicesOver, decisionNotes, decisionTitle, lateNotes, overLabel, resultLines, toldLabel, toldSections, unansweredNotes } from './decision-words.mjs';
 import { COMPARE_WORDS, again as againName, answerTag, askLine, asking as askingWords, atMoment, atMost, cannotAskAgain, choseWords, compareMoments, explanation, laneMarks, nothingToAsk, resultOver, resultTitle, sameCounts, spentAsking, spentOf, useFor, whatEachChose } from './compare-words.mjs';
 import { CHARACTER_WORDS, decidesPrint, modelRefusalWords, quoted } from './character-words.mjs';
 import { deciderOf } from './character-group.mjs';
@@ -54,6 +54,16 @@ export interface RecordHost {
 }
 
 const sentenceCase = (text: string | null) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : text);
+
+/**
+ * What a model's decision with no usable answer sent (U3), from its receipt's provider record: how many asks left
+ * this computer (none where the receipt names no provider), their time and cost, and the receipt's reason.
+ */
+function unansweredOf(provider: Json | null, reason: string | null): Json {
+  const calls: Json[] = Array.isArray(provider?.calls) ? provider.calls : [];
+  return { asks: provider ? Math.max(1, calls.length) : 0, latencyMs: provider?.latency_ms ?? null, costUsd: provider?.cost_usd ?? null,
+    costKnown: provider?.cost_known === true, reason };
+}
 
 /**
  * The moment a character's decision belongs to, from the moments read: the one this request made with them acting
@@ -282,22 +292,27 @@ export function recordStates(host: RecordHost) {
       const named = names(showing);
       const to = said?.to ? named.subject(said.to) : null;
       const proposal = receipt?.proposal ?? null, provider = receipt?.provider ?? null, config = request.provider_config ?? null;
-      const choices = choiceRows(context, proposal?.label ?? null);
       const result = resultLines({ verdict,
         latencyMs: provider?.latency_ms ?? null, costUsd: provider?.cost_usd ?? null, costKnown: provider?.cost_known === true });
       // One time per decision: the minute it applied in (appliedTick).
       const at = worldTime(appliedTick(events, decision.requestId, request.base_tick), start);
       const applied = (showing.events ?? []).find((event: Json) => (event.event_kind === 'decision_applied' && event.document?.request_id === decision.requestId)
         || (event.event_kind === 'said' && event.document?.thing?.request_id === decision.requestId));
+      const stale = Boolean(proposal) && applied?.event_kind === 'decision_applied' && applied.document?.disposition === 'stale';
+      const choices = choiceRows(context, proposal?.label ?? null);
       // Who decided (T7): a model's request names its provider; a person playing or an outside program, its kind.
       const origin = config?.provider ? 'model' : config?.kind ?? applied?.document?.origin ?? applied?.document?.thing?.decider ?? moment?.decider?.kind ?? null;
       const actor = named.subject(subjectId);
       const decider = origin === 'model' || origin === 'person' || origin === 'external' ? origin : null;
+      // A model's decision with no usable answer (U3): its receipt keeps no proposal. A model's choice its minute found
+      // the world had moved past was made but not done: the routine acted.
+      const unanswered = origin === 'model' && !proposal ? unansweredOf(provider, receipt?.reason ?? null) : null;
+      const late = origin === 'model' && stale;
       return { ...blank,
         // The moment it belongs to, where the moments read has it: "06:52 · Day 1 · Teo met Ines at the bench".
         over: moment ? [worldWhen(at), sentenceCase(momentTitle(moment, named))].filter(Boolean).join(' · ')
           : overLabel({ at, who, said: Boolean(said), to: said?.to ? host.personName(said.to) : null }),
-        title: decisionTitle({ line: said?.line ?? null, chose: proposal?.label ?? null }) || showing.did?.[decision.rowIndex]?.what || '',
+        title: decisionTitle({ line: said?.line ?? null, chose: late ? null : proposal?.label ?? null }) || showing.did?.[decision.rowIndex]?.what || '',
         model: config ? host.modelName({ provider: config.provider, model_id: config.model_id }) ?? config.model_id ?? null : null,
         done: result.done, verdict: result.verdict, told: toldSections(context, who),
         personality: context?.character ? { name: context.character.name ?? null, about: context.character.about ?? null } : null,
@@ -311,10 +326,11 @@ export function recordStates(host: RecordHost) {
         decider,
         // What a person playing them was shown, or what their model or outside program was told (DESIGN, WORDS.md R5b, R5c).
         toldLabel: toldLabel(who, decider),
-        answered: origin === 'model' && provider ? { latencyMs: provider.latency_ms ?? null, costUsd: provider.cost_usd ?? null, costKnown: provider.cost_known === true } : null,
+        answered: origin === 'model' && provider && !unanswered ? { latencyMs: provider.latency_ms ?? null, costUsd: provider.cost_usd ?? null, costKnown: provider.cost_known === true } : null,
+        unanswered, late,
         choicesHeading: choicesOver(who),
         // What each part is, for a newcomer (A7); the page shows them until the person hides them.
-        notes: decisionNotes({ who, decider, canCompare }),
+        notes: { ...decisionNotes({ who, decider, canCompare }), ...(unanswered ? unansweredNotes({ who, ...unanswered }) : late ? lateNotes({ who }) : {}) },
         // The open page's own picture, drawn ahead of those its day's rows asked for first.
         picture: moment ? host.pictures.momentNow(moment as never, true) : null,
         portraits: (moment ? titledSubjects(moment) : [subjectId, said?.to].filter(Boolean)).map((id: string) => ({ name: named.subject(id), url: host.pictures.portraitNow(id) })),

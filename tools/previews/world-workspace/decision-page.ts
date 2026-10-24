@@ -9,7 +9,7 @@
 import { CHARACTER_WORDS } from './character-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
 import { FLOW_LAYOUTS, choiceEnd, choiceLines, flowLayout, flowSize, headBottom, rowMost, titleLines, toldHeight } from './decision-flow.mjs';
-import { DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, choseOneOf, decidedByParts, ringPrint } from './decision-words.mjs';
+import { DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, UNANSWERED_WORDS, askedPrint, choseOneOf, decidedByParts, notAskedWords, ringPrint, unansweredParts } from './decision-words.mjs';
 import { page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orbs, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
 import './world-ui-record-decision.css';
@@ -52,6 +52,13 @@ export interface DecisionPageState {
   /** The answer's recorded time and cost (the receipt's latency_ms, cost_usd and cost_known), for the head's small
    * print. Absent: the small print carries `done`. */
   readonly answered?: { readonly latencyMs: number | null; readonly costUsd: string | number | null; readonly costKnown: boolean } | null;
+  /** A model's decision with no usable answer (U3): the asks that left this computer, their time and cost, and why. */
+  readonly unanswered?: {
+    readonly asks: number; readonly latencyMs: number | null; readonly costUsd: string | number | null; readonly costKnown: boolean;
+    readonly reason: string | null;
+  } | null;
+  /** A model's choice its minute found the world had moved past: made, not done, and the routine acted (U3). */
+  readonly late?: boolean;
   /** Over the column of choices: "Teo's choices" (choicesOver). Absent: `choicesLabel`. */
   readonly choicesHeading?: string | null;
   /** The moment's picture (R2), as an image address; absent or null, the quiet tile. */
@@ -149,13 +156,16 @@ function placeTold(told: HTMLElement, at: Flow['told']): void {
   told.style.maxHeight = `${at.most}px`;
 }
 
-/** The head's small print: who decided, and nothing else (D5). */
+/** The head's small print: who decided, and nothing else (D5); where the choice was not taken, who was asked and that the routine acted (U3). */
 function smallPrint(state: DecisionPageState): Parts {
+  if (state.unanswered || state.late) return unansweredParts({ model: state.model, asks: state.unanswered?.asks ?? 1, late: state.late === true }) as Parts;
   return decidedByParts({ decider: state.decider ?? (state.model ? 'model' : null), model: state.model }) as Parts;
 }
 
-/** Under the ring, by the choice they paid for (D5): the answer's time and cost, or the host's `done` where those are not given. */
+/** Under the ring, by the choice they paid for (D5): the answer's time and cost, or the host's `done` where those are not given; where
+ * the choice was not taken, what the asks sent took and cost (U3). */
 function paidPrint(state: DecisionPageState): string | null {
+  if (state.unanswered) return state.unanswered.asks > 0 ? askedPrint(state.unanswered) as string : null;
   if (state.answered) return ringPrint(state.answered) as string | null;
   return state.done ? `${state.done.charAt(0).toLowerCase()}${state.done.slice(1)}` : null;
 }
@@ -314,7 +324,9 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         px(caption, drawn.caption.x, drawn.caption.y);
         if (decider === 'person' || decider === 'external') caption.append(element('span', 'wu-rd-who', decider === 'person' ? CHARACTER_WORDS.personPlaying : CHARACTER_WORDS.outsideProgram));
         else if (state.model) caption.append(element('span', 'wu-rd-who wu-hr-model', state.model));
-        if (taken >= 0) caption.append(element('span', 'wu-rd-count', choseOneOf(choices.length)));
+        if (state.late) caption.append(element('span', 'wu-rd-count', UNANSWERED_WORDS.late));
+        else if (taken >= 0) caption.append(element('span', 'wu-rd-count', choseOneOf(choices.length)));
+        else if (state.unanswered) caption.append(element('span', 'wu-rd-count', state.unanswered.asks > 0 ? UNANSWERED_WORDS.none : notAskedWords(state.unanswered.reason)));
         // An outside program's answer shows no cost line (DESIGN 04:04); a person playing records none.
         const paid = decider === 'external' || decider === 'person' ? null : paidPrint(state);
         if (paid) caption.append(element('span', 'wu-rd-paid', paid));
@@ -348,7 +360,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
             item.style.maxWidth = `${rowMost(layout)}px`;
             item.append(element('span', 'wu-rd-number', String(choice.number)), element('span', 'wu-rd-choice-words', choice.words));
             if (row.taken) {
-              item.append(element('span', 'wu-hr-tag', DECISION_WORDS.chosen));
+              item.append(element('span', 'wu-hr-tag', state.late ? DECISION_WORDS.chosenNotDone : DECISION_WORDS.chosen));
               takenRow = item;
             }
             drawnRows.push({ index: row.index, item });

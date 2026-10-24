@@ -242,11 +242,15 @@ export function didRows({ events, subjectId, startMinute = null, wordGoal, model
       push({ time, what: saidRow(to, document.thing.line), sub: rowSub(model ? { model, options: options(document.thing.request_id) } : { decider: document.thing.decider }), requestId: document.thing.request_id ?? null, model,
         decider: document.thing.decider ?? null, tick: event.tick });
     } else if (event.event_kind === 'decision_applied' && !said.has(document.request_id)) {
-      const what = typeof document.chose === 'string' && document.chose ? document.chose.charAt(0).toUpperCase() + document.chose.slice(1) : wordGoal(document);
+      // A choice the world had moved past before it applied was not taken (U3): such a row says what the routine did.
+      const late = document.disposition === 'stale', kept = !late && typeof document.chose === 'string' && document.chose ? document.chose : null;
+      const what = kept ? kept.charAt(0).toUpperCase() + kept.slice(1) : wordGoal(document);
       if (!what) continue;
       const model = document.model ? modelName(document.model) : null;
       push({ time, what, sub: rowSub(model ? { model, options: options(document.request_id) } : { decider: document.origin }), requestId: document.request_id ?? null, model,
-        decider: document.origin ?? null, did: event.did ?? null, chose: typeof document.chose === 'string' ? document.chose : null, tick: event.tick });
+        decider: document.origin ?? null, did: kept ? event.did ?? null : null, chose: kept, tick: event.tick,
+        // A model was asked and its choice was not taken: no usable answer, or one that came too late.
+        unanswered: model && !kept ? (late ? 'late' : 'none') : null });
     } else if (event.event_kind === 'goal_selected' && document.reason !== 'chosen_by_their_model') {
       const before = earlier.get(event);
       if (sameGoal(document.goal, before?.document?.goal)) {
@@ -269,6 +273,10 @@ export function didRows({ events, subjectId, startMinute = null, wordGoal, model
   }
   return foldRows(rows, foldable).slice(0, limit);
 }
+
+/** Whether a day row is a decision a model answered, which Compare can ask again (C4): a model asked with a usable
+ * answer, taken or made too late; never one with no usable answer (U3). */
+export const modelAnswered = row => Boolean(row?.requestId && row?.model && row?.unanswered !== 'none');
 
 /**
  * The same goal (R5h): the same kind toward the same place, thing or person, as a purposeful society's goal says it

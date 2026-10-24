@@ -12,7 +12,7 @@ import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
 import { SAID_READ, choosableModels, deciderOf, freeHere, groupContent, keepLastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, offersModels, openWhileOffered, overRows, questionGroup } from './character-group.mjs';
-import { PAGE_FRAMING, PERSON_RING_METRES, askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, ownPeople, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
+import { PAGE_FRAMING, PERSON_RING_METRES, askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, ownPeople, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
 import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, outOfViewNote, pageSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
@@ -686,7 +686,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         chosen: Boolean(model), chosenRefusal: choice?.refusal ?? null, assignable }) : null,
       run: { open: Boolean(run), big: run ? runningLine(run, Date.now(), runFree()) : runLength(limits, runFree()), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal, view.model ?? null) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
-      did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...(row.heard ? {} : { model: row.model ?? null, choices: row.model ? decisionOptions(row.requestId) ?? null : null, decisions: row.decisions ?? null, decider: row.decider === 'person' || row.decider === 'external' ? row.decider : null }), ...records.dayRow(pageView, row) })) : null,
+      did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...(row.heard ? {} : { model: row.model ?? null, choices: row.model ? decisionOptions(row.requestId) ?? null : null, decisions: row.decisions ?? null, decider: row.decider === 'person' || row.decider === 'external' ? row.decider : null, unanswered: row.unanswered ?? null }), ...records.dayRow(pageView, row) })) : null,
       didFocus: pageView.didFocus, lastRun, lastRunWhy, canAsk: !readOnly,
       ask: pageView.ask ? { questions: ASK_ASPECTS.map(aspect => askWords(aspect, view.who)), focus: pageView.ask.focus, busy: pageView.ask.busy,
         asked: pageView.ask.asked, answer: pageView.ask.answer, failure: pageView.ask.failure } : null,
@@ -905,7 +905,6 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   /** [C] is drawn only where it works (C4, K6): a model to ask beside the character's own, and a decision a model answered. */
   const comparable = (showing) => !readOnly && Boolean(showing && compareModels(showing.row)?.length);
-  const modelAnswered = (row) => Boolean(row?.requestId && row?.model);
   function readOffer(showing) {
     const compare = showing?.compare, model = compareModels(showing.row)?.[compare.focus];
     if (!model || compare.offers.has(modelKey(model))) return;

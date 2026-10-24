@@ -4,7 +4,7 @@
 // context does not carry leaves its line or section out. The stored text itself is the Full record.
 // What came of a choice is the choice account's verdict (web/packages/app/src/decision-record.ts),
 // passed in, so the page and the account never disagree. verify-decision-words.mjs holds these.
-import { amount, deciderWords, possessive } from './character-words.mjs';
+import { amount, deciderWords, finer, possessive } from './character-words.mjs';
 import { personalityRecordLines } from './personality-words.mjs';
 import { worldTime } from './world-clock.mjs';
 
@@ -14,6 +14,8 @@ export const DECISION_WORDS = Object.freeze({
   heard: 'Heard',
   remembers: 'Remembers',
   chosen: 'Chosen',
+  /** A choice the world had moved past before it could happen (U3). */
+  chosenNotDone: 'Chosen, not done',
   fullRecord: 'Full record',
   earlierLater: 'Earlier, later',
   inspect: 'Inspect decision',
@@ -120,6 +122,112 @@ export function decisionNotes({ who, decider = null, canCompare = false }) {
     choices: picker ? `The actions the world allowed ${name} there. ${picker} picked one, and the world checked it before it happened.` : null,
     happened: 'What the choice did in the world, at that minute.',
     compare: model && canCompare ? 'Compare asks another open model the same moment, to see what it would choose.' : null,
+  });
+}
+
+/**
+ * A model's decision with no usable answer (U3, DESIGN's WORDS.md 12:57): its receipt states no proposal, and the
+ * routine acted. It was asked where its receipt names a provider (an attempt left this computer), not asked where it
+ * names none. An asked receipt refused before its next ask was asked again after an answer that was not an action,
+ * since only such an answer is asked again. These are the reasons each such line names.
+ */
+export const UNANSWERED_REASONS = Object.freeze({
+  money: Object.freeze(['spending_limit_reached', 'process_budget_spent', 'process_share_spent', 'world_hour_spend_spent']),
+  noTime: Object.freeze(['no_time_to_ask', 'unanswered_in_its_minute']),
+  notAgain: Object.freeze(['spending_not_granted', 'spending_revoked', 'spending_expired', 'spending_suspended', 'spending_unavailable',
+    'spending_scope_missing', 'request_refused', 'provider_not_admitted', 'provider_credential_absent', 'model_no_longer_offered',
+    'world_hour_decisions_spent']),
+});
+
+/** Such a decision's own words under the ring and in its head: no usable answer, or a choice the world moved past. */
+export const UNANSWERED_WORDS = Object.freeze({ none: 'no usable answer', late: 'chose too late', routine: 'the routine acted', notAsked: 'not asked' });
+
+/** Why a model was not asked, in four words or fewer, by its receipt's reason; absent where the reason has none. */
+const NOT_ASKED = Object.freeze({
+  ...Object.fromEntries(UNANSWERED_REASONS.money.map(reason => [reason, 'over the money left'])),
+  ...Object.fromEntries(UNANSWERED_REASONS.noTime.map(reason => [reason, 'no time to ask'])),
+  spending_suspended: 'spending was paused',
+  ...Object.fromEntries(['spending_not_granted', 'spending_revoked', 'spending_expired', 'spending_scope_missing'].map(reason => [reason, 'spending was not open'])),
+  spending_unavailable: 'spending check failed',
+  provider_credential_absent: 'its service not connected',
+  provider_not_admitted: 'not allowed here',
+  model_no_longer_offered: 'no longer offered here',
+  model_unavailable: 'the model was unavailable',
+  model_call_failed: 'the call failed',
+  request_refused: 'refused before sending',
+  provider_configuration_changed: "the model's settings changed",
+  world_hour_decisions_spent: 'hourly limit reached',
+  decision_context_changed: 'the world moved on',
+});
+
+/** Under the ring where nothing was sent: "not asked: over the money left", or "not asked" alone. */
+export function notAskedWords(reason) {
+  return Object.hasOwn(NOT_ASKED, reason ?? '') ? `${UNANSWERED_WORDS.notAsked}: ${NOT_ASKED[reason]}` : UNANSWERED_WORDS.notAsked;
+}
+
+/**
+ * The head's small print for a model's decision whose choice was not taken, the model's name its own part: "Asked
+ * Nemotron 3 Ultra 550B · no usable answer · the routine acted"; where nothing was sent, "Nemotron 3 Ultra 550B not
+ * asked · the routine acted"; a choice the world had moved past, "Asked Qwen3 235B · chose too late · the routine
+ * acted". Nothing where no model is named.
+ */
+export function unansweredParts({ model = null, asks = 0, late = false } = {}) {
+  const name = plain(model);
+  if (!name) return [];
+  if (!late && asks < 1) return [{ model: name }, ` ${UNANSWERED_WORDS.notAsked} · ${UNANSWERED_WORDS.routine}`];
+  return ['Asked ', { model: name }, ` · ${late ? UNANSWERED_WORDS.late : UNANSWERED_WORDS.none} · ${UNANSWERED_WORDS.routine}`];
+}
+
+/**
+ * Under the ring for an asked decision with no usable answer, what the asks sent took and cost: "asked once in 2.1 s ·
+ * $0.0121", "asked twice in 4.3 s · $0.0242", "at most" where only the bound is known.
+ */
+export function askedPrint({ asks = 1, latencyMs = null, costUsd = null, costKnown = true } = {}) {
+  const times = asks === 1 ? 'once' : asks === 2 ? 'twice' : `${asks} times`;
+  const took = !Number.isFinite(latencyMs) ? '' : latencyMs < 100 ? ' in under 0.1\u00a0s' : ` in ${(latencyMs / 1000).toFixed(1)}\u00a0s`;
+  const cost = costUsd === null || costUsd === undefined || !amount(costUsd) ? null : `${costKnown ? '' : 'at most '}${finer(costUsd)}`;
+  return [`asked ${times}${took}`, cost].filter(Boolean).join(' · ');
+}
+
+/**
+ * The newcomer's notes for a decision with no usable answer, in place of a choice's: under the head, why the routine
+ * acted, by the receipt's reason and whether it was asked; the ring's, what the asks sent took and cost (none where
+ * nothing was sent); the choices', that none was taken and why.
+ */
+export function unansweredNotes({ who, asks = 0, reason = null }) {
+  const name = who.within, routine = `so ${possessive(name)} routine acted.`, allowed = `The actions the world allowed ${name} there.`;
+  const has = kind => UNANSWERED_REASONS[kind].includes(reason);
+  if (asks < 1) {
+    const by = has('money') ? 'Asking it would have gone over the money left' : has('noTime') ? 'There was no time to ask it' : 'It could not be asked just then';
+    return Object.freeze({ by: `${by}, ${routine}`, ring: null, choices: `${allowed} The model was not asked, so none was taken.` });
+  }
+  const off = 'Its answer was not one of the actions';
+  const by = has('money') ? `${off}, and asking it again would have gone over the money left`
+    : reason === 'no_time_to_ask' ? `${off}, and there was no time to ask it again`
+      : has('notAgain') ? `${off}, and it could not be asked again just then`
+        : reason === 'model_timed_out' ? 'It did not answer in time'
+          : reason === 'answer_not_offered' ? (asks > 1 ? 'Its answers were not among the actions' : off)
+            : reason === 'model_call_failed' || reason === 'model_unavailable' ? 'Asking it failed'
+              : reason === 'provider_configuration_changed' ? "The model's settings changed while it was asked"
+                : reason === 'decision_context_changed' ? 'The world had moved on while it was asked'
+                  : 'Its answer could not be used';
+  // An answer that was not an action: answer_not_offered, or one asked again and refused before it was sent.
+  const notAnAction = reason === 'answer_not_offered' || has('money') || reason === 'no_time_to_ask' || has('notAgain');
+  const choices = !notAnAction ? 'No usable answer came back from the model, so none was taken.'
+    : reason === 'answer_not_offered' && asks > 1 ? "The model's answers were not among them, so none was taken."
+      : "The model's answer was not one of them, so none was taken.";
+  const ring = asks === 1 ? 'How long its one ask took and what it cost.' : asks === 2 ? 'How long its two asks took and what they cost.'
+    : 'How long its asks took and what they cost.';
+  return Object.freeze({ by: `${by}, ${routine}`, ring, choices: `${allowed} ${choices}` });
+}
+
+/** The notes for a choice the world had moved past before it could happen (U3): the head's and the choices'; the
+ * ring keeps its answer's own. */
+export function lateNotes({ who }) {
+  const name = who.within;
+  return Object.freeze({
+    by: `The world had moved on before its choice could be acted on, so ${possessive(name)} routine acted.`,
+    choices: `The actions the world allowed ${name} there. The model picked one, but the world had moved on before it could happen.`,
   });
 }
 

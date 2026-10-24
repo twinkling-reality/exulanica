@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_RUN, NOT_CONNECTED, RUN_REFUSALS, RUN_WORDS, atMost, defaultRunLimits, endedNote, OWN_ENDS, runFor, runStopWords, runLength, runRefusalWords, runningLine, spentWords, stripWords, timeLeft, whoDecides, decidingWords, pillRunLine } from './run-words.mjs';
+import { DEFAULT_RUN, MODEL_MINDS_REFUSALS, NOT_CONNECTED, RUN_REFUSALS, RUN_WORDS, atMost, defaultRunLimits, endedNote, OWN_ENDS, runFor, runStopWords, runLength, runRefusalWords, runningLine, spentWords, stripWords, timeLeft, whoDecides, decidingWords, pillRunLine } from './run-words.mjs';
 import { called } from './character-words.mjs';
 
 const python = path => readFileSync(new URL('../../../' + path, import.meta.url), 'utf8');
@@ -15,6 +15,11 @@ for (const code of python('exulanica/api/routes/society_control.py').matchAll(/^
 assert.match(python('exulanica/api/app.py'), /_problem\(409, "stale_society_state"/);
 raised.add('stale_society_state');
 assert.deepEqual([...raised].sort(), Object.keys(RUN_REFUSALS).sort());
+// A start refused while open models are not asked names the control read's code (U3): each worded code is one the
+// control read can state, and the allowance used up reads as the budget spent, never "Nothing was spent".
+const minds = python('exulanica/api/routes/society_control.py').match(/model_minds_code: Literal\[([^\]]+)\]/)[1].match(/"([a-z_]+)"/g).map(code => code.slice(1, -1));
+for (const code of Object.keys(MODEL_MINDS_REFUSALS)) assert.ok(minds.includes(code), code);
+assert.equal(runRefusalWords('spending_cap_reached'), 'The run did not start: the budget for AI models here is spent.');
 // A playing world opens a run as it plays: no refusal asks the person to pause first.
 assert.ok(!raised.has('society_not_paused'));
 assert.equal(runRefusalWords('stale_society_state'), 'The world changed a moment ago. Press Run again.');
@@ -33,7 +38,7 @@ for (const code of ['toString', 'http_500', null]) assert.equal(runRefusalWords(
 // One noun: a run, never a session; never a code, an id or an em dash.
 const who = called({ name: 'Teo' }), resident = called({ name: null, kind: 'resident' });
 const limits = defaultRunLimits(60_000, 1);
-const sentences = [...Object.values(RUN_WORDS), ...Object.values(RUN_REFUSALS), ...Object.values(NOT_CONNECTED), runFor(limits), runLength(limits), whoDecides(who), whoDecides(resident)];
+const sentences = [...Object.values(RUN_WORDS), ...Object.values(RUN_REFUSALS), ...Object.values(MODEL_MINDS_REFUSALS), ...Object.values(NOT_CONNECTED), runFor(limits), runLength(limits), whoDecides(who), whoDecides(resident)];
 for (const words of sentences) {
   assert.doesNotMatch(words, /session|entity|provider/i, words);
   assert.doesNotMatch(words, /_|\u2014|\b(he|she)\b/i, words);

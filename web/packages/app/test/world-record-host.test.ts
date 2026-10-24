@@ -382,6 +382,49 @@ describe('a decision, filled', () => {
     expect(reading).not.toHaveProperty('decided');
     expect(reading.ground).toBe('blob:still');
   });
+
+  it("says a model's decision with no usable answer was asked and the routine acted, never that it chose (U3)", async () => {
+    const { recordStates } = await recordHost();
+    const records = recordStates(host().host);
+    const showing = teoPage();
+    await records.readMoments(showing);
+    // Its answer was not one of the actions, and its second ask was refused for money: one ask sent, no proposal.
+    const sent = { latency_ms: 2100, cost_usd: '0.01214400', cost_known: true, calls: [{ outcome: 'reply_refused', usd: '0.01214400' }] };
+    const refused = { ...detail('leave', sent), decision: { status: 'unavailable', reason: 'spending_limit_reached', proposal: null, provider: sent } };
+    const state = records.decision(showing, { requestId: 'r5', detail: refused, failure: null, record: false });
+    expect(state.unanswered).toEqual({ asks: 1, latencyMs: 2100, costUsd: '0.01214400', costKnown: true, reason: 'spending_limit_reached' });
+    expect([state.answered, state.late, state.choices.some((choice: Json) => choice.chosen)]).toEqual([null, false, false]);
+    expect(state.notes).toMatchObject({
+      by: "Its answer was not one of the actions, and asking it again would have gone over the money left, so Teo's routine acted.",
+      ring: 'How long its one ask took and what it cost.',
+      choices: "The actions the world allowed Teo there. The model's answer was not one of them, so none was taken.",
+    });
+    // Nothing sent: the receipt names no provider, so it was not asked.
+    const unasked = { ...detail('leave', null), decision: { status: 'unavailable', reason: 'spending_limit_reached', proposal: null, provider: null } };
+    expect(records.decision(showing, { requestId: 'r5', detail: unasked, failure: null, record: false }).unanswered).toMatchObject({ asks: 0 });
+    // An answered decision is as before.
+    expect(records.decision(showing, { requestId: 'r5', detail: detail('leave'), failure: null, record: false })).toMatchObject({ unanswered: null, late: false });
+  });
+
+  it('says a choice its minute found the world had moved past was made too late, titled by what Teo did (U3)', async () => {
+    const { recordStates } = await recordHost();
+    const records = recordStates(host().host);
+    const showing: Json = teoPage();
+    await records.readMoments(showing);
+    // The minute found the world changed: the event keeps the choice, disposition stale; the routine acted.
+    showing.events = [...(showing.events ?? []), { event_kind: 'decision_applied', tick: 412, subject_id: 'teo',
+      document: { request_id: 'r9', chose: 'walk to the bench', disposition: 'stale', reason: 'decision_context_changed' } }];
+    showing.did = [{ what: 'Walked to the quay', requestId: 'r9' }];
+    const state = records.decision(showing, { requestId: 'r9', rowIndex: 0, detail: detail('walk to the bench'), failure: null, record: false });
+    expect([state.late, state.unanswered, state.title]).toEqual([true, null, 'Walked to the quay']);
+    // The model picked one: its row stays marked, and its answer's time and cost stand under the ring.
+    expect(state.choices.find((choice: Json) => choice.chosen)?.words).toMatch(/bench/i);
+    expect(state.answered).toEqual({ latencyMs: 900, costUsd: '0.0003', costKnown: true });
+    expect(state.notes).toMatchObject({
+      by: "The world had moved on before its choice could be acted on, so Teo's routine acted.",
+      choices: 'The actions the world allowed Teo there. The model picked one, but the world had moved on before it could happen.',
+    });
+  });
 });
 
 describe('Compare, filled', () => {
