@@ -401,7 +401,7 @@ REFUSALS = {
     "spending-mode-missing": "--model needs EXULANICA_SPENDING, durable or process, how the API spends",
     "api-origin": "the API did not confirm it imported exulanica from the checkout",
     "token-refused": "the API did not accept the synthetic token",
-    "door-bridges-file": "--door-bridges names a file holding one JSON array of bridge objects",
+    "door-bridges-file": "--door-bridges names a file holding one bridge object or a JSON array of them",
     "accounts-shape": "--accounts-guest-code needs --edge-port, --tiles, --scripted-model, "
     "--spending durable and --society-playback",
     "arrival-not-baked": "the arrival worlds' tiles were not baked in time",
@@ -733,11 +733,14 @@ def synthetic_permissions(tiles: bool) -> list[str]:
 def door_bridges_setting(path: Path, workspace_ids: Sequence[str]) -> str:
     """``EXULANICA_DOOR_BRIDGES`` from a file of bridge declarations: each entry's ``"workspaces":
     "synthetic"`` becomes the run's synthetic workspace ids; anything else is passed as written,
-    for the API's own loader to admit or refuse at its start."""
+    for the API's own loader to admit or refuse at its start. A file holding one declaration, as
+    ``bridges/agents/examples/bridge-entry.json`` does, is read as an array of that one."""
     try:
         declared = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         refuse("door-bridges-file", REFUSALS["door-bridges-file"])
+    if isinstance(declared, dict) and "bridge" in declared:
+        declared = [declared]
     if not isinstance(declared, list) or not all(isinstance(entry, dict) for entry in declared):
         refuse("door-bridges-file", REFUSALS["door-bridges-file"])
     return json.dumps(
@@ -3168,8 +3171,8 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument(
                 "--door-bridges",
                 metavar="FILE",
-                help="admit the outside programs a JSON array of bridge declarations names "
-                '(EXULANICA_DOOR_BRIDGES; an entry\'s "workspaces": "synthetic" becomes the '
+                help="admit the outside programs a bridge declaration, or a JSON array of them, "
+                'names (EXULANICA_DOOR_BRIDGES; an entry\'s "workspaces": "synthetic" becomes the '
                 "run's synthetic workspaces) (default: no bridge)",
             )
             command.add_argument(

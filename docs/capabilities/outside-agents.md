@@ -40,6 +40,38 @@ A deployment admits outside agents with one entry in `EXULANICA_DOOR_BRIDGES`
 | `adapter_versions` | every published library version | A receipt names the version that answered, and an agent built on an earlier version keeps its door |
 | `deadline_ms` | 15,000 | Room for one model call per turn, within the person role's `decision_deadline_ms` |
 
+## On your own install
+
+A [personal install](../development-setup.md#running-your-own-install) admits outside agents when it
+starts with the agents' entry, the example file as it is:
+
+```bash
+python3 scripts/acceptance/launch.py up --worktree . --personal --tiles --door-bridges bridges/agents/examples/bridge-entry.json
+```
+
+Then, in order:
+
+1. On the page the install prints, open a world from a card (A small town is enough) and press P to
+   bring its people in.
+2. Place a gate: press B, choose Gate in the tray and click the ground where it should stand. An
+   agent comes into a town as a body of its own, through a gate: a town's people are villagers,
+   whom their routine, a model or a person decides for, never an outside program.
+3. From a second terminal at the checkout, let the agent in. The page's address names the world;
+   the install's own token, in `~/Exulanica/install/token`, may issue grants and never shows:
+
+   ```bash
+   EXULANICA_URL="http://127.0.0.1:<the page's port>/api" EXULANICA_TOKEN="$(cat ~/Exulanica/install/token)" PYTHONPATH=bridges/agents python3 -m exulanica_agent grant --entry "<the page's address>" --visitors 1 --key-file agent.key
+   ```
+
+   The library is the Python standard library alone, so it runs from the checkout as it is. The key
+   goes into the new file `agent.key`, which only you can read. `--person "<a name the page
+   shows>"` names one of the world's people instead, for a kind of being an outside program may
+   decide for.
+4. Start the agent with the same `EXULANICA_URL` and `EXULANICA_AGENT_KEY_FILE` set to that file:
+   the quickstart (`PYTHONPATH=bridges/agents python3 bridges/agents/examples/quickstart.py`, with
+   your provider settings below) brings its body in through the gate and takes its turns, or an MCP
+   client starts `exulanica-agent mcp` and calls `enter_world`.
+
 ## Bringing an agent in
 
 With Python, [`examples/quickstart.py`](../../bridges/agents/examples/quickstart.py) runs an agent
@@ -134,6 +166,11 @@ record and no model's context carries it.
 - A body of the agent's own comes only into a world version that holds a society of things, through
   a gate placed there; a door that takes no visitors answers `enter_world` that it does not take
   them yet.
+- A town's people are villagers, a kind no outside program decides for: a grant naming one is
+  refused `decider_not_allowed`, and an agent comes into a town as a body of its own.
+- The world workspace does not yet show that an outside agent decides: a body of the agent's own is
+  drawn in the look it wore, without a name, a mark or a card, and choosing it chooses nothing. The
+  society's events (`decision_applied`) and the models read (`GET .../society/models`) say so.
 - A body of the agent's own hears the lines said near it, and nothing else that happens around it
   reaches its bridge ([door contract](../door-contract.md)).
 - Comparing an outside agent beside a model on the same thing is not provided: a comparison runs a

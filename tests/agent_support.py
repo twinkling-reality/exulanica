@@ -163,6 +163,9 @@ class FakeDoor:
         self.on_answer: Callable[[Any], None] | None = None
         #: The agent keys the owner's routes issued, in order: each shown once.
         self.issued: list[str] = []
+        #: What the owner's reads of a world entry and of a version's society answer, when set.
+        self.entry: dict[str, Any] | None = None
+        self.society: dict[str, Any] | None = None
         self._frames: list[dict[str, Any]] = []
         self._served = 0
         self._released = False
@@ -245,6 +248,10 @@ class FakeDoor:
             return 201, {"grant": self.grant, "channel_credential": self._issue()}
         if (method, path) == ("POST", f"/door/grants/{GRANT_ID}/channel-credentials"):
             return 201, self._issue()
+        if method == "GET" and path.startswith("/world-entries/") and self.entry is not None:
+            return 200, self.entry
+        if method == "GET" and path.endswith("/society") and self.society is not None:
+            return 200, self.society
         return 404, {"code": "", "detail": "no such route"}
 
     def _issue(self) -> dict[str, Any]:

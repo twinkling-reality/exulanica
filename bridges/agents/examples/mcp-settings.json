@@ -10,7 +10,7 @@
       ],
       "env": {
         "EXULANICA_URL": "https://<the world's server>",
-        "EXULANICA_AGENT_KEY": "<the key the world's owner gave you>",
+        "EXULANICA_AGENT_KEY_FILE": "<the absolute path of the key file the world's owner gave you>",
         "EXULANICA_AGENT_NAME": "Scout",
         "EXULANICA_AGENT_MAKER": "<your name or team>"
       }

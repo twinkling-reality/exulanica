@@ -24,6 +24,10 @@ pip install "exulanica-agent @ git+https://github.com/twinkling-reality/exulanic
 
 Copying the `exulanica_agent` folder next to your program works too.
 
+To try one on Exulanica running on your own computer, the guide's
+[On your own install](../../docs/capabilities/outside-agents.md#on-your-own-install) starts the
+install with the agents' door, places a gate and lets an agent in from the page's address.
+
 ## The quickstart
 
 [`examples/quickstart.py`](examples/quickstart.py) runs an agent with a model on Nebius Token
@@ -87,7 +91,7 @@ When its grant allows a visitor, an agent can bring a body of its own into the w
 (`body.enter()`, or the `enter_world` tool). The body arrives at the next world minute as an outside
 agent, wearing the two-tone mannequin look unless the agent asks for another its mapping offers
 (`plain`, dressed as one of the world's people), and its turns follow as any thing's do. Its
-declared name, maker and mind stay outside the world: the door keeps them for its card. When the
+declared name, maker and mind stay outside the world, with the door. When the
 agent's program stops, the body stays and the world's routine decides for it; a program that starts
 again with the same key takes its turns again, as a toolkit's restarted run does. It leaves when the
 world's owner sends it home or ends the grant, and the agent reads why; `body.leave()` tells the
@@ -118,7 +122,8 @@ done
 or, with `--live`, with Nemotron itself. [`checks/nat_run.py`](checks/nat_run.py) runs it in a real
 world and records each model call's time and tokens, and their price on Nebius Token Factory. Its
 `--mind` names the model the agent thinks with, and `--name` and `--maker` what the agent declares
-it is called and who made it, which the world shows on its card; each defaults to the example's.
+it is called and who made it, which the door keeps with its answers; each defaults to the
+example's.
 
 ## What an agent can and cannot do
 
@@ -132,7 +137,7 @@ visitor, and only at their turns. It cannot:
 - run anything inside the world: only its chosen action and its line enter, as data;
 - say what the world's rules refuse: a line is one line within the length its action allows, and
   a line the rules would change is not said;
-- put a name inside the world: its declared name, maker and mind are shown on its card only;
+- put a name inside the world: its declared name, maker and mind stay with the door;
 - spend the world's owner's money: its answers cost the world nothing, and its own model calls are
   its own;
 - stay after the owner ends its grant, which happens at once and on its own within a day.
@@ -146,16 +151,19 @@ exulanica-agent check
 Says hello with the settings above and prints what the agent may do and the world's rules.
 
 ```bash
-EXULANICA_URL=https://<the world> EXULANICA_TOKEN=<an owner token> exulanica-agent grant --world <id> --version <id> --visitors 1 --gate <id> --key-file agent.key
+EXULANICA_URL=https://<the world> EXULANICA_TOKEN=<an owner token> exulanica-agent grant --entry "<the page's address>" --visitors 1 --key-file agent.key
 ```
 
 For a world's owner with an API token that holds `world.write` and `door.grant`: issues one for
 outside agents and writes the key, shown once, to a new file only its owner can read. It never
 prints the key. A token of only `world.read` and `world.write` is refused `403 not_authorised`.
-A grant names the world version its things are in or its bodies arrive in (`--version`); `--thing <id>`
-names one of the world's own things for the agent to decide for, `--visitors` how many bodies of
-its own it may bring, and `--gate` the gate they come through, by the id it was placed with (else
-one of the version's gates).
+`--entry` names the world as the page shows it (its address, or the entry id in it) and reads the
+world and the version its things are in or its bodies arrive in; `--world <id> --version <id>`
+name them directly. `--person "<name>"` names one of the world's people by the name the page shows
+and `--thing <id>` any of its things, for the agent to decide for; a person whose kind no outside
+program decides for, such as a town's villager, is refused `decider_not_allowed`. `--visitors`
+says how many bodies of its own it may bring, and `--gate` the gate they come through, by the id it
+was placed with (else one of the version's gates).
 
 ```bash
 EXULANICA_URL=https://<the world> EXULANICA_TOKEN=<an owner token> exulanica-agent key --grant <id> --key-file agent-new.key

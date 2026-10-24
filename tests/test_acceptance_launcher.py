@@ -1221,6 +1221,15 @@ def test_door_bridges_fill_the_run_s_synthetic_workspaces_and_reach_the_api_alon
     assert plain.door_bridges is None
 
 
+def test_a_door_bridges_file_holding_one_declaration_admits_that_one(tmp_path):
+    # The agents' example (bridges/agents/examples/bridge-entry.json) is one declaration, as a
+    # person starting their own install passes it.
+    example = Path(__file__).resolve().parents[1] / "bridges/agents/examples/bridge-entry.json"
+    assert json.loads(LAUNCH.door_bridges_setting(example, [])) == [
+        json.loads(example.read_text(encoding="utf-8"))
+    ]
+
+
 @pytest.mark.parametrize("written", ["{}", "[1]", "not json"])
 def test_a_door_bridges_file_that_is_not_an_array_of_objects_is_refused(tmp_path, written):
     path = tmp_path / "bridges.json"

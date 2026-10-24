@@ -21,6 +21,9 @@ def think(turn: Turn) -> dict:  # ask the model exactly what the world's own mod
 
 
 body = Body.connect(name="Scout", maker="Your name", mind=MODEL)
+permission = body.permission or {}
+if permission.get("visitors_maximum") and not permission.get("things"):
+    print(body.enter().words)  # a grant for a body of its own: it comes in through the world's gate
 for turn in body.turns():
     try:
         choice = think(turn)

@@ -726,6 +726,94 @@ def test_a_grant_names_the_version_its_things_are_in_and_a_gate_only_for_bodies(
     assert door.requests_to("/door/grants") == [] and not target.exists()
 
 
+#: A world as the page opened it, and the people of its version's society.
+ENTRY = "01a16b1d-dd40-75b9-8901-23d13247320e"
+PEOPLE = [
+    {"id": "person-4", "display_name": "Bodhi Marsh"},
+    {"id": "person-5", "display_name": "Ines Oak"},
+]
+
+
+def _from_the_page(door: FakeDoor, inhabitants: list[dict[str, str]]) -> tuple[str, str]:
+    world, version = "world:generated:town", str(uuid.uuid4())
+    door.entry = {"entry_id": ENTRY, "world_id": world, "authored_version_id": version}
+    door.society = {"state": {"inhabitants": inhabitants}}
+    return world, version
+
+
+def test_a_grant_reads_the_world_from_the_pages_address_and_a_person_by_name(
+    door, monkeypatch, tmp_path, capsys
+):
+    # A newcomer has the page's address and the names it shows, not the world's ids.
+    monkeypatch.setenv("EXULANICA_TOKEN", OWNER_TOKEN)
+    world, version = _from_the_page(door, PEOPLE)
+    target = tmp_path / "agent.key"
+    with served(door) as url:
+        monkeypatch.setenv("EXULANICA_URL", url)
+        address = f"http://127.0.0.1:19952/?entry={ENTRY}"
+        argv = ["grant", "--entry", address, "--person", "bodhi marsh", "--key-file", str(target)]
+        assert command.main(argv) == 0
+    [read] = door.requests_to(f"/world-entries/{ENTRY}")
+    [people] = door.requests_to(f"/world/versions/{version}/society")
+    assert read["owner"] and people["owner"] and people["query"] == {"world_id": world}
+    [issue] = door.requests_to("/door/grants")
+    assert issue["query"] == {"world_id": world}
+    assert (issue["body"]["version_id"], issue["body"]["things"]) == (version, ["person-4"])
+    assert target.read_text(encoding="utf-8").strip() not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("inhabitants", "words"),
+    [
+        (PEOPLE, "nobody in this world is called Juno Ford"),
+        ([*PEOPLE, {"id": "person-6", "display_name": "Juno Ford"}] * 2, "2 are called Juno Ford"),
+    ],
+)
+def test_a_name_the_world_cannot_tell_apart_is_refused_before_any_grant(
+    door, monkeypatch, tmp_path, capsys, inhabitants, words
+):
+    monkeypatch.setenv("EXULANICA_TOKEN", OWNER_TOKEN)
+    _from_the_page(door, inhabitants)
+    target = tmp_path / "agent.key"
+    with served(door) as url:
+        monkeypatch.setenv("EXULANICA_URL", url)
+        argv = ["grant", "--entry", ENTRY, "--person", "Juno Ford", "--key-file", str(target)]
+        assert command.main(argv) == 1
+    assert words in capsys.readouterr().err
+    assert door.requests_to("/door/grants") == [] and not target.exists()
+
+
+def test_a_person_an_agent_may_not_decide_for_points_to_a_body_of_its_own(
+    door, monkeypatch, tmp_path, capsys
+):
+    # A town's people are villagers, whose kind takes no outside decider; a visitor still can.
+    monkeypatch.setenv("EXULANICA_TOKEN", OWNER_TOKEN)
+    _from_the_page(door, PEOPLE)
+    door.refuse("/door/grants", 409, "decider_not_allowed")
+    target = tmp_path / "agent.key"
+    with served(door) as url:
+        monkeypatch.setenv("EXULANICA_URL", url)
+        argv = ["grant", "--entry", ENTRY, "--person", "Ines Oak", "--key-file", str(target)]
+        assert command.main(argv) == 1
+    assert "--visitors 1" in capsys.readouterr().err and not target.exists()
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--world", "w", "--entry", ENTRY],
+        ["--visitors", "1"],
+        ["--entry", "http://127.0.0.1:19952/?entry=nothing"],
+    ],
+)
+def test_a_grant_names_its_world_once_and_by_a_real_entry(door, monkeypatch, tmp_path, argv):
+    monkeypatch.setenv("EXULANICA_TOKEN", OWNER_TOKEN)
+    with served(door) as url:
+        monkeypatch.setenv("EXULANICA_URL", url)
+        assert command.main(["grant", *argv, "--key-file", str(tmp_path / "agent.key")]) == 2
+    assert door.requests == []
+
+
 def test_a_new_key_needs_a_grants_id(monkeypatch, tmp_path):
     monkeypatch.setenv("EXULANICA_URL", "http://127.0.0.1:9")
     monkeypatch.setenv("EXULANICA_TOKEN", OWNER_TOKEN)
@@ -827,7 +915,10 @@ def test_the_toolkit_example_thinks_with_a_model_verified_for_this_choice():
     assert "tool_call" in {mechanism.value for mechanism in spec.answering}
 
 
-def test_the_quickstart_answers_a_turn_with_its_minds_choice(monkeypatch):
+@pytest.mark.parametrize("visitors", [0, 1], ids=["things", "a body of its own"])
+def test_the_quickstart_answers_a_turn_with_its_minds_choice(monkeypatch, visitors):
+    # A grant naming the world's things hands the quickstart their turns; a grant for a body of
+    # its own has no turn until the quickstart brings that body in through the gate.
     from exulanica.models.manifest import load_manifest
 
     manifest = load_manifest()
@@ -860,7 +951,7 @@ def test_the_quickstart_answers_a_turn_with_its_minds_choice(monkeypatch):
         call = {"function": {"name": "act", "arguments": json.dumps({"action": "go to the bench"})}}
         return Reply({"choices": [{"message": {"tool_calls": [call]}}]})
 
-    door = FakeDoor()
+    door = FakeDoor(grant=grant_view(visitors=1) if visitors else None)
     frame = person_ask()
     door.push(frame)
     with served(door) as url:
@@ -881,6 +972,7 @@ def test_the_quickstart_answers_a_turn_with_its_minds_choice(monkeypatch):
         assert not run.is_alive(), "the quickstart did not stop when its permission ended"
     [sent] = door.requests_to("/door/channel/answers")
     assert sent["body"]["label"] == "go to the bench"
+    assert len(door.requests_to("/door/channel/arrivals")) == visitors
     [asked] = asked_mind
     assert asked["url"] == manifest.providers["nebius_token_factory"].base_url + "/chat/completions"
     assert asked["authorization"] == "Bearer test-mind-key"
