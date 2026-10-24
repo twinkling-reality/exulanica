@@ -10,7 +10,7 @@ export function agents(): DocumentPage {
     chapters: [
       { key: 'connect', title: 'Connect to Your World', nodes: [
         p('You need Python 3.11 or later, a server configured for outside agents, and a key issued by the world owner. An agent key authorizes one grant; it is separate from the owner’s API token.'),
-        codeBlock('Install', 'pip install "exulanica-agent @ git+https://github.com/twinkling-reality/exulanica#subdirectory=bridges/agents"', 'bash'),
+        codeBlock('Install', 'pip install "exulanica-agent @ git+https://github.com/twinkling-reality/exulanica@945501fb5ce7a8da68199706390054a9ceb64f35#subdirectory=bridges/agents"', 'bash'),
         el('details', { class: 'docs-owner-setup' }, [el('summary', { text: 'World owners: issue an agent key' }),
           p('Set EXULANICA_URL to your server and EXULANICA_TOKEN to an owner token with world.write and door.grant. A token of only world.read and world.write is refused. Replace the world, version, and thing IDs with IDs from that world. This creates a two-hour grant and writes its key to a new private file; it never prints the key.'),
           codeBlock('Create a grant', 'exulanica-agent grant \\\n  --world "$WORLD_ID" --version "$VERSION_ID" \\\n  --thing "$THING_ID" --minutes 120 \\\n  --key-file ./agent.key', 'bash'),
@@ -38,7 +38,7 @@ export function agents(): DocumentPage {
       ] },
       { key: 'mcp', title: 'MCP', nodes: [
         p('Install the MCP extra, then add this stdio server to your MCP client. Replace the server address and key path. If the executable is outside your client’s PATH, use its absolute path as command.'),
-        codeBlock('Install MCP support', 'pip install "exulanica-agent[mcp] @ git+https://github.com/twinkling-reality/exulanica#subdirectory=bridges/agents"', 'bash'),
+        codeBlock('Install MCP support', 'pip install "exulanica-agent[mcp] @ git+https://github.com/twinkling-reality/exulanica@945501fb5ce7a8da68199706390054a9ceb64f35#subdirectory=bridges/agents"', 'bash'),
         codeBlock('MCP client configuration', JSON.stringify({ mcpServers: { exulanica: { command: 'exulanica-agent', args: ['mcp'], env: { EXULANICA_URL: 'https://your-exulanica-server.example', EXULANICA_AGENT_KEY_FILE: '/absolute/path/to/agent.key', EXULANICA_AGENT_NAME: 'Scout', EXULANICA_AGENT_MAKER: 'Your name or team' } } } }, null, 2), 'json'),
         p('Start with world_rules, then call wait_for_turn. Use act with the returned turn handle and an offered action before its deadline. Check what_happened for the result, then wait for the next turn.'),
         table(['Tool', 'Behavior'], [

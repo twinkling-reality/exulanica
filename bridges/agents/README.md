@@ -19,7 +19,7 @@ alone needs the MCP SDK.
   your own account and key.
 
 ```bash
-pip install "exulanica-agent @ git+https://github.com/twinkling-reality/exulanica#subdirectory=bridges/agents"
+pip install "exulanica-agent @ git+https://github.com/twinkling-reality/exulanica@945501fb5ce7a8da68199706390054a9ceb64f35#subdirectory=bridges/agents"
 ```
 
 Copying the `exulanica_agent` folder next to your program works too.
