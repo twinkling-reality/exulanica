@@ -107,6 +107,9 @@ assert.deepEqual(toldSections(town, resident), [
 ]);
 // A society of things' model told the world's clock (clock_told) is shown it as told; before that it was told a minute.
 assert.deepEqual(toldSections({ here: 'on the quay', tick: 27, world_clock: { minute_of_day: 1108, day: 0 } }, resident)[0].lines, ['On the quay · 18:28 · Day 1']);
+// Where the character lives, the world's title its owner named (world_named), on its own line above the spot and minute.
+assert.deepEqual(toldSections({ world: { title: 'A cozy little town by the sea at dusk' }, here: 'on the quay', tick: 27, world_clock: { minute_of_day: 1108, day: 0 } }, resident)[0],
+  { label: 'Where and when', lines: ['\u201cA cozy little town by the sea at dusk\u201d, named by its owner', 'On the quay · 18:28 · Day 1'], apart: true });
 assert.deepEqual(toldSections({ here: 'on the quay', tick: 27 }, resident)[0].lines, ['On the quay · Minute 27']);
 // A town's premises told by name (places_named, P3): the page shows where the model stood and what it remembered as
 // told, at a premises' door, inside one, and a premises remembered by what the being did there.

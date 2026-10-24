@@ -251,6 +251,7 @@ def test_the_host_stores_and_the_minute_applies_exactly_what_the_person_role_bui
                 seed=before["seed"],
                 provider_config=config,
                 day_start=None,
+                world_title=None,
             )
             if request is not None:
                 expected.append(request)

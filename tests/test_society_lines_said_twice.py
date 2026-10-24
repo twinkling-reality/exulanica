@@ -105,6 +105,7 @@ def _told(versions=None, *, edit=None):
             "deadline_ms": contract.value("decision_deadline_ms"),
         },
         day_start=None,
+        world_title=None,
     )
     return request
 
@@ -123,9 +124,9 @@ def test_a_line_says_another_again_by_its_letters_and_digits_case_folded():
 def test_a_society_of_things_is_asked_under_the_eleventh_prompt_with_both_line_rules():
     person = person_role()
     things = person.terms(THINGS_PROFILE)
-    assert things.prompt_version == "society-person-choice/v11"
+    assert things.prompt_version == "society-person-choice/v12"
     assert things.line_rules == frozenset({"names_no_listener", "repeats_no_line"})
-    assert things.versions["society-decision-action"] == 14
+    assert things.versions["society-decision-action"] == 16
     assert things.not_offered.endswith("nor says again a line already said.")
     # The tenth prompt's terms keep the one rule they stated.
     assert person.terms_with_prompt(PROMPT_V10).line_rules == frozenset({"names_no_listener"})
@@ -228,7 +229,7 @@ def test_an_answer_a_full_heard_list_may_have_let_go_is_not_told():
 
 def test_a_person_playing_is_told_which_of_their_lines_went_unanswered():
     played = play_contract(person_role(), THINGS_PROFILE)
-    assert PLAY_CATALOG_VERSION == 15 == played.versions["society-decision-action"]
+    assert PLAY_CATALOG_VERSION == 17 == played.versions["society-decision-action"]
     assert "answers_told" in played.label_rules
 
 

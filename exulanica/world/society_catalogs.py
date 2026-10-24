@@ -241,7 +241,7 @@ AFFORDANCE_DIGESTS: Final = {1: "ca280468cc1051bd5f4dfadc72625c9b14be9a9fdeec840
 #: next; the person role's registry entry states which versions a new request records, for each
 #: engine that states its own.
 _DECISION_CATALOG_VERSIONS: Final = {
-    "society-decision-action": (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+    "society-decision-action": (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17),
     "society-decision-policy": (1, 2, 3, 4, 5, 6, 7, 8),
 }
 #: How a person's hour is scored, and the protocol and seeds a comparison of models is made under.

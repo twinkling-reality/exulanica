@@ -205,6 +205,7 @@ def _run(registry, key: str, adapter) -> dict[str, Any]:
             asking=asking,
             seam=lambda _state, _due: {},
             day_start=None,
+            world_title=None,
         )
 
     played = play(_Live(role, client, spec, mechanism, contract))
@@ -730,6 +731,7 @@ PUBLISHED_REGISTRIES = {
     "decision-roles.v12.json": "e2bc7705b493014d63c29fde90bee8e7177fa53eab5223f648099c30b3ed799c",
     "decision-roles.v13.json": "b3bf2a0b6f4b94b9dee459e263e7d3c5aa1a891883767147a5e4730038b438ae",
     "decision-roles.v14.json": "74964ea314651c01e64e538e1f5cc1dc101fec0e8d8c2693991d0d1083c5c816",
+    "decision-roles.v15.json": "dfc0e6bed63fd4c37ad692a3c1af0fea1481312853c1b3398de3e0a48813b60c",
 }
 
 
@@ -753,6 +755,7 @@ LABEL_RULES_AS_PUBLISHED = {
         "clock_told": 11,
         "places_named": 12,
         "answers_told": 14,
+        "world_named": 16,
     },
     "junction_signal": {
         "names_as_written": 1,
@@ -761,6 +764,7 @@ LABEL_RULES_AS_PUBLISHED = {
         "clock_told": 1,
         "places_named": 1,
         "answers_told": 1,
+        "world_named": 1,
     },
 }
 
@@ -785,25 +789,30 @@ def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
     own, things = person.terms(), person.terms(THINGS)
     assert own == person.terms("exulanica-society/v2") == person.terms("exulanica-society/v5")
     assert own.versions == {"society-decision-action": 2, "society-decision-policy": 2}
-    assert things.versions == {"society-decision-action": 14, "society-decision-policy": 8}
+    assert things.versions == {"society-decision-action": 16, "society-decision-policy": 8}
     assert (own.prompt_version, things.prompt_version) == (
         "society-person-choice/v1",
-        "society-person-choice/v11",
+        "society-person-choice/v12",
     )
+    # The eleventh prompt, which every request made under the fourteenth catalog records, stays
+    # readable with it; the twelfth adds where the being lives to what it says a model is told.
+    eleventh_prompt = person.terms_with_prompt("society-person-choice/v11")
+    assert eleventh_prompt is not None
+    assert eleventh_prompt.versions == {"society-decision-action": 14, "society-decision-policy": 8}
     # The tenth prompt, which every request made under the twelfth catalog records, stays
     # readable with it, and the eleventh says the same over the fourteenth.
     tenth_prompt = person.terms_with_prompt("society-person-choice/v10")
-    assert tenth_prompt is not None and tenth_prompt.instruction == things.instruction
+    assert tenth_prompt is not None and tenth_prompt.instruction == eleventh_prompt.instruction
     assert tenth_prompt.versions == {"society-decision-action": 12, "society-decision-policy": 8}
     # The ninth prompt, which every request made under the eleventh catalog records, stays
     # readable with it, and the tenth says the same over the twelfth.
     ninth_prompt = person.terms_with_prompt("society-person-choice/v9")
-    assert ninth_prompt is not None and ninth_prompt.instruction == things.instruction
+    assert ninth_prompt is not None and ninth_prompt.instruction == eleventh_prompt.instruction
     assert ninth_prompt.versions == {"society-decision-action": 11, "society-decision-policy": 8}
     # The eighth prompt, which every request made under the ninth catalog records, stays readable
     # with it, and the ninth says the same over the eleventh.
     eighth_prompt = person.terms_with_prompt("society-person-choice/v8")
-    assert eighth_prompt is not None and eighth_prompt.instruction == things.instruction
+    assert eighth_prompt is not None and eighth_prompt.instruction == eleventh_prompt.instruction
     assert eighth_prompt.versions == {"society-decision-action": 9, "society-decision-policy": 8}
     # The sixth and seventh prompts, which every request made before the eighth records, stay
     # readable with the eighth catalogs; the seventh speaks of a character and of past choices only
@@ -813,7 +822,7 @@ def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
     assert sixth is not None and seventh is not None
     eighth = {"society-decision-action": 8, "society-decision-policy": 8}
     assert sixth.versions == seventh.versions == eighth
-    assert seventh.instruction == things.instruction
+    assert seventh.instruction == eleventh_prompt.instruction
     assert "When you are told who the being is" in things.instruction
     assert "When you are shown what the being chose lately" in things.instruction
     assert "who the being is" not in sixth.instruction

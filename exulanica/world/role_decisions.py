@@ -305,6 +305,7 @@ def role_request(
     withhold: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     options: Sequence[RoleOption] | None = None,
     day_start: int | None,
+    world_title: str | None,
 ) -> tuple[dict | None, str]:
     """A subject's sealed request over the options they have in ``state``, asked over ``source``.
 
@@ -319,7 +320,9 @@ def role_request(
     so a run of minutes that built them to ask what may be offered builds them once.
     ``day_start`` is the first minute of the day the society's people start at, as its first
     input states it, or None: every caller states it, so a request that tells the clock is
-    rebuilt telling the same one.
+    rebuilt telling the same one. ``world_title`` is the world's title as its first input
+    records it, or None, stated by every caller the same way, so a request that tells where its
+    being lives is rebuilt telling the same place.
     """
     if options is None:
         options = role.adapter.options(role, state, source, subject_id, contract, seed=seed)
@@ -331,7 +334,14 @@ def role_request(
         return None, "nothing_to_choose"
     # The request's own contract, so what it is told reads its own catalogs' rules (F9).
     context = role.adapter.context(
-        role, state, source, subject_id, options, contract=contract, day_start=day_start
+        role,
+        state,
+        source,
+        subject_id,
+        options,
+        contract=contract,
+        day_start=day_start,
+        world_title=world_title,
     )
     if withhold is not None:
         context = withhold(context)
@@ -715,6 +725,7 @@ def play_minutes(
     first_sequence: int = 0,
     finish: Finish | None = None,
     day_start: int | None,
+    world_title: str | None,
 ) -> PlayedMinutes:
     """Play ``ticks`` minutes from ``start``, asking ``asking`` for ``role``'s subjects.
 
@@ -753,6 +764,7 @@ def play_minutes(
             first_sequence=first_sequence,
             finish=finish,
             day_start=day_start,
+            world_title=world_title,
         )
 
 
@@ -775,6 +787,7 @@ def _play_minutes(
     first_sequence: int,
     finish: Finish | None,
     day_start: int | None,
+    world_title: str | None,
 ) -> PlayedMinutes:
     state = start
     played = PlayedMinutes()
@@ -807,6 +820,7 @@ def _play_minutes(
                 offer=_only(kept.get(subject, frozenset())),
                 options=asked[subject],
                 day_start=day_start,
+                world_title=world_title,
             )
             if request is not None:
                 requests.append(request)

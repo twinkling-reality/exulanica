@@ -47,6 +47,12 @@ PEOPLE_DAY_START_SQL = (
     "select document->'people'->'day'->'start_minute_of_day' as start from world_society_input "
     "where workspace_id=%s and society_id=%s and input_seq=1"
 )
+#: The world's title as its owner named it when the society was made, as the society's first input
+#: records it (``world.title``), and nothing else of that input: null where it records none.
+WORLD_TITLE_SQL = (
+    "select document->'world'->>'title' as title from world_society_input "
+    "where workspace_id=%s and society_id=%s and input_seq=1"
+)
 
 
 class InvalidEventCursor(ValueError):
@@ -289,6 +295,15 @@ class SocietyReads:
         ).fetchone()
         start = None if found is None else found["start"]
         return start if type(start) is int else None
+
+    def world_title(self, row: dict[str, Any]) -> str | None:
+        """The world's title as its owner named it when the society was made, as its first input
+        records it, or None where it records none."""
+        found = self.connection.execute(
+            WORLD_TITLE_SQL, (self.workspace_id, row["society_id"])
+        ).fetchone()
+        title = None if found is None else found["title"]
+        return title if isinstance(title, str) else None
 
     def input_provenance(self, version_id: uuid.UUID, input_seq: int) -> dict[str, Any]:
         """One stored input's identity and the authored state it followed, never the input itself.

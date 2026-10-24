@@ -50,14 +50,14 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the frame and the segment overlay",
     ),
     "exulanica/world/society_planner.py": (
-        2_680,
+        2_684,
         "the v2 society's input, graph, spots, talk and minute, and where residents start",
     ),
     "exulanica/api/society_runtime.py": (
-        2_424,
+        2_433,
         "society composition for districts and for authored worlds, and the site reads, "
         "with the version's changes to a site's made parts, and a first input's day start from "
-        "the world's setting",
+        "the world's setting and its world's title",
     ),
     "exulanica/world/society_things.py": (
         2_295,
@@ -74,14 +74,16 @@ LIMITS: dict[str, tuple[int, str]] = {
         "and the traffic read again after a thing's edit and held while its world does not run",
     ),
     "exulanica/world/saved_entries.py": (
-        1_944,
-        "reopening a personal world at a saved state, and making a town on its land",
+        1_966,
+        "reopening a personal world at a saved state, making a town on its land, and the title a "
+        "society made now records",
     ),
     "exulanica/world/society_decision_contract.py": (
-        1_619,
+        1_637,
         "the contract a model answers under when it runs a person, with the request's own contract "
         "threaded through its context builders, the minute told as the world's clock, the "
-        "town's premises told by name and each line said told with whether it was answered",
+        "town's premises told by name, each line said told with whether it was answered and "
+        "where the being lives",
     ),
     "web/packages/atlas-react/src/playcanvas/society/crowd.ts": (
         1_607,

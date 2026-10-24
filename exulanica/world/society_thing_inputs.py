@@ -306,6 +306,19 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
             check_recorded(document[MOVEMENT_MODULES_FIELD], things_engine())
         except MovementError as exc:
             raise ValueError(f"a things input's movement modules: {exc}") from exc
+    if "world" in document:
+        from exulanica.things.lines import LineRefused, check_line
+        from exulanica.world.saved_entries import TITLE_MAXIMUM
+
+        world = document["world"]
+        if document["input_seq"] != 1 or not isinstance(world, dict) or set(world) != {"title"}:
+            raise ValueError(
+                "a society's first input alone records its world's title, and only that"
+            )
+        try:
+            check_line(world["title"], maximum=TITLE_MAXIMUM)
+        except LineRefused as exc:
+            raise ValueError(f"a things input's world title is not one plain line: {exc}") from exc
     if "people" in document:
         from exulanica.world.town_people import TownPeopleRefused, validate_people_frame
 

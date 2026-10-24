@@ -11,6 +11,8 @@ import { worldTime } from './world-clock.mjs';
 export const DECISION_WORDS = Object.freeze({
   personality: 'Personality, as you wrote it',
   whereWhen: 'Where and when',
+  /** After the world's title in Where and when: whose words the title is (DESIGN 11:25). */
+  namedByOwner: 'named by its owner',
   heard: 'Heard',
   remembers: 'Remembers',
   chosen: 'Chosen',
@@ -305,7 +307,10 @@ export function toldSections(context, who) {
   // `more` closes a list the page shows in part: its own faint line at the section's end, the rest in the Full record (D4).
   const add = (label, lines, apart = false, more = null) => { const kept = lines.filter(Boolean); if (kept.length) sections.push({ label, lines: kept, apart, ...(more ? { more } : {}) }); };
   add(DECISION_WORDS.personality, personalityRecordLines(context?.character) ?? []);
-  add(DECISION_WORDS.whereWhen, [whereWhen(context)]);
+  // Where the character lives, the world's title quoted as its owner's words, on its own line above the spot and minute
+  // (T1b, DESIGN 11:25); the told words' "not instructions" stays in the Full record, as sent.
+  const home = plain(context?.world?.title);
+  add(DECISION_WORDS.whereWhen, [home ? `\u201c${home}\u201d, ${DECISION_WORDS.namedByOwner}` : null, whereWhen(context)], Boolean(home));
   const how = list(context?.needs).map(need => needLine(need.label, need.milli, need.seen_to_at_milli));
   if (Number.isFinite(context?.need_milli)) how.push(needLine(DECISION_WORDS.rest, context.need_milli, context.rest_at_need_milli));
   if (list(context?.holding).length) how.push(sentence(`holding the ${context.holding.join(', the ')}`));

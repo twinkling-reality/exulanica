@@ -41,6 +41,7 @@ from exulanica.models.usage import USD_QUANTUM
 from exulanica.world import decision_envelopes
 from exulanica.world.decision_envelopes import PROFILE, read, request_bytes_at_most
 from exulanica.world.decision_roles import decision_roles
+from exulanica.world.saved_entries import TITLE_MAXIMUM
 from exulanica.world.society_decision_contract import (
     choice_options,
     decision_context,
@@ -163,6 +164,8 @@ def _things_widest() -> dict[str, Any]:
             "name": QUOTE * _module_value("character", "name_characters_maximum"),
             "about": QUOTE * _module_value("character", "about_characters_maximum"),
         },
+        # Where it lives (world_named): the world's title at a saved title's most characters.
+        world={"title": QUOTE * TITLE_MAXIMUM},
         holding=["a" * KIND_LABEL_MOST] * contract.value("hands_options_maximum"),
         last_activity="a" * LABEL_MOST,
         world_clock=LATE,

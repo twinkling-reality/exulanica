@@ -74,7 +74,12 @@ from exulanica.world.role_decisions import (
     replay_minutes,
     resume_minutes,
 )
-from exulanica.world.society import SocietyEvent, people_day_start, society_state_sha256
+from exulanica.world.society import (
+    SocietyEvent,
+    people_day_start,
+    society_state_sha256,
+    world_title_of,
+)
 from exulanica.world.society_choice import WAIT_KEY
 from exulanica.world.society_decision_contract import (
     DecisionContract,
@@ -494,8 +499,10 @@ def _minutes(
             on_minute=on_minute,
             first_sequence=first_sequence,
             finish=None if family.finish is None else family.finish(seed),
-            # The run's inputs start at the society's first, which states its people's day.
+            # The run's inputs start at the society's first, which states its people's day and
+            # its world's title.
             day_start=people_day_start(plan.inputs[0]) if plan.inputs else None,
+            world_title=world_title_of(plan.inputs[0]) if plan.inputs else None,
         )
 
 

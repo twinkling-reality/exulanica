@@ -311,6 +311,10 @@ def _validate_society_input(document: dict[str, Any]) -> None:
             fields.add("people")
         if "day" in document:
             fields.add("day")
+        # The world's title as its owner named it when the society was made: its first input
+        # alone records it, where the world had one (world_named).
+        if "world" in document:
+            fields.add("world")
         # The run forms of the kinds its workspace keeps that a placed thing is of, the placed
         # things left out because theirs is gone, and the water its swimmers cross: each stated
         # only where there is one.

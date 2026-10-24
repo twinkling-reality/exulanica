@@ -122,6 +122,28 @@ TITLE_MAXIMUM: Final = 200
 _TITLE_REFUSED_CATEGORIES: Final = frozenset({"Cc", "Cs", "Cf"})
 
 
+def told_world_title(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str
+) -> str | None:
+    """The title a world's saved entry holds now, as a society made now records it for what its
+    people are told (``world_named``), or None where the world has no saved entry or its title is
+    not one plain line the line rule holds (a title saved before titles were held to normal form
+    C among them): a society records a title only as a line, never a changed one."""
+    from exulanica.things.lines import LineRefused, check_line
+
+    row = connection.execute(
+        "select title from saved_world_entry where workspace_id=%s and world_id=%s",
+        (workspace_id, world_id),
+    ).fetchone()
+    if row is None:
+        return None
+    title = row["title"] if isinstance(row, Mapping) else row[0]
+    try:
+        return check_line(title, maximum=TITLE_MAXIMUM)
+    except LineRefused:
+        return None
+
+
 def _clean_title(title: str) -> str:
     """``title`` trimmed, or :class:`InvalidSavedWorldTitle` when nothing or too much is left or it
     holds a control, surrogate or format character."""

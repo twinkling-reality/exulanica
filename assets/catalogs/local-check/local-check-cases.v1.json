@@ -3,7 +3,7 @@
  "role": "society_decision",
  "engine": "exulanica-society/v7",
  "contract_versions": {
-  "society-decision-action": 14,
+  "society-decision-action": 16,
   "society-decision-policy": 8
  },
  "made_by": "scripts/make_local_check_cases.py",

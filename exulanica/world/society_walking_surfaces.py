@@ -806,6 +806,7 @@ def build_walking_surfaces_input(
     made_records: Sequence[object] | None = None,
     water: WaterStatement | None = None,
     rest: Callable[[Point], int] | None = None,
+    world_title: str | None = None,
 ) -> dict[str, Any]:
     """Compose a generated world's input over the walking surfaces its records state, from the
     place :func:`walking_surfaces_place` made of them for ``ground``.
@@ -1125,6 +1126,11 @@ def build_walking_surfaces_input(
         document["population_kind"] = dict(kind)
         # A society's first input records the modules its minutes run, by version.
         record_modules(document)
+        if input_seq == 1 and world_title is not None:
+            # The world's title as its owner named it now, which its people are told where they
+            # live (world_named): recorded once, so a later rename tells nothing new and every
+            # request rebuilds as it was asked.
+            document["world"] = {"title": world_title}
         if input_seq == 1 and people is not None and reason is None:
             # What the town's people are made from, before any draw: genesis completes it
             # with the society's seed, and replay reads it from this input. A later input

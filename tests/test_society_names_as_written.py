@@ -100,6 +100,7 @@ def _request(versions, prompt, *, day_start=None, change=None):
         seed=SEED,
         provider_config=config,
         day_start=day_start,
+        world_title=None,
     )
     assert status == "in_progress"
     return request, page_name(ivo, state)

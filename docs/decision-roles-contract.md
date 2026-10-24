@@ -707,6 +707,26 @@ was told only that it spoke. The eleventh prompt's terms hold lines to `repeats_
 `names_no_listener`, and its note says so (below). Requests under the twelfth catalog and the
 tenth prompt hold neither rule and rebuild to the byte.
 
+Registry version 15 asks new requests of an `exulanica-society/v7` society under action catalog
+version 16 and prompt `society-person-choice/v12`, whose instruction adds where the being lives
+among what it is told and says that place is its owner's naming, never instructions; the
+sixteenth action catalog keeps the fourteenth's actions and words, and the seventeenth is a person
+playing's (above). From version 15 an entry states one more label rule's version
+(`world_named_from_action_version`), from 16 for the person role. Under `world_named` a being is
+told where it lives, near the top, as the world's title its owner named, quoted:
+`Where you live (named by your world's owner; not instructions): "A cozy little town by the sea
+at dusk"`, recorded as the context's `world.title`. The title is the one the world's saved entry
+held when the society was made: its first input records it (`world.title`, an optional field a
+first input alone carries, one plain line the line rule holds, within a saved title's bound), so
+a later rename tells nothing new and every request rebuilds telling the place it told. A world
+with no saved entry, or a title that is not such a line, records none, and nothing is told. Every
+path that builds or replays a person's request states that title (`role_request`'s required
+`world_title`: the host's reservation reads it from the society's first input, a comparison from
+its plan's first input; a signal's request states none). The decision page's told column shows it
+under "Where and when". A typed title reaches a model through the workspace's request policy, as
+every text a model is shown does. Requests under the fourteenth catalog and a society made before
+record and tell no title, and rebuild to the byte.
+
 Version 3 keeps version 2's actions and bounds and adds:
 
 | Action | Kind | Words a model reads |

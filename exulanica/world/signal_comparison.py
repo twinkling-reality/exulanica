@@ -277,6 +277,7 @@ def _request(plan: SignalRunPlan, point: Mapping[str, Any]) -> dict[str, Any]:
         seed=_REQUEST_SEED,
         provider_config=dict(plan.provider_config or {}),
         day_start=None,
+        world_title=None,
     )
     if request is None:
         raise ValueError(f"no request could be made at a choice point: {status}")

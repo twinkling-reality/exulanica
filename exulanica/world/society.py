@@ -293,6 +293,13 @@ def people_day_start(first_input: Mapping[str, Any]) -> int | None:
     return start if type(start) is int else None
 
 
+def world_title_of(first_input: Mapping[str, Any]) -> str | None:
+    """The world's title as its owner named it when the society was made, as its first input
+    records it (``world.title``; only a first input carries one), or None."""
+    title = (first_input.get("world") or {}).get("title")
+    return title if isinstance(title, str) else None
+
+
 def told_clock(state: Mapping[str, Any], day_start: int | None) -> dict[str, int] | None:
     """The time of day and the day, counted from 0, of the minute a choice is made for, as
     ``clock_told`` tells it: the minute after the state's, which the answer is carried out and its

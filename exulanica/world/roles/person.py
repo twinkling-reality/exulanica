@@ -170,6 +170,7 @@ def context(
     *,
     contract: DecisionContract | None = None,
     day_start: int | None = None,
+    world_title: str | None = None,
 ) -> dict[str, Any]:
     if _living(state["profile"]):
         return living_context(state, source, subject_id, options, profile=role.context_profile)
@@ -181,6 +182,7 @@ def context(
         profile=role.context_profile,
         contract=contract,
         day_start=day_start,
+        world_title=world_title,
     )
 
 

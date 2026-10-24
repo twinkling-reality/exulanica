@@ -230,7 +230,7 @@ def play(client: Any, spec: Any, arm: str, *, seed: str) -> dict[str, Any]:
     from exulanica.api.decision_host import RoleAsk, ask
     from exulanica.world.decision_roles import decision_roles
     from exulanica.world.role_decisions import apply_receipts, role_receipt, role_request
-    from exulanica.world.society import people_day_start
+    from exulanica.world.society import people_day_start, world_title_of
     from exulanica.world.society_decision_contract import person_role
     from exulanica.world.society_planner import advance_purposeful_society
     from exulanica.world.society_things import advance_things, initial_things_society
@@ -272,8 +272,9 @@ def play(client: Any, spec: Any, arm: str, *, seed: str) -> dict[str, Any]:
                     "deadline_ms": contract.value("decision_deadline_ms"),
                 },
                 withhold=_withhold(arm),
-                # The scene's one input is its first, which states any people's day.
+                # The scene's one input is its first, which states any people's day and title.
                 day_start=people_day_start(document),
+                world_title=world_title_of(document),
             )
             if request is None:
                 continue

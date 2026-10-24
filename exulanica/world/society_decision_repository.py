@@ -327,6 +327,7 @@ class SocietyDecisionRepository:
             offer=offer,
             withhold=withhold,
             day_start=self.society.people_day_start(row),
+            world_title=self.society.world_title(row),
         )
         if request is None:
             return {"request": None, "decision": None, "status": status}, False

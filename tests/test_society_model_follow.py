@@ -200,6 +200,7 @@ def run_scenario(*, invalid=False):
             contract=contract,
             finish=_things_finish(SEED),
             day_start=None,
+            world_title=None,
         )
 
     played = play(PursuitAnswers(role, client, spec, mechanism, contract, transport=transport))

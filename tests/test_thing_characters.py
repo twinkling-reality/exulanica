@@ -299,6 +299,7 @@ def _asked(state, document):
             "deadline_ms": 20000,
         },
         day_start=None,
+        world_title=None,
     ), contract.value("context_bytes_maximum")
 
 

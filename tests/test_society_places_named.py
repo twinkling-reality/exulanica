@@ -128,6 +128,7 @@ def _request(
         seed=town_people.SEED,
         provider_config=config,
         day_start=day_start,
+        world_title=None,
     )
     assert status == "in_progress"
     return request

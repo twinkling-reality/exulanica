@@ -380,6 +380,7 @@ def build_authored_ground_society_input_v5(
     routine: PurposefulRoutine | None = None,
     workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
     made_kinds: Mapping[str, Mapping[str, Any]] | None = None,
+    world_title: str | None = None,
 ) -> dict[str, Any]:
     """Compose a society of things' input, ``exulanica.society-composition/authored-ground-v5``.
 
@@ -420,6 +421,7 @@ def build_authored_ground_society_input_v5(
         workspace_obstacles=workspace_obstacles,
         things=True,
         made_kinds=made_kinds,
+        world_title=world_title,
     )
 
 
@@ -440,6 +442,7 @@ def _authored_ground_with_routine(
     workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
     things: bool = False,
     made_kinds: Mapping[str, Mapping[str, Any]] | None = None,
+    world_title: str | None = None,
 ) -> dict[str, Any]:
     chosen = purposeful_routine() if routine is None else routine
     catalog = world_object_catalog()
@@ -487,6 +490,10 @@ def _authored_ground_with_routine(
         document["population_kind"] = dict(kind)
         # A society's first input records the modules its minutes run, by version.
         record_modules(document)
+    if input_seq == 1 and world_title is not None:
+        # The world's title as its owner named it now, which its people are told where they live
+        # (world_named): recorded once, so a later rename tells nothing new.
+        document["world"] = {"title": world_title}
     document["document_sha256"] = input_sha256(document)
     validate_society_input(document)
     return document

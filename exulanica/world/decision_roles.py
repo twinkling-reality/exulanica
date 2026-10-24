@@ -285,6 +285,7 @@ class RoleAdapter(Protocol):
         *,
         contract: DecisionContract | None = None,
         day_start: int | None = None,
+        world_title: str | None = None,
     ) -> dict[str, Any]: ...
 
     def option_from_record(self, record: Mapping[str, Any]) -> RoleOption: ...
@@ -722,7 +723,9 @@ LABEL_RULES_FROM: Final = 11
 #: activity naming whom it is with as the page names them; ``clock_told``, the minute told as the
 #: world's clock where the world keeps one; ``places_named``, a premises where the being stands and
 #: one it remembers told by the name the day page gives it; ``answers_told``, each line the being
-#: said lately told with whether the one it was said to answered, where that is known.
+#: said lately told with whether the one it was said to answered, where that is known;
+#: ``world_named``, where the being lives told as the world's title its owner named, where the
+#: society's first input records one.
 LABEL_RULES: Final = (
     "names_as_written",
     "straight_line_distances",
@@ -730,6 +733,7 @@ LABEL_RULES: Final = (
     "clock_told",
     "places_named",
     "answers_told",
+    "world_named",
 )
 #: The registry version from which an entry states each label rule's from-version: the first two
 #: from :data:`LABEL_RULES_FROM`, a later one from the version that added it.
@@ -740,6 +744,7 @@ LABEL_RULE_REGISTRY_VERSIONS: Final = {
     "clock_told": 12,
     "places_named": 13,
     "answers_told": 14,
+    "world_named": 15,
 }
 _TERM_FIELDS: Final = frozenset(
     {

@@ -101,6 +101,7 @@ def test_the_registered_signal_role_seals_only_a_nearby_vehicle_choice():
         seed="0" * 64,
         provider_config=provider,
         day_start=None,
+        world_title=None,
     )
     assert status == "in_progress" and request is not None
     validate_role_request(role, request)
@@ -116,6 +117,7 @@ def test_the_registered_signal_role_seals_only_a_nearby_vehicle_choice():
         seed="0" * 64,
         provider_config=provider,
         day_start=None,
+        world_title=None,
     )
     assert absent is None and reason == "nothing_to_choose"
 

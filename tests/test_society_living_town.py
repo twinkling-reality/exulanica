@@ -269,6 +269,7 @@ def _played(minutes: int, chosen: set[str], asking):
             asking=port,
             seam=lambda _s, _due: LivingSeam(SEED, living_places([document], routine), routine),
             day_start=None,
+            world_title=None,
         )
 
     return role, contract, state, play, play(asking(role, contract))

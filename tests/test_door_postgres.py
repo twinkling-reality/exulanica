@@ -498,6 +498,7 @@ def _person_requests(door, count: int) -> list[tuple[dict[str, Any], str]]:
             seed=seed,
             provider_config=model_shaped,
             day_start=None,
+            world_title=None,
         )
         if request is not None:
             found.append((request, person))

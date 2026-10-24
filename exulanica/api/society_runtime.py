@@ -66,6 +66,7 @@ from exulanica.world.kinds.worker import (
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import AuthoredObject
 from exulanica.world.placed_things import WorkspaceKindReference
+from exulanica.world.saved_entries import told_world_title
 from exulanica.world.site_parts import changes_document, changes_sha256
 from exulanica.world.society import (
     SocietyBytesNotRead,
@@ -1913,6 +1914,10 @@ class SocietyRuntime:
                     standing=self._standing,
                     workspace_obstacles=workspace,
                     made_kinds=self._made_kinds(connection, binding.workspace_id, version.things),
+                    # Its first input records the world's title as its owner named it now.
+                    world_title=told_world_title(connection, binding.workspace_id, binding.world_id)
+                    if seq == 1
+                    else None,
                 )
             if arrival is not None:
                 arrived_ground = replace(
@@ -2064,6 +2069,11 @@ class SocietyRuntime:
                 support_source=town.support_source,
                 made_records=town.made,
                 water=water_for_input(connection, binding, seq, town.water),
+                # A society of things' first input records the world's title as its owner named it
+                # now, which its people are told where they live.
+                world_title=told_world_title(connection, binding.workspace_id, binding.world_id)
+                if seq == 1 and chosen == WALKING_SURFACES_COMPOSITION_V3
+                else None,
                 # A thing rests where a placing is held to rest it.
                 rest=society_rest(
                     connection,

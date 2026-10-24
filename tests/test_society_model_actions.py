@@ -201,6 +201,7 @@ def _request(state, document, subject, contract=None, seed=SEED):
         seed=seed,
         provider_config=_config(contract),
         day_start=None,
+        world_title=None,
     )
     assert request is not None, status
     return request
@@ -382,6 +383,7 @@ def test_a_person_with_nothing_but_waiting_to_do_is_not_asked():
         provider_config=_config(contract),
         offer=lambda options: [o for o in options if o.kind == "wait"],
         day_start=None,
+        world_title=None,
     )
     assert (request, status) == (None, "nothing_to_choose")
     # The positive control: standing and waiting are a choice.
@@ -395,6 +397,7 @@ def test_a_person_with_nothing_but_waiting_to_do_is_not_asked():
         provider_config=_config(contract),
         offer=lambda options: [o for o in options if o.kind in ("wait", "stand")],
         day_start=None,
+        world_title=None,
     )
     assert status == "in_progress" and len(request["context"]["options"]) == 2
 
@@ -628,6 +631,7 @@ def _played(seed, minutes, choose):
                 seed=seed,
                 provider_config=_config(contract),
                 day_start=None,
+                world_title=None,
             )
             if request is None:
                 continue
@@ -782,6 +786,7 @@ def _first_contract_digests(seed, minutes=60):
                 seed=seed,
                 provider_config=config,
                 day_start=None,
+                world_title=None,
             )
             if request is None:
                 continue

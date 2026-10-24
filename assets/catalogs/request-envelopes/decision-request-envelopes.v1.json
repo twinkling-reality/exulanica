@@ -30,6 +30,12 @@
       "prompt_version": "society-person-choice/v11",
       "request_bytes_at_most": 36864,
       "reason": "A society of things' being sends its instruction, its situation (where it stands and what it notices, what it remembers, the lines it heard and the lines it said, each said line marked when nobody answered it, its character), the offered actions and the function or schema with every option: about 34 KB with every part at its own most, lines written in double quotes and the retry's note, more than the context's 16,000 bytes can carry together. The envelope leaves room above it."
+    },
+    {
+      "role": "society_decision",
+      "prompt_version": "society-person-choice/v12",
+      "request_bytes_at_most": 36864,
+      "reason": "A society of things' being sends its instruction, its situation (where it lives, as its world's owner named it, where it stands and what it notices, what it remembers, the lines it heard and the lines it said, each said line marked when nobody answered it, its character), the offered actions and the function or schema with every option: about 35 KB with every part at its own most, lines written in double quotes and the retry's note, more than the context's 16,000 bytes can carry together. The envelope leaves room above it."
     }
   ]
 }
