@@ -2,7 +2,7 @@
 // BUILD-SHEETS-CHARACTER-TALKING-BUILDING.md section 1): what it says, from the reads the page holds, and where
 // it stands. Pure: the reads come in as data and the words from character-words.mjs; character-group.ts draws
 // the answer. verify-character-group.mjs holds it.
-import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, cardWords, checkingLine, decidesPrint, keyGroup, makerLine, modelsDecide, modelsNamed, noModelRunning, notAbleLine, providerName, quoted, readingRecord, routineRow, rowPrice, runnerCalls, runnerOpen, saidUnder, stopsAfter } from './character-words.mjs';
+import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, cardWords, checkingLine, decidesPrint, keyGroup, makerLine, modelsDecide, modelsNamed, noModelRunning, notAbleFold, notAbleLine, providerName, quoted, readingRecord, reasonsOn, routineRow, rowPrice, runnerCalls, runnerOpen, saidUnder, stopsAfter } from './character-words.mjs';
 import { RUN_WORDS, atMost, runFor, runRefusalWords } from './run-words.mjs';
 import { dayWord } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -266,14 +266,19 @@ function sharedNames(models, runner) {
  * under their own faint label, each one a check found not able with its reason in one line. No number and no focus:
  * none is offered. `runner` is the models read's runnerModels; `models` the chooser's, to tell same names apart.
  */
-export function runnerRows(runner = [], models = []) {
+export function runnerRows(runner = [], models = [], foldFor = null) {
   const shared = sharedNames(models, runner);
   const sub = model => (shared.has(model.name) ? runnerCalls(model) : null);
   const checking = runner.filter(model => model.state === 'checking').map(model => Object.freeze({ word: checkingLine(model), sub: sub(model) }));
   const notAble = runner.filter(model => model.state === 'not_able').map(model => Object.freeze({ word: model.name, sub: sub(model), line: notAbleLine(model) }));
-  return checking.length || notAble.length
-    ? Object.freeze({ checking: Object.freeze(checking), label: notAble.length ? CHARACTER_WORDS.notAbleHere : null, notAble: Object.freeze(notAble) })
-    : null;
+  if (!checking.length && !notAble.length) return null;
+  // The world's list (`foldFor`, whose day page it is) folds the not-able rows into one line (DESIGN 11:58), so Routine
+  // and the keys stay in view; the day page's chooser lists each with its reason.
+  if (foldFor && notAble.length) {
+    return Object.freeze({ checking: Object.freeze(checking), label: null, notAble: Object.freeze([]),
+      fold: Object.freeze({ line: notAbleFold(notAble.length), sub: reasonsOn(foldFor) }) });
+  }
+  return Object.freeze({ checking: Object.freeze(checking), label: notAble.length ? CHARACTER_WORDS.notAbleHere : null, notAble: Object.freeze(notAble), fold: null });
 }
 
 /** The refusals of a model this install would never offer: a hosted one where it holds no key. */
@@ -324,18 +329,20 @@ export function openWhileOffered(choosing, read) {
 export function modelGroup({ who, models = [], current = null, focus = 0, refusal = null, busy = false, waiting = false, fromServer = false, runner = [] }) {
   const items = galleryItems(models, fromServer, runner);
   // A runner's models not offered (L1) stand faint after this computer's last choosable row, or, with none, under the
-  // group's label at the top.
-  const faint = runnerRows(runner, models);
+  // group's label at the top; those not able fold into one line here.
+  const faint = runnerRows(runner, models, who);
   const lastHere = items.reduce((found, item, index) => (item.group === CHARACTER_WORDS.hereFree ? index : found), -1);
   const at = Math.max(0, Math.min(items.length - 1, Number.isSafeInteger(focus) ? focus : 0));
-  const first = Math.max(0, Math.min(items.length - MODEL_ROWS, at - MODEL_ROWS + 1));
-  const shown = items.slice(first, first + MODEL_ROWS);
-  const rows = shown.map((item, offset) => Object.freeze({
-    action: 'use', index: first + offset, key: String(offset + 1), word: item.word, sub: item.sub, price: item.price,
-    current: sameModel(item.model, current), on: first + offset === at,
-    label: item.group !== null && (offset === 0 || shown[offset - 1].group !== item.group) ? item.group : null,
-    open: first + offset === at ? item.open : null,
-    runner: first + offset === lastHere ? faint : null,
+  // Routine stands below the models whatever the window (DESIGN 11:58): the window moves over the models alone.
+  const routine = items.length - 1, room = MODEL_ROWS - 1;
+  const first = Math.max(0, Math.min(routine - room, Math.min(at, routine - 1) - room + 1));
+  const shown = [...items.slice(first, Math.min(first + room, routine)).map((item, offset) => ({ item, index: first + offset })), { item: items[routine], index: routine }];
+  const rows = shown.map(({ item, index }, offset) => Object.freeze({
+    action: 'use', index, key: String(offset + 1), word: item.word, sub: item.sub, price: item.price,
+    current: sameModel(item.model, current), on: index === at,
+    label: item.group !== null && (offset === 0 || shown[offset - 1].item.group !== item.group) ? item.group : null,
+    open: index === at ? item.open : null,
+    runner: index === lastHere ? faint : null,
   }));
   return Object.freeze({
     name: who.title,
@@ -347,12 +354,20 @@ export function modelGroup({ who, models = [], current = null, focus = 0, refusa
       waiting: waiting && first === 0 ? Object.freeze({ label: CHARACTER_WORDS.hereFree, line: CHARACTER_WORDS.noneRunning }) : null,
       runner: faint && lastHere < 0 && first === 0 ? Object.freeze({ ...faint, group: CHARACTER_WORDS.hereFree }) : null,
       first, rows: Object.freeze(rows), busy,
+      // More models past the window's foot: its foot fades, as the told column's does.
+      more: first + room < routine,
       keys: Object.freeze([{ keys: ['\u2191', '\u2193'], word: CHARACTER_WORDS.choose }, { keys: ['Enter'], word: CHARACTER_WORDS.useThisModel }]),
     }),
     print: refusal,
     after: null,
     refused: Boolean(refusal),
   });
+}
+
+/** The index a number key names in modelGroup's window from `first`: a model in it, or Routine just under it. */
+function windowIndex(first, number, count) {
+  const shown = Math.min(MODEL_ROWS - 1, count - first);
+  return number <= shown ? first + number - 1 : number === shown + 1 ? count : -1;
 }
 
 /** The keys that still move the person while the model list shows (r07). */
@@ -414,7 +429,7 @@ export function modelPicker({ models, currentOf, write, refusal, onUsed = (verif
       event.preventDefault();
       if (event.repeat) return true;
       if (event.code === 'ArrowUp' || event.code === 'ArrowDown') picker.move(event.code === 'ArrowUp' ? -1 : 1);
-      else if (digit) void picker.use(first + Number(digit[1]) - 1);
+      else if (digit) void picker.use(windowIndex(first, Number(digit[1]), models().length));
       else if (event.code === 'Enter') void picker.use(picking.focus);
       else if (event.code === 'Escape') picker.close();
       return true;

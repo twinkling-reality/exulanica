@@ -526,6 +526,36 @@ describe("a person's runner's models (L1)", () => {
   });
 });
 
+describe("the world's model list (L1, DESIGN 11:58)", () => {
+  it('keeps Routine below the window, fades the foot while more lie past it, and folds the runner\'s not-able rows', async () => {
+    const group = await (import('../../../../tools/previews/world-workspace/' + 'character-group.mjs') as Promise<{
+      modelGroup(input: Record<string, unknown>): unknown;
+    }>);
+    const drawn = await (import('../../../../tools/previews/world-workspace/' + 'character-group.ts') as Promise<{
+      characterGroup(input: { scale: () => number; onAction: (action: string) => void }): { root: HTMLElement; set(content: unknown): void };
+    }>);
+    const many = Array.from({ length: 12 }, (_, n) => ({ provider: 'ollama_local', modelId: `m${n}`, name: `Model ${n + 1}`, local: true, price: { input: '0', output: '0' } }));
+    const runner = [{ provider: 'ollama_local', modelId: `local/sha256-${'c'.repeat(64)}`, name: 'tiny', family: null, size: null,
+      servedAs: 'tiny:1m', licence: null, state: 'not_able', reason: 'form', contextTokens: 4096, deadlineMs: 20000, checkedMs: null }];
+    const shown = drawn.characterGroup({ scale: () => 1, onAction: () => {} });
+    document.body.append(shown.root);
+    shown.set(group.modelGroup({ who: teo, models: many, focus: 0, runner }));
+    const window = shown.root.querySelector('.cg-window')!;
+    expect(window.classList.contains('cg-more')).toBe(true);
+    expect([...window.querySelectorAll('.cg-model-word')].map((node) => node.textContent)).toEqual(Array.from({ length: 8 }, (_, n) => `Model ${n + 1}`));
+    // Routine stands below the window, in the list itself, with the next number (Teo's current: no model).
+    const routine = [...shown.root.querySelectorAll('.cg-list > .cg-model')];
+    expect(routine.map((node) => [node.querySelector('.wu-glyph')?.textContent, node.querySelector('.cg-model-word')?.textContent])).toEqual([['9', 'RoutineCurrent']]);
+    // The not-able rows fold into one faint line at the foot of this computer's group, with where their reasons are told:
+    // past the window here, in view once the window reaches the group's foot.
+    expect(all(shown.root, '.cg-waiting')).toEqual([]);
+    shown.set(group.modelGroup({ who: teo, models: many, focus: 11, runner }));
+    expect(shown.root.querySelector('.cg-window')!.classList.contains('cg-more')).toBe(false);
+    expect(all(shown.root, '.cg-window .cg-waiting')).toEqual(['And 1 more on this computer that cannot decide for a person here.Their reasons are on Teo\'s day page.']);
+    shown.root.remove();
+  });
+});
+
 describe("Teo's day keeps the world's clock", () => {
   type View = {
     dayStartMinute(state: unknown): number | null;

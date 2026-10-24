@@ -190,6 +190,12 @@ export function cardWords(model) {
   return Object.freeze({ said: `\u201c${card.says}\u201d`, from: `from ${possessive(card.maker)} model card · ${card.licence}` });
 }
 
+/** The world's model list folds a runner's models a check found not able into one line (L1, DESIGN 11:58). */
+export const notAbleFold = count => `And ${count} more on this computer that cannot decide for a person here.`;
+
+/** Under the fold: where each one's reason is told. */
+export const reasonsOn = who => `Their reasons are on ${possessive(who.within)} day page.`;
+
 /** A runner's model being checked (L1): "Llama · 1.2B · Checking that it can decide for a person here…". */
 export const checkingLine = model => `${model.name} · ${CHARACTER_WORDS.checking}`;
 

@@ -30,6 +30,8 @@ export interface RunnerRows {
   readonly checking: readonly { readonly word: string; readonly sub: string | null }[];
   readonly label: string | null;
   readonly notAble: readonly { readonly word: string; readonly sub: string | null; readonly line: string }[];
+  /** In the world's list, the not-able rows folded into one line and where their reasons are told (DESIGN 11:58). */
+  readonly fold?: { readonly line: string; readonly sub: string } | null;
   readonly group?: string;
 }
 
@@ -39,7 +41,10 @@ export interface ModelList {
   /** This computer's runner's models not offered, under its label at the top, where it offers none (L1). */
   readonly runner?: RunnerRows | null;
   readonly first: number;
+  /** The rows: the window's models, then Routine, which stands below them whatever the window. */
   readonly rows: readonly ModelRow[];
+  /** More models past the window's foot, which then fades (DESIGN 11:58). */
+  readonly more?: boolean;
   readonly keys: readonly { readonly keys: readonly string[]; readonly word: string }[];
   readonly busy: boolean;
 }
@@ -186,6 +191,7 @@ export function runnerRows(block: RunnerRows): HTMLElement[] {
     ...block.checking.map(row => faint(row.word, row.sub)),
     ...(block.label ? [text('p', 'cg-group-label', block.label)] : []),
     ...block.notAble.map(row => faint(row.word, row.sub, row.line)),
+    ...(block.fold ? [faint(block.fold.line, block.fold.sub)] : []),
   ];
 }
 
@@ -195,8 +201,13 @@ function modelList(list: ModelList, onAction: (action: string) => void): HTMLEle
   rows.setAttribute('role', 'listbox');
   if (list.waiting) rows.append(text('p', 'cg-group-label', list.waiting.label), text('p', 'cg-waiting', list.waiting.line));
   if (list.runner) rows.append(...runnerRows(list.runner));
-  for (const row of list.rows) {
-    if (row.label) rows.append(text('p', 'cg-group-label', row.label));
+  // The window's models scroll inside the list, faded at their foot while more lie past it; Routine stands below.
+  const models = document.createElement('div');
+  models.className = list.more ? 'cg-window cg-more' : 'cg-window';
+  rows.append(models);
+  for (const [at, row] of list.rows.entries()) {
+    const into = at === list.rows.length - 1 ? rows : models;
+    if (row.label) into.append(text('p', 'cg-group-label', row.label));
     const button = document.createElement('button');
     button.type = 'button';
     button.className = row.on ? 'cg-model cg-on' : 'cg-model';
@@ -214,13 +225,13 @@ function modelList(list: ModelList, onAction: (action: string) => void): HTMLEle
     if (row.sub) named.append(text('span', 'cg-model-sub', row.sub));
     button.append(glyph, named, text('span', 'cg-price', row.price));
     button.addEventListener('click', () => onAction(`use:${row.index}`));
-    rows.append(button);
+    into.append(button);
     if (row.open) {
       const open = text('p', 'cg-model-open', row.open.said);
       if (row.open.from) open.append(text('span', 'cg-model-from', row.open.from));
-      rows.append(open);
+      into.append(open);
     }
-    if (row.runner) rows.append(...runnerRows(row.runner));
+    if (row.runner) into.append(...runnerRows(row.runner));
   }
   const keys = document.createElement('p');
   keys.className = 'cg-keys';

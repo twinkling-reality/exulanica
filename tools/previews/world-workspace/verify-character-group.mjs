@@ -235,11 +235,19 @@ assert.deepEqual(withRunner.list.rows.map(row => [row.key, row.word, row.sub, ro
 ]);
 assert.deepEqual(withRunner.list.rows[0].open, { said: 'Checked on this computer: it chose one of the offered choices in 2.1 s.', from: 'from your runner · \u201cAN INVENTED LICENSE\u201d' });
 assert.deepEqual(withRunner.list.rows.map(row => row.runner === null), [false, true, true], 'faint after this computer\'s last row only');
+// In the world's list the not-able rows fold into one line, where their reasons are told (DESIGN 11:58); the day page's
+// chooser lists each with its reason.
 assert.deepEqual(withRunner.list.rows[0].runner, {
+  checking: [{ word: 'Qwen3 · 4.0B · Checking that it can decide for a person here…', sub: 'Your runner calls it b' }],
+  label: null, notAble: [],
+  fold: { line: 'And 1 more on this computer that cannot decide for a person here.', sub: "Their reasons are on Teo's day page." },
+});
+assert.deepEqual(runnerRows(runner, [ableHere]), {
   checking: [{ word: 'Qwen3 · 4.0B · Checking that it can decide for a person here…', sub: 'Your runner calls it b' }],
   label: 'Also on this computer, not able to decide for a person here',
   notAble: [{ word: 'Llama · 134.52M', sub: null, line: 'It did not answer with one of the offered choices when checked.' }],
-});
+  fold: null,
+}, 'the day page: each with its reason');
 assert.equal(withRunner.list.runner, null);
 const noneAbleHere = modelGroup({ who: teo, models: [served[1]], runner: runner.slice(1) });
 assert.equal(noneAbleHere.list.runner.group, 'On this computer, free', 'no choosable row here: under the group\'s label, first');
@@ -288,14 +296,40 @@ assert.equal(openWhileOffered(open, { models: allRefused }), null, 'none left to
 const refusedChoice = modelGroup({ who: teo, models: served, refusal: 'This model cannot decide for Teo here.' });
 assert.equal(refusedChoice.print, 'This model cannot decide for Teo here.');
 assert.equal(refusedChoice.refused, true);
-// Past nine, the window follows the focus and the number keys name its rows.
+// Past nine, the window follows the focus over the models alone and the number keys name its rows; Routine and the keys
+// never leave view (DESIGN 11:58): Routine stands under the window with the next number, and the window's foot fades
+// while more models lie past it.
 const many = Array.from({ length: 12 }, (_, index) => ({ provider: 'p', modelId: `m${index}`, name: `Model ${index + 1}`, price: { input: '0.1', output: '0.2' } }));
 assert.equal(MODEL_ROWS, 9);
-assert.deepEqual(modelGroup({ who: teo, models: many, focus: 0 }).list.rows.map(row => row.index), [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+const top = modelGroup({ who: teo, models: many, focus: 0 }).list;
+assert.deepEqual(top.rows.map(row => [row.key, row.index]), [['1', 0], ['2', 1], ['3', 2], ['4', 3], ['5', 4], ['6', 5], ['7', 6], ['8', 7], ['9', 12]]);
+assert.equal(top.rows.at(-1).word, 'Routine');
+assert.equal(top.more, true);
 const scrolled = modelGroup({ who: teo, models: many, focus: 11 });
-assert.equal(scrolled.list.first, 3);
-assert.deepEqual(scrolled.list.rows.map(row => [row.key, row.index]), [['1', 3], ['2', 4], ['3', 5], ['4', 6], ['5', 7], ['6', 8], ['7', 9], ['8', 10], ['9', 11]]);
-assert.equal(modelGroup({ who: teo, models: many, focus: 12 }).list.rows.at(-1).word, 'Routine');
+assert.equal(scrolled.list.first, 4);
+assert.deepEqual(scrolled.list.rows.map(row => [row.key, row.index]), [['1', 4], ['2', 5], ['3', 6], ['4', 7], ['5', 8], ['6', 9], ['7', 10], ['8', 11], ['9', 12]]);
+assert.equal(scrolled.list.more, false);
+const onRoutine = modelGroup({ who: teo, models: many, focus: 12 }).list;
+assert.deepEqual([onRoutine.rows.at(-1).word, onRoutine.rows.at(-1).on, onRoutine.first], ['Routine', true, 4]);
+assert.equal(modelGroup({ who: teo, models: served }).list.more, false, 'all in view: no fade');
+{
+  // Its number reaches Routine however far the window has moved; a number past it names nothing.
+  const used = [];
+  const picker = modelPicker({ models: () => many, currentOf: () => null, write: async (_row, model) => { used.push(model?.name ?? 'Routine'); return null; }, refusal: () => null });
+  const digit = (code, first) => { picker.open('row'); picker.key({ code, repeat: false, preventDefault() {} }, first); };
+  digit('Digit9', 0);
+  await Promise.resolve();
+  digit('Digit1', 4);
+  await Promise.resolve();
+  digit('Digit9', 4);
+  await Promise.resolve();
+  assert.deepEqual(used, ['Routine', 'Model 5', 'Routine']);
+  const few = modelPicker({ models: () => served, currentOf: () => null, write: async (_row, model) => { used.push(model?.name ?? 'Routine'); return null; }, refusal: () => null });
+  few.open('row');
+  few.key({ code: 'Digit9', repeat: false, preventDefault() {} }, 0);
+  await Promise.resolve();
+  assert.equal(used.length, 3, 'no ninth row with three models: nothing chosen');
+}
 
 {
   // The model list's state and keys (r07): opens on their model, the arrows move, a number on the window or Enter writes,

@@ -35,9 +35,13 @@
    4.5 to 1 or more and the names at 7 to 1 over a sunlit front (DESIGN 17:44, measured with its contrast.py). */
 .cg-group[data-list="true"] { width: calc(620 * var(--u)); --shade-fill: rgba(6, 12, 16, .88); }
 .cg-list { margin-top: var(--space-16); display: grid; row-gap: max(16px, calc(16 * var(--u))); --glyph: max(32px, calc(32 * var(--u))); pointer-events: auto; }
+/* The window's models (L1, DESIGN 11:58): the list's own spacing, the foot faded while more models lie past it, as the
+   told column's; Routine and the keys stand below. */
+.cg-window { display: grid; row-gap: max(16px, calc(16 * var(--u))); }
+.cg-window.cg-more { -webkit-mask-image: linear-gradient(#000 calc(100% - 48px), transparent); mask-image: linear-gradient(#000 calc(100% - 48px), transparent); }
 .cg-group-label { margin: var(--space-8) 0 calc(-8 * var(--u)); font: 400 max(12px, calc(13 * var(--u)))/max(14px, calc(16 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .80); }
 .cg-waiting { margin: 0; text-wrap: pretty; font: 400 max(14px, calc(15 * var(--u)))/max(20px, calc(22 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .86); }
-.wu-root .cg-list > .cg-model { position: relative; display: grid; grid-template-columns: var(--glyph) minmax(0, 1fr) auto; column-gap: max(16px, calc(16 * var(--u))); align-items: center;
+.wu-root .cg-list > .cg-model, .wu-root .cg-window > .cg-model { position: relative; display: grid; grid-template-columns: var(--glyph) minmax(0, 1fr) auto; column-gap: max(16px, calc(16 * var(--u))); align-items: center;
   min-height: var(--glyph); margin: 0; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 .cg-model-named { display: grid; }
 .cg-model-sub { font: 400 max(12px, calc(13 * var(--u)))/max(16px, calc(18 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .80); white-space: nowrap; }

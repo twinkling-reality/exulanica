@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { checkingLine, notAbleLine, runnerCalls, runnerOpen } from './character-words.mjs';
+import { checkingLine, notAbleFold, notAbleLine, reasonsOn, runnerCalls, runnerOpen } from './character-words.mjs';
 import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, askWho, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineBetween, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
@@ -153,4 +153,8 @@ assert.deepEqual(runnerOpen({ runner: { licence: null, checkedMs: 238 } }), { sa
 const longLicence = runnerOpen({ runner: { licence: 'L'.repeat(120), checkedMs: 238 } }).from;
 assert.equal(longLicence, `from your runner · \u201c${'L'.repeat(79)}\u2026\u201d`, 'at most 80 characters of the licence');
 assert.equal(runnerOpen({ runner: { licence: null, checkedMs: null } }), null, 'nothing known: nothing opens');
+// The world's list folds the not-able rows (DESIGN 11:58).
+assert.equal(notAbleFold(4), 'And 4 more on this computer that cannot decide for a person here.');
+assert.equal(reasonsOn(called({ name: 'Cyra Moss' })), "Their reasons are on Cyra Moss's day page.");
+assert.equal(reasonsOn(called({ name: null, kind: 'Resident' })), "Their reasons are on the resident's day page.");
 console.log('Character words checks passed: names and kinds, the chosen line, the page lines, money and the model list.');
