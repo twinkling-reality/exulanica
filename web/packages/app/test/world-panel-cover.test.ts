@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // The world's marks keep under the panels drawn over them (V10, tools/previews/world-workspace/character-group.ts
-// panelCover): the looked-at tag and the aim mark are not drawn in a frame where they cross the chosen card, the
+// panelCover): the looked-at tag, the aim mark, a line over a head and a farther name (V10b) are not drawn in a frame where they cross the chosen card, the
 // question or the group (its model list included), and are drawn again where they do not. The presence that stacks the
 // tag under the panels and asks this each frame (character-presence.ts) reads the page's own modules by the page's paths,
 // so its stacking is proved on the page.
@@ -52,6 +52,29 @@ describe('the world\'s marks under an open panel', () => {
     laidOut(label.root, { x: 760, y: 440, width: 150, height: 90 });
     under.clear(label);
     expect(label.root.hidden).toBe(false);
+  });
+
+  it('hides a line over a head and a farther name where they cross the open list, and keeps them beside it (V10b)', async () => {
+    const { panelCover } = await group();
+    const talk = await import('../../../../tools/previews/world-workspace/' + 'world-ui-talk.ts') as unknown as {
+      speech(): { root: HTMLElement; draw(words: object): void; place(x: number, y: number): void };
+      nameOver(): { root: HTMLElement; draw(words: string): void; place(x: number, y: number): void };
+    };
+    const chooser = laidOut(document.createElement('div'), CHOOSER);
+    const under = panelCover(() => [chooser]);
+    const line = talk.speech(), name = talk.nameOver();
+    document.body.append(line.root, name.root);
+    // A line said by someone behind the list, and a name over someone beside it.
+    laidOut(line.root, { x: 700, y: 400, width: 280, height: 60 });
+    laidOut(name.root, { x: 1400, y: 380, width: 120, height: 30 });
+    under.cover(line.root);
+    under.cover(name.root);
+    expect(line.root.style.visibility).toBe('hidden');
+    expect(name.root.style.visibility).toBe('');
+    // The list put away: the line is drawn again.
+    laidOut(chooser, null);
+    under.cover(line.root);
+    expect(line.root.style.visibility).toBe('');
   });
 
   it('hides the aim mark under a panel in the middle, keeps it beside one at the side, and shows it once the panel goes', async () => {

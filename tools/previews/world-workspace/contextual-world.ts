@@ -1448,6 +1448,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     }
     for (const [id, part] of nameParts) if (!named.includes(id)) { part.remove(); nameParts.delete(id); }
     for (const [key, part] of togetherParts) if (!together.has(key)) { part.remove(); togetherParts.delete(key); }
+    for (const part of [...speechParts.values(), ...nameParts.values(), ...togetherParts.values()]) presence.cover(part.root); // V10b: under open panels
     if (pageView && now - (pageView.drawnAt ?? 0) >= 1000) { pageView.drawnAt = now; drawPage(); }
     overlayCosts.push(performance.now() - workStart); if (overlayCosts.length > 120) overlayCosts.shift();
     if (now - lastMeasure >= 1000) {
