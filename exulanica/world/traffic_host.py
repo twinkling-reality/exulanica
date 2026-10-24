@@ -39,6 +39,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import logging
 import struct
 import threading
 import time
@@ -101,6 +102,8 @@ __all__ = [
     "traffic_process_pool",
     "version_world_roads",
 ]
+
+_LOG = logging.getLogger(__name__)
 
 #: A container's layout, as the tessellator writes it (``web/packages/loom-tess/README.md``): four
 #: magic bytes, the header's length as a little-endian 32-bit integer, then the header, canonical
@@ -459,7 +462,29 @@ def footprint_closing(
     the street each closed turn turns into (rules 3); ``widest``, ``street``, ``turn``, ``lane`` or
     ``None``. A footprint on no lane asks no worker. A refusal, of the town's roads or by the
     worker, an answer later than ``wait_seconds`` (:data:`CLOSING_SECONDS` unless given), or an ask
-    while as many wait as may, answers ``read: false`` and nothing else, never a guess."""
+    while as many wait as may, answers ``read: false`` and nothing else, never a guess. Any other
+    failure on the way, of a read or of the worker's job, answers the same, logged by its kind, so
+    the note never fails a preview: the reads run in a savepoint, and a failed one leaves the
+    preview's own transaction as it was."""
+    rules: int | None = None
+    try:
+        with connection.transaction():
+            rules = _closing_rules(connection, workspace_id, world_id, snapshot_id)
+            if rules is None:
+                return None
+            return _closing_read(
+                connection, workspace_id, world_id, snapshot_id, footprints, rules, wait_seconds
+            )
+    # Whatever fails, the closing note never fails the preview it rides on.
+    except Exception as error:
+        _LOG.warning("A placed footprint's closing was not read: %s", type(error).__name__)
+        return {"read": False} if rules is None else {"rules": rules, "read": False}
+
+
+def _closing_rules(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, snapshot_id: uuid.UUID
+) -> int | None:
+    """The traffic rules a town's placed things are read under, or None where they close nothing."""
     # A world made from a world kind states no records: no roads to close, nothing generated here.
     if not states_records(connection, workspace_id, world_id, snapshot_id):
         return None
@@ -468,8 +493,19 @@ def footprint_closing(
     except InvalidStructuralData:
         return None
     rules = traffic_rules_of(receipt)
-    if rules < CLOSING_RULES:
-        return None
+    return rules if rules >= CLOSING_RULES else None
+
+
+def _closing_read(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    snapshot_id: uuid.UUID,
+    footprints: Sequence[Sequence[tuple[int, int]]],
+    rules: int,
+    wait_seconds: float | None,
+) -> dict[str, Any]:
+    """:func:`footprint_closing` for a town whose traffic reads placed things under ``rules``."""
     unread = {"rules": rules, "read": False}
     try:
         value = saved_world_roads(connection, workspace_id, world_id, snapshot_id)

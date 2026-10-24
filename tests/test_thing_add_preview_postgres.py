@@ -22,8 +22,10 @@ a town made under traffic rules 1, nor on the farm.
 from __future__ import annotations
 
 import dataclasses
+import logging
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from types import MappingProxyType
 from typing import Any
@@ -205,7 +207,9 @@ def _bench_preview(api, entry: dict, point: tuple[int, int]) -> dict[str, Any]: 
     return _verdict(_preview(api, entry, "bench", BENCH, {**pose, "y_mm": rest}))
 
 
-def test_a_bench_s_preview_states_the_lane_or_the_turns_it_would_close_in_a_town(town, monkeypatch):
+def test_a_bench_s_preview_states_the_lane_or_the_turns_it_would_close_in_a_town(
+    town, monkeypatch, caplog
+):
     api, worker = town
     entry = _made(api, "A bench's preview")
     _, lane_point = _lane_middle(api, entry)
@@ -237,7 +241,9 @@ def test_a_bench_s_preview_states_the_lane_or_the_turns_it_would_close_in_a_town
         return function()
 
     monkeypatch.setattr(worker, "ask", refused)
-    assert _bench_preview(api, entry, lane_point)["closes"] == {"rules": 3, "read": False}
+    with caplog.at_level(logging.WARNING, logger=traffic_host.__name__):
+        assert _bench_preview(api, entry, lane_point)["closes"] == {"rules": 3, "read": False}
+    assert "not read" not in caplog.text, "a refusal is expected, not logged as a fault"
     monkeypatch.setattr(worker, "ask", late)
     monkeypatch.setattr(traffic_host, "CLOSING_SECONDS", 0.1)
     assert _bench_preview(api, entry, lane_point)["closes"] == {"rules": 3, "read": False}
@@ -266,6 +272,53 @@ def test_a_bench_s_preview_states_the_lane_or_the_turns_it_would_close_in_a_town
         )
     )
     assert moved["availability"] == "ready" and moved["closes"] == in_junction
+
+
+def test_a_failure_on_the_closing_path_leaves_the_preview_ready_and_its_closing_unread(
+    town, monkeypatch, caplog
+):
+    api, worker = town
+    entry = _made(api, "A closing that fails")
+    _, point = _lane_middle(api, entry)
+    ask = worker.ask
+
+    def faulty(function):  # type: ignore[no-untyped-def]
+        raise ValueError("a fault in the worker's job")
+
+    monkeypatch.setattr(worker, "ask", faulty)
+    with caplog.at_level(logging.WARNING, logger=traffic_host.__name__):
+        verdict = _bench_preview(api, entry, point)
+    assert verdict["availability"] == "ready"
+    assert verdict["closes"] == {"rules": 3, "read": False}
+    assert "ValueError" in caplog.text
+    monkeypatch.setattr(worker, "ask", ask)
+
+    # A read that fails in the database is rolled back to the closing's savepoint: the preview's own
+    # transaction goes on, and it answers as it would.
+    def failing(connection, *_arguments):  # type: ignore[no-untyped-def]
+        connection.execute("select * from a_table_no_one_made")
+
+    monkeypatch.setattr(traffic_host, "saved_world_roads", failing)
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger=traffic_host.__name__):
+        verdict = _bench_preview(api, entry, point)
+    assert verdict["availability"] == "ready"
+    assert verdict["closes"] == {"rules": 3, "read": False}
+    assert "UndefinedTable" in caplog.text
+    # Asked inside a transaction of the caller's, the transaction still takes its next statement.
+    connection = api.repository.connection
+    x, y = point
+    square = [(x - 300, -y - 300), (x + 300, -y - 300), (x + 300, -y + 300), (x - 300, -y + 300)]
+    with connection.transaction():
+        found = traffic_host.footprint_closing(
+            connection,
+            api.repository.workspace_id,
+            entry["world_id"],
+            uuid.UUID(entry["source_snapshot_id"]),
+            [square],
+        )
+        assert found == {"rules": 3, "read": False}
+        assert connection.execute("select 1 as one").fetchone() == {"one": 1}
 
 
 def test_a_town_made_under_traffic_rules_1_previews_no_closing(town, monkeypatch):

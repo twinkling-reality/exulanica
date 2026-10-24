@@ -542,8 +542,10 @@ the movement package and run the roads module, `exulanica-movement/roads/v1`
   closes turns into, by name; and `widest`, `street`, else `turn`, else `lane`, else null for a
   footprint on no lane, which asks the worker nothing. A refused road read, a refusing worker, no
   answer within `CLOSING_SECONDS` (a quarter of a second: a kept town answers in milliseconds, so the
-  wait is only ever for an episode the worker is computing), or two asks already waiting is
-  `read: false` with nothing else, never a guess, and the preview is otherwise answered as before. A town made under rules 1, and a world with no
+  wait is only ever for an episode the worker is computing), two asks already waiting, or any other
+  failure of its reads or of the worker's job (logged by its kind; the reads run in a savepoint) is
+  `read: false` with nothing else (and `rules` once they were read), never a guess, and the preview
+  is otherwise answered as before. A town made under rules 1, and a world with no
   town records, states no `closes`.
 - **The clock.** Second `n` is the `n`th second since the Unix epoch, so every page showing a city
   shows its vehicles in the same places. A saved world whose clock is coupled keys its traffic by
