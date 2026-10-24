@@ -64,6 +64,7 @@ from exulanica.models.errors import (
     ProviderRefused,
     TransportError,
 )
+from exulanica.models.local_runner import runner_answer, runner_request
 from exulanica.models.manifest import Manifest, ModelSpec, Role
 from exulanica.models.provider_catalog import ProviderPrice
 from exulanica.models.spending import (
@@ -294,7 +295,12 @@ class ModelChain:
         timeout: float,
         headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
-        url = f"{self._manifest.provider(spec.provider).base_url}{path}"
+        provider = self._manifest.provider(spec.provider)
+        url = f"{provider.base_url}{path}"
+        if spec.served_as is not None:
+            # A model a person's runner holds is asked as its check asked it, through the runner's
+            # own chat route, and its answer read back in this route's shape.
+            url, payload = f"{provider.origin}/api/chat", runner_request(spec, payload)
         response = self._transport.post_json(
             url,
             headers=dict(headers) if headers is not None else self._headers(spec),
@@ -325,6 +331,8 @@ class ModelChain:
                 retryable=False,
                 reached_provider=True,
             )
+        if spec.served_as is not None:
+            body = runner_answer(spec, body)
         observer = getattr(self, "_probe_response", None)
         if observer is not None:
             observer(body)

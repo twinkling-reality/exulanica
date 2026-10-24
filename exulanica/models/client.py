@@ -109,6 +109,7 @@ from exulanica.models.errors import (
     StructuredOutputError,
 )
 from exulanica.models.handoff import ModelHandoff
+from exulanica.models.local_runner import CheckStore, LocalChecks
 from exulanica.models.manifest import (
     AnsweringMechanism,
     ChosenRoleBinding,
@@ -189,7 +190,8 @@ class LocalLiveness:
     for each provider, every other caller meanwhile answered by the last read without waiting, so
     at most one request every ``every`` seconds pays for a read. Before a server's first read ends
     it counts as running, as it was offered before a read existed; a read that fails in any way
-    counts as stopped.
+    counts as stopped. The last catalog a running server answered is kept (:meth:`catalog`): the
+    models its runner holds are read from it, at no read of their own (L1).
     """
 
     def __init__(
@@ -210,6 +212,7 @@ class LocalLiveness:
         self._start = start or (lambda read: read())
         self._lock = threading.Lock()
         self._answered: dict[str, bool] = {}
+        self._catalogs: dict[str, Any] = {}
         self._read_at: dict[str, float] = {}
         self._reading: set[str] = set()
 
@@ -228,6 +231,12 @@ class LocalLiveness:
         with self._lock:
             return frozenset(key for key, running in self._answered.items() if not running)
 
+    def catalog(self, provider_id: str) -> Any | None:
+        """The catalog ``provider_id``'s server answered at its last read, or None where that read
+        failed or none has ended yet. Reads nothing."""
+        with self._lock:
+            return self._catalogs.get(provider_id)
+
     def _read(self, provider_id: str) -> None:
         from exulanica.models.preflight import local_catalog
 
@@ -238,9 +247,10 @@ class LocalLiveness:
             running = catalog is not None
         except Exception:
             # Any failure to read means the server does not answer.
-            running = False
+            catalog, running = None, False
         with self._lock:
             self._answered[provider_id] = running
+            self._catalogs[provider_id] = catalog
             self._read_at[provider_id] = self._clock()
             self._reading.discard(provider_id)
 
@@ -337,6 +347,9 @@ class ModelClient:
         #: Whether each admitted provider on this computer runs: read only through a transport that
         #: reaches the network (one carrying an allowlist); a test double answers for itself.
         self._liveness: LocalLiveness | None = None
+        #: The admitted provider on this computer whose runner's models are checked, and the
+        #: transport they are asked through; None where liveness is not read.
+        self._runner: tuple[Provider, Transport] | None = None
         for provider in sorted(self._manifest.providers.values(), key=lambda p: p.provider_id):
             if local_only and provider.takes_credential:
                 self._refusals[provider.provider_id] = PROVIDER_CREDENTIAL_ABSENT
@@ -393,6 +406,7 @@ class ModelClient:
         ]
         if egress is not None and local:
             self._liveness = LocalLiveness(local, network)
+            self._runner = (local[0], network)
         self._chain = ModelChain(
             manifest=self._manifest,
             transport=network,
@@ -1057,8 +1071,12 @@ class ModelClient:
                     provider=self._manifest.spec(model_id).provider,
                     reason="model_binding_scope_mismatch",
                 )
+            # A model a person's own runner holds is theirs to choose under its own licence:
+            # nothing of its weights is shipped, served or recorded here. Every other added model
+            # is admitted only under a licence a person classed as accepted.
             if (
-                provider_catalog.licence_class(self._manifest.spec(model_id).provider, model_id)
+                self._manifest.spec(model_id).served_as is None
+                and provider_catalog.licence_class(self._manifest.spec(model_id).provider, model_id)
                 != provider_catalog.ACCEPTED
             ):
                 raise ProviderRefused(
@@ -1177,6 +1195,22 @@ class ModelClient:
                 reason=refusal or PROVIDER_NOT_ADMITTED,
             )
         return self._chain.provider_prices(provider)
+
+    def runner_catalog(self, provider_id: str) -> Any | None:
+        """The tag list ``provider_id``'s server on this computer answered at its last liveness
+        read, or None where it did not answer, none ended yet or this client reads none. Reads
+        nothing."""
+        return None if self._liveness is None else self._liveness.catalog(provider_id)
+
+    def local_checks(self, store: CheckStore, **terms: Any) -> LocalChecks | None:
+        """Checks of the models its runner holds, for the provider on this computer this client
+        admits, asked through this client's own egress-checked transport and kept in ``store``,
+        under ``terms`` (:class:`~exulanica.models.local_runner.LocalChecks`); None where this
+        client reads no such provider."""
+        if self._runner is None:
+            return None
+        provider, transport = self._runner
+        return LocalChecks(provider, transport, store, **terms)
 
     def with_chosen_manifest(
         self,

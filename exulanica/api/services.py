@@ -28,6 +28,7 @@ rather than a thing that would need to be discovered.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import logging
 import os
@@ -109,6 +110,7 @@ from exulanica.api.instance_settings import (
 )
 from exulanica.api.kind_drafts import KindDrafts
 from exulanica.api.permissions import Permission
+from exulanica.api.runner_models import install_checks, local_execution_source, runner_specs
 from exulanica.api.runtime_wiring import (
     AUTHORED_WORLDS_PROFILE as AUTHORED_WORLDS_PROFILE,
 )
@@ -155,6 +157,7 @@ from exulanica.models.egress import (
     load_egress_allowlist,
 )
 from exulanica.models.errors import ModelError
+from exulanica.models.local_runner import LocalChecks, with_runner_models
 from exulanica.models.manifest import MANIFEST_PATH, Manifest, Role, load_manifest
 from exulanica.models.spending import HELD_CLOSED
 from exulanica.references import store as reference_store
@@ -310,6 +313,12 @@ class Services(ServiceRefusals, WorkerFactories):
     #: asks only the models a world chose, refusing every other provider by name. None otherwise;
     #: every endpoint reading :attr:`model_client` still finds none. See :attr:`decision_client`.
     choice_client: ModelClient | None = None
+    #: Which models a person's own runner holds are able to decide for a person here
+    #: (:mod:`exulanica.models.local_runner`): where the install keeps its checks
+    #: (``EXULANICA_LOCAL_CHECKS_DIR``) and its decision client reads a provider on this computer.
+    #: None otherwise, and in an install that admits workspace models, whose own source the host
+    #: asks instead.
+    local_checks: LocalChecks | None = None
     #: The only directory whose already-local files the environment admission route may name.
     #: None disables that write surface while retaining metadata and byte reads.
     environment_admission_root: Path | None = None
@@ -580,16 +589,21 @@ class Services(ServiceRefusals, WorkerFactories):
             spending=self.spending,
             binding_source=self.workspace_execution_source
             if self.admits_workspace_models
+            else functools.partial(local_execution_source, self)
+            if self.local_checks is not None
             else None,
         )
 
     def workspace_choice_manifest(
         self, connection: psycopg.Connection, workspace_id: uuid.UUID, engine: str | None
     ) -> Manifest:
-        """A read-only offered catalog from replayed evidence, with recorded probe rates."""
+        """A read-only offered catalog from replayed evidence, with recorded probe rates; in an
+        install that checks its runner's models, the manifest with those able now beside it."""
         from exulanica.world.workspace_model_bindings import proven_bindings, with_bindings
 
         manifest = load_manifest()
+        if self.local_checks is not None:
+            return with_runner_models(manifest, runner_specs(self, engine))
         if not self.admits_workspace_models or engine is None:
             return manifest
         return with_bindings(manifest, proven_bindings(connection, workspace_id, engine, manifest))
@@ -1269,6 +1283,16 @@ def build_services(
         choice_client = ModelClient(local_only=True)
         if spending is not None:
             choice_client = choice_client.with_spending_source(spending)
+    admits_workspace_models = _explicitly_enabled(
+        env_get("WORKSPACE_MODELS", environ),
+        "workspace_models_not_boolean",
+        "EXULANICA_WORKSPACE_MODELS",
+    )
+    local_checks = (
+        None
+        if admits_workspace_models
+        else install_checks(client if client is not None else choice_client, environ)
+    )
     if (
         accounts is not None
         and accounts.guest is not None
@@ -1296,6 +1320,7 @@ def build_services(
         executor_shares_the_write_role=readonly_url is None,
         model_client=client,
         choice_client=choice_client,
+        local_checks=local_checks,
         accounts=accounts,
         door=door_runtime(database, environ, open_to=_door_open_to(accounts)),
         environment_admission_root=data_dir / "environment-inbox",
@@ -1347,11 +1372,7 @@ def build_services(
         reference_web_pictures=searches_web_pictures_here(
             env_get("REFERENCE_WEB_PICTURES", environ)
         ),
-        admits_workspace_models=_explicitly_enabled(
-            env_get("WORKSPACE_MODELS", environ),
-            "workspace_models_not_boolean",
-            "EXULANICA_WORKSPACE_MODELS",
-        ),
+        admits_workspace_models=admits_workspace_models,
         runs_model_probe_worker=_explicitly_enabled(
             env_get("MODEL_PROBE_WORKER", environ),
             "model_probe_worker_not_boolean",

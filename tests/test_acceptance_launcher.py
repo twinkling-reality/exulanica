@@ -890,6 +890,9 @@ def test_a_personal_install_with_no_key_admits_the_models_on_this_computer(tmp_p
         "http://localhost:11434"
     ]
     assert "EXULANICA_EGRESS_ALLOWLIST" not in _api_environment(False, shell)
+    # Their checks are kept in the install's own store; with no server to ask, none are made.
+    assert environment(False, shell)["EXULANICA_LOCAL_CHECKS_DIR"] == "run/data/local-checks"
+    assert "EXULANICA_LOCAL_CHECKS_DIR" not in _api_environment(False, shell)
     # With a key, the person's own list stands, as --model states it.
     keyed = {
         "NEBIUS_API_KEY": "sk-not-a-real-key",
@@ -911,6 +914,7 @@ def test_a_personal_install_with_no_key_admits_the_models_on_this_computer(tmp_p
         {**state, "local_model_servers": ["http://localhost:11434"]}, run, {}, model=False
     )
     assert json.loads(restarted["EXULANICA_EGRESS_ALLOWLIST"]) == ["http://localhost:11434"]
+    assert restarted["EXULANICA_LOCAL_CHECKS_DIR"] == str(run / "data" / "local-checks")
     assert "EXULANICA_EGRESS_ALLOWLIST" not in LAUNCH.recorded_api_environment(
         state, run, {}, model=False
     )

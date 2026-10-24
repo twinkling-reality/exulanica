@@ -35,9 +35,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from exulanica.api.decision_host import HOST_REFUSALS
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
+from exulanica.api.runner_models import runner_model_name, runner_rows
 from exulanica.api.services import Services
 from exulanica.api.world_scope import WorldId
 from exulanica.door.outside import outside_deciders
+from exulanica.models.local_runner import checked_ms
 from exulanica.models.manifest import Manifest, load_manifest
 from exulanica.models.model_cards import model_card
 from exulanica.models.usage import usd_string
@@ -266,6 +268,7 @@ def society_model_history(
         return _role_refused(exc)
     repository = SocietyModelChoiceRepository(connection, session.workspace_id, world_id=world_id)
     manifest = load_manifest()
+    services = get_services(request)
     views = [
         view
         for view in reversed(repository.history(version_id, role))
@@ -288,7 +291,9 @@ def society_model_history(
                     else {
                         "provider": view["model"]["provider"],
                         "model_id": view["model"]["model_id"],
-                        "name": manifest.model_name(view["model"]["model_id"]),
+                        # A model a person's runner held is named by its kept check.
+                        "name": runner_model_name(services, view["model"]["model_id"])
+                        or manifest.model_name(view["model"]["model_id"]),
                     },
                     "ended": bool(view.get("ended", False)),
                 }
@@ -340,6 +345,9 @@ def offered_models(
         if mechanism is None:
             continue
         card = model_card(spec.model_id)
+        # The check kept for a model a person's own runner holds, read only for such a model.
+        checks = None if spec.served_as is None else services.local_checks
+        kept = None if checks is None else checks.kept(spec.model_id)
         models.append(
             {
                 "provider": spec.provider,
@@ -358,10 +366,29 @@ def offered_models(
                 "refusal": services.provider_refusal(spec.provider),
                 "source": "shipped_manifest"
                 if spec.model_id in load_manifest().models
+                else "this_computer_check"
+                if spec.served_as is not None
                 else "workspace_probe",
-                "fresh_rates_required": spec.model_id not in load_manifest().models,
+                "fresh_rates_required": spec.model_id not in load_manifest().models
+                and spec.served_as is None,
                 "card": None if card is None else card.served(),
             }
+            # A model a person's own runner holds, as the runner states it: its family and size,
+            # the name it serves it by now, and the licence it states, quoted and never classed.
+            | (
+                {}
+                if spec.served_as is None
+                else {
+                    "runner": {
+                        "family": None if kept is None else kept.get("family"),
+                        "size": None if kept is None else kept.get("parameter_size"),
+                        "served_as": spec.served_as,
+                        "licence": None if kept is None else kept.get("licence"),
+                        # How long its check's slowest case took to answer, which its row tells.
+                        "checked_ms": checked_ms(kept),
+                    }
+                }
+            )
         )
     # Free first: what this computer serves before what a provider bills, each in its order.
     return sorted(models, key=lambda model: not model["on_this_computer"])
@@ -413,6 +440,14 @@ def society_models_view(
         return refusals[key]
 
     models = offered_models(role, services, asked, manifest=manifest)
+
+    def name_of(model_id: str) -> str:
+        """The name a person reads for a model the read mentions: the manifest's, or for a model
+        a person's runner held, the one its kept check gives, whether or not it still holds it."""
+        if model_id not in manifest.models:
+            return runner_model_name(services, model_id) or manifest.model_name(model_id)
+        return manifest.model_name(model_id)
+
     # What models decided: an outside program's decisions name no model, and are read by its own
     # door's routes, not summarised here among the models'.
     asked_models = [decision for decision in decisions if decision["decider"]["kind"] == "model"]
@@ -439,6 +474,10 @@ def society_models_view(
             "model_people_maximum": contract.value(role.subjects_bound),
         },
         "models": models,
+        # Every model a person's own runner serves beside the manifest's, able (also offered in
+        # ``models``), being checked, or not able and why; an optional field, empty where nothing
+        # is checked here.
+        "runner_models": runner_rows(services, snapshot["profile"]),
         # Each choice with why its model is not asked here, when it is not: the page says the
         # routine decides for now, and why, rather than naming a model nobody asks.
         # Every model the read mentions carries the name Manifest.model_name gives it, the one the
@@ -450,7 +489,7 @@ def society_models_view(
                 **choice,
                 "model": None
                 if choice["model"] is None
-                else {**choice["model"], "name": manifest.model_name(choice["model"]["model_id"])},
+                else {**choice["model"], "name": name_of(choice["model"]["model_id"])},
                 "refusal": None if choice["model"] is None else refusal(choice["model"]),
             }
             | (_played(choice, session) if is_played(choice["decider"]) else {})
@@ -464,7 +503,7 @@ def society_models_view(
                 "decider": choice["decider"],
                 "model": None
                 if choice["model"] is None
-                else {**choice["model"], "name": manifest.model_name(choice["model"]["model_id"])},
+                else {**choice["model"], "name": name_of(choice["model"]["model_id"])},
             }
             for grant_id, choice in sorted(travellers.items())
         ],
@@ -486,18 +525,16 @@ def society_models_view(
                     "chose",
                 )
             }
-            | {"name": manifest.model_name(decision["model_id"])}
+            | {"name": name_of(decision["model_id"])}
             for _, decision in sorted(latest.items())
         ],
         "by_model": [
-            {**summary, "name": manifest.model_name(summary["model_id"])}
-            for summary in _by_model(asked_models)
+            {**summary, "name": name_of(summary["model_id"])} for summary in _by_model(asked_models)
         ],
         # The same measures for each being under each model, added as an optional field: what a
         # page says of how a being is doing is read here, never recomputed.
         "by_being": [
-            {**entry, "name": manifest.model_name(entry["model_id"])}
-            for entry in by_being(asked_models)
+            {**entry, "name": name_of(entry["model_id"])} for entry in by_being(asked_models)
         ],
         "decisions_read": {"counted": len(decisions), "maximum": DECISIONS_READ},
         # Every subject an outside program decides for now under a grant that stands, the world's

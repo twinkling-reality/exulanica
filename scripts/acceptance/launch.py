@@ -1013,6 +1013,9 @@ def api_environment(
         # A person's own install with no key may ask the models on this computer, and nothing else:
         # with no credential the API builds a client that asks only those (A2).
         environment["EXULANICA_EGRESS_ALLOWLIST"] = json.dumps(list(local_servers))
+        # Each of those models is checked once before a person may choose it, and the check is kept
+        # in the install's own store (L1).
+        environment["EXULANICA_LOCAL_CHECKS_DIR"] = str(data_dir / "local-checks")
     environment.update(
         {
             "EXULANICA_DATABASE_URL": exports["EXULANICA_DATABASE_URL"],

@@ -303,6 +303,57 @@ role whose every billed allowance is spent reads as spent (`offered_providers` n
 providers only), and the durable authority admits no attempt to it: the process's budget alone
 reserves and counts each one. No recorded run asks it under durable spending.
 
+#### Every model a person's runner holds
+
+Beyond the model the manifest ships for it, every model a person's own Ollama runner holds may
+decide for their people once a check on this computer has found it able
+([`local_runner.py`](../exulanica/models/local_runner.py)). An install checks only where it states a
+check directory, `EXULANICA_LOCAL_CHECKS_DIR`: the acceptance launcher's keyless `--personal` install
+sets it to `local-checks` in its own store, and an install that admits workspace models checks none.
+
+- **Known by its weights.** The runner's tag list, which the liveness read already keeps, names
+  each model once per sha256 digest, whatever tags serve it. A choice, its receipts and a replay
+  record `local/sha256-<digest>`. The tag the runner serves those weights by is only what it is
+  asked by, read again for each minute's asks; a model whose weights no tag serves is neither
+  offered nor asked. A person reads it by its family and size as the runner states them ("Llama ·
+  1.2B"), or by the name they gave it where the runner states neither, never by an alias.
+- **The check.** Once per digest, in one background thread, one model at a time, the smallest the
+  runner states first, so a list fills fastest. A model that does
+  not read text, or whose context (`/api/show`) is shorter than a person's request needs, is not
+  able; that need is the role's context bound read at three bytes a token, with room for the
+  instruction and the answer (8,192 tokens for a 16,000 byte bound). Otherwise one unrecorded ask
+  loads it, within 180 seconds, and two fixed requests of the people's role
+  ([cases](../assets/catalogs/local-check/local-check-cases.v1.json), from the tests' own starter
+  square, with no person's data) are asked through the runner's own `/api/chat`: the role's
+  messages, its strict JSON schema as the format, that context, room for a 512 token answer,
+  temperature 0 and, for a model that reasons, reasoning off. It is able where the host takes every
+  answer within the role's 20 second deadline (`answer_outcome` in
+  [`role_decisions.py`](../exulanica/world/role_decisions.py): an offered label, a line exactly where
+  the label says something, within the line rule, naming no one it is said to). Not able has one
+  reason: `text`, `context`, `slow`, `form`, or `error` where the check could not be made (the
+  runner answered an ask with an error, or the check failed in a way nobody named).
+- **The record** is the install's own runtime data, one JSON file per digest, kept, and never an
+  evaluation record. A record made under other cases, another contract or another context is
+  stale, and the model is checked again; an `error` record stands for 6 hours, then the model is
+  checked again the next time a list shows it. A runner that went away mid-check leaves none.
+- **Offered and asked.** A society whose engine asks its people under the terms the cases were made
+  under, the society of things, is offered every model its runner serves now whose kept check finds
+  it able, beside the manifest's own (`Services.workspace_choice_manifest`). A model being checked
+  or not able is listed with its state and reason (`runner_models` in the people's models read) and
+  is never offered. A chosen one is asked exactly as its check asked it, by the same request, for
+  the role and prompt version it was checked under only, and only while the tag that served its
+  weights when the minute began still serves them (`local_execution_source` in
+  [`runner_models.py`](../exulanica/api/runner_models.py)). The runner names no digest in its answer, so a tag
+  pulled onto other weights is asked under the old digest until the next liveness read, at most 15 seconds. It costs
+  nothing, as every model on this computer does. Societies of other engines, and every role a world
+  does not choose for its people, are offered none.
+- **Licence.** A model a person runs on their own computer is theirs to choose under its own
+  licence: Exulanica ships, serves and records none of its weights. Its row quotes the first line
+  of the licence the runner states, never classed or judged here. Every hosted model is still
+  admitted only under a licence a person classed as accepted.
+
+Not measured: how long a check of a large model takes on a computer with less memory.
+
 Three recipes of the two Apache-2.0 models on disk were probed on this computer by both
 mechanisms, on the same six plain and sixteen line choices as the Super and Ultra probe, first one
 ask at a time and then eight at once, cold and warm

@@ -278,6 +278,13 @@ class ModelSpec:
     #: ``server_environment`` it was measured under, with why. Empty for a hosted model. Left out
     #: of the hash, as ``answering`` is.
     recipe: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}), hash=False)
+    #: For a model a person's own runner holds, known by its weights
+    #: (:mod:`exulanica.models.local_runner`): the name the runner serves those weights by now,
+    #: which it is asked by through the runner's own chat route as its check asked it. None for
+    #: every model this manifest declares.
+    served_as: str | None = None
+    #: Whether such a model reasons, and so is asked with reasoning off, as its check asked it.
+    served_with_reasoning_off: bool = False
 
     def cost_usd(self, *, prompt_tokens: int, completion_tokens: int) -> Decimal:
         """Billable cost of one call, exactly.

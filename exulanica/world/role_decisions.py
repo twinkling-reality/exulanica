@@ -410,6 +410,42 @@ def names_its_listener(
     return listener is not None and names_listener(line, listener)
 
 
+def answer_outcome(
+    role: DecisionRole,
+    context: Mapping[str, Any],
+    contract_versions: Mapping[str, int],
+    label: str,
+    line: str | None,
+) -> str:
+    """How the host takes a model's answer to a request of ``context``, asked under its engine's
+    terms and ``contract_versions``: ``offered_label`` where it takes it, or the rule
+    :func:`check_role_result` holds a proposal to that refuses it (``label_not_offered``,
+    ``line_where_none``, ``no_line_where_one``, ``line_breaks_rule`` or ``line_names_listener``).
+    A model on a person's runner is checked by it before a person may choose it."""
+    option = next((o for o in context["options"] if o["label"] == label), None)
+    if option is None:
+        return "label_not_offered"
+    says = label in role.line_labels(context)
+    if says != bool(line):
+        return "line_where_none" if line else "no_line_where_one"
+    if line is None:
+        return "offered_label"
+    try:
+        checked = check_line(line, maximum=context["line_characters_maximum"])
+    except LineRefused:
+        return "line_breaks_rule"
+    request = {
+        "context": context,
+        "provider_config": {
+            "prompt_version": role.terms_of(context).prompt_version,
+            "contract": {"catalog_versions": dict(contract_versions)},
+        },
+    }
+    if names_its_listener(role, request, option, checked):
+        return "line_names_listener"
+    return "offered_label"
+
+
 def check_role_result(
     role: DecisionRole, result: Mapping[str, Any], request: Mapping[str, Any]
 ) -> None:
