@@ -538,7 +538,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       client: modelsClient, current: () => picker.of(row) !== null && held === row && current() })).verified,
     refusal: (error, row) => modelRefusalWords(error.code ?? 'stale', subjectView(row).who),
     onUsed: (verified) => { subjectReads.models = verified; if (asking) { asking.shown = runWatch.limits(verified); asking.refusal = null; } } });
-  const runWatch = mountRunWatch({ pill: corners, entry, credentials, isCurrent: current, readOnly,
+  // Every model a run asks here is on this computer, or null before the models are read: no money figure (A2).
+  const runFree = () => subjectReads.models ? freeHere(subjectReads.models, subjectReads.models.choices.filter(choice => choice.model && !choice.refusal).map(choice => choice.model)) : null;
+  const runWatch = mountRunWatch({ pill: corners, entry, credentials, isCurrent: current, readOnly, free: runFree,
     askers: () => (subjectReads.models?.choices ?? []).filter(choice => choice.model && !choice.refusal).map(choice => whoOf(choice.subjectId)),
     onChange: () => { if (pageView) drawPage(); },
   });
@@ -681,7 +683,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       connected,
       runLine: subjectReads.models ? runSectionLine(view.who, { hostRefusal: subjectReads.models.hostRefusal, offered: subjectReads.models.models,
         chosen: Boolean(model), chosenRefusal: choice?.refusal ?? null, assignable }) : null,
-      run: { open: Boolean(run), big: run ? runningLine(run, Date.now()) : runLength(limits), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal, view.model ?? null) : null },
+      run: { open: Boolean(run), big: run ? runningLine(run, Date.now(), runFree()) : runLength(limits, runFree()), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal, view.model ?? null) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
       did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...(row.heard ? {} : { model: row.model ?? null, choices: row.model ? decisionOptions(row.requestId) ?? null : null, decisions: row.decisions ?? null, decider: row.decider === 'person' || row.decider === 'external' ? row.decider : null }), ...records.dayRow(pageView, row) })) : null,
       didFocus: pageView.didFocus, lastRun, lastRunWhy, canAsk: !readOnly,

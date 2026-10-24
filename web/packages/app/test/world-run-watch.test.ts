@@ -12,7 +12,7 @@ vi.mock('../src/society-control-api.ts', () => ({
   },
 }));
 vi.mock('../../../../tools/previews/world-workspace/entity-execution.mjs', () => ({
-  openRun: () => null,
+  openRun: (control: { livingSession?: { state?: string } } | null) => (control?.livingSession?.state === 'open' ? control.livingSession : null),
   stopRun: vi.fn(),
   // As startRun does: the world's running state read now, then the limits the run opens under from it.
   startRun: async ({ limitsFor }: { limitsFor: (control: unknown, models: unknown) => unknown }) => {
@@ -77,5 +77,25 @@ describe('the running state a run asks under', () => {
     await watch.refresh();
     expect(watch.limits(MODELS)).toEqual(defaultRunLimits(8000, 1));
     watch.dispose();
+  });
+
+  it('draws the pill of a run whose every model is on this computer, or whose models are not read yet, with no money figure (A2)', async () => {
+    const { mountRunWatch } = await runWatch();
+    const run = {
+      sessionId: 's1', state: 'open', endsBy: new Date(Date.now() + 553_000).toISOString(),
+      limits: { usd: '0.05000000' }, used: { usd: '0', unresolved: { count: 0, usd: '0' } },
+    };
+    server.control = { versionId: 'v1', hostPlayback: { intervalMs: 8000 }, tickIntervalMs: 8000, livingSession: run };
+    for (const free of [true, false, null]) {
+      const pill = { run: vi.fn(), runEnded: vi.fn() };
+      const watch = mountRunWatch({ pill, askers: () => [{ start: 'Teo', within: 'Teo' }], free: () => free,
+        entry: { worldId: 'w1', authoredVersionId: 'v1' }, credentials: {}, isCurrent: () => true, readOnly: false, onChange: () => {} });
+      await watch.refresh();
+      const line = String(pill.run.mock.calls.at(-1)?.[0]?.line);
+      expect(line).toMatch(/^Teo's model is deciding · \d+:\d\d left/u);
+      expect(line.includes('$')).toBe(free === false);
+      watch.dispose();
+    }
+    server.control = null;
   });
 });

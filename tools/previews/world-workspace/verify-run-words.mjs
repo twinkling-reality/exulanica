@@ -58,6 +58,8 @@ assert.equal(DEFAULT_RUN.usd, '0.05000000');
 assert.equal(runFor(limits), 'Run for 10 minutes');
 assert.equal(atMost(limits, true), 'At most $0.05');
 assert.equal(runLength(limits), '10 minutes · at most $0.05');
+// A run whose every model is on this computer says no money figure: free (A2).
+assert.equal(runLength(limits, true), '10 minutes · Free');
 assert.equal(whoDecides(who), "Teo's model decides. Everyone else keeps their routine.");
 assert.equal(whoDecides(resident), "The resident's model decides. Everyone else keeps their routine.");
 const now = Date.parse('2026-10-14T17:20:00Z');
@@ -66,9 +68,14 @@ assert.equal(timeLeft(open.endsBy, now), '9:13');
 assert.equal(timeLeft(open.endsBy, now + 600_000), '0:00');
 assert.deepEqual({ ...stripWords(open, now) }, { running: 'Running', timeLeft: '9:13', left: 'left', spent: '$0.0011', of: 'of $0.05', stop: 'Stop' });
 assert.equal(runningLine(open, now), '9:13 left · $0.0011 of $0.05');
+assert.equal(runningLine(open, now, true), '9:13 left');
+// Before the page has read the run's models, no money figure is said either.
+assert.equal(runningLine(open, now, null), '9:13 left');
 // The pill's run line (r09): who decides by J28's names, then the time left and the spending.
 const teo = called({ name: 'Teo' }), ines = called({ name: 'Ines' }), someone = called({ name: null, kind: 'Resident' });
 assert.equal(pillRunLine(open, now, [teo]), "Teo's model is deciding · 9:13 left · $0.0011 of $0.05");
+assert.equal(pillRunLine(open, now, [teo], true), "Teo's model is deciding · 9:13 left");
+assert.equal(pillRunLine(open, now, [], null), 'Running · 9:13 left');
 assert.equal(decidingWords([teo, ines]), "Teo's and Ines's models are deciding");
 assert.equal(decidingWords([teo, ines, someone]), "Teo's, Ines's and the resident's models are deciding");
 assert.equal(decidingWords([someone]), "The resident's model is deciding");

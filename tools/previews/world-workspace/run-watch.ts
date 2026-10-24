@@ -44,10 +44,15 @@ export interface RunWatch {
   dispose(): void;
 }
 
-export function mountRunWatch({ pill, askers, entry, credentials, isCurrent, readOnly, onChange }: {
+export function mountRunWatch({ pill, askers, free = () => false, entry, credentials, isCurrent, readOnly, onChange }: {
   readonly pill: RunPill;
   /** The characters whose choice is a model, as the page calls them now, for the pill's "who decides". */
   readonly askers: () => readonly CalledAs[];
+  /**
+   * Whether every model those characters have is on this computer, or null before the page has read them: the pill then
+   * says no money figure (A2).
+   */
+  readonly free?: () => boolean | null;
   readonly entry: { readonly worldId: string; readonly authoredVersionId: string };
   readonly credentials: Record<string, unknown>;
   readonly isCurrent: () => boolean;
@@ -112,7 +117,7 @@ export function mountRunWatch({ pill, askers, entry, credentials, isCurrent, rea
     const run = openRun(control);
     if (!run) { if (shown) pill.run(null); shown = false; return; }
     shown = true;
-    pill.run({ line: pillRunLine(run, Date.now(), askers()), onStop: () => { void watch.stop(); } });
+    pill.run({ line: pillRunLine(run, Date.now(), askers(), free()), onStop: () => { void watch.stop(); } });
   }
   async function read() {
     const before = openRun(control);

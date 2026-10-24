@@ -12,6 +12,8 @@ export const RUN_WORDS = Object.freeze({
   left: 'left',
   back: 'Back',
   stopsByItself: 'It stops by itself, or when you press Stop.',
+  /** A run whose every model is on this computer, in place of its money figure (A2). */
+  free: 'Free',
 });
 
 /** Why a run could not start or stop, by the server's code (spec 8.8). */
@@ -65,8 +67,8 @@ export const runFor = limits => `Run for ${minutesWords(limits.wallSeconds)}`;
 /** The most a run may spend: "At most $0.05" heads the card; "at most $0.05" sits in a line. */
 export const atMost = (limits, start = false) => `${start ? 'At' : 'at'} most ${amount(limits.usd)}`;
 
-/** The page's Run line: "10 minutes · at most $0.05". */
-export const runLength = limits => `${minutesWords(limits.wallSeconds)} · ${atMost(limits)}`;
+/** The page's Run line: "10 minutes · at most $0.05"; "10 minutes · Free" where every model it asks is on this computer (A2). */
+export const runLength = (limits, free = false) => `${minutesWords(limits.wallSeconds)} · ${free ? RUN_WORDS.free : atMost(limits)}`;
 
 /** What a run does, said of the chosen character. */
 export const whoDecides = who => `${possessive(who.start)} model decides. Everyone else keeps their routine.`;
@@ -98,14 +100,19 @@ export function decidingWords(whos) {
   return `${names.slice(0, -1).join(', ')} and ${names.at(-1)} models are deciding`;
 }
 
-/** The pill's run line (r09): who decides, the time left and the spending, "Teo's model is deciding · 9:13 left · $0.0011 of $0.05". */
-export function pillRunLine(run, now, whos) {
-  return [decidingWords(whos), runningLine(run, now)].join(' · ');
+/**
+ * The pill's run line (r09): who decides, the time left and the spending, "Teo's model is deciding · 9:13 left · $0.0011 of
+ * $0.05"; with no money figure where every model the run asks is on this computer (`free`, A2) or the page has not read
+ * them yet (`free` null).
+ */
+export function pillRunLine(run, now, whos, free = false) {
+  return [decidingWords(whos), runningLine(run, now, free)].join(' · ');
 }
 
-/** The page's line while a run is on: "9:13 left · $0.0011 of $0.05" (the strip and the orb say it runs; DESIGN's J9). */
-export function runningLine(run, now) {
-  return [`${timeLeft(run.endsBy, now)} ${RUN_WORDS.left}`, `${amount(run.used.usd)} of ${amount(run.limits.usd)}`].join(' · ');
+/** The page's line while a run is on: "9:13 left · $0.0011 of $0.05" (the strip and the orb say it runs; DESIGN's J9); "9:13 left" where it is free or not known yet. */
+export function runningLine(run, now, free = false) {
+  const left = `${timeLeft(run.endsBy, now)} ${RUN_WORDS.left}`;
+  return free === false ? [left, `${amount(run.used.usd)} of ${amount(run.limits.usd)}`].join(' · ') : left;
 }
 
 /** What a closed run spent, with what is not settled yet. */
