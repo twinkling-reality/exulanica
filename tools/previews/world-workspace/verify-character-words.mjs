@@ -86,7 +86,7 @@ for (const words of said) {
 // Why a character's model does not run (J2, J22): the cause the models read states, asking for
 // nothing the page cannot do.
 const open = [{ refusal: null }, { refusal: 'model_no_longer_offered' }];
-assert.equal(runSectionLine(teo, { offered: open, assignable: true }), 'Teo follows a routine. Choose a model to run.');
+assert.equal(runSectionLine(teo, { offered: open, assignable: true }), 'Teo follows a routine. Choose an AI model to run.');
 assert.equal(runSectionLine(resident, { offered: open }), 'The resident follows a routine.');
 assert.equal(runSectionLine(teo, { offered: open, chosen: true }), null, 'a chosen model that may be asked runs');
 for (const unasked of [{ hostRefusal: 'provider_credential_absent', offered: open }, { hostRefusal: 'models_not_run_here', offered: open },

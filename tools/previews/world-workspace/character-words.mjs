@@ -24,7 +24,7 @@ export const CHARACTER_WORDS = Object.freeze({
   noModel: 'No AI model',
   free: 'Free',
   current: 'Current',
-  chooseModel: 'Choose a model',
+  chooseModel: 'Choose an AI model',
   /** Above the chooser's rows (A3): what the models are, and that picking one spends nothing. */
   chooserIntro: 'Open models, each from its maker. Picking one spends nothing. Only a run spends.',
   /** The chooser's groups by where a model runs (A3), free first; the key group is keyGroup's. */
@@ -191,7 +191,7 @@ export function modelLine(model) {
 }
 
 /** The page's Run section for a character with no model (DESIGN's J2). */
-export const routineRun = who => `${who.start} follows a routine. Choose a model to run.`;
+export const routineRun = who => `${who.start} follows a routine. Choose an AI model to run.`;
 
 /** The same where this person cannot choose a model here (no [M] Model): no instruction it cannot follow. */
 export const followsRoutine = who => `${who.start} follows a routine.`;
@@ -262,7 +262,7 @@ export function modelRefusalWords(code, who) {
 export const GROUP_WORDS = Object.freeze({
   decide: who => `Let ${possessive(who.within)} model decide`,
   stop: who => `Stop ${possessive(who.within)} model`,
-  choose: who => `Choose ${possessive(who.within)} model`,
+  choose: who => `Choose ${possessive(who.within)} AI model`,
   follow: who => `Follow ${who.within}`,
   stopFollowing: () => CHARACTER_WORDS.stopFollowing,
 });

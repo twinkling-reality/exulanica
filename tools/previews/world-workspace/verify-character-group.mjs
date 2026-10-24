@@ -11,7 +11,7 @@ const teo = called({ name: 'Teo' }), marco = called({ name: 'Marco' }), resident
 assert.equal(dayWord(teo), "Teo's day", 'the talking scene\'s own word (talk-words.mjs), one word for both');
 assert.equal(GROUP_WORDS.decide(teo), "Let Teo's model decide");
 assert.equal(GROUP_WORDS.stop(teo), "Stop Teo's model");
-assert.equal(GROUP_WORDS.choose(teo), "Choose Teo's model");
+assert.equal(GROUP_WORDS.choose(teo), "Choose Teo's AI model");
 assert.equal(GROUP_WORDS.follow(teo), 'Follow Teo');
 assert.equal(dayWord(resident), "The resident's day");
 assert.equal(GROUP_WORDS.follow(resident), 'Follow the resident');
@@ -116,7 +116,7 @@ const running = groupContent({ who: teo, decider: 'model', model: 'Nemotron 3 Na
 assert.deepEqual(keys(running), ["Enter Teo's day", "R Stop Teo's model", 'V Follow Teo']);
 assert.equal(running.print, "Teo's model is deciding · 1:52 left");
 assert.deepEqual(keys(groupContent({ who: teo, decider: 'model', model: 'M', connected: false })), ["Enter Teo's day", 'V Follow Teo'], 'a model that cannot be asked here: no R');
-assert.deepEqual(keys(groupContent({ who: teo, decider: 'routine', assignable: true })), ["Enter Teo's day", "M Choose Teo's model", 'V Follow Teo']);
+assert.deepEqual(keys(groupContent({ who: teo, decider: 'routine', assignable: true })), ["Enter Teo's day", "M Choose Teo's AI model", 'V Follow Teo']);
 assert.deepEqual(keys(groupContent({ who: teo, decider: 'routine', assignable: false })), ["Enter Teo's day", 'V Follow Teo'], 'no M where this page cannot choose');
 assert.deepEqual(keys(groupContent({ who: teo, decider: 'person', model: 'M' })), ["Enter Teo's day", 'V Follow Teo']);
 assert.deepEqual(keys(groupContent({ who: teo, decider: 'external', assignable: true })), ["Enter Teo's day", 'V Follow Teo']);
@@ -186,7 +186,7 @@ const ordered = choosableModels({ models: served });
 assert.deepEqual(ordered.map(model => model.name), ['Qwen3 4B Instruct', 'Nemotron 3 Nano 30B', 'Qwen3 235B Instruct'], 'this computer first, then the lowest price');
 const listed = modelGroup({ who: teo, models: ordered, current: { provider: 'nebius', modelId: 'nvidia/nano' }, focus: 1 });
 assert.equal(listed.name, 'Teo');
-assert.equal(listed.doing, 'Choose a model');
+assert.equal(listed.doing, 'Choose an AI model');
 assert.equal(listed.note, 'Open models, each from its maker. Picking one spends nothing. Only a run spends.');
 assert.deepEqual(listed.rows, [], 'the list takes the rows\' place');
 assert.equal(listed.list.waiting, null, 'a model runs on this computer: its group holds it');
