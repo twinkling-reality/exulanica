@@ -105,7 +105,8 @@ export const DECISION_NOTE_WORDS = Object.freeze({ hide: 'Hide notes', show: 'No
 
 /**
  * The decision page's notes for a newcomer (A7, DESIGN 17:13): one plain line under the head's small print, what
- * was told, the choices and What happened, and the Compare key's where it shows, each claiming nothing the page does
+ * was told, the choices and What happened, the ring's under its time and cost (D5), and the Compare key's where it
+ * shows, each claiming nothing the page does
  * not show. A model's words where a model decided; where a person playing or an outside program did, the choices'
  * naming who picked (the world checks every choice, whoever makes it) and What happened's. `who` is the being as a
  * sentence calls it.
@@ -113,7 +114,8 @@ export const DECISION_NOTE_WORDS = Object.freeze({ hide: 'Hide notes', show: 'No
 export function decisionNotes({ who, decider = null, canCompare = false }) {
   const name = who.within, model = decider === 'model', picker = model ? 'The model' : deciderWords(decider);
   return Object.freeze({
-    by: model ? `The open model that chose for ${name}, how long it took to answer, and what this one choice cost.` : null,
+    by: model ? `The open model that chose for ${name}.` : null,
+    ring: model ? 'How long it took to answer and what this one choice cost.' : null,
     told: model ? `The prompt ${possessive(name)} model was given: everything it was told about that moment, and nothing more. Full record shows it as it was sent.` : null,
     choices: picker ? `The actions the world allowed ${name} there. ${picker} picked one, and the world checked it before it happened.` : null,
     happened: 'What the choice did in the world, at that minute.',
@@ -128,17 +130,24 @@ export const choicesOver = who => `${possessive(who.start)} choices`;
 export const choseOneOf = count => `chose 1 of ${count}`;
 
 /**
- * The head's small print (r10) as parts, a model's name its own part ({ model }) so the page keeps it on one line:
- * "Decided by Nemotron 3 Nano 30B · answered in 0.9 s · cost $0.0003", "Decided by a person playing", "Decided by an
- * outside program" (`decider` 'person' or 'external', T7). A part not recorded is left out; with no one named, the
- * line opens on its first part, capitalised.
+ * The head's small print (r10) as parts, a model's name its own part ({ model }) so the page keeps it on one line: who
+ * decided and nothing else (D5), "Decided by Nemotron 3 Nano 30B", "Decided by a person playing", "Decided by an outside
+ * program" (`decider` 'person' or 'external', T7); nothing where no one is named.
  */
-export function decidedByParts({ decider = null, model = null, latencyMs = null, costUsd = null, costKnown = true } = {}) {
+export function decidedByParts({ decider = null, model = null } = {}) {
   const who = decider === 'person' ? DECISION_FLOW_WORDS.decidedByPerson : decider === 'external' ? DECISION_FLOW_WORDS.decidedByProgram : null;
-  const named = who ? [who] : plain(model) ? [DECISION_FLOW_WORDS.decidedBy, { model: plain(model) }] : [];
-  const rest = [answeredIn(latencyMs), costWords(costUsd, costKnown)].filter(Boolean);
-  if (!named.length) return rest.length ? [capital(rest.join(' · '))] : [];
-  return rest.length ? [...named, ` · ${rest.join(' · ')}`] : named;
+  return who ? [who] : plain(model) ? [DECISION_FLOW_WORDS.decidedBy, { model: plain(model) }] : [];
+}
+
+/**
+ * Under the ring, by the choice they paid for (D5): the answer's time and its cost, "answered in 0.1 s · $0.0001",
+ * "answered in 1.3 s · at most $0.0014" where only its bound is known; a part not recorded is left out, null with neither.
+ */
+export function ringPrint({ latencyMs = null, costUsd = null, costKnown = true } = {}) {
+  const cost = costUsd === null || costUsd === undefined || !amount(costUsd) ? null : `${costKnown ? '' : 'at most '}${amount(costUsd)}`;
+  // A figure never breaks across lines under the ring (DESIGN 04:04): "0.1 s" keeps a no-break space.
+  const parts = [answeredIn(latencyMs)?.replace(/ s$/u, '\u00a0s'), cost].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
 }
 
 /**

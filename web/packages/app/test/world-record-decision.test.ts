@@ -109,7 +109,8 @@ describe('A decision (r10)', () => {
     expect(page.querySelector('.wu-rd-head .wu-hr-over')?.textContent).toBe('06:52 · Day 1 · Teo met Ines at the bench');
     expect(page.querySelector('.wu-rd-title')?.textContent).toBe('Teo spoke to Ines');
     expect(document.activeElement?.textContent).toBe('Teo spoke to Ines');
-    expect(page.querySelector('.wu-rd-by')?.textContent).toBe('Decided by Nemotron 3 Nano 30B · answered in 0.9 s · cost $0.0003');
+    // Who decided, and nothing else: the answer's time and cost stand under the ring (D5).
+    expect(page.querySelector('.wu-rd-by')?.textContent).toBe('Decided by Nemotron 3 Nano 30B');
     expect(page.querySelector('.wu-rd-by .wu-hr-model')?.textContent).toBe('Nemotron 3 Nano 30B');
 
     // What the model was told, each section's name and words; the personality's name plain and its words as written, in
@@ -137,7 +138,9 @@ describe('A decision (r10)', () => {
     expect(lines.querySelectorAll('circle.end')).toHaveLength(9);
     expect([...lines.querySelectorAll('circle.end.lit')].map((dot) => [dot.getAttribute('cx'), dot.getAttribute('cy')])).toEqual([['852', '438']]);
     // Under the ring: the model's name and how many choices it had.
-    expect(all(page, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose 1 of 9']);
+    expect(all(page, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose 1 of 9', 'answered in 0.9\u00a0s · $0.0003']);
+    // What the model was told is the first heading after the title.
+    expect(page.querySelector('.wu-rd-told > h2.wu-rd-told-heading')?.textContent).toBe("What Teo's model was told");
     expect(at(page.querySelector('.wu-rd-caption'))).toEqual(['740px', '650px']);
 
     // The choices, numbered as offered, 44px apart; the taken one in the ink with its tag.
@@ -173,7 +176,7 @@ describe('A decision (r10)', () => {
     const { root, page } = await open(teo({ choices: choices(words, 1), choicesHeading: "Teo's choices" }));
     expect(numbers(root)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect([...root.querySelectorAll<HTMLElement>('.wu-rd-choice')].map((row) => Number.parseFloat(row.style.top))).toEqual(Array.from({ length: 12 }, (_, step) => 372 + 44 * step));
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose 1 of 14']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose 1 of 14', 'answered in 0.9\u00a0s · $0.0003']);
     // Only the down arrow while more lie below; the up arrow once more lie above.
     expect(all(root, '.wu-rd-more')).toEqual(['↓']);
     expect(press('ArrowDown').defaultPrevented).toBe(true);
@@ -231,9 +234,9 @@ describe('A decision (r10)', () => {
       earlier: false, later: true, record: null, failure: null, canCompare: false,
     });
     expect(root.querySelector('.wu-rd-title')?.textContent).toBe('Wait here a minute');
-    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Decided by Nemotron 3 Nano 30B · answered in 1.3 s · cost at most $0.0014');
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Decided by Nemotron 3 Nano 30B');
     expect(root.querySelector('.wu-rd-over .wu-rd-label')?.textContent).toBe("Teo's choices (3)");
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose 1 of 3']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose 1 of 3', 'answered in 1.3 s · cost at most $0.0014']);
     // What happened: what was chosen, then what came of it; the quiet tile where no picture exists.
     expect(root.querySelector('.wu-rd-moment .wu-rd-action')?.textContent).toBe('Wait here a minute');
     expect(root.querySelector('.wu-rd-moment .wu-rd-verdict')?.textContent).toBe('Accepted; no minute has acted on it yet.');
@@ -367,6 +370,19 @@ describe('A decision (r10)', () => {
   });
 });
 
+describe('Under the ring, the answer and what it cost (D5)', () => {
+  it("shows no cost line for an outside program's answer, and the figures keep their space unbroken", async () => {
+    const { root } = await open(teo({ decider: 'external', model: null }));
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['An outside program', 'chose 1 of 9']);
+    document.body.replaceChildren();
+    const model = await open(teo());
+    expect(model.root.querySelector('.wu-rd-caption > .wu-rd-paid')?.textContent).toBe('answered in 0.9\u00a0s · $0.0003');
+    // The caption's words stand in a halo of the page's own ground, so the fan's curves break around them.
+    const css = readFileSync(`${process.cwd()}/../tools/previews/world-workspace/world-ui-record-decision.css`, 'utf8');
+    expect(css).toMatch(/\.wu-rd-caption > \* \{ text-shadow: [^}]*var\(--hr-ground\)/);
+  });
+});
+
 describe('A long choice wraps rather than losing its end (D3)', () => {
   it('draws a long choice whole on two lines at 1440 and moves the rows below it down by the second line', async () => {
     const words = ['Say something to Ines Brook (a villager), 4 m away', 'Wait a minute', 'Stand here'];
@@ -386,7 +402,8 @@ describe('A long choice wraps rather than losing its end (D3)', () => {
 describe('A decision explains itself to a newcomer (A7)', () => {
   afterEach(() => { localStorage.clear(); });
   const NOTES = {
-    by: 'The open model that chose for Teo, how long it took to answer, and what this one choice cost.',
+    by: 'The open model that chose for Teo.',
+    ring: 'How long it took to answer and what this one choice cost.',
     told: "The prompt Teo's model was given: everything it was told about that moment, and nothing more. Full record shows it as it was sent.",
     choices: 'The actions the world allowed Teo there. The model picked one, and the world checked it before it happened.',
     happened: 'What the choice did in the world, at that minute.',
@@ -396,6 +413,7 @@ describe('A decision explains itself to a newcomer (A7)', () => {
   it('notes the four parts under their labels and Compare in the key row, and N hides them on every later decision', async () => {
     const { root, page } = await open(teo({ notes: NOTES }));
     expect(all(root, '.wu-rd-head .wu-rd-hint')).toEqual([NOTES.by]);
+    expect(all(root, '.wu-rd-caption > .wu-rd-hint')).toEqual([NOTES.ring]);
     expect(all(root, '.wu-rd-told .wu-rd-hint')).toEqual([NOTES.told]);
     expect(all(root, '.wu-rd-over-hint')).toEqual([NOTES.choices]);
     expect(all(root, '.wu-rd-text .wu-rd-hint')).toEqual([NOTES.happened]);
@@ -414,7 +432,7 @@ describe('A decision explains itself to a newcomer (A7)', () => {
     expect(later.root.querySelectorAll('.wu-rd-hint')).toHaveLength(0);
     // Its key in the row brings them back.
     (later.root.querySelector('[aria-keyshortcuts="N"]') as HTMLButtonElement).click();
-    expect(later.root.querySelectorAll('.wu-rd-hint')).toHaveLength(5);
+    expect(later.root.querySelectorAll('.wu-rd-hint')).toHaveLength(6);
     expect(keys(later.root)).toContain('NHide notes');
   });
 

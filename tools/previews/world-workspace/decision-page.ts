@@ -9,7 +9,7 @@
 import { CHARACTER_WORDS } from './character-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
 import { FLOW_LAYOUTS, choiceEnd, choiceLines, flowLayout, flowSize, headBottom, rowMost, titleLines, toldHeight } from './decision-flow.mjs';
-import { DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, choseOneOf, decidedByParts } from './decision-words.mjs';
+import { DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, choseOneOf, decidedByParts, ringPrint } from './decision-words.mjs';
 import { page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orbs, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
 import './world-ui-record-decision.css';
@@ -65,7 +65,7 @@ export interface DecisionPageState {
   readonly personality?: { readonly name: string | null; readonly about: string | null } | null;
   /** What each part is, for a newcomer (A7): a line under the small print, what was told, the choices and What
    * happened, and the Compare key's; null where a part has none. Absent: no notes. */
-  readonly notes?: { readonly by: string | null; readonly told: string | null; readonly choices: string | null;
+  readonly notes?: { readonly by: string | null; readonly ring?: string | null; readonly told: string | null; readonly choices: string | null;
     readonly happened: string | null; readonly compare: string | null } | null;
 }
 
@@ -149,13 +149,15 @@ function placeTold(told: HTMLElement, at: Flow['told']): void {
   told.style.maxHeight = `${at.most}px`;
 }
 
-/** The head's small print: who decided, then the answer's time and cost (or the host's `done` where those are not given). */
+/** The head's small print: who decided, and nothing else (D5). */
 function smallPrint(state: DecisionPageState): Parts {
-  const decider = state.decider ?? (state.model ? 'model' : null);
-  if (state.answered) return decidedByParts({ decider, model: state.model, ...state.answered });
-  const named: Parts = decidedByParts({ decider, model: state.model });
-  if (!state.done) return named;
-  return named.length ? [...named, ` · ${state.done.charAt(0).toLowerCase()}${state.done.slice(1)}`] : [state.done];
+  return decidedByParts({ decider: state.decider ?? (state.model ? 'model' : null), model: state.model }) as Parts;
+}
+
+/** Under the ring, by the choice they paid for (D5): the answer's time and cost, or the host's `done` where those are not given. */
+function paidPrint(state: DecisionPageState): string | null {
+  if (state.answered) return ringPrint(state.answered) as string | null;
+  return state.done ? `${state.done.charAt(0).toLowerCase()}${state.done.slice(1)}` : null;
 }
 
 /** The flow's lines: the bracket and its line into the ring, the ring, the dashed choices, the lit path, the dots. */
@@ -281,7 +283,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
       if (!read || sections.length) {
         told = element('section', 'wu-rd-told');
         placeTold(told, drawn.told);
-        told.append(element('p', 'wu-rd-label', state.toldLabel));
+        told.append(element('h2', 'wu-rd-label wu-rd-told-heading', state.toldLabel));
         if (notes?.told) told.append(element('p', 'wu-rd-hint', notes.told));
         if (state.failure) {
           const note = element('p', 'wu-rd-note', state.failure);
@@ -313,6 +315,10 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         if (decider === 'person' || decider === 'external') caption.append(element('span', 'wu-rd-who', decider === 'person' ? CHARACTER_WORDS.personPlaying : CHARACTER_WORDS.outsideProgram));
         else if (state.model) caption.append(element('span', 'wu-rd-who wu-hr-model', state.model));
         if (taken >= 0) caption.append(element('span', 'wu-rd-count', choseOneOf(choices.length)));
+        // An outside program's answer shows no cost line (DESIGN 04:04); a person playing records none.
+        const paid = decider === 'external' || decider === 'person' ? null : paidPrint(state);
+        if (paid) caption.append(element('span', 'wu-rd-paid', paid));
+        if (notes?.ring && paid) caption.append(element('p', 'wu-rd-hint', notes.ring));
         if (caption.childElementCount) nodes.push(caption);
 
         // The choices as they were offered, the taken one in the ink with its tag; the arrows' caps where more lie.

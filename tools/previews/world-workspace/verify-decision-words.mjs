@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, answeredIn, askedAt, choiceRows, choicesLabel, choicesOver, choseOneOf, costWords, decidedByParts, decisionNotes, decisionTitle,
+  DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, answeredIn, askedAt, choiceRows, choicesLabel, choicesOver, choseOneOf, costWords, decidedByParts, ringPrint, decisionNotes, decisionTitle,
   needLine, overLabel, resultLines, toldLabel, toldSections,
 } from './decision-words.mjs';
 import { called } from './character-words.mjs';
@@ -48,13 +48,14 @@ assert.equal(choicesOver(teo), "Teo's choices");
 // A newcomer's notes (A7): a model's decision names the model's parts; a person playing's, What happened's alone; Compare's
 // only where C shows; an unnamed being inside the sentence.
 const noted = decisionNotes({ who: teo, decider: 'model', canCompare: true });
-assert.equal(noted.by, 'The open model that chose for Teo, how long it took to answer, and what this one choice cost.');
+assert.equal(noted.by, 'The open model that chose for Teo.');
+assert.equal(noted.ring, 'How long it took to answer and what this one choice cost.');
 assert.equal(noted.told, "The prompt Teo's model was given: everything it was told about that moment, and nothing more. Full record shows it as it was sent.");
 assert.equal(noted.choices, 'The actions the world allowed Teo there. The model picked one, and the world checked it before it happened.');
 assert.equal(noted.happened, 'What the choice did in the world, at that minute.');
 assert.equal(noted.compare, 'Compare asks another open model the same moment, to see what it would choose.');
 assert.equal(decisionNotes({ who: teo, decider: 'model' }).compare, null);
-assert.deepEqual({ ...decisionNotes({ who: teo, decider: 'person', canCompare: true }) }, { by: null, told: null,
+assert.deepEqual({ ...decisionNotes({ who: teo, decider: 'person', canCompare: true }) }, { by: null, ring: null, told: null,
   choices: 'The actions the world allowed Teo there. A person playing picked one, and the world checked it before it happened.',
   happened: 'What the choice did in the world, at that minute.', compare: null });
 assert.equal(decisionNotes({ who: teo, decider: 'external' }).by, null);
@@ -71,12 +72,15 @@ assert.equal(toldLabel(teo), "What Teo's model was told");
 assert.deepEqual([answeredIn(912), answeredIn(13), answeredIn(100), answeredIn(null)], ['answered in 0.9 s', 'answered in under 0.1 s', 'answered in 0.1 s', null]);
 assert.deepEqual([costWords('0.00030000'), costWords('0.0014006', false), costWords('0'), costWords(null), costWords('nonsense')], ['cost $0.0003', 'cost at most $0.0014', 'cost $0', null, null]);
 const partsText = parts => parts.map(part => typeof part === 'string' ? part : part.model).join('');
-assert.deepEqual(decidedByParts({ model: 'Nemotron 3 Nano 30B', ...record }), ['Decided by ', { model: 'Nemotron 3 Nano 30B' }, ' · answered in 0.9 s · cost $0.0003']);
+// D5: the head names who decided only; the time and cost stand under the ring.
+assert.deepEqual(decidedByParts({ model: 'Nemotron 3 Nano 30B', ...record }), ['Decided by ', { model: 'Nemotron 3 Nano 30B' }]);
+assert.deepEqual([ringPrint(record), ringPrint({ latencyMs: 1300, costUsd: '0.0014006', costKnown: false }), ringPrint({ latencyMs: 1300 }), ringPrint({})],
+  ['answered in 0.9\u00a0s · $0.0003', 'answered in 1.3\u00a0s · at most $0.0014', 'answered in 1.3\u00a0s', null]);
 assert.deepEqual(decidedByParts({ decider: 'model', model: ' Nemotron 3 Nano 30B ' }), ['Decided by ', { model: 'Nemotron 3 Nano 30B' }]);
 assert.deepEqual(decidedByParts({ decider: 'person' }), ['Decided by a person playing']);
-assert.equal(partsText(decidedByParts({ decider: 'external', latencyMs: 1300 })), 'Decided by an outside program · answered in 1.3 s');
+assert.equal(partsText(decidedByParts({ decider: 'external', latencyMs: 1300 })), 'Decided by an outside program');
 assert.equal(partsText(decidedByParts({ decider: 'person', model: 'Nemotron 3 Nano 30B' })), 'Decided by a person playing');
-assert.deepEqual(decidedByParts({ latencyMs: 1300, costUsd: '0.0014006', costKnown: false }), ['Answered in 1.3 s · cost at most $0.0014']);
+assert.deepEqual(decidedByParts({ latencyMs: 1300, costUsd: '0.0014006', costKnown: false }), []);
 assert.deepEqual(decidedByParts({}), []);
 assert.deepEqual(decidedByParts(), []);
 
