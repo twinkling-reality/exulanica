@@ -19,6 +19,9 @@
   text-shadow: none; pointer-events: auto;
 }
 .wu-light :focus-visible { outline: 1px solid var(--l-focus); outline-offset: 2px; }
+/* The page's own container takes focus when the making page shows, for its keys and status: no ring round the
+   whole page; every control inside keeps its own (C5). */
+.wu-light:focus { outline: none; }
 
 /* The chosen world's still picture (N18) and its veils: frame 20 sharp, frame 21 blurred. */
 .wu-light-world { position: absolute; inset: 0; z-index: -3; background: #ffffff center / cover no-repeat; }
