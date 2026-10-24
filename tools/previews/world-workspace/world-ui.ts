@@ -49,6 +49,28 @@ export function scaleOf(root: HTMLElement): number {
   return Number.isFinite(value) && value > 0 ? value : 1;
 }
 
+/**
+ * Gives the keys back to the world (`target`, the scene's canvas) when what held focus has gone: Esc closes a card,
+ * the model list or the question with focus on one of its buttons, the browser drops focus to the page body, and the
+ * renderer walks only while its canvas has focus. Called every frame with whether the world is shown (no page over it):
+ * it remembers the last element that held focus, and focuses `target` when focus is on the body or on a hidden element
+ * and that element is gone (removed, hidden or inert). A click on blank page, a field or a live button keep focus.
+ */
+export function keysToWorld(target: HTMLElement): (shown: boolean) => void {
+  let last: Element | null = null;
+  const live = (element: Element): boolean => element.isConnected && element.closest('[hidden], [inert]') === null
+    && (typeof element.checkVisibility !== 'function' || element.checkVisibility());
+  return (shown) => {
+    const active = document.activeElement;
+    const onPage = active !== null && active !== document.body && active !== document.documentElement;
+    if (onPage && live(active)) { last = active; return; }
+    const gone = onPage || (last !== null && last !== target && !live(last));
+    if (!shown || !gone || target.inert || !target.isConnected) return;
+    last = target;
+    target.focus({ preventScroll: true });
+  };
+}
+
 /** An outlined key and its word (5.1). */
 export function keyWord(options: KeyWordOptions): HTMLButtonElement | HTMLSpanElement {
   const { keys, word, shortcut, onPress, small = false, disabled = false } = options;

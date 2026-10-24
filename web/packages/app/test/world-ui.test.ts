@@ -27,6 +27,9 @@ interface WorldUi {
   tip(word: string, key: string): HTMLElement;
   shade(options?: { small?: boolean }): HTMLElement;
   glyphRows(rows: readonly { key: string; word: string; shortcut?: string; onPress?: () => void; disabled?: boolean }[], sizes?: { glyph?: number | string; rowGap?: number | string; colGap?: number | string; word?: number | string; nudge?: number; bars?: boolean }): HTMLElement;
+  keysToWorld(target: HTMLElement): (shown: boolean) => void;
+  sideCard(options?: { scale?: () => number }): { readonly root: HTMLElement; readonly body: HTMLElement; place(bounds: { left: number; top: number; right: number; bottom: number }): 'right' | 'left'; hide(): void };
+  promptColumn(prompts: readonly HTMLElement[]): HTMLElement;
 }
 // A joined path: the test runner still finds the file, and the type checker leaves the preview
 // module (outside this package) out of the program.
@@ -349,5 +352,87 @@ describe('build mode\'s own parts', () => {
     names.place([{ words: 'Ari', x: 10, y: 20 }], 0.78);
     expect(labels.map(label => label.hidden)).toEqual([false, true]);
     expect(labels[0]!.textContent).toBe('Ari');
+  });
+});
+
+describe('the keys going back to the world (TERRAIN rehearsal 5, finding 3)', () => {
+  /** The scene's canvas, which the renderer walks for only while it has focus, beside the world's panels. */
+  const scene = (): { host: HTMLElement; canvas: HTMLCanvasElement } => {
+    const host = document.createElement('div'), canvas = document.createElement('canvas');
+    canvas.tabIndex = 0;
+    document.body.append(host, canvas);
+    return { host, canvas };
+  };
+
+  it('takes focus back to the scene when Esc lets go of the chosen card while its prompt has focus', async () => {
+    const { keysToWorld, sideCard, keyWord, promptColumn } = await parts();
+    const { host, canvas } = scene();
+    // The chosen card as character-presence.ts fills it: its words, then its prompts.
+    const card = sideCard();
+    host.append(card.root);
+    const prompt = keyWord({ keys: ['Enter'], word: 'Details', onPress: () => {} });
+    card.body.append(promptColumn([prompt]));
+    card.place({ left: 400, top: 200, right: 520, bottom: 600 });
+    const back = keysToWorld(canvas);
+    prompt.focus();
+    back(true);
+    expect(document.activeElement).toBe(prompt);
+    // What Esc does: the page lets go of the chosen person and the card empties (character-presence.ts choose(null)).
+    // Focus falls to the body, where the renderer's keys walk nothing.
+    card.hide(); card.body.replaceChildren();
+    expect(document.activeElement).toBe(document.body);
+    back(true);
+    expect(document.activeElement).toBe(canvas);
+  });
+
+  it('takes it back from a focused button its panel hid, as the model list closes', async () => {
+    const { keysToWorld } = await parts();
+    const { host, canvas } = scene();
+    const list = document.createElement('div'), model = document.createElement('button');
+    list.append(model);
+    host.append(list);
+    const back = keysToWorld(canvas);
+    model.focus();
+    back(true);
+    list.hidden = true;
+    back(true);
+    expect(document.activeElement).toBe(canvas);
+    // A model picked with a click: the click focuses its button and closes the list in one go, before a frame looks.
+    const again = document.createElement('button');
+    list.replaceChildren(again);
+    list.hidden = false;
+    again.focus();
+    list.hidden = true;
+    back(true);
+    expect(document.activeElement).toBe(canvas);
+  });
+
+  it('leaves focus where it is under a page, after a click on blank page, in a field and on a live button', async () => {
+    const { keysToWorld } = await parts();
+    const { host, canvas } = scene();
+    const field = document.createElement('input'), button = document.createElement('button');
+    host.append(field, button);
+    const back = keysToWorld(canvas);
+    // A page over the world keeps its own focus, even where its button went: the page gives it back as it closes.
+    button.focus();
+    back(false);
+    button.remove();
+    back(false);
+    expect(document.activeElement).toBe(document.body);
+    // A click on blank page leaves the field it blurred still there: focus stays on the body.
+    field.focus();
+    back(true);
+    field.blur();
+    back(true);
+    expect(document.activeElement).toBe(document.body);
+    // A field and a live button keep focus.
+    field.focus();
+    back(true);
+    expect(document.activeElement).toBe(field);
+    const live = document.createElement('button');
+    host.append(live);
+    live.focus();
+    back(true);
+    expect(document.activeElement).toBe(live);
   });
 });

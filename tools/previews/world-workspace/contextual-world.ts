@@ -32,7 +32,7 @@ import { dayFocus, readDayEvents, readNewerEvents, recordStates } from './record
 import { personalityBody, personalityRefusalWords } from './personality-words.mjs';
 import { createKindLabels, madeBeingName, placedLine } from './build-words.mjs';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
-import { areaBanner, mountUiScale } from './world-ui.ts';
+import { areaBanner, keysToWorld, mountUiScale } from './world-ui.ts';
 import { mountCorners } from './world-corners.ts';
 import { endOpening } from './world-opening.ts';
 import { MADE_HANDOFF_KEY, readMade } from './create-steps.mjs';
@@ -1283,12 +1283,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     else if (fate === 'history') openHistory();
     event.stopImmediatePropagation();
   }, { capture: true, signal: lifetime.signal });
+  const keysBack = keysToWorld(canvas); // Esc closing a panel with focus on its button gives the keys back to the world.
   function frame(now) {
     const workStart = performance.now();
     if (state.atlas?.binding !== b || !root.isConnected) { disposePrior(); return; }
     // The next frame is asked for first, so one failed read or word never stops the overlay.
     frameId = requestAnimationFrame(frame);
-    trackHeld();
+    trackHeld(); keysBack(!pageShown());
     root.dataset.camera = [b.controls.state.yaw, b.controls.state.pitch].map(value => value.toFixed(6)).join(',');
     root.dataset.viewerPosition = JSON.stringify([b.controls.state.x, b.controls.state.y, b.controls.state.z]);
     build?.frame(now);
