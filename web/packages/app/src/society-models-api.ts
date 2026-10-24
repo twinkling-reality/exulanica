@@ -43,6 +43,37 @@ export interface SocietyModel extends NamedModelRef {
   readonly local?: boolean;
   /** What its maker says of it, from its own model card (`exulanica/models/model_cards.py`); null where none is kept or a read does not say. */
   readonly card?: ModelCard | null;
+  /** For a model a person's own runner holds, what the runner states of it; absent for every other model. */
+  readonly runner?: RunnerDetails | null;
+}
+
+/**
+ * What a person's own runner states of a model it holds (`exulanica/models/local_runner.py`): its family and size, the
+ * name it serves the model by, and the first line of the licence it states, quoted and never classed; each null where
+ * it states none.
+ */
+export interface RunnerDetails {
+  readonly family: string | null;
+  readonly size: string | null;
+  readonly servedAs: string;
+  readonly licence: string | null;
+  /** How long its check's slowest case took to answer, in milliseconds; null where none was asked. */
+  readonly checkedMs: number | null;
+}
+
+/** Whether a check on this computer found a runner's model able to decide for a person here, or is still checking. */
+export type RunnerState = 'able' | 'checking' | 'not_able';
+
+/**
+ * A model a person's own runner serves beside the manifest's: able (and offered among the models), being checked, or
+ * not able, with why by code (`text`, `context`, `slow`, `form` or `error`) and the numbers a reason is told by: what
+ * it reads at once, and a person's deadline.
+ */
+export interface RunnerModel extends NamedModelRef, RunnerDetails {
+  readonly state: RunnerState;
+  readonly reason: string | null;
+  readonly contextTokens: number | null;
+  readonly deadlineMs: number | null;
 }
 
 /**
@@ -282,6 +313,8 @@ export interface SocietyModels {
   readonly travellers?: readonly TravellerChoice[];
   /** Each being's measures under each model; absent from a server that predates them. */
   readonly byBeing?: readonly BeingDecisionMeasures[];
+  /** Every model a person's own runner serves beside the manifest's, with its check's state; absent from an older server. */
+  readonly runnerModels?: readonly RunnerModel[];
 }
 
 const invalid = (): never => { throw new Error('Invalid society models response'); };
@@ -304,6 +337,27 @@ function modelCard(value: unknown): ModelCard {
   });
 }
 const flag = (value: unknown): boolean => (typeof value === 'boolean' ? value : invalid());
+
+function runnerDetails(value: unknown): RunnerDetails {
+  const held = object(value);
+  return Object.freeze({
+    family: maybe(held['family'], text), size: maybe(held['size'], text), servedAs: text(held['served_as']),
+    licence: maybe(held['licence'], text), checkedMs: held['checked_ms'] === undefined ? null : maybe(held['checked_ms'], count),
+  });
+}
+
+const RUNNER_STATES: ReadonlySet<unknown> = new Set(['able', 'checking', 'not_able']);
+function runnerModel(value: unknown): RunnerModel {
+  const held = object(value);
+  return Object.freeze({
+    ...modelRef(held),
+    ...runnerDetails(held),
+    state: RUNNER_STATES.has(held['state']) ? held['state'] as RunnerState : invalid(),
+    reason: maybe(held['reason'], text),
+    contextTokens: maybe(held['context_tokens'], count),
+    deadlineMs: maybe(held['deadline_ms'], count),
+  });
+}
 
 function modelRef(value: unknown): NamedModelRef {
   const held = object(value);
@@ -447,6 +501,7 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         refusal: maybe(held['refusal'], text),
         local: held['on_this_computer'] === true,
         card: held['card'] === undefined ? null : maybe(held['card'], modelCard),
+        ...(held['runner'] === undefined ? {} : { runner: maybe(held['runner'], runnerDetails) }),
       };
     }),
     choices: list(row['choices']).map((entry) => {
@@ -519,6 +574,8 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         return { ...modelRef(held), subjectId: text(held['subject_id']), measures: decisionMeasures(held['measures']) };
       }),
     }),
+    // Added to the profile as an optional field: absent from an older server.
+    ...(row['runner_models'] === undefined ? {} : { runnerModels: list(row['runner_models']).map(runnerModel) }),
   });
 }
 

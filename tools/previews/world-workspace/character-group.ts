@@ -20,12 +20,24 @@ export interface GroupRow { readonly action: string; readonly key: string; reado
  */
 export interface ModelRow {
   readonly action: 'use'; readonly index: number; readonly key: string; readonly word: string; readonly sub: string | null; readonly price: string;
-  readonly current: boolean; readonly on: boolean; readonly label: string | null; readonly open: { readonly said: string; readonly from: string } | null;
+  readonly current: boolean; readonly on: boolean; readonly label: string | null; readonly open: { readonly said: string; readonly from: string | null } | null;
+  /** After this computer's last choosable row: its runner's models not offered (character-group.mjs runnerRows). */
+  readonly runner?: RunnerRows | null;
+}
+
+/** A runner's models not offered (L1): faint, with no number and no focus; `group` where they stand under its label. */
+export interface RunnerRows {
+  readonly checking: readonly { readonly word: string; readonly sub: string | null }[];
+  readonly label: string | null;
+  readonly notAble: readonly { readonly word: string; readonly sub: string | null; readonly line: string }[];
+  readonly group?: string;
 }
 
 /** The model list in the group's place of its rows (r07, A3): this computer's group where none runs yet, the rows in their groups, and the small keys. */
 export interface ModelList {
   readonly waiting: { readonly label: string; readonly line: string } | null;
+  /** This computer's runner's models not offered, under its label at the top, where it offers none (L1). */
+  readonly runner?: RunnerRows | null;
   readonly first: number;
   readonly rows: readonly ModelRow[];
   readonly keys: readonly { readonly keys: readonly string[]; readonly word: string }[];
@@ -161,11 +173,28 @@ export function characterGroup({ scale, onAction }: { readonly scale: () => numb
  * where none runs yet), a button per row with its maker and size under its name, the focused row opened beneath with
  * its maker's own words, and the small keys under them.
  */
+/** A runner's models not offered (L1), in the faint ink: each being checked, then, under their label, each not able
+ * with why in a line beneath its name; another row's name told apart by what the runner calls it. */
+export function runnerRows(block: RunnerRows): HTMLElement[] {
+  const faint = (word: string, ...under: (string | null)[]): HTMLElement => {
+    const row = text('p', 'cg-waiting', word);
+    for (const line of under) if (line) row.append(text('span', 'cg-model-from', line));
+    return row;
+  };
+  return [
+    ...(block.group ? [text('p', 'cg-group-label', block.group)] : []),
+    ...block.checking.map(row => faint(row.word, row.sub)),
+    ...(block.label ? [text('p', 'cg-group-label', block.label)] : []),
+    ...block.notAble.map(row => faint(row.word, row.sub, row.line)),
+  ];
+}
+
 function modelList(list: ModelList, onAction: (action: string) => void): HTMLElement[] {
   const rows = document.createElement('div');
   rows.className = 'cg-list';
   rows.setAttribute('role', 'listbox');
   if (list.waiting) rows.append(text('p', 'cg-group-label', list.waiting.label), text('p', 'cg-waiting', list.waiting.line));
+  if (list.runner) rows.append(...runnerRows(list.runner));
   for (const row of list.rows) {
     if (row.label) rows.append(text('p', 'cg-group-label', row.label));
     const button = document.createElement('button');
@@ -188,9 +217,10 @@ function modelList(list: ModelList, onAction: (action: string) => void): HTMLEle
     rows.append(button);
     if (row.open) {
       const open = text('p', 'cg-model-open', row.open.said);
-      open.append(text('span', 'cg-model-from', row.open.from));
+      if (row.open.from) open.append(text('span', 'cg-model-from', row.open.from));
       rows.append(open);
     }
+    if (row.runner) rows.append(...runnerRows(row.runner));
   }
   const keys = document.createElement('p');
   keys.className = 'cg-keys';

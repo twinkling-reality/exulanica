@@ -57,6 +57,37 @@ function pick(root: HTMLElement, value: string): void {
 }
 
 describe('reading who decides', () => {
+  it("reads a person's runner's models: an able one among the models with what the runner states, and every one with its check", () => {
+    const digest = (c: string) => `local/sha256-${c.repeat(64)}`;
+    const able = {
+      provider: 'ollama_local', model_id: digest('a'), name: 'Llama · 1.2B',
+      description: 'Llama · 1.2B, a model on this computer that a check here found able to decide for a person.',
+      provider_description: 'This computer, through Ollama.', mechanism: 'json_schema', usd_per_mtok: { input: '0', output: '0' },
+      refusal: null, on_this_computer: true, card: null,
+      runner: { family: 'llama', size: '1.2B', served_as: 'small:1b', licence: 'AN INVENTED COMMUNITY LICENSE', checked_ms: 238 },
+    };
+    const row = (c: string, state: string, reason: string | null, more: Record<string, unknown> = {}) => ({
+      provider: 'ollama_local', model_id: digest(c), name: 'Qwen3 · 4.0B', family: 'qwen3', size: '4.0B', served_as: `q${c}:4b`,
+      licence: null, state, reason, context_tokens: null, deadline_ms: null, ...more,
+    });
+    const view = parseSocietyModels(read({
+      models: [...read().models, able],
+      runner_models: [
+        { ...able, family: 'llama', size: '1.2B', served_as: 'small:1b', licence: 'AN INVENTED COMMUNITY LICENSE', state: 'able', reason: null, context_tokens: 131072, deadline_ms: 20000 },
+        row('b', 'checking', null),
+        row('c', 'not_able', 'context', { context_tokens: 4096, deadline_ms: 20000 }),
+      ],
+    }));
+    expect(view.models[1]!.runner).toEqual({ family: 'llama', size: '1.2B', servedAs: 'small:1b', licence: 'AN INVENTED COMMUNITY LICENSE', checkedMs: 238 });
+    expect(view.models[0]!.runner).toBeUndefined();
+    expect(view.runnerModels!.map(model => [model.state, model.reason, model.servedAs, model.contextTokens])).toEqual([
+      ['able', null, 'small:1b', 131072], ['checking', null, 'qb:4b', null], ['not_able', 'context', 'qc:4b', 4096],
+    ]);
+    // An older server says nothing of a runner; a state the page does not know is refused.
+    expect(parseSocietyModels(read()).runnerModels).toBeUndefined();
+    expect(() => parseSocietyModels(read({ runner_models: [row('d', 'pulling', null)] }))).toThrow();
+  });
+
   it('reads what decisions came to as the server measured it, null rates kept null, and an older read without it', () => {
     const rate = (numerator: number, denominator: number, value: number | null) => ({ numerator, denominator, minimum: 5, value });
     const measured = {

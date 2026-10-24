@@ -9,8 +9,8 @@
 import { label, orb as runOrb, page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orb as portraitOrb, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
 import { CHARACTER_WORDS, askWho, modelLine, routineRow, priceWords, whatDid, nothingYet, readingRecord, called } from './character-words.mjs';
-import { galleryItems } from './character-group.mjs';
-import type { ModelCard } from '../../../web/packages/app/src/society-models-api.ts';
+import { galleryItems, runnerRows } from './character-group.mjs';
+import type { ModelCard, RunnerModel } from '../../../web/packages/app/src/society-models-api.ts';
 import { PERSONALITY_LIMITS, PERSONALITY_WORDS, counter, length, notRead, readsEach, savedNote, writtenWords } from './personality-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
 import { PATH_WORDS, byParts, plural } from './history-words.mjs';
@@ -111,6 +111,8 @@ export interface CharacterPageState {
     readonly choices: readonly ModelChoice[] | null; readonly focus: number; readonly refusal: string | null; readonly busy: boolean;
     /** This computer's group stands with its one line where none runs yet (A3); its key group is this server's budget on a guest's page. */
     readonly waiting?: boolean; readonly fromServer?: boolean;
+    /** This computer's runner's models with their checks (L1): those not offered stand faint after its last row. */
+    readonly runner?: readonly RunnerModel[];
   } | null;
   /** Whether [C] Compare is offered (frame 12a). */
   readonly canCompare: boolean;
@@ -541,10 +543,17 @@ function modelRows(choices: readonly ModelChoice[], focus: number, labelled: str
 /** One row of the gallery as character-group.mjs galleryItems words it. */
 interface GalleryItem {
   readonly word: string; readonly sub: string | null; readonly price: string; readonly group: string | null;
-  readonly open: { readonly said: string; readonly from: string } | null;
+  readonly open: { readonly said: string; readonly from: string | null } | null;
 }
 
-function galleryRows(choices: readonly ModelChoice[], focus: number, waiting: boolean, fromServer: boolean, onChoose: (index: number) => void, onUse: (index: number) => void): HTMLElement {
+/** A runner's models not offered (character-group.mjs runnerRows, L1). */
+interface RunnerFaint {
+  readonly checking: readonly { readonly word: string; readonly sub: string | null }[];
+  readonly label: string | null;
+  readonly notAble: readonly { readonly word: string; readonly sub: string | null; readonly line: string }[];
+}
+
+function galleryRows(choices: readonly ModelChoice[], focus: number, waiting: boolean, fromServer: boolean, onChoose: (index: number) => void, onUse: (index: number) => void, runner: readonly RunnerModel[] = []): HTMLElement {
   const list = element('ul', 'wu-model-rows wu-gallery');
   list.setAttribute('role', 'listbox');
   list.setAttribute('aria-label', CHARACTER_WORDS.chooseModel);
@@ -561,7 +570,26 @@ function galleryRows(choices: readonly ModelChoice[], focus: number, waiting: bo
     list.append(groupLabel(here), line);
     group = here;
   }
-  const items: readonly GalleryItem[] = galleryItems(choices.flatMap((choice) => (choice.model ? [choice.model] : [])), fromServer);
+  const models = choices.flatMap((choice) => (choice.model ? [choice.model] : []));
+  const items: readonly GalleryItem[] = galleryItems(models, fromServer, runner);
+  // A runner's models not offered (L1): faint after this computer's last row, or under its label first where it has none.
+  const faint: RunnerFaint | null = runnerRows(runner, models);
+  const lastHere = items.reduce((found: number, item: GalleryItem, index: number) => (item.group === CHARACTER_WORDS.hereFree ? index : found), -1);
+  const faintRows = (block: RunnerFaint) => {
+    const row = (word: string, ...under: (string | null)[]) => {
+      const item = element('li', 'wu-gallery-waiting wu-small-text', word);
+      item.setAttribute('role', 'presentation');
+      for (const line of under) if (line) item.append(element('div', 'wu-model-from wu-faint', line));
+      return item;
+    };
+    list.append(...block.checking.map((one) => row(one.word, one.sub)));
+    if (block.label) list.append(groupLabel(block.label));
+    list.append(...block.notAble.map((one) => row(one.word, one.sub, one.line)));
+  };
+  if (faint && lastHere < 0) {
+    if (group !== CHARACTER_WORDS.hereFree) list.append(groupLabel(CHARACTER_WORDS.hereFree));
+    faintRows(faint);
+  }
   items.forEach((item: GalleryItem, index: number) => {
     if (item.group !== null && item.group !== group) list.append(groupLabel(item.group));
     group = item.group;
@@ -584,12 +612,13 @@ function galleryRows(choices: readonly ModelChoice[], focus: number, waiting: bo
     row.append(named, element('span', 'wu-model-price', item.price));
     if (index === focus && item.open) {
       const open = element('p', 'wu-model-open wu-small-text', item.open.said);
-      open.append(element('span', 'wu-model-from wu-faint', item.open.from));
+      if (item.open.from) open.append(element('span', 'wu-model-from wu-faint', item.open.from));
       row.append(open);
     }
     row.addEventListener('click', () => onChoose(index));
     row.addEventListener('dblclick', () => onUse(index));
     list.append(row);
+    if (faint && index === lastHere) faintRows(faint);
   });
   return list;
 }
@@ -643,7 +672,7 @@ function drawSide(state: CharacterPageState, layout: Layout, width: number, act:
     const choosing = state.choosing;
     side.append(label(CHARACTER_WORDS.chooseModel), element('p', 'wu-small-text wu-model-intro', CHARACTER_WORDS.chooserIntro));
     if (!choosing.choices) side.append(element('p', 'wu-char-note', CHARACTER_WORDS.readingModels));
-    else side.append(galleryRows(choosing.choices, choosing.focus, choosing.waiting === true, choosing.fromServer === true, (index) => act('choose', index), (index) => act('use', index)));
+    else side.append(galleryRows(choosing.choices, choosing.focus, choosing.waiting === true, choosing.fromServer === true, (index) => act('choose', index), (index) => act('use', index), choosing.runner));
     if (choosing.refusal) side.append(refusalLine(choosing.refusal));
     return side;
   }

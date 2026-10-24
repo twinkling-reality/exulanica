@@ -476,6 +476,56 @@ describe("Teo's day keys", () => {
   });
 });
 
+describe("a person's runner's models (L1)", () => {
+  // What a runner states (a model's family, the name it serves it by, its licence) is the person's own text: drawn as
+  // text in both choosers, never as markup.
+  const mark = '<img src=x onerror="window.ranMarkup = true">';
+  const digest = (c: string) => `local/sha256-${c.repeat(64)}`;
+  const able = {
+    provider: 'ollama_local', providerDescription: 'This computer, through Ollama.', modelId: digest('a'), name: `Llama · 1.2B${mark}`,
+    price: { input: '0', output: '0' }, local: true, card: null,
+    runner: { family: `llama${mark}`, size: '1.2B', servedAs: `small${mark}`, licence: `A LICENSE ${mark}`, checkedMs: 238 },
+  };
+  const faint = (c: string, name: string, state: string, reason: string | null) => ({
+    provider: 'ollama_local', modelId: digest(c), name, family: null, size: null, servedAs: `${c}${mark}`, licence: null, state, reason,
+    contextTokens: 4096, deadlineMs: 20000, checkedMs: null,
+  });
+  const runner = [faint('b', `Llama · 1.2B${mark}`, 'checking', null), faint('c', `tiny${mark}`, 'not_able', 'form')];
+
+  it('draws them on the page as text, never as markup', async () => {
+    const { root, page } = await open();
+    page.draw(teoState({ choosing: { choices: [{ model: able, current: false }, { model: null, current: false }], focus: 0, refusal: null, busy: false, runner } }));
+    expect(root.querySelector('img[src="x"]')).toBeNull();
+    expect(all(root, '.wu-model-name')[0]).toBe(`Llama · 1.2B${mark}`);
+    expect(all(root, '.wu-model-sub')).toEqual([`Your runner calls it small${mark}`]);
+    expect(all(root, '.wu-model-open > .wu-model-from')).toEqual([`from your runner · \u201cA LICENSE ${mark}\u201d`]);
+    expect(all(root, '.wu-gallery-waiting')).toEqual([
+      `Llama · 1.2B${mark} · Checking that it can decide for a person here…Your runner calls it b${mark}`,
+      `tiny${mark}It did not answer with one of the offered choices when checked.`,
+    ]);
+    expect(all(root, '.wu-gallery-label')).toEqual(['On this computer, free', 'Also on this computer, not able to decide for a person here']);
+  });
+
+  it('draws them in the model list as text, never as markup', async () => {
+    const { runnerRows } = await (import('../../../../tools/previews/world-workspace/' + 'character-group.ts') as Promise<{
+      runnerRows(block: unknown): HTMLElement[];
+    }>);
+    const host = document.createElement('div');
+    host.append(...runnerRows({
+      group: 'On this computer, free',
+      checking: [{ word: `Llama · 1.2B${mark} · Checking that it can decide for a person here…`, sub: `Your runner calls it b${mark}` }],
+      label: 'Also on this computer, not able to decide for a person here',
+      notAble: [{ word: `tiny${mark}`, sub: null, line: 'It did not answer with one of the offered choices when checked.' }],
+    }));
+    expect(host.querySelector('img')).toBeNull();
+    expect(all(host, '.cg-waiting')).toEqual([
+      `Llama · 1.2B${mark} · Checking that it can decide for a person here…Your runner calls it b${mark}`,
+      `tiny${mark}It did not answer with one of the offered choices when checked.`,
+    ]);
+    expect(all(host, '.cg-group-label')).toEqual(['On this computer, free', 'Also on this computer, not able to decide for a person here']);
+  });
+});
+
 describe("Teo's day keeps the world's clock", () => {
   type View = {
     dayStartMinute(state: unknown): number | null;

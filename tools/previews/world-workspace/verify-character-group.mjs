@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { runnerRows } from './character-group.mjs';
 import { GROUP_LAYOUT, MODEL_ROWS, SAID_READ, choosableModels, offersModels, openWhileOffered, deciderOf, freeHere, groupContent, groupHeld, groupPlace, keepLastSaid, lastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, questionGroup, readLastSaid } from './character-group.mjs';
 import { GROUP_WORDS, called, decidesPrint, modelsDecide, noModelRunning, quoted, saidUnder, stopsAfter } from './character-words.mjs';
 import { dayWord } from './talk-words.mjs';
@@ -217,6 +218,35 @@ assert.equal(listed.print, null);
 assert.equal(modelGroup({ who: teo, models: served, current: null, focus: 3 }).list.rows[3].current, true, 'no model: Routine is theirs');
 assert.equal(modelGroup({ who: teo, models: [], current: null }).list.rows.length, 1, 'nothing served: Routine alone');
 assert.equal(modelGroup({ who: teo, models: served, focus: 99 }).list.rows.at(-1).on, true, 'focus held to the list');
+// A person's runner's models (L1): an able one is a row of this computer's group, named by family and size, told apart
+// by what the runner calls it where another row reads the same, opened with the licence its runner states; the rest
+// stand faint after that group's last row, being checked, then under their own label not able with why; none takes a
+// number or the focus. With no choosable row of this computer's, they stand under its label first.
+const runnerModel = (letter, name, state, reason = null) => ({ provider: 'ollama_local', modelId: `local/sha256-${letter.repeat(64)}`, name,
+  family: null, size: null, servedAs: `${letter}:latest`, licence: null, state, reason, contextTokens: 4096, deadlineMs: 20000 });
+const ableHere = { ...served[2], modelId: 'local/sha256-' + 'a'.repeat(64), name: 'Qwen3 · 4.0B', card: null,
+  runner: { family: 'qwen3', size: '4.0B', servedAs: 'qwen3:4b-instruct', licence: 'AN INVENTED LICENSE', checkedMs: 2104 } };
+const runner = [runnerModel('a', 'Qwen3 · 4.0B', 'able'), runnerModel('b', 'Qwen3 · 4.0B', 'checking'), runnerModel('c', 'Llama · 134.52M', 'not_able', 'form')];
+const withRunner = modelGroup({ who: teo, models: choosableModels({ models: [served[1], ableHere] }), runner, focus: 0 });
+assert.deepEqual(withRunner.list.rows.map(row => [row.key, row.word, row.sub, row.label]), [
+  ['1', 'Qwen3 · 4.0B', 'Your runner calls it qwen3:4b-instruct', 'On this computer, free'],
+  ['2', 'Nemotron 3 Nano 30B', 'NVIDIA · 30B', 'With your Nebius Token Factory key, per million tokens'],
+  ['3', 'Routine', null, null],
+]);
+assert.deepEqual(withRunner.list.rows[0].open, { said: 'Checked on this computer: it chose one of the offered choices in 2.1 s.', from: 'from your runner · \u201cAN INVENTED LICENSE\u201d' });
+assert.deepEqual(withRunner.list.rows.map(row => row.runner === null), [false, true, true], 'faint after this computer\'s last row only');
+assert.deepEqual(withRunner.list.rows[0].runner, {
+  checking: [{ word: 'Qwen3 · 4.0B · Checking that it can decide for a person here…', sub: 'Your runner calls it b' }],
+  label: 'Also on this computer, not able to decide for a person here',
+  notAble: [{ word: 'Llama · 134.52M', sub: null, line: 'It did not answer with one of the offered choices when checked.' }],
+});
+assert.equal(withRunner.list.runner, null);
+const noneAbleHere = modelGroup({ who: teo, models: [served[1]], runner: runner.slice(1) });
+assert.equal(noneAbleHere.list.runner.group, 'On this computer, free', 'no choosable row here: under the group\'s label, first');
+assert.equal(modelGroup({ who: teo, models: [served[1]], runner: runner.slice(1), focus: 1 }).list.first, 0);
+assert.equal(runnerRows([runnerModel('a', 'Qwen3 · 4.0B', 'able')], []), null, 'nothing faint where every runner model is offered');
+assert.equal(modelGroup({ who: teo, models: ordered }).list.runner, null, 'no runner: nothing faint');
+
 // F5: only a model this install can ask is offered. A server on this computer the install does not reach, or a hosted
 // provider it holds no key for, is refused in the models read and left out of both choosers.
 const refusedHere = [

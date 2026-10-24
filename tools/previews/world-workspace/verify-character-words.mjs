@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { checkingLine, notAbleLine, runnerCalls, runnerOpen } from './character-words.mjs';
 import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, askWho, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineBetween, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
@@ -132,4 +133,24 @@ assert.equal(modelsNamed(['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct']), 'Nemot
 assert.equal(modelsNamed(['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct', 'Nemotron 3 Super 120B']), 'Nemotron 3 Nano 30B and 2 other models');
 assert.equal(modelsNamed(['A', 'B', 'A', ' B ', null, '']), 'A and B', 'each model once, however many people it decides for');
 assert.equal(modelsNamed([]), null);
+// A person's runner's models (L1, DESIGN's words): being checked, not able and why from the check's own numbers, the
+// name a runner calls one where another row reads the same, and the licence the runner states, quoted.
+const qwen = { name: 'Qwen3 · 4.0B', servedAs: 'qwen3:4b-instruct:latest', contextTokens: 4096, deadlineMs: 20000 };
+assert.equal(checkingLine(qwen), 'Qwen3 · 4.0B · Checking that it can decide for a person here…');
+assert.equal(CHARACTER_WORDS.notAbleHere, 'Also on this computer, not able to decide for a person here');
+assert.equal(notAbleLine({ ...qwen, reason: 'context' }), 'It reads at most 4,096 tokens at once, less than a person is told here.');
+assert.equal(notAbleLine({ ...qwen, reason: 'form' }), 'It did not answer with one of the offered choices when checked.');
+assert.equal(notAbleLine({ ...qwen, reason: 'slow' }), 'It took longer than the 20 seconds a person has to decide.');
+assert.equal(notAbleLine({ ...qwen, reason: 'text' }), 'It does not read text.');
+assert.equal(notAbleLine({ ...qwen, reason: 'error' }), 'It could not be checked here.');
+assert.equal(runnerCalls(qwen), 'Your runner calls it qwen3:4b-instruct');
+// Its open row (DESIGN 11:22): what its check found, its slowest case in tenths of a second, then the licence the
+// runner states, quoted and cut to 80 characters; with no licence the check's line opens alone.
+assert.deepEqual(runnerOpen({ runner: { licence: 'AN INVENTED LICENSE', checkedMs: 2104 } }), {
+  said: 'Checked on this computer: it chose one of the offered choices in 2.1 s.', from: 'from your runner · \u201cAN INVENTED LICENSE\u201d',
+});
+assert.deepEqual(runnerOpen({ runner: { licence: null, checkedMs: 238 } }), { said: 'Checked on this computer: it chose one of the offered choices in 0.2 s.', from: null });
+const longLicence = runnerOpen({ runner: { licence: 'L'.repeat(120), checkedMs: 238 } }).from;
+assert.equal(longLicence, `from your runner · \u201c${'L'.repeat(79)}\u2026\u201d`, 'at most 80 characters of the licence');
+assert.equal(runnerOpen({ runner: { licence: null, checkedMs: null } }), null, 'nothing known: nothing opens');
 console.log('Character words checks passed: names and kinds, the chosen line, the page lines, money and the model list.');

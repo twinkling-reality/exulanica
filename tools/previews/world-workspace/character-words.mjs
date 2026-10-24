@@ -32,6 +32,10 @@ export const CHARACTER_WORDS = Object.freeze({
   serverBudget: "From this server's budget, per million tokens",
   /** The group of models on this computer where none runs yet (A3 item 2, amended 17:22). */
   noneRunning: 'None is running yet. Start one with a local model runner, and it shows here, free.',
+  /** A model a person's own runner holds, while a check on this computer runs (L1): its faint row, after its name. */
+  checking: 'Checking that it can decide for a person here…',
+  /** The faint label over the runner's models a check found not able, after the group's choosable rows (L1). */
+  notAbleHere: 'Also on this computer, not able to decide for a person here',
   perMillion: 'Per million tokens',
   choose: 'Choose',
   useThisModel: 'Use this model',
@@ -184,6 +188,40 @@ export function cardWords(model) {
   const card = model?.card;
   if (!card) return null;
   return Object.freeze({ said: `\u201c${card.says}\u201d`, from: `from ${possessive(card.maker)} model card · ${card.licence}` });
+}
+
+/** A runner's model being checked (L1): "Llama · 1.2B · Checking that it can decide for a person here…". */
+export const checkingLine = model => `${model.name} · ${CHARACTER_WORDS.checking}`;
+
+/** Why a runner's model is not able to decide for a person here (L1), in one line from its check. */
+export function notAbleLine(model) {
+  if (model?.reason === 'context') return `It reads at most ${Number(model.contextTokens).toLocaleString('en-US')} tokens at once, less than a person is told here.`;
+  if (model?.reason === 'form') return 'It did not answer with one of the offered choices when checked.';
+  if (model?.reason === 'slow') return `It took longer than the ${Math.round(Number(model.deadlineMs) / 1000)} seconds a person has to decide.`;
+  if (model?.reason === 'text') return 'It does not read text.';
+  return 'It could not be checked here.';
+}
+
+/** Under a runner's model whose name another row shares (L1 rule 5): "Your runner calls it qwen3:4b-instruct". */
+export const runnerCalls = model => `Your runner calls it ${model.servedAs.replace(/:latest$/u, '')}`;
+
+/** The most of a runner's licence line its open row quotes (L1). */
+const LICENCE_SHOWN = 80;
+
+/**
+ * A runner's model's open words in the chooser (L1, DESIGN 11:22): no maker's card is kept for it, so first what its
+ * check on this computer found, in the row's ink ("Checked on this computer: it chose one of the offered choices in
+ * 2.1 s.", its slowest case), then, in the faint ink, the licence its runner states, quoted as stated and cut to 80
+ * characters; with no licence stated the check's line opens alone. Null where neither is known.
+ */
+export function runnerOpen(model) {
+  const runner = model?.runner;
+  const checked = Number.isFinite(runner?.checkedMs)
+    ? `Checked on this computer: it chose one of the offered choices in ${(runner.checkedMs / 1000).toFixed(1)} s.` : null;
+  const licence = plain(runner?.licence);
+  const quoted = licence && (licence.length > LICENCE_SHOWN ? `${licence.slice(0, LICENCE_SHOWN - 1)}\u2026` : licence);
+  const from = quoted ? `from your runner · \u201c${quoted}\u201d` : null;
+  return checked || from ? Object.freeze({ said: checked ?? '', from }) : null;
 }
 
 /** The page's Model line: the price per million tokens, or no model. */
