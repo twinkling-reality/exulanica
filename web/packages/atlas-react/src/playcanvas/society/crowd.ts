@@ -1124,13 +1124,17 @@ export class SocietyCrowd {
     });
   }
 
-  /** The nearest drawn inhabitant whose box `hit` meets before `limit`, near or far. */
+  /**
+   * The nearest drawn inhabitant whose box `hit` meets before `limit`, near or far; with `central`, one the ray passes
+   * through the middle of wins over one it only grazes (P1: a click chooses the person under the pointer).
+   */
   pick(
     limit: number,
     hit: (min: readonly [number, number, number], max: readonly [number, number, number]) => number | null,
+    central?: (min: readonly [number, number, number], max: readonly [number, number, number]) => boolean,
   ): string | null {
-    let nearest = limit;
-    let selected: string | null = null;
+    let nearest = limit, nearestCentral = limit;
+    let selected: string | null = null, selectedCentral: string | null = null;
     // A selected inhabitant wins a tie with anyone standing on the same point.
     const chosen = this.selectedId;
     const order = chosen && this.near.has(chosen)
@@ -1147,8 +1151,12 @@ export class SocietyCrowd {
         nearest = distance;
         selected = id;
       }
+      if (distance !== null && distance < nearestCentral && central?.(min, max) === true) {
+        nearestCentral = distance;
+        selectedCentral = id;
+      }
     }
-    return selected;
+    return selectedCentral ?? selected;
   }
 
   /**

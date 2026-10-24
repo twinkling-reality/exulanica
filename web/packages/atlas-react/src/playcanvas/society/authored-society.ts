@@ -430,6 +430,9 @@ export class AuthoredRegionSociety {
   /**
    * The nearest drawn inhabitant along a world-space ray, or null; with `limit`, only one nearer
    * than that many world metres along it (something else the ray meets first stands in front).
+   * One the ray passes through the middle of (seen from above, within half their box's reach of
+   * where they stand) wins over a nearer one whose box it only grazes: the person under the
+   * pointer, not a passer-by beside the line (P1).
    */
   pickInhabitant(
     origin: readonly [number, number, number],
@@ -453,6 +456,14 @@ export class AuthoredRegionSociety {
       return this.box.intersectsRay(this.ray, this.hitPoint)
         ? this.hitPoint.distance(this.ray.origin)
         : null;
+    }, (minimum, maximum) => {
+      const [x, z] = [(minimum[0] + maximum[0]) / 2, (minimum[2] + maximum[2]) / 2];
+      const reach = Math.min(maximum[0] - minimum[0], maximum[2] - minimum[2]) / 4;
+      const { x: ox, z: oz } = this.ray.origin, { x: dx, z: dz } = this.ray.direction;
+      const across = Math.hypot(dx, dz);
+      // How far beside the ray their middle stands, seen from above; a ray straight down, from its foot.
+      const beside = across > 1e-9 ? Math.abs(dx * (z - oz) - dz * (x - ox)) / across : Math.hypot(x - ox, z - oz);
+      return beside <= reach;
     });
   }
 
