@@ -85,7 +85,9 @@ export interface RecordPictures {
   renderMomentPicture(moment: MomentForPicture, signal?: AbortSignal): Promise<MomentPicture | null>;
   /**
    * A moment's picture address where it is known; else null, its picture is read or made and `changed` follows.
-   * `lead`: the open page's own picture, drawn ahead of every draw still waiting (never stopping the one drawn now).
+   * A moment that carries its tick is drawn ahead of every older one still waiting, so a day's rows draw newest first
+   * even where rows come on top while the older ones wait. `lead`: the open page's own picture, drawn ahead of every
+   * draw still waiting (never stopping the one drawn now).
    */
   momentNow(moment: MomentForPicture | null | undefined, lead?: boolean): string | null;
   /** A character's round portrait, kept or made once from its look; null where it cannot be made. */
@@ -122,8 +124,11 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
   const portraits = new Map<string, Promise<string | null>>();
   const portraitKnown = new Map<string, string | null>();
   let still: string | null = null;
-  /** The draws waiting their turn (a moment's draw names its moment), and whether one is being drawn now. */
-  const waiting: { readonly moment: string | null; readonly start: () => void }[] = [];
+  /**
+   * The draws waiting their turn (a moment's draw names its moment, and its tick where it is drawn newest first), and
+   * whether one is being drawn now.
+   */
+  const waiting: { readonly moment: string | null; readonly tick: number | null; readonly lead: boolean; readonly start: () => void }[] = [];
   let drawing = false;
 
   const keep = (address: string) => {
@@ -133,13 +138,17 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
   const client = (signal: AbortSignal) => new HistoryPicturesClient({ ...credentials, signal });
   /**
    * One draw at a time, each after the one drawn now, whatever that one answered: in the order asked, except the open
-   * page's own moment (`lead`), which goes ahead of every draw still waiting, the newest lead first. A decision opened
-   * over its day so waits for one draw at most, not for every picture of the day's rows.
+   * page's own moment (`lead`), which goes ahead of every draw still waiting, the newest lead first, and a moment asked
+   * with its `tick`, which goes ahead of every older moment still waiting (behind the leads; a portrait keeps its
+   * place). A decision opened over its day so waits for one draw at most, not for every picture of the day's rows,
+   * and a day's newest row is drawn first, whenever it came.
    */
-  function serial<T>(task: () => Promise<T>, moment: string | null = null, lead = false): Promise<T> {
+  function serial<T>(task: () => Promise<T>, moment: string | null = null, lead = false, tick: number | null = null): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      const turn = { moment, start: () => { void Promise.resolve().then(task).then(resolve, reject).finally(nextDraw); } };
+      const turn = { moment, tick, lead, start: () => { void Promise.resolve().then(task).then(resolve, reject).finally(nextDraw); } };
+      const older = tick === null ? -1 : waiting.findIndex((one) => !one.lead && one.tick !== null && one.tick < tick);
       if (lead) waiting.unshift(turn);
+      else if (older >= 0) waiting.splice(older, 0, turn);
       else waiting.push(turn);
       if (!drawing) nextDraw();
     });
@@ -152,7 +161,7 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
   /** A moment asked before and still waiting, moved ahead of every other draw waiting: the open page now shows it. */
   function hasten(moment: string): void {
     const at = waiting.findIndex((turn) => turn.moment === moment);
-    if (at > 0) waiting.unshift(...waiting.splice(at, 1));
+    if (at >= 0) waiting.unshift({ ...waiting.splice(at, 1)[0]!, lead: true });
   }
   function people(): CharacterCatalog | null {
     try {
@@ -227,11 +236,11 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
     return null;
   }
 
-  function renderMoment(moment: MomentForPicture, signal?: AbortSignal, lead = false): Promise<MomentPicture | null> {
+  function renderMoment(moment: MomentForPicture, signal?: AbortSignal, lead = false, tick: number | null = null): Promise<MomentPicture | null> {
     if (disposed) return Promise.resolve(null);
     const own = lifetime.signal;
     return serial(() => (own.aborted || signal?.aborted ? Promise.resolve(null)
-      : renderMomentPicture({ entry, moment, credentials, signal: signal ?? own })), moment.moment_id, lead);
+      : renderMomentPicture({ entry, moment, credentials, signal: signal ?? own })), moment.moment_id, lead, tick);
   }
 
   function release() {
@@ -291,7 +300,8 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
       } else if (!disposed) {
         rendering.add(id);
         const own = lifetime.signal;
-        void renderMoment(moment, own, lead).then((picture) => {
+        const { tick } = moment as MomentForPicture & { readonly tick?: unknown };
+        void renderMoment(moment, own, lead, typeof tick === 'number' ? tick : null).then((picture) => {
           if (own.aborted) return;
           rendered.set(id, picture);
           if (picture) void pictureAddress(picture);

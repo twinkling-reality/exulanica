@@ -553,6 +553,31 @@ describe("a world's pictures", () => {
     expect(draws.order).toHaveLength(6);
     people.served = false;
   });
+
+  it("draws a day's rows newest first, a row that comes on top ahead of the older ones still waiting, never ahead of a lead", async () => {
+    urls();
+    people.served = true;
+    let letThrough: () => void = () => {};
+    draws.gate = new Promise((resolve) => { letThrough = resolve; });
+    const pictures = await open();
+    const row = (id: string, tick: number) => ({ moment_id: id, tick, scene: { people: [{}] }, picture: null });
+    // Teo's day, newest row first, and Teo's portrait; the newest row's picture is being drawn.
+    for (const [id, tick] of [['r30', 30], ['r20', 20], ['r10', 10]] as const) expect(pictures.momentNow(row(id, tick))).toBeNull();
+    expect(pictures.portraitNow('teo')).toBeNull();
+    await vi.waitFor(() => expect(draws.order).toEqual(['r30']));
+    // The world plays on with the day open: a row comes on top, a decision is opened, another row comes on top, the
+    // oldest row is opened as a decision, and one more row comes on top.
+    pictures.momentNow(row('r40', 40));
+    pictures.momentNow(row('n', 45), true);
+    pictures.momentNow(row('r50', 50));
+    pictures.momentNow(row('r10', 10), true);
+    pictures.momentNow(row('r60', 60));
+    letThrough();
+    await vi.waitFor(() => expect(draws.order).toHaveLength(8));
+    // The leads first, newest lead first; then the rows newest first, whenever they came; the portrait keeps its place.
+    expect(draws.order).toEqual(['r30', 'r10', 'n', 'r60', 'r50', 'r40', 'r20', 'portrait teo']);
+    people.served = false;
+  });
 });
 
 describe("the talking scene's top line (T9)", () => {
