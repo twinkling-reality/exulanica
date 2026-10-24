@@ -9,7 +9,8 @@ import type { PlacedThing } from '../src/world-objects-api.js';
 /*
  * A placed being stands in the crowd as the version placed it: the crowd's figures answer its
  * standing facing from the placement's yaw by the layer's own rule. A resident nobody placed faces
- * the open way where they stand by the world's plan sight, and nobody faces any way without one.
+ * the open way where they stand by the world's plan sight, and nobody faces any way without one; the
+ * same sight says how much room lies from a crowd point along a way, which keeps the crowd's steps off walls.
  */
 
 const { FakeLayer } = vi.hoisted(() => {
@@ -96,6 +97,21 @@ describe('a resident\'s standing facing', () => {
       }
       expect(ways.size).toBeGreaterThan(2);
       things.destroy();
+    }
+  });
+
+  it('says how much room lies from a crowd point along a way, the wall 40 cm north of it, wherever the society is drawn', async () => {
+    // North in the world is the moved society's own north, and the turned one's own east.
+    for (const [data, at, north] of [[moved, [0, 19.6], [0, -1]], [turned, [-19.6, 0], [1, 0]]] as const) {
+      const things = await mount(data);
+      expect(things.crowdFigures.openAlong(at, north, 5)).toBeCloseTo(0.4, 9);
+      // Nothing stands south of the wall: as far as asked.
+      expect(things.crowdFigures.openAlong(at, [-north[0], -north[1]], 5)).toBe(5);
+      things.destroy();
+    }
+    for (const unsaid of [await mount(moved, false), await mount(null)]) {
+      expect(unsaid.crowdFigures.openAlong([0, 19.6], [0, -1], 5)).toBeNull();
+      unsaid.destroy();
     }
   });
 

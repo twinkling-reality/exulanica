@@ -261,6 +261,14 @@ export interface CrowdTiming {
   readonly peopleSpacingMetres?: number;
   readonly spacingStepMetres?: number;
   /**
+   * How far apart across their way two walking the same way are drawn when nearer; how far aside a walker passing
+   * someone standing is drawn; and the room a body needs past its centre, which a step past `spacingStepMetres`
+   * leaves to the nearest wall (the crowd's figures' `openAlong`), in metres. Absent or zero, walkers walk their path.
+   */
+  readonly walkerSpacingMetres?: number;
+  readonly passAsideMetres?: number;
+  readonly bodyDepthMetres?: number;
+  /**
    * What one tick lets each person whose kind states its own pace walk, millimetres, by id, as the
    * server serves it beside the state (`walk_budgets_mm_per_tick`). Such a person walks that budget
    * and, when nothing hurries them and their figure states no pace, walks at it over the tick's

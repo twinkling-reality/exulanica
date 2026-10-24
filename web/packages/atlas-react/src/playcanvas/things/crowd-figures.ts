@@ -147,6 +147,11 @@ export interface ThingCrowdFiguresOptions {
    * nothing says.
    */
   readonly arrivalFacingAt?: (id: string, at: readonly [number, number], walked: number) => number | null;
+  /**
+   * How far is open from a point of the crowd's frame (east and south in metres) along a way (a unit east
+   * and south), at most `most` metres; null where nothing says.
+   */
+  readonly openAlong?: (at: readonly [number, number], way: readonly [number, number], most: number) => number | null;
 }
 
 /**
@@ -219,6 +224,11 @@ export class ThingCrowdFigures implements CrowdFigures {
   /** Where someone stopped, the way the crowd turns them: as `arrivalFacingAt` says. */
   arrivalFacingAt(id: string, at: readonly [number, number], walked: number): number | null {
     return this.options.arrivalFacingAt?.(id, at, walked) ?? null;
+  }
+
+  /** How far is open from a point the crowd draws someone at, along a way: as `openAlong` says. */
+  openAlong(at: readonly [number, number], way: readonly [number, number], most: number): number | null {
+    return this.options.openAlong?.(at, way, most) ?? null;
   }
 
   /** The figure drawing a person now, or null while it is not drawn in full or not yet made. */

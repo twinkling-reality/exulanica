@@ -1,0 +1,48 @@
+{
+  "profile": "exulanica.society-presentation/v1",
+  "note": "How a page draws what a society records, where the record leaves it open. Every value here is presentation: no recorded position, path or event is changed by it, and a page that reads none of it draws everyone at their recorded point. Each value is a chosen default with its reason, not a measured cost or a safety bound; a later version is another file beside this one.",
+  "entries": [
+    {
+      "key": "conversation_distance_mm",
+      "value": 900,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Two people who stand talking with each other are drawn this far apart, centre to centre, when their recorded standing points are nearer. A society stands each talker at a node of its own walking lines, and two nodes of one line can lie a few hundred millimetres apart: on one town of 36 over four hours, 876 standing pairs were a median 590 mm apart and as near as 120 mm, so two bodies were drawn inside each other. At 900 mm, two bodies each about 250 mm from centre to front (the figure the walk to a seat already uses) have about 400 mm between them, which is inside the distance people keep to talk and outside each other. Each steps half the shortfall back along the line between them, at their own walking pace."
+    },
+    {
+      "key": "people_spacing_mm",
+      "value": 700,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Any two people standing outdoors who are not talking with each other are drawn at least this far apart, centre to centre, when their recorded standing points are nearer: a society stands people at nodes of its walking lines, which can lie a hundred or so millimetres apart, so two bodies would be drawn inside each other (30 such pairs in three minutes of one fresh town of 128). Two bodies each about 250 mm from centre to front, the figure the conversation distance uses, have about 200 mm between them at 700 mm: apart, and still a crowd. Each steps back from the other along the line between them, at their own walking pace."
+    },
+    {
+      "key": "spacing_step_most_mm",
+      "value": 150,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "The most a standing person is drawn off their recorded point to keep the people spacing, all their neighbours together: a town's footway line can lie 400 mm off a shopfront (the walking lattice of other grounds keeps 450 mm, the walking module's clearance_mm), and a body is about 250 mm from centre to front, so a step of at most 150 mm never brings a body into a wall, whichever way it goes. Two recorded at one point part 300 mm, the most two such steps allow; two recorded 400 mm or more apart reach the full spacing."
+    },
+    {
+      "key": "walker_spacing_mm",
+      "value": 700,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "Two people walking the same way nearer than this, across their way, are drawn this far apart, each half the shortfall: the spacing people standing keep, two bodies each about 250 mm from centre to side with about 200 mm between them, as two walk side by side without brushing. A society walks its people on the lines of its walking ground, so two on one line in step are drawn inside each other (3 such pairs in three minutes of one fresh town of 128). The step is across their way only: their path along it is the society's."
+    },
+    {
+      "key": "pass_aside_mm",
+      "value": 500,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "A walker passing someone standing nearer than this, across their way, is drawn this far aside of them: a body's width, so the two never pass through each other (15 walkers passed through someone standing in three minutes of one fresh town of 128). The walker steps, not the one standing, and walks back onto their line once past."
+    },
+    {
+      "key": "body_depth_mm",
+      "value": 250,
+      "unit": "millimetre",
+      "class": "chosen_default",
+      "reason": "The room a body needs past its centre, the figure the conversation distance and the spacing step already use: a step past spacing_step_most_mm is taken only as far as the world's plan sight shows the way open by the step and this much more, so a body never reaches a wall, a frontage's glass included."
+    }
+  ]
+}

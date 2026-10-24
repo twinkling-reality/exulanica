@@ -1,13 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { CONVERSATION_DISTANCE_METRES, PEOPLE_SPACING_METRES, SPACING_STEP_METRES } from '../src/society-presentation.js';
+import {
+  BODY_DEPTH_METRES, CONVERSATION_DISTANCE_METRES, PASS_ASIDE_METRES, PEOPLE_SPACING_METRES, SPACING_STEP_METRES, WALKER_SPACING_METRES,
+} from '../src/society-presentation.js';
 
 /*
  * The page reads how far apart talkers are drawn from the catalog, never from a figure of its own:
- * the value here is read from the file again, by hand, and every entry states its reason.
+ * each value here is read from the newest file again, by hand, and every entry states its reason.
  */
 const CATALOG = JSON.parse(readFileSync(
-  new URL('../../../../assets/catalogs/society-presentation/society-presentation.v2.json', import.meta.url), 'utf8',
+  new URL('../../../../assets/catalogs/society-presentation/society-presentation.v3.json', import.meta.url), 'utf8',
 )) as { profile: string; entries: { key: string; value: number; unit: string; class: string; reason: string }[] };
 
 describe('the society presentation catalog', () => {
@@ -32,11 +34,25 @@ describe('the society presentation catalog', () => {
     expect(SPACING_STEP_METRES + 0.25).toBeLessThanOrEqual(0.4);
   });
 
-  it("carries the first version's values unchanged", () => {
-    const first = JSON.parse(readFileSync(
-      new URL('../../../../assets/catalogs/society-presentation/society-presentation.v1.json', import.meta.url), 'utf8',
-    )) as typeof CATALOG;
-    for (const entry of first.entries) expect(CATALOG.entries.find((one) => one.key === entry.key)).toEqual(entry);
+  it('states how far apart walkers in step are drawn, how far aside one passes someone standing, and a body\'s depth', () => {
+    const value = (key: string) => CATALOG.entries.find((one) => one.key === key)!.value / 1000;
+    expect(WALKER_SPACING_METRES).toBe(value('walker_spacing_mm'));
+    expect(PASS_ASIDE_METRES).toBe(value('pass_aside_mm'));
+    expect(BODY_DEPTH_METRES).toBe(value('body_depth_mm'));
+    // Two walking side by side keep the spacing people standing keep; one passes a body's width aside, two depths.
+    expect(WALKER_SPACING_METRES).toBe(PEOPLE_SPACING_METRES);
+    expect(PASS_ASIDE_METRES).toBe(2 * BODY_DEPTH_METRES);
+    // The step's own most and a body stay inside a footway line 0.4 m off a shopfront.
+    expect(SPACING_STEP_METRES + BODY_DEPTH_METRES).toBeLessThanOrEqual(0.4);
+  });
+
+  it("carries the earlier versions' values unchanged", () => {
+    for (const version of ['v1', 'v2']) {
+      const earlier = JSON.parse(readFileSync(
+        new URL(`../../../../assets/catalogs/society-presentation/society-presentation.${version}.json`, import.meta.url), 'utf8',
+      )) as typeof CATALOG;
+      for (const entry of earlier.entries) expect(CATALOG.entries.find((one) => one.key === entry.key)).toEqual(entry);
+    }
   });
 
   it('gives every value a class and a reason', () => {

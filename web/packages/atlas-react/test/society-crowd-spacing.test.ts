@@ -2,7 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { SocietyCrowd } from '../src/playcanvas/society/crowd.js';
-import { spacingSteps } from '../src/playcanvas/society/spacing.js';
+import { spacingSteps, walkingSteps, type Room } from '../src/playcanvas/society/spacing.js';
+import type { CrowdFigures } from '../src/playcanvas/society/crowd.js';
 import type { CrowdPose, CrowdRenderableFactory, OwnedSocietyState } from '../src/playcanvas/society/types.js';
 import { serveFixturePeople } from './served-people.js';
 
@@ -11,14 +12,23 @@ import { serveFixturePeople } from './served-people.js';
  * are drawn at least the people spacing apart, each half the shortfall back along the line between
  * them, a step held to the most one may take. Plain arithmetic: recorded 0.5 m apart with a 0.7 m
  * spacing, each stands 0.1 m back; recorded 0.2 m apart, each would need 0.25 m and takes the most,
- * 0.15 m, so they stand 0.5 m apart.
+ * 0.15 m, so they stand 0.5 m apart, or the whole 0.25 m where the room behind holds it and a body
+ * more. Walkers (T0b): two walking the same way nearer than the walker spacing are drawn apart across
+ * their way, each half the shortfall, and a walker passing someone standing within the pass aside is
+ * drawn aside of them, the one standing never moved; each held as a stander's step is.
  */
 const SPACING = 0.7;
 const STEP = 0.15;
 const TIMING = { nowMs: 0, intervalMs: 60_000, conversationMetres: 0.9, peopleSpacingMetres: SPACING, spacingStepMetres: STEP };
+const APART = 0.7;
+const ASIDE = 0.5;
+const BODY = 0.25;
+const WALKING = { ...TIMING, walkerSpacingMetres: APART, passAsideMetres: ASIDE, bodyDepthMetres: BODY };
+/** Room everywhere as far as asked: nothing near. */
+const OPEN: Room = (_at, _way, most) => most;
 
 
-function setup() {
+function setup(room: Room | null = null) {
   const canvas = document.createElement('canvas');
   const device = new pc.NullGraphicsDevice(canvas);
   const app = new pc.AppBase(canvas);
@@ -42,6 +52,7 @@ function setup() {
     };
   };
   const crowd = new SocietyCrowd(device, root, { factory });
+  if (room !== null) crowd.setFigures({ figureFor: () => null, openAlong: room } satisfies CrowdFigures);
   const last = (id: string) => poses.get(id)!.at(-1)! as CrowdPose & { yaw?: number };
   let now = 0;
   /** Frames of a 60 Hz display for `seconds`. */
@@ -100,6 +111,75 @@ describe('the people spacing, worked out', () => {
   });
 });
 
+describe('walkers across their way, worked out', () => {
+  const walker = (id: string, x: number, z: number, way: readonly [number, number] = [1, 0]) => ({ id, at: [x, z] as const, way });
+  const still = (id: string, x: number, z: number) => ({ id, at: [x, z] as const });
+  const near = (step: readonly [number, number] | undefined, x: number, z: number) => {
+    expect(step![0]).toBeCloseTo(x, 9);
+    expect(step![1]).toBeCloseTo(z, 9);
+  };
+  const free = { apart: APART, aside: ASIDE, stepMost: 1, bodyDepth: BODY };
+
+  it('parts two walking the same way nearer than the spacing, each half the shortfall across their way', () => {
+    // Both walk east, 0.3 m apart north and south: each steps 0.2 m away from the other.
+    const steps = walkingSteps([walker('a', 10, 5), walker('b', 10.1, 5.3)], [], free);
+    near(steps.get('a'), 0, -0.2);
+    near(steps.get('b'), 0, 0.2);
+    // Two on one line part by id, the lesser to their right (south, walking east).
+    const one = walkingSteps([walker('m', 3, 1), walker('k', 3.2, 1)], [], free);
+    near(one.get('k'), 0, 0.35);
+    near(one.get('m'), 0, -0.35);
+  });
+
+  it('leaves two walking opposite ways, the spacing apart, or one behind the other, on their lines', () => {
+    expect(walkingSteps([walker('a', 10, 5), walker('b', 10, 5.3, [-1, 0])], [], free).size).toBe(0);
+    expect(walkingSteps([walker('a', 10, 5), walker('b', 10, 5 + APART)], [], free).size).toBe(0);
+    // One behind the other on one line, two body depths or more apart: bodies that do not meet, walking on.
+    expect(walkingSteps([walker('a', 10, 5), walker('b', 10 + 2 * BODY + 0.01, 5)], [], free).size).toBe(0);
+    expect(walkingSteps([walker('a', 10, 5), walker('b', 10 + 2 * BODY - 0.01, 5)], [], free).size).toBe(2);
+    expect(walkingSteps([walker('a', 10, 5), walker('b', 10, 5.3)], [], { ...free, apart: 0, aside: 0 }).size).toBe(0);
+  });
+
+  it('steps a walker passing someone standing the whole shortfall aside, away from them, and never the one standing', () => {
+    // Walking east, someone standing 0.1 m south of the line just ahead: the walker steps 0.4 m north.
+    const steps = walkingSteps([walker('w', 10, 5)], [still('s', 10.2, 5.1)], free);
+    near(steps.get('w'), 0, -0.4);
+    expect(steps.has('s')).toBe(false);
+    // From twice the pass aside ahead until a pass aside behind; not further ahead or once past.
+    near(walkingSteps([walker('w', 10, 5)], [still('s', 10 + 2 * ASIDE - 0.01, 5.1)], free).get('w'), 0, -0.4);
+    expect(walkingSteps([walker('w', 10, 5)], [still('s', 10 + 2 * ASIDE + 0.01, 5.1)], free).size).toBe(0);
+    near(walkingSteps([walker('w', 10, 5)], [still('s', 10 - ASIDE + 0.01, 5.1)], free).get('w'), 0, -0.4);
+    expect(walkingSteps([walker('w', 10, 5)], [still('s', 10 - ASIDE - 0.01, 5.1)], free).size).toBe(0);
+    // From one standing on the line, to the side with more room: south (their right) where north is tight, and back.
+    const tight = (way: number): Room => (_at, w, most) => Math.min(most, w[1] * way > 0 ? 2 : 0.3);
+    near(walkingSteps([walker('w', 10, 5)], [still('s', 10.2, 5)], { ...free, room: tight(1) }).get('w'), 0, 0.5);
+    near(walkingSteps([walker('w', 10, 5)], [still('s', 10.2, 5)], { ...free, room: tight(-1) }).get('w'), 0, -0.5);
+    // One standing a pass aside or more off the line is passed on it.
+    expect(walkingSteps([walker('w', 10, 5)], [still('s', 10.2, 5 + ASIDE + 0.01)], free).size).toBe(0);
+  });
+
+  it('holds a step to the most one takes where the room is not known, and to the room less a body where it is', () => {
+    const at = [walker('w', 10, 5)], stander = [still('s', 10.2, 5.1)];
+    near(walkingSteps(at, stander, { ...free, stepMost: STEP }).get('w'), 0, -STEP);
+    // 0.5 m open north: the step goes as far as leaves a body's depth, 0.25 m.
+    near(walkingSteps(at, stander, { ...free, stepMost: STEP, room: (_a, _w, most) => Math.min(most, 0.5) }).get('w'), 0, -0.25);
+    near(walkingSteps(at, stander, { ...free, stepMost: STEP, room: OPEN }).get('w'), 0, -0.4);
+  });
+});
+
+describe('the people spacing where the room is known', () => {
+  const at = (id: string, x: number) => ({ id, at: [x, 0] as const });
+
+  it('takes the whole shortfall past the most one step takes where the room behind holds it and a body', () => {
+    const steps = spacingSteps([at('a', 10), at('b', 10.2)], SPACING, STEP, OPEN, BODY);
+    expect(steps.get('a')![0]).toBeCloseTo(-0.25, 9);
+    expect(steps.get('b')![0]).toBeCloseTo(0.25, 9);
+    // 0.3 m open behind each: no more than the most one step takes.
+    const tight = spacingSteps([at('a', 10), at('b', 10.2)], SPACING, STEP, (_a, _w, most) => Math.min(most, 0.3), BODY);
+    expect(tight.get('a')![0]).toBeCloseTo(-STEP, 9);
+  });
+});
+
 describe('people standing near each other', () => {
   it('are drawn the spacing apart where recorded nearer, as a step, and their recorded points do not move', () => {
     const { crowd, last, run, done } = setup();
@@ -119,7 +199,15 @@ describe('people standing near each other', () => {
     done();
   });
 
-  it('stay at their recorded points when no spacing is handed, and a walker passing is not steered', () => {
+  it('part the whole spacing where the room behind each holds the step and a body', () => {
+    const { crowd, last, run, done } = setup(OPEN);
+    crowd.set(state(1, [person('west', [[10, 5]], null), person('east', [[10.2, 5]], null)]), [10, 5], WALKING);
+    run(2);
+    expect(last('east').position[0] - last('west').position[0]).toBeCloseTo(SPACING, 9);
+    done();
+  });
+
+  it('stay at their recorded points when no spacing is handed, and a walker passing is not steered without a pass aside', () => {
     const { crowd, last, run, done } = setup();
     crowd.set(state(1, [person('west', [[10, 5]], null), person('east', [[10.5, 5]], null)]), [10, 5], { nowMs: 0, intervalMs: 60_000 });
     run(2);
@@ -142,5 +230,54 @@ describe('people standing near each other', () => {
     }
     expect(nearest).toBeLessThan(0.3);
     walking.done();
+  });
+});
+
+describe('people walking', () => {
+  /** Two walking east from x 8 to 12 on lines `gap` metres apart north and south, frame by frame. */
+  function inStep(room: Room | null, gap: number) {
+    const walking = setup(room);
+    walking.crowd.set(state(1, [person('north', [[8, 5]], null), person('south', [[8, 5 + gap]], null)]), [10, 5], WALKING);
+    walking.run(1);
+    walking.crowd.set(state(2, [person('north', [[8, 5], [12, 5]], null), person('south', [[8, 5 + gap], [12, 5 + gap]], null)]), [10, 5], { ...WALKING, nowMs: walking.at() });
+    const apart: number[] = [];
+    for (let frame = 0; frame < 60 * 60; frame += 1) {
+      walking.run(1 / 60);
+      const [n, s] = [walking.last('north').position, walking.last('south').position];
+      if (n[0] > 11.5) break;
+      if (n[0] > 9) apart.push(s[2] - n[2]);
+    }
+    walking.done();
+    return apart;
+  }
+
+  it('are drawn the walker spacing apart across their way when walking in step nearer, room allowing', () => {
+    const apart = inStep(OPEN, 0.2);
+    expect(Math.min(...apart.slice(-30))).toBeCloseTo(APART, 2);
+    // Where the room is not known each takes no more than the most one step takes.
+    expect(Math.max(...inStep(null, 0.2))).toBeCloseTo(0.2 + 2 * STEP, 2);
+  });
+
+  it('pass someone standing aside of them, back on their line once past, the one standing never moved', () => {
+    // At a person's own pace, and at the faster pace a short minute asks.
+    for (const intervalMs of [60_000, 2_000]) {
+      const walking = setup(OPEN);
+      walking.crowd.set(state(1, [person('walker', [[8, 5]], null), person('stander', [[10.3, 5]], null)]), [10, 5], { ...WALKING, intervalMs });
+      walking.run(1);
+      walking.crowd.set(state(2, [person('walker', [[8, 5], [14, 5]], null), person('stander', [[10.3, 5]], null)]), [10, 5], { ...WALKING, intervalMs, nowMs: walking.at() });
+      let nearest = Number.POSITIVE_INFINITY;
+      for (let frame = 0; frame < 60 * 60; frame += 1) {
+        walking.run(1 / 60);
+        const w = walking.last('walker').position, s = walking.last('stander').position;
+        nearest = Math.min(nearest, Math.hypot(w[0] - s[0], w[2] - s[2]));
+        expect(s[0]).toBeCloseTo(10.3, 9);
+        expect(s[2]).toBeCloseTo(5, 9);
+        if (w[0] > 13.5) break;
+      }
+      // Never nearer than a body's width, centre to centre.
+      expect(nearest).toBeGreaterThan(ASIDE - 0.01);
+      if (intervalMs === 60_000) expect(walking.last('walker').position[2]).toBeCloseTo(5, 3);
+      walking.done();
+    }
   });
 });

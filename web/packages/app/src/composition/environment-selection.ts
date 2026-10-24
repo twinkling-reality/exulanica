@@ -98,7 +98,7 @@ import { onSiteSeatsChanged, siteSeats } from './site-furniture.js';
 import { pointerRay, type SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyPlaces } from '../society-api.js';
 import { engineCreatedOver, societyEngine } from '../society-engines.js';
-import { CONVERSATION_DISTANCE_METRES, PEOPLE_SPACING_METRES, SPACING_STEP_METRES } from '../society-presentation.js';
+import { BODY_DEPTH_METRES, CONVERSATION_DISTANCE_METRES, PASS_ASIDE_METRES, PEOPLE_SPACING_METRES, SPACING_STEP_METRES, WALKER_SPACING_METRES } from '../society-presentation.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
 import { facingFigures, LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings, THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type MountedThings, type ThingLookChosenDetail, type ThingPickDetail, type ThingPickVia, type ThingsDependencies, visitorsOf } from './things.js';
 import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
@@ -2604,6 +2604,7 @@ export function mountEnvironmentSelection(
       // Two who stand talking are drawn a conversation apart, however near their recorded points.
       conversationMetres: CONVERSATION_DISTANCE_METRES,
       peopleSpacingMetres: PEOPLE_SPACING_METRES, spacingStepMetres: SPACING_STEP_METRES,
+      walkerSpacingMetres: WALKER_SPACING_METRES, passAsideMetres: PASS_ASIDE_METRES, bodyDepthMetres: BODY_DEPTH_METRES,
       // The engine's own walk budget for each body paced by its kind; a kind's pace does not change
       // between minutes, so minutes rebuilt from events walk by the latest read's.
       ...(next.walkBudgetsMm === undefined ? {} : { walkBudgetsMm: next.walkBudgetsMm }),

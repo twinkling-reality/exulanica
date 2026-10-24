@@ -14,7 +14,7 @@ import {
   type PlaceDrawing, type SeatingLayout, type SeatingMiss, type SeatingResult,
 } from './seating.js';
 import { activityOnSeat, facingRule, type FacingRule } from './activity-facing.js';
-import { spacingSteps } from './spacing.js';
+import { spacingSteps, walkingSteps } from './spacing.js';
 import { spokenPartners } from './spoken-partners.js';
 import type {
   CrowdJump,
@@ -144,6 +144,11 @@ export interface CrowdFigures {
    * nothing says, and they keep the way they walked.
    */
   arrivalFacingAt?(id: string, at: readonly [number, number], walked: number): number | null;
+  /**
+   * How far is open from `at` (east and south in metres, the crowd's frame) along `way` (a unit east and
+   * south), at most `most` metres: the room a person drawn there has that way. Null where nothing says.
+   */
+  openAlong?(at: readonly [number, number], way: readonly [number, number], most: number): number | null;
 }
 
 export interface CrowdCounts {
@@ -434,7 +439,10 @@ export class SocietyCrowd {
   private startLagMs = 0;
   /** How far apart talking partners are drawn when recorded nearer, metres; 0 draws everyone where recorded. */
   private conversationMetres = 0;
-  private spacing = { metres: 0, stepMost: 0, steps: new Map() as ReadonlyMap<string, readonly [number, number]> };
+  private spacing = {
+    metres: 0, stepMost: 0, apart: 0, aside: 0, bodyDepth: 0,
+    steps: new Map() as ReadonlyMap<string, readonly [number, number]>, walking: new Map() as ReadonlyMap<string, readonly [number, number]>,
+  };
   /** Whether anybody still has recorded walking to present. */
   private moving = false;
   /** When the crowd was last drawn, in the caller's clock. */
@@ -538,7 +546,8 @@ export class SocietyCrowd {
     this.intervalMs = Math.max(1, options.intervalMs ?? DEFAULT_INTERVAL_MS);
     this.startLagMs = Math.max(0, options.startLagMs ?? 0);
     this.conversationMetres = Math.max(0, options.conversationMetres ?? 0);
-    this.spacing = { ...this.spacing, metres: Math.max(0, options.peopleSpacingMetres ?? 0), stepMost: Math.max(0, options.spacingStepMetres ?? 0) };
+    const metres = (value: number | undefined) => Math.max(0, value ?? 0);
+    this.spacing = { ...this.spacing, metres: metres(options.peopleSpacingMetres), stepMost: metres(options.spacingStepMetres), apart: metres(options.walkerSpacingMetres), aside: metres(options.passAsideMetres), bodyDepth: metres(options.bodyDepthMetres) };
     // Drawn below as on any frame: the figures are handed the time since they were last drawn.
     const sinceDrawn = continuing
       ? Math.max(0, nowMs - this.lastFrameMs) / MILLISECONDS_PER_SECOND
@@ -1306,12 +1315,16 @@ export class SocietyCrowd {
   private stepAside(walker: Walker, dt: number, reduced: boolean): boolean {
     // At rest they stand where they are kept (before a seat they got up from), else on their point.
     const talking = this.conversationStep(walker);
-    const spaced = talking === NO_STEP && walker.arrived ? this.spacing.steps.get(walker.id) : undefined;
+    const spaced = talking !== NO_STEP ? undefined : (walker.arrived ? this.spacing.steps : this.spacing.walking).get(walker.id);
     const wanted = talking !== NO_STEP ? talking : spaced === undefined ? walker.beside : [walker.beside[0] + spaced[0], walker.beside[1] + spaced[1]] as const;
     const dx = wanted[0] - walker.aside[0], dz = wanted[1] - walker.aside[1];
     const left = Math.hypot(dx, dz);
     if (left === 0) return false;
-    const reach = reduced ? left : this.walkSpeedOf(walker.id) * Math.max(0, dt);
+    // A walker on their way steps aside, and back onto their line, at least as fast as they walk on, whatever pace
+    // the minute asks: a step left from before a turn never trails behind them into someone.
+    const on = !walker.arrived
+      ? Math.hypot(walker.position[0] + walker.aside[0] - walker.drawn[0], walker.position[1] + walker.aside[1] - walker.drawn[2]) : 0;
+    const reach = reduced ? left : Math.max(this.walkSpeedOf(walker.id) * Math.max(0, dt), on);
     if (reach >= left) {
       walker.aside = wanted;
       return false;
@@ -1483,13 +1496,6 @@ export class SocietyCrowd {
         moving = true;
       }
     }
-    if (this.spacing.metres > 0) {
-      // Everyone standing outdoors at rest, off a seat and in no conversation, kept a spacing apart (T0).
-      const standers = [...this.walkers.values()]
-        .filter((w) => w.arrived && !w.indoors && w.settle === null && !w.onSeat && this.conversationStep(w) === NO_STEP)
-        .map((w) => ({ id: w.id, at: [w.position[0] + w.beside[0], w.position[1] + w.beside[1]] as const }));
-      this.spacing.steps = spacingSteps(standers, this.spacing.metres, this.spacing.stepMost);
-    }
     for (const walker of this.walkers.values()) {
       // Someone getting up from a seat walks on once they are back at their place.
       if (walker.total > 0 && walker.settle === null) {
@@ -1519,6 +1525,24 @@ export class SocietyCrowd {
         walker.indoors = !walker.indoors;
         wentIn = true;
       }
+    }
+    // Steps apart and aside are asked of where everyone stands now, then drawn.
+    if (this.spacing.metres > 0) {
+      // Everyone standing outdoors at rest, off a seat and in no conversation, kept a spacing apart (T0).
+      const standers = [...this.walkers.values()]
+        .filter((w) => w.arrived && !w.indoors && w.settle === null && !w.onSeat && this.conversationStep(w) === NO_STEP)
+        .map((w) => ({ id: w.id, at: [w.position[0] + w.beside[0], w.position[1] + w.beside[1]] as const }));
+      const room = (at: readonly [number, number], way: readonly [number, number], most: number) => this.figures?.openAlong?.(at, way, most) ?? null;
+      this.spacing.steps = spacingSteps(standers, this.spacing.metres, this.spacing.stepMost, room, this.spacing.bodyDepth);
+      // Walkers outdoors on their way, across which they step from one walking with them or someone standing (T0b).
+      const walking = [...this.walkers.values()].filter((w) => !w.arrived && !w.indoors && w.settle === null)
+        .map((w) => ({ id: w.id, at: w.position, way: [-Math.sin(w.facing), -Math.cos(w.facing)] as const }));
+      const still = [...this.walkers.values()].filter((w) => w.arrived && !w.indoors && !w.onSeat)
+        .map((w) => ({ id: w.id, at: [w.position[0] + w.aside[0], w.position[1] + w.aside[1]] as const }));
+      const { apart, aside, stepMost, bodyDepth } = this.spacing;
+      this.spacing.walking = walkingSteps(walking, still, { apart, aside, stepMost, bodyDepth, room });
+    }
+    for (const walker of this.walkers.values()) {
       const settling = this.settle(walker, dt, reduced);
       moving ||= !walker.arrived || settling;
     }

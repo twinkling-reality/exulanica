@@ -92,12 +92,14 @@ export interface CrowdFacingSources {
 /**
  * Which way someone faces where nothing says, for any society's crowd: first drawn standing, the
  * open way where they stand; stopped after a walk, the way they walked while it is open ahead, else
- * the open way nearest it (`openFacing`). Each point and way carried to the sight's world frame
+ * the open way nearest it (`openFacing`); and how much room lies from a point along a way, which keeps
+ * the crowd's steps apart off walls (`openAlong`). Each point and way carried to the sight's world frame
  * through the crowd's root and back; null while there is no sight or no root.
  */
 export function crowdFacing(sources: CrowdFacingSources): {
   readonly standingFacingAt: (person: OwnedSocietyState['inhabitants'][number]) => number | null;
   readonly arrivalFacingAt: (id: string, at: readonly [number, number], walked: number) => number | null;
+  readonly openAlong: (at: readonly [number, number], way: readonly [number, number], most: number) => number | null;
 } {
   const facing = (key: string, east: number, south: number, walked: number | null): number | null => {
     const sight = sources.sight?.() ?? null;
@@ -112,13 +114,25 @@ export function crowdFacing(sources: CrowdFacingSources): {
   return {
     standingFacingAt: (person) => facing(person.id, person.position_mm[0] / 1000, person.position_mm[1] / 1000, null),
     arrivalFacingAt: (id, [east, south], walked) => facing(id, east, south, walked),
+    // How far a wall (one seen through too) lies from a crowd point along a way, carried to the sight's frame.
+    openAlong: ([east, south], [wayEast, waySouth], most) => {
+      const sight = sources.sight?.() ?? null;
+      const root = sources.society?.()?.root ?? null;
+      if (sight === null || root === null) return null;
+      const m = root.getWorldTransform().data;
+      const way = [m[0]! * wayEast + m[8]! * waySouth, m[2]! * wayEast + m[10]! * waySouth] as const;
+      const length = Math.hypot(way[0], way[1]);
+      if (!(length > 0)) return null;
+      const from = [m[0]! * east + m[8]! * south + m[12]!, 0, m[2]! * east + m[10]! * south + m[14]!] as const;
+      return Math.min(most, (sight.wallReach ?? sight.reach)(from, [way[0] / length, 0, way[1] / length]));
+    },
   };
 }
 
 /** A crowd's figures for a society with no things: each person drawn as everyone is, facing as `crowdFacing` says. */
 export function facingFigures(sources: CrowdFacingSources) {
-  const { standingFacingAt, arrivalFacingAt } = crowdFacing(sources);
-  return { figureFor: () => null, standingFacingOf: standingFacingAt, arrivalFacingAt };
+  const { standingFacingAt, arrivalFacingAt, openAlong } = crowdFacing(sources);
+  return { figureFor: () => null, standingFacingOf: standingFacingAt, arrivalFacingAt, openAlong };
 }
 
 export interface MountedThings {

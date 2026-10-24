@@ -1,10 +1,10 @@
 /**
  * How the page draws what a society records, where the record leaves it open: read from the one
  * data file that states each value with its reason,
- * `assets/catalogs/society-presentation/society-presentation.v2.json`. Presentation only: nothing
+ * `assets/catalogs/society-presentation/society-presentation.v3.json`. Presentation only: nothing
  * here changes a recorded position, path or event.
  */
-import catalogText from '../../../../assets/catalogs/society-presentation/society-presentation.v2.json?raw';
+import catalogText from '../../../../assets/catalogs/society-presentation/society-presentation.v3.json?raw';
 
 interface PresentationEntry {
   readonly key: string;
@@ -46,3 +46,12 @@ export const PEOPLE_SPACING_METRES = millimetres('people_spacing_mm') / 1000;
 
 /** The most a standing person is drawn off their recorded point to keep that spacing, in metres. */
 export const SPACING_STEP_METRES = millimetres('spacing_step_most_mm') / 1000;
+
+/** How far apart across their way two people walking the same way are drawn when nearer, in metres. */
+export const WALKER_SPACING_METRES = millimetres('walker_spacing_mm') / 1000;
+
+/** How far aside a walker passing someone standing is drawn, in metres. */
+export const PASS_ASIDE_METRES = millimetres('pass_aside_mm') / 1000;
+
+/** The room a body needs past its centre, which a longer step leaves to the nearest wall, in metres. */
+export const BODY_DEPTH_METRES = millimetres('body_depth_mm') / 1000;

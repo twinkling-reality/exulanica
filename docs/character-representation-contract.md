@@ -385,8 +385,8 @@ from the person's own look, one draw call each, with a step rhythm and a lean in
 distant figures opened cracks at knees and ankles and are not used. Visual detail does not change simulation state or which person
 an interaction targets.
 
-The renderer never moves a canonical person to an unrecorded position for presentation, and it
-does not steer walkers around each other. Keeping people apart is the simulation's rule: a
+The renderer never moves a canonical person to an unrecorded position, and it does not change a
+walker's recorded path: the steps apart and aside below are drawn only. Keeping people apart is the simulation's rule: a
 purposeful society over an input that states places holds one person to a place and keeps people
 standing still a standing spacing apart, and the living society holds one person to a standing
 spot ([synthetic society contract](synthetic-society-contract.md)). Where a society puts two people
@@ -637,7 +637,7 @@ back along the line between them, a step taken at their own walking pace, and tw
 east and west. One who walks up to the other stops a conversation away. When the
 talk ends they walk on from where they are drawn, back onto their recorded path. The distance is a
 chosen default, stated with its reason in
-`assets/catalogs/society-presentation/society-presentation.v2.json` (`conversation_distance_mm`)
+`assets/catalogs/society-presentation/society-presentation.v3.json` (`conversation_distance_mm`)
 and handed to the crowd with each state (`conversationMetres` in `CrowdTiming`); a caller that
 hands none draws everyone at their recorded point. It is presentation only: no recorded position
 changes, and `positionOf` still answers the recorded point.
@@ -647,12 +647,23 @@ talking with each other (off a seat, in no conversation) and are recorded nearer
 spacing are drawn that far apart, each half the shortfall back along the line between them, two at
 one point parting east and west; a person's steps from every neighbour together are held to the most
 one step may take, so a body never reaches a wall (`society/spacing.ts` in atlas-react's
-playcanvas package). Both figures are chosen defaults with their reasons in
-`assets/catalogs/society-presentation/society-presentation.v2.json` (`people_spacing_mm`,
-`spacing_step_most_mm`; v2 carries v1's conversation distance unchanged), handed to the crowd as
-`peopleSpacingMetres` and `spacingStepMetres`. Two recorded very near part only as far as two such
-steps allow. A walker is not steered: one walking past another, or two walking in step on one path,
-may still pass through each other for a moment. Presentation only, as above.
+playcanvas package). Where the world's plan sight says how much room lies behind them that way (the
+crowd's figures' `openAlong`, from the same sight that turns a stander from a wall), the step goes on
+toward the whole shortfall as far as that room holds the step and a body's depth more.
+
+Walkers are drawn apart across their way the same way. Two walking the same way (within 45 degrees)
+nearer than the walker spacing are drawn that far apart across their heading, each half the
+shortfall, two on one line parting by id; a walker passing someone standing within the pass aside of
+their line, from twice that distance ahead until that distance behind, steps the whole shortfall
+aside of them and walks back onto their line once past, the one standing never moved. Each step is
+held as a stander's is, to the room beside them less a body, else to the most one step takes, and is
+eased at the walker's pace. Two walking opposite ways are not steered and may pass through each other
+for a moment. The figures are chosen defaults with their reasons in
+`assets/catalogs/society-presentation/society-presentation.v3.json` (`people_spacing_mm`,
+`spacing_step_most_mm`, `walker_spacing_mm`, `pass_aside_mm`, `body_depth_mm`; v3 carries v1's and
+v2's values unchanged), handed to the crowd as `peopleSpacingMetres`, `spacingStepMetres`,
+`walkerSpacingMetres`, `passAsideMetres` and `bodyDepthMetres`. A caller that hands none of the
+walking figures draws every walker on their path. Presentation only, as above.
 
 **Seats.** With each state the page hands the crowd a seating layout (`society/seating.ts`): each
 kind's use as `GET /world/assets` serves it from the world object catalog, the drawn version's
