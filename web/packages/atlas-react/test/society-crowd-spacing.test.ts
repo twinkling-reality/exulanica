@@ -154,6 +154,19 @@ describe('walkers across their way, worked out', () => {
     const tight = (way: number): Room => (_at, w, most) => Math.min(most, w[1] * way > 0 ? 2 : 0.3);
     near(walkingSteps([walker('w', 10, 5)], [still('s', 10.2, 5)], { ...free, room: tight(1) }).get('w'), 0, 0.5);
     near(walkingSteps([walker('w', 10, 5)], [still('s', 10.2, 5)], { ...free, room: tight(-1) }).get('w'), 0, -0.5);
+    // T0c: someone 0.1 m south of the line with a wall 0.3 m north of the walker: no room that way for the step and a
+    // body, so the walker passes south of them, 0.6 m across, ending the pass aside clear; with room both ways or none
+    // said, away from them as before.
+    const wall = (_at: readonly [number, number], w: readonly [number, number], most: number) => Math.min(most, w[1] < 0 ? 0.3 : 2);
+    near(walkingSteps([walker('w', 10, 5)], [still('s', 10.2, 5.1)], { ...free, room: wall }).get('w'), 0, 0.6);
+    near(walkingSteps([walker('w', 10, 5)], [still('s', 10.2, 5.1)], { ...free, room: OPEN }).get('w'), 0, -0.4);
+    near(walkingSteps([walker('w', 10, 5)], [still('s', 10.2, 5.1)], free).get('w'), 0, -0.4);
+    // Room enough that way for the step and a body (0.7 m): away from them, though the other side has more.
+    const enough = (_at: readonly [number, number], w: readonly [number, number], most: number) => Math.min(most, w[1] < 0 ? 0.7 : 2);
+    near(walkingSteps([walker('w', 10, 5)], [still('s', 10.2, 5.1)], { ...free, room: enough }).get('w'), 0, -0.4);
+    // A wall both ways and the other side no roomier: away from them, held to the most one step takes.
+    const narrow = (_at: readonly [number, number], w: readonly [number, number], most: number) => Math.min(most, w[1] < 0 ? 0.3 : 0.2);
+    near(walkingSteps([walker('w', 10, 5)], [still('s', 10.2, 5.1)], { ...free, stepMost: STEP, room: narrow }).get('w'), 0, -STEP);
     // One standing a pass aside or more off the line is passed on it.
     expect(walkingSteps([walker('w', 10, 5)], [still('s', 10.2, 5 + ASIDE + 0.01)], free).size).toBe(0);
   });

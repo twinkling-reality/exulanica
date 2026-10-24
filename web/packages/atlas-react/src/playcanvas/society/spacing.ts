@@ -103,7 +103,8 @@ export function spacingSteps(
  * and within two body depths along it (abreast, so their bodies meet), half the shortfall each (two on one line
  * part by id, the lesser to their right); from someone standing nearer
  * than `aside` across their way, from twice that ahead until that far behind, the walker alone the whole
- * shortfall away from them (from one on their line, to the side `room` says has more). Held to the room beside
+ * shortfall away from them (from one on their line, or where the side away from them has no room for the step and a
+ * body, to the side `room` says has more, past them). Held to the room beside
  * them less a body (`room`, `bodyDepth`); with nothing said, at most `stepMost`. A walker with nobody near has none.
  */
 export function walkingSteps(
@@ -145,9 +146,15 @@ export function walkingSteps(
             if (ahead > PASS_AHEAD * aside || ahead < -aside) continue;
             const step = aside - Math.abs(across);
             if (!(step > 0)) continue;
-            const open = (way: number) => room?.(a.at, [right[0] * way, right[1] * way], step + bodyDepth) ?? null;
-            const roomier = Math.abs(across) > SAME_POINT_METRES ? side : (open(-side) ?? 0) > (open(side) ?? 0) ? -side : side;
-            add(a.id, right[0] * roomier * step, right[1] * roomier * step);
+            // Past them on the other side the step is the pass aside and how far off the line they stand.
+            const off = Math.abs(across) > SAME_POINT_METRES, past = aside + Math.abs(across);
+            const open = (way: number) => room?.(a.at, [right[0] * way, right[1] * way], past + bodyDepth) ?? null;
+            const away = open(side), beyond = open(-side);
+            // From one on their line, or where the side away from them has no room for the step and a body (a wall), the
+            // side with more room (T0c); one standing never moves.
+            const cross = (!off || (away !== null && away < step + bodyDepth)) && (beyond ?? 0) > (away ?? 0);
+            const by = cross ? past : step;
+            add(a.id, right[0] * (cross ? -side : side) * by, right[1] * (cross ? -side : side) * by);
           } else if (a.id < b.id && Math.abs(ahead) < 2 * bodyDepth && Math.abs(across) < apart
             && a.way[0] * b.way[0] + a.way[1] * b.way[1] >= SAME_WAY) {
             // Two walking the same way abreast near enough that their bodies meet; one behind another walks on.
