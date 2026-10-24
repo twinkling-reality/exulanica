@@ -133,9 +133,15 @@ assert.deepEqual(toldSections(garden, teo), [
   { label: 'How Teo is', lines: ['Rest: needed now (802 of 1000).', 'Holding the acorn.'] , apart: true },
   { label: 'Near Teo', lines: ['Ines, 3 m away, standing, can hear Teo.', 'A duck, beside Teo, resting, holding the leaf, from another world.', 'The bench, 4 m away.', 'And 3 more farther away.'] , apart: false },
   { label: 'Heard', lines: ['Ines, 1 minute ago: “Morning.”'] , apart: false },
-  { label: 'Remembers', lines: ['Ines, met 3 minutes ago.', 'Ari, met 1 minute ago, no longer here.', 'The lower pools, this minute.', 'The bench, 2 minutes ago.', 'And 2 more in the Full record.'] , apart: false },
+  { label: 'Remembers', lines: ['Ines, met 3 minutes ago.', 'Ari, met 1 minute ago, no longer here.', 'The lower pools, this minute.', 'The bench, 2 minutes ago.'] , apart: false, more: 'And 2 more in the Full record.' },
 ]);
 assert.deepEqual(toldSections({}, teo), []);
+// D4: Heard shows the newest three lines in the order they were told, the rest in the Full record; three or fewer, all.
+const heardOf = count => ({ heard: Array.from({ length: count }, (_, at) => ({ from: `Ines ${at + 1}`, line: `Line ${at + 1}.`, minutes_ago: count - at, to_you: false })) });
+assert.deepEqual(toldSections(heardOf(5), teo).find(section => section.label === 'Heard').lines,
+  ['Ines 3, 3 minutes ago: “Line 3.”', 'Ines 4, 2 minutes ago: “Line 4.”', 'Ines 5, 1 minute ago: “Line 5.”']);
+assert.deepEqual(['And 2 earlier lines in the Full record.', 'And 1 earlier line in the Full record.', undefined],
+  [5, 4, 3].map(count => toldSections(heardOf(count), teo).find(section => section.label === 'Heard').more));
 
 // Plain words: no em dash, no code, no "it" for a character (the personality is "it": as you wrote it;
 // a spot's own words, in brackets, are the server's and name a place).

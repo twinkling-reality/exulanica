@@ -26,6 +26,8 @@ export const DECISION_WORDS = Object.freeze({
 
 /** At most this many lines of what is remembered; the rest are in the Full record. */
 export const REMEMBERED_LINES = 4;
+/** At most this many lines heard, the newest, in the order they were told; the rest are in the Full record (D4). */
+export const HEARD_LINES = 3;
 
 const plain = value => typeof value === 'string' && value.trim() ? value.trim() : null;
 const capital = words => words.charAt(0).toUpperCase() + words.slice(1);
@@ -178,7 +180,8 @@ function whereWhen(context) {
  */
 export function toldSections(context, who) {
   const sections = [];
-  const add = (label, lines, apart = false) => { const kept = lines.filter(Boolean); if (kept.length) sections.push({ label, lines: kept, apart }); };
+  // `more` closes a list the page shows in part: its own faint line at the section's end, the rest in the Full record (D4).
+  const add = (label, lines, apart = false, more = null) => { const kept = lines.filter(Boolean); if (kept.length) sections.push({ label, lines: kept, apart, ...(more ? { more } : {}) }); };
   add(DECISION_WORDS.personality, personalityRecordLines(context?.character) ?? []);
   add(DECISION_WORDS.whereWhen, [whereWhen(context)]);
   const how = list(context?.needs).map(need => needLine(need.label, need.milli, need.seen_to_at_milli));
@@ -196,8 +199,11 @@ export function toldSections(context, who) {
   const farther = (surroundings?.more_beings || 0) + (surroundings?.more_things || 0);
   if (farther > 0) near.push(`And ${farther} more farther away.`);
   add(nearLabel(who), near);
-  add(DECISION_WORDS.heard, list(context?.heard).filter(item => plain(item.line))
-    .map(item => `${[plain(item.from) ?? 'Someone', ago(item.minutes_ago)].filter(Boolean).join(', ')}: “${plain(item.line)}”`));
+  const heard = list(context?.heard).filter(item => plain(item.line))
+    .map(item => `${[plain(item.from) ?? 'Someone', ago(item.minutes_ago)].filter(Boolean).join(', ')}: “${plain(item.line)}”`);
+  // The newest heard kept, so the ones left out came before them: "earlier" (DESIGN 03:17).
+  const earlier = heard.length - Math.min(heard.length, HEARD_LINES);
+  add(DECISION_WORDS.heard, heard.slice(-HEARD_LINES), false, earlier > 0 ? `And ${earlier} earlier ${earlier === 1 ? 'line' : 'lines'} in the Full record.` : null);
   const remembers = context?.remembers;
   if (remembers) {
     const lines = [
@@ -207,8 +213,7 @@ export function toldSections(context, who) {
     const handed = list(remembers.handed).length;
     const shown = lines.slice(0, REMEMBERED_LINES);
     const more = lines.length - shown.length + handed;
-    if (more > 0) shown.push(`And ${more} more in the Full record.`);
-    add(DECISION_WORDS.remembers, shown);
+    add(DECISION_WORDS.remembers, shown, false, more > 0 ? `And ${more} more in the Full record.` : null);
   }
   return sections;
 }

@@ -16,10 +16,13 @@
 /* What the model was told: its label, then each section's name and words; past its place it scrolls. */
 .wu-record-decision .wu-rd-told { position: absolute; overflow: auto; scrollbar-width: thin; }
 .wu-record-decision .wu-rd-told > .wu-rd-label { margin-bottom: 20px; }
+/* More told than the box holds: its foot fades out over a line rather than ending in a cut one, until scrolled (D4). */
+.wu-record-decision .wu-rd-told[data-more="true"] { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 48px), transparent); }
 .wu-record-decision .wu-rd-section { margin-top: 18px; }
 .wu-record-decision .wu-rd-name { margin: 0; font: 500 13px/1.3 var(--font-sans); color: var(--hr-quiet); }
 .wu-record-decision .wu-rd-words { margin: 4px 0 0; font: 400 16px/1.45 var(--font-sans); color: var(--hr-ink); text-wrap: pretty; }
 .wu-record-decision .wu-rd-block { display: block; }
+.wu-record-decision .wu-rd-block.wu-rd-faint { color: var(--hr-quiet); opacity: .78; }
 .wu-record-decision .wu-rd-quote { font-style: italic; font-weight: 300; }
 .wu-record-decision .wu-rd-note { margin: 0; font: 400 16px/1.45 var(--font-sans); color: var(--hr-quiet); }
 .wu-record-decision .wu-rd-note[data-refused="true"] { color: var(--hr-refused); }

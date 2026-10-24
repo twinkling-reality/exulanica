@@ -29,7 +29,7 @@ export interface DecisionPageState {
   readonly verdict: string | null;
   readonly toldLabel: string;
   /** The sections of what the model was told; null while the record is read. */
-  readonly told: readonly { readonly label: string; readonly lines: readonly string[]; readonly apart: boolean }[] | null;
+  readonly told: readonly { readonly label: string; readonly lines: readonly string[]; readonly apart: boolean; readonly more?: string }[] | null;
   readonly choicesLabel: string;
   readonly choices: readonly { readonly number: number; readonly words: string; readonly chosen: boolean }[];
   readonly earlier: boolean;
@@ -110,7 +110,7 @@ interface Flow {
 
 type Section = NonNullable<DecisionPageState['told']>[number];
 type Written = NonNullable<DecisionPageState['personality']>;
-interface Block { readonly words: string; readonly quote: boolean }
+interface Block { readonly words: string; readonly quote: boolean; readonly faint?: boolean }
 
 const SVG = 'http://www.w3.org/2000/svg';
 /** Where the person's choice to hide the newcomer's notes is kept on this computer (A7): a convenience, so where it
@@ -138,7 +138,9 @@ function blocksOf(section: Section, written: Written | null): readonly Block[] {
     const blocks: Block[] = [...(name ? [{ words: name, quote: false }] : []), ...(about ? [{ words: `“${about}”`, quote: true }] : [])];
     if (blocks.length) return blocks;
   }
-  return section.apart ? section.lines.map((words) => ({ words, quote: false })) : [{ words: section.lines.join(' '), quote: false }];
+  const shown = section.apart ? section.lines.map((words) => ({ words, quote: false })) : [{ words: section.lines.join(' '), quote: false }];
+  // A list shown in part closes on its own faint line (D4).
+  return section.more ? [...shown, { words: section.more, quote: false, faint: true }] : shown;
 }
 
 /** What the model was told, at its place: below the head, stopping above the window's foot (it scrolls past that). */
@@ -288,7 +290,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         } else if (!state.told) told.append(element('p', 'wu-rd-note', DECISION_WORDS.reading));
         sections.forEach((section, at) => {
           const words = element('p', 'wu-rd-words');
-          for (const block of blocks[at]!) words.append(element('span', block.quote ? 'wu-rd-block wu-rd-quote' : 'wu-rd-block', block.words));
+          for (const block of blocks[at]!) words.append(element('span', block.quote ? 'wu-rd-block wu-rd-quote' : block.faint ? 'wu-rd-block wu-rd-faint' : 'wu-rd-block', block.words));
           const part = element('div', 'wu-rd-section');
           part.append(element('p', 'wu-rd-name', section.label), words);
           told!.append(part);
@@ -402,6 +404,9 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         lines.innerHTML = flowMarkup(flow);
       }
     }
+
+    // A told column taller than its box fades at its foot until it is scrolled to its end (D4).
+    if (told) { const box = told; const more = () => { box.dataset['more'] = String(box.scrollHeight - box.scrollTop - box.clientHeight > 1); }; more(); box.addEventListener('scroll', more, { passive: true }); }
 
     // The choices' note measured: it stands where the label stood and the label rises above it, so neither touches a row.
     if (over && choiceNote && choiceNote.offsetHeight > 0) {

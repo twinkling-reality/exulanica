@@ -435,3 +435,27 @@ describe('A decision explains itself to a newcomer (A7)', () => {
     expect(keys(none.root)).not.toContain('NHide notes');
   });
 });
+
+describe("The told column ends cleanly (D4)", () => {
+  it('fades a told column taller than its box until it is scrolled to its end', async () => {
+    const { root } = await open(teo());
+    const told = root.querySelector('.wu-rd-told') as HTMLElement;
+    const sizes = { scrollHeight: 900, clientHeight: 600, scrollTop: 0 };
+    for (const name of Object.keys(sizes)) Object.defineProperty(told, name, { configurable: true, get: () => sizes[name as keyof typeof sizes] });
+    told.dispatchEvent(new Event('scroll'));
+    expect(told.dataset['more']).toBe('true');
+    sizes.scrollTop = 300;
+    told.dispatchEvent(new Event('scroll'));
+    expect(told.dataset['more']).toBe('false');
+  });
+
+  it("closes a list shown in part on its own faint line at the section's end", async () => {
+    const heard = { label: 'Heard', lines: ['Ines, 2 minutes ago: “Morning.”', 'Ari, 1 minute ago: “Hello.”'], apart: false, more: 'And 4 earlier lines in the Full record.' };
+    const { root } = await open(teo({ told: [heard] }));
+    const section = [...root.querySelectorAll('.wu-rd-section')].find((part) => part.querySelector('.wu-rd-name')?.textContent === 'Heard')!;
+    const blocks = [...section.querySelectorAll('.wu-rd-block')];
+    expect(blocks.at(-1)?.textContent).toBe('And 4 earlier lines in the Full record.');
+    expect(blocks.at(-1)?.classList.contains('wu-rd-faint')).toBe(true);
+    expect(blocks.filter((block) => block.classList.contains('wu-rd-faint'))).toHaveLength(1);
+  });
+});
