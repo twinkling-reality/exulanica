@@ -199,6 +199,30 @@ describe('the traffic layer', () => {
     });
   });
 
+  it('draws a bicycle\'s tyres again after every bicycle was taken down, a new traffic or a redraw in another look', () => {
+    // The tyre ring is made once and shared; the engine destroys a mesh when the last of its instances is destroyed,
+    // and a destroyed mesh drawn again throws on every frame (no vertex buffer, no index buffer).
+    const { root } = setup();
+    const layer = new TrafficLayer(root, () => 0, toRenderer);
+    const BIKE = { length: 1780, width: 690, height: 1500, wheelbase: 1780, frontOverhang: 0, rearOverhang: 0 };
+    const bike = (id: string) => car(id, 3, true, { vehicleClass: 'bicycle', bodyFamily: 'upright_bicycle', dimensionsMm: BIKE });
+    // Each tyre of a drawn bicycle, by whether its mesh can still be drawn.
+    const tyres = (id: string) => (root.findByName(`vehicle:${id}`)!.children as pc.Entity[])
+      .filter((part) => part.name === 'wheel').map((wheel) => wheel.render!.meshInstances[0]!.mesh)
+      .map((mesh) => mesh.vertexBuffer !== null && mesh.indexBuffer[0] !== undefined);
+    layer.setWindow(trafficWindow([bike('first')]), 0);
+    layer.update(500);
+    expect(tyres('first')).toEqual([true, true]);
+    // A placing or a move makes another traffic: every vehicle held is taken down, then the new one is drawn.
+    layer.setWindow(trafficWindow([bike('after')], { inputSha256: 'b'.repeat(64) }), 0);
+    layer.update(600);
+    expect(tyres('after')).toEqual([true, true]);
+    // A redraw in another look takes every vehicle down too.
+    layer.setBodies(null);
+    layer.update(700);
+    expect(tyres('after')).toEqual([true, true]);
+  });
+
   it('draws a bicycle\'s rider only while it rides, and none on one parked at its stand', () => {
     const { root } = setup();
     const layer = new TrafficLayer(root, () => 0, toRenderer);

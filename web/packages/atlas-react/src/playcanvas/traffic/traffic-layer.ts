@@ -129,7 +129,11 @@ export class TrafficLayer {
   private readonly drawn = new Map<string, Drawn>();
   private readonly windows = new Map<number, { window: TrafficWindow; rows: Map<string, VehicleSamples>; late: Set<string> }>();
   private readonly materials = new Map<string, pc.StandardMaterial>();
-  /** A tyre's ring of each stated tube, made once: a torus of outer diameter 1 about its y axis. */
+  /**
+   * A tyre's ring of each stated tube, made once: a torus of outer diameter 1 about its y axis. The layer holds a
+   * reference to each, so taking every bicycle down never destroys one it draws again (the engine destroys a mesh
+   * when its last instance goes); `destroy` lets them go.
+   */
   private readonly rings = new Map<number, pc.Mesh>();
   private inputSha256: string | null = null;
   private stepMs = 0;
@@ -282,7 +286,7 @@ export class TrafficLayer {
     this.materials.clear();
     this.destroyed = true;
     this.root.destroy();
-    for (const ring of this.rings.values()) ring.destroy();
+    for (const ring of this.rings.values()) { ring.decRefCount(); ring.destroy(); }
     this.rings.clear();
   }
 
@@ -464,6 +468,7 @@ export class TrafficLayer {
     const made = this.rings.get(tube);
     if (made !== undefined) return made;
     const mesh = pc.Mesh.fromGeometry(device, new pc.TorusGeometry({ tubeRadius: tube / 2, ringRadius: (1 - tube) / 2, segments: 32, sides: 8 }));
+    mesh.incRefCount();
     this.rings.set(tube, mesh);
     return mesh;
   }
