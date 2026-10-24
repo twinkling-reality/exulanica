@@ -153,6 +153,9 @@ services:
       # The day this host keeps what is made on it until, an ISO date the Create offer states
       # (docs/deployment.md): empty states none, as a host that keeps what is made does.
       EXULANICA_HOST_KEEPS_UNTIL: ${EXULANICA_HOST_KEEPS_UNTIL:-}
+      # Whether a person's recorded decisions may be asked again of another model (Compare): empty
+      # reads as on; off for an installation where no model may be scored against another.
+      EXULANICA_ASK_AGAIN: ${EXULANICA_ASK_AGAIN:-}
       <<: *society-playback
       # Who plays: "on" (the default), this process in threads; "process", the playback-worker
       # service below, started with `--profile playback`, and this process plays nothing.

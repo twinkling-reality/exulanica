@@ -569,6 +569,30 @@ def test_no_composition_takes_a_kind_of_place_from_a_person():
                 ), (path.name, line)
 
 
+def test_only_the_api_is_told_whether_decisions_are_asked_again_and_public_env_can_turn_it_off():
+    """The server's operator turns Compare off in public.env (EXULANICA_ASK_AGAIN=off): the public
+    composition, compose.yaml under deploy/public/public.yaml, hands the setting to the API, empty
+    (on) unless public.env says, and no other service names it."""
+    composed = sorted(
+        path
+        for pattern in ("compose*.yaml", "deploy/**/*.yaml")
+        for path in ROOT.glob(pattern)
+        if "\nservices:\n" in path.read_text(encoding="utf-8")
+    )
+    for path in composed:
+        for name, block in _services(path.read_text(encoding="utf-8")).items():
+            for line in block.splitlines():
+                if "EXULANICA_ASK_AGAIN" not in line:
+                    continue
+                assert name == "api", (path.name, name)
+                assert re.fullmatch(r" +EXULANICA_ASK_AGAIN: \$\{EXULANICA_ASK_AGAIN:-\}", line), (
+                    path.name,
+                    line,
+                )
+    assert "      EXULANICA_ASK_AGAIN: ${EXULANICA_ASK_AGAIN:-}" in BASE_SERVICES["api"]
+    assert "EXULANICA_ASK_AGAIN" not in OVERLAY_SERVICES["api"]
+
+
 def test_only_the_api_makes_a_society_of_things_and_prepare_towns_dresses_the_arrival():
     """A guest's arrival town is dressed with a scene whose beings live in a society of things
     (exulanica/api/arrival_dressing.py): only the API is handed the setting, off by default; the

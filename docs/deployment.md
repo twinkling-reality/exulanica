@@ -1537,7 +1537,9 @@ then `up`. With no container and no credential `up` starts the server and says `
 not set`: every route that asks a model then says none is configured.
 
 A server kept only for a while states the day it is deleted after in `public.env`
-(`EXULANICA_HOST_KEEPS_UNTIL=YYYY-MM-DD`, 5.1), so Create tells each visitor before they type.
+(`EXULANICA_HOST_KEEPS_UNTIL=YYYY-MM-DD`, 5.1), so Create tells each visitor before they type. A
+server where no model may be scored against another states `EXULANICA_ASK_AGAIN=off` there (5.1),
+so no page offers Compare.
 A setting in `public.env` is changed the same way: edit the line, then `up`. The base wait between
 simulated minutes (`EXULANICA_SOCIETY_TICK_INTERVAL_MS`, 5.1.5) reaches the API, which plays every
 town here; a town already playing keeps the interval its playback was last set with, until its
