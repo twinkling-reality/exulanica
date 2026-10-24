@@ -762,7 +762,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     else if (action === 'save' && editing) void savePersonality();
     else if (action === 'model' && pageState().assignable) {
       const current = choosableModels(subjectReads.models).findIndex(item => item.provider === modelOf(pageView.row).model?.provider && item.modelId === modelOf(pageView.row).model?.modelId);
-      pageView.choosing = { focus: current < 0 ? choosableModels(subjectReads.models).length : current, refusal: null, busy: false, key: crypto.randomUUID() };
+      pageView.choosing = { focus: Math.max(current, 0), refusal: null, busy: false, key: crypto.randomUUID() };
       drawPage();
     }
     else if (action === 'choose' && choosing) { choosing.focus = index; choosing.refusal = null; drawPage(); }

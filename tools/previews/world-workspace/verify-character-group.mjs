@@ -249,7 +249,7 @@ assert.equal(openWhileOffered(open, { models: allRefused }), null, 'none left to
   const picker = modelPicker({ models: () => offered, currentOf: () => null, write: async () => 'verified', refusal: () => '' });
   const row = { key: 'teo' };
   picker.open(row);
-  assert.equal(picker.of(row)?.focus, served.length, 'opens on Routine');
+  assert.equal(picker.of(row)?.focus, 0, 'Routine theirs: opens on the first model');
   offered = [];
   assert.equal(picker.of(row), null, 'every model refused while the card\'s list is open: it closes');
   offered = served;
@@ -299,10 +299,14 @@ assert.equal(modelGroup({ who: teo, models: many, focus: 12 }).list.rows.at(-1).
   assert.deepEqual(writes, [['teo', 'qwen/235b', 'key-2']]);
   assert.deepEqual(used, ['verified']);
   assert.equal(picker.of(row), null);
-  // With nothing chosen it opens on Routine; Enter writes Routine (null); a refusal keeps the list with its words and a new key.
+  // With nothing chosen it opens on the first model, choosing nothing; at Routine Enter writes Routine (null); a refusal
+  // keeps the list with its words and a new key.
   current = null;
   picker.open(row);
-  assert.equal(picker.of(row).focus, served.length);
+  assert.equal(picker.of(row).focus, 0);
+  assert.equal(writes.length, 1, 'opening chooses nothing');
+  for (let step = 0; step < ordered.length; step += 1) press('ArrowDown');
+  assert.equal(picker.of(row).focus, ordered.length);
   answer = Promise.reject({ code: 'stale' });
   press('Enter');
   await settle(); await settle();

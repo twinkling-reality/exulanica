@@ -325,7 +325,8 @@ const MOVING_KEYS = Object.freeze(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 
 
 /**
  * Choosing a model in the group (r07): the list's state for the chosen character and its keys. M opens it on their
- * current model (Routine, after the served models, where they have none); the arrows move; a number (on the window
+ * current model, or where Routine is theirs on the first model, opened with its maker's words (focus never chooses);
+ * the arrows move; a number (on the window
  * modelGroup shows) or Enter gives that model; Esc closes it unchanged, and it closes when none is left to choose.
  * `models()` is the models a person may choose here (choosableModels), `currentOf(row)` the character's model; `write(row, selected, key)` makes the page's own write (selected null for
  * Routine) and answers the models read it verified, or throws the refusal; `refusal(error, row)` words a refusal;
@@ -341,7 +342,7 @@ export function modelPicker({ models, currentOf, write, refusal, onUsed = (verif
     open(row) {
       const list = models(), current = currentOf(row) ?? null;
       const at = list.findIndex(model => sameModel(model, current));
-      picking = { row, focus: at < 0 ? list.length : at, refusal: null, busy: false, key: newKey() };
+      picking = { row, focus: Math.max(at, 0), refusal: null, busy: false, key: newKey() };
     },
     /** Esc: back to where M was pressed, unless a write is on its way. */
     close() { if (!picking?.busy) picking = null; },
