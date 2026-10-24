@@ -1,9 +1,20 @@
 import assert from 'node:assert/strict';
-import { SPEAKING_ABOVE, TALK_SCENE, createScene, toldMoments } from './talk-scene.mjs';
+import { SPEAKING_DOT, TALK_SCENE, createScene, speakingDot, toldMoments } from './talk-scene.mjs';
 
 // T9: the scene's figures.
 assert.deepEqual({ ...TALK_SCENE }, { afterMs: 2000, lines: 2, holdMs: 2000, perCharMs: 70, replyLeastMs: 6000, replyBeyondMinuteMs: 1000 });
-assert.equal(SPEAKING_ABOVE, 18);
+// The speaking dot (r24): 0.3 m over the head's top, never more than 24 px above it on screen. A pinhole camera at the
+// origin looking down -z, 1,000 px focal length, the screen's middle at (960, 540).
+assert.deepEqual({ ...SPEAKING_DOT }, { overMetres: 0.3, mostPx: 24 });
+const pinhole = ({ x, y, z }) => (z < 0 ? { x: 960 + (1000 * x) / -z, y: 540 - (1000 * y) / -z } : null);
+// 20 m off, 0.3 m reads as 15 px: the dot there.
+assert.deepEqual(speakingDot({ top: { x: 0, y: 0, z: -20 }, project: pinhole }), { x: 960, y: 525 });
+// 3 m off, 0.3 m would read as 100 px: held to 24 px over the top, and to 24 px scaled where the page is scaled.
+assert.deepEqual(speakingDot({ top: { x: 0, y: 0, z: -3 }, project: pinhole }), { x: 960, y: 516 });
+assert.deepEqual(speakingDot({ top: { x: 0, y: 0, z: -3 }, project: pinhole, scale: 0.75 }), { x: 960, y: 522 });
+// No head, or one behind the camera: no dot.
+assert.equal(speakingDot({ top: null, project: pinhole }), null);
+assert.equal(speakingDot({ top: { x: 0, y: 0, z: 3 }, project: pinhole }), null);
 const exchange = { other: 'ines', serial: 1 };
 const said = (subjectId, to, words) => ({ subjectId, to, words, said: true });
 

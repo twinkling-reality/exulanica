@@ -73,8 +73,23 @@ export function createScene(rule = TALK_SCENE) {
   };
 }
 
-/** Where the speaking dot sits over the speaker's head (r24): this many pixels above it. */
-export const SPEAKING_ABOVE = 18;
+/**
+ * Where the speaking dot sits over the speaker's head (r24, DESIGN 10:25 on 24 October): `overMetres` over the top of
+ * the head in the world, so it reads as theirs at any distance, and never more than `mostPx` (scaled) above the top on
+ * screen, so near the camera it does not land on the wall behind them.
+ */
+export const SPEAKING_DOT = Object.freeze({ overMetres: 0.3, mostPx: 24 });
+
+/**
+ * The speaking dot's place on screen: `top` the top of the speaker's head in render space ({ x, y, z }), `project` a
+ * point to the screen ({ x, y }, or null behind the camera), `scale` the page's. Null where the head does not project.
+ */
+export function speakingDot({ top, project, scale = 1, rule = SPEAKING_DOT }) {
+  if (!top) return null;
+  const at = project(top), over = project({ x: top.x, y: top.y + rule.overMetres, z: top.z });
+  if (!at || !over) return null;
+  return { x: at.x, y: Math.max(over.y, at.y - rule.mostPx * scale) };
+}
 
 /** The moment kinds a conversation is told by (R1's moments: a meeting, talking, speaking to someone or to all). */
 const SPOKEN = new Set(['met', 'talked', 'spoke', 'spoke_to_all']);
