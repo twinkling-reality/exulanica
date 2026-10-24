@@ -28,7 +28,7 @@ import { NAMED_LEAST_PX, OVER_HEAD, STACK_GAP, TALK_FRAMING, createTalk, edgePla
 import { SCENE_WORDS, dayWord, knownWho, orbLetter, plateTo, speechLabel, togetherNames } from './talk-words.mjs';
 import { fetchThingCardRoute, writeThingCharacter } from '/src/thing-card-route-api.ts';
 import { historyHooks, historyWrite, recordPictures } from './history-host.ts';
-import { dayFocus, readDayEvents, readNewerEvents, recordStates } from './record-host.ts';
+import { dayFocus, decisionPlace, readDayEvents, readNewerEvents, recordStates } from './record-host.ts';
 import { personalityBody, personalityRefusalWords } from './personality-words.mjs';
 import { createKindLabels, madeBeingName, placedLine } from './build-words.mjs';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
@@ -847,7 +847,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!showing?.did || index === null || index === undefined || !showing.did[index]?.requestId) return;
     showing.didFocus = index;
     const page = showing.decision?.page ?? openDecisionPage(root, action => decisionAct(action));
-    const decision = { page, rowIndex: index, requestId: showing.did[index].requestId, detail: null, failure: null, record: false };
+    const decision = { page, row: showing.did[index], requestId: showing.did[index].requestId, detail: null, failure: null, record: false };
     showing.decision = decision;
     showing.page.hide(true);
     if (!pictures.still()) void pictures.takeStill().then(drawPage);
@@ -870,28 +870,25 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     subjectView, modelOf, nameOf: calledWithin, personName: (id) => personName(id), modelName: (model) => modelName(model), latest: (requestId) => subjectReads.models?.latest.find(item => item.requestId === requestId) ?? null,
     compareModels, modelKey: (model) => modelKey(model), comparedDecisions: (compare, offer) => comparedDecisions(compare, offer), boundOf: (decisions) => boundOf(decisions),
     label: (kind) => kindLabels.label(kind), run: () => runWatch.run ?? null, assignable: () => pageState().assignable });
-  /** The rows a decision stands behind, newest first, as indexes into What Teo did. */
-  const decisionRows = (showing) => (showing.did ?? []).flatMap((row, at) => row.requestId ? [at] : []);
   function decisionAct(action) {
     const decision = pageView?.decision;
     if (!decision) return;
     if (action === 'back') { if (decision.record) { decision.record = false; drawPage(); } else closeDecision(); }
     else if (action === 'record' && decision.detail) { decision.record = !decision.record; drawPage(); }
-    else if (action === 'compare' && comparable(pageView) && modelAnswered(pageView.did?.[decision.rowIndex])) {
+    else if (action === 'compare' && comparable(pageView) && modelAnswered(decisionPlace(pageView.did, decision).row)) {
       // The same flow for this one moment, on the character's page (C1).
       const requestId = decision.requestId;
       closeDecision();
       pageAct('compare', requestId);
     }
     else if (action === 'earlier' || action === 'later') {
-      const order = decisionRows(pageView), here = order.indexOf(decision.rowIndex);
-      const next = here < 0 ? undefined : order[here + (action === 'earlier' ? 1 : -1)];
-      if (next !== undefined) void openDecision(next);
+      const next = decisionPlace(pageView.did, decision)[action];
+      if (next !== null) void openDecision(next);
     }
   }
   function decisionState() {
-    const showing = pageView, decision = showing.decision, order = decisionRows(showing), here = order.indexOf(decision.rowIndex);
-    return records.decision(showing, decision, { earlier: here >= 0 && here < order.length - 1, later: here > 0, canCompare: comparable(showing) && modelAnswered(showing.did?.[decision.rowIndex]) });
+    const showing = pageView, decision = showing.decision, place = decisionPlace(showing.did, decision);
+    return records.decision(showing, decision, { earlier: place.earlier !== null, later: place.later !== null, canCompare: comparable(showing) && modelAnswered(place.row) });
   }
   // Compare (frames 12a and 12b, rulings C1 and C2): a character's recorded decisions asked again,
   // exactly as asked, of a chosen model and once more of the model that answered each. The count and

@@ -383,6 +383,31 @@ describe('a decision, filled', () => {
     expect(reading.ground).toBe('blob:still');
   });
 
+  it('keeps an open decision on its own row while What Teo did is read again under it each minute', async () => {
+    const { decisionPlace, recordStates } = await recordHost();
+    const records = recordStates(host().host);
+    const showing: Json = teoPage();
+    await records.readMoments(showing);
+    // A decision with no line and no choice takes its title from its row: opened from the second row of four.
+    const timedOut = { ...detail('leave', null), decision: { status: 'unavailable', reason: 'model_timed_out', proposal: null, provider: null } };
+    showing.did = [{ requestId: 'r3', what: 'Waited' }, { requestId: 'r2', what: 'Stood a while' }, { requestId: null, what: 'Walked home' }, { requestId: 'r1', what: 'Sat down' }];
+    const open = { requestId: 'r2', row: showing.did[1], detail: timedOut, failure: null, record: false };
+    expect(records.decision(showing, open).title).toBe('Stood a while');
+    expect(decisionPlace(showing.did, open)).toEqual({ row: showing.did[1], earlier: 3, later: 0 });
+    // A minute on, read again (each read makes its rows anew), with a line said and a routine row on top: its title, and
+    // the decisions either side, are its own still.
+    showing.did = [{ requestId: 'r4', what: 'Said to Bela Thorne' }, { requestId: null, what: 'Waited' }, ...showing.did.map((row: Json) => ({ ...row }))];
+    expect(records.decision(showing, open).title).toBe('Stood a while');
+    expect(decisionPlace(showing.did, open)).toEqual({ row: showing.did[3], earlier: 5, later: 2 });
+    // Folded since into a newer repeat on top, it keeps the row it opened from, and no decision either side.
+    showing.did = [{ requestId: 'r6', what: 'Stood a while' }, { requestId: 'r1', what: 'Sat down' }];
+    expect(records.decision(showing, open).title).toBe('Stood a while');
+    expect(decisionPlace(showing.did, open)).toEqual({ row: open.row, earlier: null, later: null });
+    // The newest decision has none later, the oldest none earlier.
+    expect(decisionPlace(showing.did, { requestId: 'r6' })).toMatchObject({ earlier: 1, later: null });
+    expect(decisionPlace(showing.did, { requestId: 'r1' })).toMatchObject({ earlier: null, later: 0 });
+  });
+
   it("says a model's decision with no usable answer was asked and the routine acted, never that it chose (U3)", async () => {
     const { recordStates } = await recordHost();
     const records = recordStates(host().host);

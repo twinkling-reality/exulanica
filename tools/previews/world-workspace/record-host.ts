@@ -149,6 +149,18 @@ export function dayFocus({ rows, focus, earlier = false, before = null, moved = 
   return at;
 }
 
+/**
+ * Where an open decision stands in a day page's rows (`rows`, newest first), found by its decision each time it is
+ * asked: the rows are read again each minute while it is open, so a place kept from its opening names another row. Its
+ * row (the row it opened from, `decision.row`, where that has since folded into a newer repeat), and the rows of the
+ * decisions just before and after it, `earlier` and `later`, or null.
+ */
+export function decisionPlace(rows: readonly Json[] | null | undefined, decision: Json): { row: Json | null; earlier: number | null; later: number | null } {
+  const order = (rows ?? []).flatMap((row, at) => (row.requestId ? [at] : []));
+  const here = order.findIndex((at) => rows?.[at]?.requestId === decision.requestId);
+  return { row: here >= 0 ? rows?.[order[here] ?? -1] ?? null : decision.row ?? null, earlier: here >= 0 ? order[here + 1] ?? null : null, later: here > 0 ? order[here - 1] ?? null : null };
+}
+
 export function recordStates(host: RecordHost) {
   /** Reads the moments and the version's placed things for a page (`showing`): kept on it, re-read with its rows; and,
    * where the day page asks (`runs`), the society's runs, each the minutes it played (P2), kept as they were where the
@@ -312,7 +324,7 @@ export function recordStates(host: RecordHost) {
         // The moment it belongs to, where the moments read has it: "06:52 · Day 1 · Teo met Ines at the bench".
         over: moment ? [worldWhen(at), sentenceCase(momentTitle(moment, named))].filter(Boolean).join(' · ')
           : overLabel({ at, who, said: Boolean(said), to: said?.to ? host.personName(said.to) : null }),
-        title: decisionTitle({ line: said?.line ?? null, chose: late ? null : proposal?.label ?? null }) || showing.did?.[decision.rowIndex]?.what || '',
+        title: decisionTitle({ line: said?.line ?? null, chose: late ? null : proposal?.label ?? null }) || decisionPlace(showing.did, decision).row?.what || '',
         model: config ? host.modelName({ provider: config.provider, model_id: config.model_id }) ?? config.model_id ?? null : null,
         done: result.done, verdict: result.verdict, told: toldSections(context, who),
         personality: context?.character ? { name: context.character.name ?? null, about: context.character.about ?? null } : null,
