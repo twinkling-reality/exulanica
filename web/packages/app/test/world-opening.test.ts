@@ -40,6 +40,29 @@ describe('the opening', () => {
     expect([step(), drawn()]).toEqual(['Drawing the land', '50.0%']);
   });
 
+  it('opens a town the front door says is still baking on its bake from the first frame (C3b)', async () => {
+    const entryId = '01a13bd3-fa95-7c62-8683-42e78f2a0e2c';
+    history.replaceState(null, '', `/?entry=${entryId}`);
+    sessionStorage.setItem('exulanica.opening.v1', JSON.stringify({ entryId, title: 'A town', picture: null, baking: true }));
+    (await opening()).mountOpening();
+    const step = (): string | null | undefined => document.querySelector('.wu-opening-step')?.textContent;
+    const drawn = (): string | undefined => (document.querySelector('.wu-opening-fill') as HTMLElement | null)?.style.width;
+    expect([step(), drawn()]).toEqual(['Making the land', '0.0%']);
+    // It read baked before its bake was waited for: the world's first report counts the bake done.
+    window.dispatchEvent(new CustomEvent('exulanica:opening', { detail: { report: 'world-read' } }));
+    expect([step(), drawn()]).toEqual(['Drawing the land', '50.0%']);
+    sessionStorage.clear();
+  });
+
+  it('opens a town the front door does not say is baking on reading the world, as before', async () => {
+    const entryId = '01a13bd3-fa95-7c62-8683-42e78f2a0e2c';
+    history.replaceState(null, '', `/?entry=${entryId}`);
+    sessionStorage.setItem('exulanica.opening.v1', JSON.stringify({ entryId, title: 'A town', picture: null }));
+    (await opening()).mountOpening();
+    expect(document.querySelector('.wu-opening-step')?.textContent).toBe('Reading the world');
+    sessionStorage.clear();
+  });
+
   it.each(['capture=1', 'livePreview=1'])('shows nothing in a scene preview (%s)', async (preview) => {
     history.replaceState(null, '', `/?entry=01a13bd3-fa95-7c62-8683-42e78f2a0e2c&${preview}`);
     (await opening()).mountOpening();

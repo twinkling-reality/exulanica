@@ -61,7 +61,10 @@ for (const none of [0, null, undefined, -3, 1.5]) assert.equal(populationLine(no
 
 // The handoff from the front door names one world, carries only a picture's data, and anything
 // else reads as none.
-assert.deepEqual(readHandoff(JSON.stringify({ entryId: 'a', title: 'Bay', picture: 'data:image/jpeg;base64,AA' }), 'a'), { entryId: 'a', title: 'Bay', picture: 'data:image/jpeg;base64,AA' });
+assert.deepEqual(readHandoff(JSON.stringify({ entryId: 'a', title: 'Bay', picture: 'data:image/jpeg;base64,AA' }), 'a'), { entryId: 'a', title: 'Bay', picture: 'data:image/jpeg;base64,AA', baking: false });
+// A town still baking says so, so its opening names the bake from the first frame (C3b); only true counts.
+assert.equal(readHandoff(JSON.stringify({ entryId: 'a', title: 'Bay', baking: true }), 'a').baking, true);
+assert.equal(readHandoff(JSON.stringify({ entryId: 'a', title: 'Bay', baking: 'yes' }), 'a').baking, false);
 assert.equal(readHandoff(JSON.stringify({ entryId: 'b', title: 'Bay' }), 'a'), null);
 assert.equal(readHandoff(JSON.stringify({ entryId: 'a', title: 'Bay', picture: 'blob:http://x/1' }), 'a').picture, null);
 assert.equal(readHandoff('not json', 'a'), null);

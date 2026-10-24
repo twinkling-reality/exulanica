@@ -54,9 +54,10 @@ export function mountOpening(): void {
   document.body.append(root);
   mountUiScale(root, lifetime.signal);
   const reports: string[] = [];
-  // A town still baking opens with its bake (C3): the stage is added at its first share, the share
-  // never moves back, and it ends with the bake's report.
-  let stages: readonly { readonly report: string; readonly words: string }[] = OPENING_STAGES, share = 0;
+  // A town still baking opens with its bake (C3): from the first frame where the front door's handoff
+  // says so (C3b), else at its first share; the share never moves back, and it ends with the bake's
+  // report, or with any later stage's where the town read baked before its bake was waited for.
+  let stages: readonly { readonly report: string; readonly words: string }[] = handoff?.baking ? [BAKING_STAGE, ...OPENING_STAGES] : OPENING_STAGES, share = 0;
   const draw = (): void => {
     const now = openingProgress(reports, stages, share);
     fill.style.width = `${(now.fraction * 100).toFixed(1)}%`;
@@ -71,8 +72,9 @@ export function mountOpening(): void {
       if (stages === OPENING_STAGES) stages = [BAKING_STAGE, ...OPENING_STAGES];
       share = Math.max(share, detail.baking);
     } else if (typeof detail.report === 'string') {
-      reports.push(detail.report);
-      if (detail.report === BAKING_STAGE.report) share = 0;
+      if (stages !== OPENING_STAGES && !reports.includes(BAKING_STAGE.report)) reports.push(BAKING_STAGE.report);
+      if (detail.report !== BAKING_STAGE.report) reports.push(detail.report);
+      share = 0;
     } else return;
     if (!name.textContent && typeof detail.title === 'string') name.textContent = detail.title;
     draw();
@@ -95,8 +97,11 @@ export function endOpening(): boolean {
   return true;
 }
 
-/** The front door's Open hands the opening the world's name and the picture its card shows. */
-export async function handOverOpening(entryId: string, title: string, shownPicture: string | null): Promise<void> {
+/**
+ * The front door's Open hands the opening the world's name, the picture its card shows and whether its land is still
+ * baking, so a town still baking opens on its bake from the first frame (C3b).
+ */
+export async function handOverOpening(entryId: string, title: string, shownPicture: string | null, baking = false): Promise<void> {
   let picture: string | null = null;
   if (shownPicture?.startsWith('data:image/')) picture = shownPicture;
   else if (shownPicture?.startsWith('blob:')) {
@@ -111,5 +116,5 @@ export async function handOverOpening(entryId: string, title: string, shownPictu
       });
     } catch { picture = null; }
   }
-  try { sessionStorage.setItem(OPENING_HANDOFF_KEY, JSON.stringify({ entryId, title, picture })); } catch { /* The opening shows without them. */ }
+  try { sessionStorage.setItem(OPENING_HANDOFF_KEY, JSON.stringify({ entryId, title, picture, baking })); } catch { /* The opening shows without them. */ }
 }

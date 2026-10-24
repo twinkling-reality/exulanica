@@ -78,7 +78,7 @@ export function readHandoff(text, entryId) {
     const value = JSON.parse(text ?? 'null');
     if (!value || value.entryId !== entryId || typeof value.title !== 'string') return null;
     const picture = typeof value.picture === 'string' && value.picture.startsWith('data:image/') ? value.picture : null;
-    return { entryId, title: value.title, picture };
+    return { entryId, title: value.title, picture, baking: value.baking === true };
   } catch {
     return null;
   }

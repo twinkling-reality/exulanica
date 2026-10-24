@@ -23,6 +23,9 @@ export function frontDoorPicture(entry: SavedWorldEntry): string | null {
   return capturedPicture(captures, entry);
 }
 
+/** Whether a world's land is still baking, which its opening names from its first frame (C3b). */
+const stillBaking = (entry: SavedWorldEntry): boolean => entry.generatedGround?.tiles.some((tile) => tile.state === 'baking') ?? false;
+
 /** The saved worlds the front door shows, for Open to hand a world's name and picture to its opening. */
 let shownEntries: readonly SavedWorldEntry[] = [];
 
@@ -30,7 +33,7 @@ let shownEntries: readonly SavedWorldEntry[] = [];
 export async function openFromFrontDoor(entryId: string): Promise<void> {
   history.replaceState({ ...history.state, [CHOSEN]: entryId }, '', location.href);
   const entry = shownEntries.find(one => one.entryId === entryId);
-  if (entry) await handOverOpening(entryId, entry.title, frontDoorPicture(entry) ?? worldPicture(entry));
+  if (entry) await handOverOpening(entryId, entry.title, frontDoorPicture(entry) ?? worldPicture(entry), stillBaking(entry));
   location.assign(worldAddress(entryId, location.origin));
   return new Promise(resolve => window.addEventListener('pagehide', () => resolve(), { once: true }));
 }
@@ -45,7 +48,7 @@ export const chosenWorldPicture = (): string | null => chosenPicture;
  */
 export async function openMadeWorld(entry: SavedWorldEntry): Promise<void> {
   history.replaceState({ ...history.state, [CHOSEN]: entry.entryId }, '', location.href);
-  await handOverOpening(entry.entryId, entry.title, frontDoorPicture(entry) ?? worldPicture(entry));
+  await handOverOpening(entry.entryId, entry.title, frontDoorPicture(entry) ?? worldPicture(entry), stillBaking(entry));
   location.assign(worldAddress(entry.entryId, location.origin));
   return new Promise(resolve => window.addEventListener('pagehide', () => resolve(), { once: true }));
 }
