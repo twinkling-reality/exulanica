@@ -12,6 +12,7 @@ execution demonstrated.
 <summary>Sections</summary>
 
 - [Product purpose](#product-purpose)
+- [Where models run and who pays](#where-models-run-and-who-pays)
 - [Implementation status](#implementation-status)
 - [First milestone](#first-milestone)
 - [Delivery gates for the first demonstration](#delivery-gates-for-the-first-demonstration)
@@ -106,6 +107,39 @@ The [composition contract](world-composition-contract.md) specifies the relation
 sources, creations and representations. The [Companion guide](capabilities/companion.md) defines
 its role. **World Memory Package** is the technical name of the signed, partial portable
 snapshot format; it is one output of a world.
+
+## Where models run and who pays
+
+Exulanica is free, open-source software under the Apache 2.0 licence. Making a world and living in it
+cost nothing in themselves; the only cost is the AI models that act in a world, and the person decides
+where those models run:
+
+- **On their own computer.** A model served by a local model runner on the same computer answers for
+  free, and nothing it is told leaves that computer.
+- **Through a provider, with their own key.** Hosted open models answer, usually for a fraction of a
+  cent a decision. The key stays on the person's computer and is sent only to that provider.
+- **On someone else's install.** A host, such as a teacher, a club or a demonstration server, runs
+  Exulanica for others and sets each guest's budget. A paid hosted Exulanica would only ever be one more
+  host of this kind, never a gate in front of the software.
+
+Every cost is shown before anything is spent, as the most the work can cost, and the page then shows
+what was really spent. Money is held one step at a time: each step's most is worked out from the
+request it sends and the answer it may return, never from a model's whole context at its full price.
+Where less than the whole is left, the work spends at most what is left, and if a step could cost more
+than that it stops and says what it spent.
+
+### Learning by trying
+
+The open models a person can choose are shown as a gallery, grouped by where they run, free ones
+first: each with its maker, its size and what it costs, and, for the one in focus, a few words its
+maker wrote about it, quoted from its own model card with that card's licence. Choosing a model spends
+nothing; only a run spends.
+
+A person learns what a model does by giving it a character and watching. Every decision shows exactly
+what the model was told, the choices the world allowed, the one it took, that the world checked it
+before it happened, and what it cost; a newcomer reads a short note beside each part the first time.
+Swapping the model and watching again is how a person learns the difference. Exulanica publishes no
+scores or rankings of one model against another.
 
 ## Implementation status
 

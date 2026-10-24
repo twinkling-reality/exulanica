@@ -27,7 +27,13 @@ capability.
 [Product direction](docs/product-direction.md) owns scope, the first milestone, and the
 hypothesis about discovering models through a world.
 
-Hosted model calls go to Nebius Token Factory. The
+Exulanica is free, open-source software. Open models act for the people in a world you make, and you
+choose where they run: on your own computer for free, through a provider with your own key, usually
+for a fraction of a cent a decision, or on a host's install. Every cost is shown before it is spent.
+You learn what a model does by trying it in your world, never from a leaderboard.
+[Where models run and who pays](docs/product-direction.md#where-models-run-and-who-pays) says more.
+
+Hosted model calls go to Nebius Token Factory, and a model can also run on your own computer. The
 [model manifest](exulanica/models/models.manifest.json) names the models, including NVIDIA
 Nemotron, Qwen, and DeepSeek. Exulanica does not generate a world's appearance with a learned
 model.
