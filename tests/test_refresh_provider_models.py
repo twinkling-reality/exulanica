@@ -213,3 +213,53 @@ def test_the_transport_it_builds_reaches_its_three_origins_and_no_other(director
         HttpxTransport(egress=egress).get_json(
             "https://elsewhere.test/api/models", headers={}, timeout=1.0
         )
+
+
+@pytest.mark.parametrize(
+    "model_id",
+    [
+        "someone/../escape",
+        "../escape",
+        "someone/..",
+        "a/b/c",
+        "a//b",
+        "/name",
+        "someone/.hidden",
+        "someone/name.",
+        "some..one/name",
+        "someone/na--me",
+        f"someone/{'n' * 97}",
+        "someone/na me",
+        "someone/na%2fme",
+        "someone/na?me",
+    ],
+)
+def test_an_id_that_is_not_a_repository_s_own_form_reads_no_card(model_id):
+    """A card is read only for one optional organisation and one name: an id with a dot segment,
+    another slash or anything that could leave the card's path is refused before any read."""
+    sources = _Sources()
+    assert refresh.card_path(model_id) is None
+    assert refresh.card_facts(model_id, transport=sources) is None
+    assert sources.asked == []
+
+
+@pytest.mark.parametrize(
+    "model_id", ["Qwen/Qwen2.5-7B-Instruct", "gpt2", "openbmb/MiniCPM-V-4_5", "a/b"]
+)
+def test_a_repository_s_own_id_is_read_at_its_card_s_path(model_id):
+    sources = _Sources()
+    refresh.card_facts(model_id, transport=sources)
+    assert [url for url, _ in sources.asked] == [f"{refresh.HUGGING_FACE}/api/models/{model_id}"]
+
+
+def test_a_refresh_whose_catalog_names_a_dotted_id_reads_no_card_for_it(directory):
+    """The provider's catalog may name an id the catalog holds that is not a repository's: it is
+    written with no card, and no read leaves the card path for it."""
+    dotted = {**NEW, "model_id": "someone/../escape"}
+    sources = _Sources(public=_complete_public(NEW, dotted))
+    assert refresh.main(["--directory", str(directory)], transport=sources) == 0
+    written = json.loads((directory / "provider-models.v2.json").read_text(encoding="utf-8"))
+    facts = catalog.read_facts(written)
+    assert facts[f"{PROVIDER}|someone/../escape"].card is None
+    assert facts[f"{PROVIDER}|{NEW['model_id']}"].card is not None
+    assert not [url for url, _ in sources.asked if ".." in url]

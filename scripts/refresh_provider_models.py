@@ -21,7 +21,8 @@ Hugging Face's) and which follows no redirect:
 3. for each model the provider serves, its card's metadata, ``GET
    https://huggingface.co/api/models/<id>``, with no key: the card's revision, licence, pipeline,
    parameters as its weights count them, and the day it was made. A model with no card there
-   (or a gated or moved one) states none.
+   (or a gated or moved one) states none, and so does a model whose id is not a repository's own
+   form (one optional organisation and one name, :data:`REPOSITORY`), for which nothing is read.
 
 Nothing else is fetched: no weights, no README, and no model is asked anything. It writes
 ``provider-models.v<N+1>.json`` beside the newest version ``N``, profile
@@ -44,6 +45,7 @@ from collections.abc import Mapping, Sequence
 from datetime import date
 from pathlib import Path
 from typing import Any, Final
+from urllib.parse import quote
 
 from exulanica.models import provider_catalog
 from exulanica.models.egress import declared_origin, parse_egress_allowlist
@@ -53,6 +55,11 @@ from exulanica.models.transport import HttpxTransport, Transport
 
 #: Where each model's card is read, as metadata only.
 HUGGING_FACE: Final = "https://huggingface.co"
+#: A Hugging Face repository's own form, the only id a card is read for: an optional organisation
+#: and one name, each starting and ending with a letter or digit and holding only letters, digits,
+#: dots, hyphens and underscores, at most 96 characters, so no segment can leave the card's path.
+_SEGMENT: Final = r"[A-Za-z0-9](?:[A-Za-z0-9._-]{0,94}[A-Za-z0-9])?"
+REPOSITORY: Final = re.compile(rf"(?:{_SEGMENT}/)?{_SEGMENT}")
 #: A card read waits no longer than a catalog read does.
 TIMEOUT_SECONDS: Final = 30.0
 #: The answers that mean the card is not served here to an anonymous read (absent, gated or
@@ -84,11 +91,24 @@ def _text(value: Any, maximum: int) -> str:
     )
 
 
+def card_path(model_id: str) -> str | None:
+    """The path of ``model_id``'s card on Hugging Face's API, each segment quoted, or None where
+    the id is not a repository's own form (:data:`REPOSITORY`, with no two dots or hyphens
+    together), so that no card is read for it."""
+    if REPOSITORY.fullmatch(model_id) is None or ".." in model_id or "--" in model_id:
+        return None
+    return "/api/models/" + "/".join(quote(segment, safe="") for segment in model_id.split("/"))
+
+
 def card_facts(model_id: str, *, transport: Transport) -> dict[str, Any] | None:
     """What ``model_id``'s Hugging Face card states as metadata, as a catalog entry's ``card``, or
-    None where no card is served to an anonymous read. Refused by name on any other failure."""
+    None where no card is served to an anonymous read, or where the id is not a repository's own
+    form, for which nothing is read. Refused by name on any other failure."""
+    path = card_path(model_id)
+    if path is None:
+        return None
     response = transport.get_json(
-        f"{HUGGING_FACE}/api/models/{model_id}",
+        f"{HUGGING_FACE}{path}",
         headers={"Accept": "application/json"},
         timeout=TIMEOUT_SECONDS,
     )
