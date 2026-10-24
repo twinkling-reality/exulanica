@@ -18,7 +18,7 @@ import time
 import uuid
 
 import pytest
-from exulanica.abilities.registry import PURPOSEFUL_BY_KIND_WEIGHTS
+from exulanica.abilities.registry import PURPOSEFUL_OUTDOORS_TAKE_IN
 from exulanica.api import thing_card
 from exulanica.world import thing_library, thing_looks
 from exulanica.world.society import UnavailableSocietyInput
@@ -87,7 +87,7 @@ def test_a_thing_s_card_says_what_it_is_does_here_and_wears(app):
     # The routine's abilities, by the version of the purposeful module a society made now runs.
     routine = {"wait", "stand", "talk", "rest", "visit"}
     assert {a["module"] for a in card["abilities"] if a["key"] in routine} == {
-        PURPOSEFUL_BY_KIND_WEIGHTS
+        PURPOSEFUL_OUTDOORS_TAKE_IN
     }
     assert routine <= abilities
     offers = {offer["key"] for offer in card["offers"]}

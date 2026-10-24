@@ -33,11 +33,15 @@ def stand_near(
     people: Sequence[dict[str, Any]],
     point: tuple[int, int],
     rest: Callable[[tuple[int, int]], int] | None = None,
+    *,
+    outdoors: bool = False,
 ) -> dict[str, Any] | None:
     """The walking node of ``document`` a being put down at ``point`` would be taken in at, with
     its position and the height a thing rests at there by ``rest`` (null where the ground states
-    none), among ``people``; None where the input has none open, or is unavailable."""
-    node = open_node_near(dict(document), list(people), list(point))
+    none), among ``people``; None where the input has none open, or is unavailable. ``outdoors``
+    where the society takes a placed being in outdoors only (never at a door's node,
+    :func:`~exulanica.world.society_planner.takes_in_outdoors`), as it would take this one in."""
+    node = open_node_near(dict(document), list(people), list(point), outdoors=outdoors)
     if node is None:
         return None
     (position,) = (

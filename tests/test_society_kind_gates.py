@@ -21,7 +21,11 @@ import uuid
 from pathlib import Path
 
 import pytest
-from exulanica.abilities.registry import PURPOSEFUL, PURPOSEFUL_BY_KIND, PURPOSEFUL_BY_KIND_WEIGHTS
+from exulanica.abilities.registry import (
+    PURPOSEFUL,
+    PURPOSEFUL_BY_KIND,
+    PURPOSEFUL_OUTDOORS_TAKE_IN,
+)
 from exulanica.api.thing_card import _abilities, _offers
 from exulanica.canonical import canonical_json
 from exulanica.things.kinds import shipped_thing_kinds
@@ -50,10 +54,11 @@ ACTOR = uuid.UUID(int=0xAC7)
 
 
 def compose(*args, **kwargs):
-    """These historical capability-gate cases keep their recorded second-version premise."""
+    """These historical capability-gate cases keep their recorded second-version premise, whatever
+    later version a society made now records."""
     document = current_compose(*args, **kwargs)
     document["modules"] = sorted(
-        PURPOSEFUL_BY_KIND if module == PURPOSEFUL_BY_KIND_WEIGHTS else module
+        PURPOSEFUL_BY_KIND if module.startswith("exulanica-ability/purposeful/") else module
         for module in document["modules"]
     )
     document["document_sha256"] = input_sha256(document)
@@ -117,7 +122,7 @@ def _events_sha256(events) -> str:
 
 def test_both_current_and_second_version_societies_hold_the_routine_to_kind():
     current = current_compose((GATE, SPIRIT, KNIGHT))
-    assert PURPOSEFUL_BY_KIND_WEIGHTS in current["modules"]
+    assert PURPOSEFUL_OUTDOORS_TAKE_IN in current["modules"]
     current_state = initial_things_society(SOCIETY, SEED, current, population=4)
     assert (
         routine_withheld(current_state, _being(current_state, "lantern_spirit"))

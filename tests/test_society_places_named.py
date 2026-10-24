@@ -17,6 +17,8 @@ import uuid
 from typing import Any
 
 import pytest
+from exulanica.abilities import registry
+from exulanica.abilities.registry import PURPOSEFUL_BY_KIND_WEIGHTS
 from exulanica.world import society_catalogs, society_surroundings
 from exulanica.world.decision_roles import LABEL_RULES
 from exulanica.world.role_decisions import role_request
@@ -147,10 +149,32 @@ def test_the_premises_a_being_stands_at_is_told_by_its_name_from_the_twelfth_cat
     }
 
 
-def test_a_new_request_tells_the_premises_and_a_stored_eleventh_rebuilds_to_the_byte():
+def _as_sealed(monkeypatch) -> None:
+    """The town composed as the code that sealed the stored eleventh request composed it: its first
+    input recording the purposeful planner's third version. A society made since records the
+    fourth, whose take-in outdoors changes nothing here but the module it names, so the request's
+    bytes are the ones a society stored then rebuilds."""
+    current = registry.current_modules
+    monkeypatch.setattr(
+        registry,
+        "current_modules",
+        lambda *, day=False: tuple(
+            sorted(
+                PURPOSEFUL_BY_KIND_WEIGHTS
+                if module.startswith("exulanica-ability/purposeful/")
+                else module
+                for module in current(day=day)
+            )
+        ),
+    )
+
+
+def test_a_new_request_tells_the_premises_and_a_stored_eleventh_rebuilds_to_the_byte(monkeypatch):
     _state, _document, _villager, restaurant = _at_the_restaurant()
     name = premises_name(restaurant)
-    twelfth, eleventh = _request(TWELFTH), _request(ELEVENTH)
+    twelfth = _request(TWELFTH)
+    _as_sealed(monkeypatch)
+    eleventh = _request(ELEVENTH)
     assert twelfth["context"]["surroundings"]["at"]["words"] == f"at the {name}"
     assert [p["words"] for p in twelfth["context"]["remembers"]["places"]] == [
         f"visited the {name}",

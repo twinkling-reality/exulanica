@@ -42,6 +42,7 @@ from exulanica.world.society_engines import (
 from exulanica.world.society_erasure import SocietyErasureRefused, erase_society
 from exulanica.world.society_living_decisions import DECISION_EVENT_KIND
 from exulanica.world.society_moments import chosen_dids
+from exulanica.world.society_planner import takes_in_outdoors
 from exulanica.world.society_presence import PresenceRefused
 from exulanica.world.society_repository import (
     EVENT_KINDS_READ_MAXIMUM,
@@ -235,13 +236,17 @@ def society_stand(
     are."""
 
     def stand() -> dict[str, Any]:
-        document, people, region_id = _repository(
+        document, people, region_id, modules = _repository(
             connection, session, request, world_id
         ).stand_input(version_id)
         return {
             "profile": STAND_PROFILE,
             "stand": stand_near(
-                document, people, (x_mm, z_mm), _rest_height(objects, version_id, region_id)
+                document,
+                people,
+                (x_mm, z_mm),
+                _rest_height(objects, version_id, region_id),
+                outdoors=takes_in_outdoors({"modules": modules}),
             ),
         }
 

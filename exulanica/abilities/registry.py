@@ -47,6 +47,7 @@ __all__ = [
     "PURPOSEFUL",
     "PURPOSEFUL_BY_KIND",
     "PURPOSEFUL_BY_KIND_WEIGHTS",
+    "PURPOSEFUL_OUTDOORS_TAKE_IN",
     "REMEMBER",
     "SAY",
     "AbilityError",
@@ -72,6 +73,8 @@ PURPOSEFUL: Final = "exulanica-ability/purposeful/v1"
 PURPOSEFUL_BY_KIND: Final = "exulanica-ability/purposeful/v2"
 #: Autonomous choices read the kind's purposeful weights; explicit choices keep capability gates.
 PURPOSEFUL_BY_KIND_WEIGHTS: Final = "exulanica-ability/purposeful/v3"
+#: Version 3's choices, and a placed being taken in outdoors only, never at a door's node.
+PURPOSEFUL_OUTDOORS_TAKE_IN: Final = "exulanica-ability/purposeful/v4"
 SAY: Final = "exulanica-ability/say/v1"
 CROSSING: Final = "exulanica-ability/crossing/v1"
 #: Crossing whose summaries name a visitor by what it is, from outside, never as simulated.

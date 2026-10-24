@@ -59,7 +59,10 @@ LIMITS: dict[str, tuple[int, str]] = {
         "with the version's changes to a site's made parts, and a first input's day start from "
         "the world's setting",
     ),
-    "exulanica/world/society_things.py": (2_291, "the society of things, exulanica-society/v7"),
+    "exulanica/world/society_things.py": (
+        2_292,
+        "the society of things, exulanica-society/v7, and its outdoors take-in (purposeful/v4)",
+    ),
     "exulanica/reconstruction/standpoint.py": (
         2_163,
         "photographs from one standpoint, joined by the rotation between them",

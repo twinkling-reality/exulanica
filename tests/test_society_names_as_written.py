@@ -18,6 +18,7 @@ import uuid
 from pathlib import Path
 
 import pytest
+from exulanica.abilities.registry import PURPOSEFUL_BY_KIND_WEIGHTS
 from exulanica.models.choice import ChoiceRequest
 from exulanica.models.manifest import AnsweringMechanism
 from exulanica.world.role_decisions import role_request
@@ -41,6 +42,29 @@ NINTH_REQUEST_SHA256 = "ea182f1231d8e266665bba86bb06af7c1991fd99d7617945ca8b3ff5
 DUSK = 18 * 60
 #: The calls that build a person's or junction's request, each of which states the day start.
 REQUEST_BUILDERS = ("role_request", "person_request", "play_minutes")
+
+
+@pytest.fixture
+def sealed_square(monkeypatch):
+    """The square composed as the code that sealed the pinned requests composed it: its first input
+    recording the purposeful planner's third version. A society made since records the fourth,
+    whose take-in outdoors changes nothing here but the module it names, so the requests' bytes
+    are the ones a society stored then rebuilds."""
+    from exulanica.abilities import registry
+
+    current = registry.current_modules
+    monkeypatch.setattr(
+        registry,
+        "current_modules",
+        lambda *, day=False: tuple(
+            sorted(
+                PURPOSEFUL_BY_KIND_WEIGHTS
+                if module.startswith("exulanica-ability/purposeful/")
+                else module
+                for module in current(day=day)
+            )
+        ),
+    )
 
 
 def _named_square():
@@ -141,7 +165,9 @@ def test_what_a_being_remembers_names_it_as_its_options_do_here_or_gone():
     assert (who(True), who(False)) == (written, written.lower())
 
 
-def test_a_request_is_told_names_by_its_own_catalog_and_the_eighth_rebuilds_to_the_byte():
+def test_a_request_is_told_names_by_its_own_catalog_and_the_eighth_rebuilds_to_the_byte(
+    sealed_square,
+):
     ninth, written = _request(NINTH, "society-person-choice/v8")
     eighth, _written = _request(EIGHTH, "society-person-choice/v7")
 
@@ -211,7 +237,7 @@ def test_the_minute_is_told_as_the_world_s_clock_from_the_eleventh_catalog():
     assert "It is 00:00 on day 4 in the world, and " in _told(kept)
 
 
-def test_the_ninth_catalog_s_request_rebuilds_to_the_byte_whatever_the_day_start():
+def test_the_ninth_catalog_s_request_rebuilds_to_the_byte_whatever_the_day_start(sealed_square):
     ninth, _written = _request(NINTH, "society-person-choice/v8", day_start=DUSK)
     assert "world_clock" not in ninth["context"]
     assert f"It is minute {ninth['context']['tick']} in the world" in _told(ninth)

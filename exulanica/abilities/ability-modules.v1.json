@@ -505,6 +505,21 @@
       "reason": "The purposeful planner retains version 2's capability gates and reads each kind's wait, stand, talk, rest and visit weights for its autonomous choices. Missing weights are zero, and no weighted activity available means waiting. Both beings must prefer talk for a routine pairing. Tiredness still prefers reachable rest where the kind can rest; waiting still yields occupied places. Explicit owner and decider choices are not restricted by preference, and other abilities' weights remain unexecuted. Earlier module versions retain their recorded choices."
     },
     {
+      "module": "exulanica-ability/purposeful/v4",
+      "abilities": [
+        "wait",
+        "stand",
+        "talk",
+        "rest",
+        "visit"
+      ],
+      "parameters": [],
+      "events": [],
+      "status": "built",
+      "refusal": null,
+      "reason": "The purposeful planner's choices as version 3 makes them, and a being placed by the world's author is taken in only outdoors: at the open node nearest where it was put down that is no door's node (one every edge of which is the way to a door), never in a shop's doorway, since a placed being has no day and never goes in. The stand a being would be put down at is read by the same rule. Earlier module versions retain their recorded take-ins."
+    },
+    {
       "module": "exulanica-ability/character/v1",
       "abilities": [],
       "parameters": [

@@ -84,6 +84,7 @@ from exulanica.world.society_planner import (
     open_node_near,
     routine_of,
     routine_withheld,
+    takes_in_outdoors,
     validate_society_input,
 )
 from exulanica.world.society_summaries import SIMULATED, crossing_name, summary_name
@@ -720,6 +721,7 @@ def _place_beings(minute: _Minute, *, record: bool, before_population: bool = Fa
     the ground's population does not yet hold the nodes it was spread over, so an author's
     placement is kept as nearly as the ground allows, and the population steps aside after."""
     state, document = minute.state, minute.document
+    outdoors = takes_in_outdoors(state)
     present = {
         person["placed_id"] for person in state["inhabitants"] if person["came_by"] == "placed"
     }
@@ -752,7 +754,7 @@ def _place_beings(minute: _Minute, *, record: bool, before_population: bool = Fa
         node = (
             None
             if minute.full() or identity in here
-            else open_node_near(dict(document), standing, entry["position_mm"])
+            else open_node_near(dict(document), standing, entry["position_mm"], outdoors=outdoors)
         )
         if node is None:
             reason = (
@@ -828,6 +830,7 @@ def _reconcile(minute: _Minute) -> None:
             gone = entry is None and is_made(person["kind"]) and person["placed_id"] in erased
             minute.leave(person, "kind_erased" if gone else "removed_by_author")
     nodes = {n["node_id"]: n["position_mm"] for n in document["navigation"]["nodes"]}
+    outdoors = takes_in_outdoors(state)
     for person in state["inhabitants"]:
         if person["came_by"] != "placed":
             continue
@@ -835,7 +838,7 @@ def _reconcile(minute: _Minute) -> None:
         if entry["position_mm"] == person["placed_at_mm"]:
             continue
         others = [other for other in state["inhabitants"] if other is not person]
-        node = open_node_near(dict(document), others, entry["position_mm"])
+        node = open_node_near(dict(document), others, entry["position_mm"], outdoors=outdoors)
         person["placed_at_mm"] = list(entry["position_mm"])
         if node is None:
             # Nowhere open near where it was put: it stays where it is and keeps going.

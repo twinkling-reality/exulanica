@@ -25,7 +25,7 @@ def _being(snapshot, placed):
     return next(p for p in snapshot["state"]["inhabitants"] if p.get("placed_id") == placed)
 
 
-@pytest.mark.parametrize("recorded_version", [2, 3])
+@pytest.mark.parametrize("recorded_version", [2, 3, 4])
 def test_authored_routine_preferences_are_recorded_and_replay(made, monkeypatch, recorded_version):
     api = made
     monkeypatch.setattr(saved_entries, "new_world_id", lambda _kind: FARM)
@@ -39,17 +39,16 @@ def test_authored_routine_preferences_are_recorded_and_replay(made, monkeypatch,
     # Only genesis composition chooses the historical module. Restore today's composer before
     # edits and ordinary minutes, so retained version selection must come from saved history.
     with monkeypatch.context() as genesis:
-        if recorded_version == 2:
-            genesis.setattr(
-                registry,
-                "current_modules",
-                lambda *, day=False: tuple(
-                    "exulanica-ability/purposeful/v2"
-                    if name.startswith("exulanica-ability/purposeful/")
-                    else name
-                    for name in current_modules(day=day)
-                ),
-            )
+        genesis.setattr(
+            registry,
+            "current_modules",
+            lambda *, day=False: tuple(
+                f"exulanica-ability/purposeful/v{recorded_version}"
+                if name.startswith("exulanica-ability/purposeful/")
+                else name
+                for name in current_modules(day=day)
+            ),
+        )
         entry, society, _records = _site(api, "farm", "fixture_farm", "small_farm")
         created = api.post(society, {"region_id": "region:generated", "profile": V7})
         assert created.status_code in (200, 201), created.text
@@ -107,7 +106,8 @@ def test_authored_routine_preferences_are_recorded_and_replay(made, monkeypatch,
             assert person["kind"] == {"source": "workspace", "sha256": digest}
             positions[placed].add(tuple(person["position_mm"]))
     assert len(positions["walker"]) > 1
-    if recorded_version == 3:
+    if recorded_version >= 3:
+        # The third version reads the kind's weights, and the fourth reads them as the third does.
         assert len(positions["waiter"]) == 1
     else:
         # Version 2 keeps the world's weights even for a wait-only authored preference.

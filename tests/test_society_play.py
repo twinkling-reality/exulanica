@@ -15,6 +15,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
+from exulanica.abilities.registry import PURPOSEFUL_BY_KIND_WEIGHTS
 from exulanica.world.deciders import DeciderRefused, decider, is_played, receipt_decider
 from exulanica.world.decision_roles import LABEL_RULES
 from exulanica.world.role_decisions import check_role_result, role_request
@@ -204,7 +205,30 @@ def test_a_walk_s_receipt_names_its_node_and_no_other_option_s_does():
 SEVENTH_PLAY_REQUEST_SHA256 = "343f21b0312924ccfd6e2fd2f1c39f14120d2722d0200b031950f8db333f7008"
 
 
-def test_a_play_reads_names_as_written_and_a_stored_one_keeps_its_words():
+@pytest.fixture
+def sealed_square(monkeypatch):
+    """The square composed as the code that sealed the pinned requests composed it: its first input
+    recording the purposeful planner's third version. A society made since records the fourth,
+    whose take-in outdoors changes nothing here but the module it names, so the requests' bytes
+    are the ones a society stored then rebuilds."""
+    from exulanica.abilities import registry
+
+    current = registry.current_modules
+    monkeypatch.setattr(
+        registry,
+        "current_modules",
+        lambda *, day=False: tuple(
+            sorted(
+                PURPOSEFUL_BY_KIND_WEIGHTS
+                if module.startswith("exulanica-ability/purposeful/")
+                else module
+                for module in current(day=day)
+            )
+        ),
+    )
+
+
+def test_a_play_reads_names_as_written_and_a_stored_one_keeps_its_words(sealed_square):
     """A person playing is asked under the thirteenth action catalog, which every label rule
     reaches, as a model's: a being named as the page names it and one straight-line distance among
     them. A play stored under the tenth keeps the two rules it was told under, and one stored under

@@ -1187,14 +1187,20 @@ def _step_aside(
 
 
 def open_node_near(
-    document: dict[str, Any], people: list[dict], point: list[int] | tuple[int, int]
+    document: dict[str, Any],
+    people: list[dict],
+    point: list[int] | tuple[int, int],
+    *,
+    outdoors: bool = False,
 ) -> str | None:
     """Where somebody new stands who comes to ``point``: the node a person steps aside to there.
 
     The nearest node of the input's graph to ``point``, by squared distance and then node id, that
     is no activity's place, has an edge and that nobody in ``people`` stands at or is headed to,
     first among the nodes nobody waiting would be in the way at; None where there is none, or the
-    input is unavailable.
+    input is unavailable. ``outdoors`` (a being that never goes in, :func:`takes_in_outdoors`):
+    never a door's node either, one every edge of which is the way to a door (its subject
+    ``premises_access``, as a town's and a made place's inputs state it).
     """
     if document["availability"] != "available" or document["navigation"]["unavailable_reason"]:
         return None
@@ -1205,8 +1211,26 @@ def open_node_near(
         if places_here
         else frozenset()
     )
+    if outdoors:
+        doors = (
+            n
+            for n, joined in graph[1].items()
+            if joined and all(edge.get("subject_id") == "premises_access" for _, edge in joined)
+        )
+        places = places | frozenset(doors)
     crowded = _crowded(document) if places_here else frozenset()
     return _step_aside({"position_mm": list(point)}, people, graph, places, crowded)
+
+
+def takes_in_outdoors(state: Mapping[str, Any]) -> bool:
+    """Whether a society takes a being its world's author placed in outdoors only (never at a
+    door's node, :func:`open_node_near`): one whose first input recorded the purposeful planner at
+    :data:`~exulanica.abilities.registry.PURPOSEFUL_OUTDOORS_TAKE_IN` or later. One recorded
+    before keeps its take-ins, so it replays."""
+    from exulanica.abilities.registry import recorded_row
+
+    row = recorded_row(state.get("modules", ()), "purposeful")
+    return row is not None and row.version >= 4
 
 
 def open_ground(document: dict[str, Any], people: list[dict]) -> tuple[list[str], list[str]]:
