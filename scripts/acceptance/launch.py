@@ -424,6 +424,10 @@ REFUSALS = {
     "workspaces-out-of-range": "--workspaces is outside 1 to WORKSPACES_MAXIMUM",
     "token-file-unknown": "--revoke names no token file this run wrote",
     "scripted-with-model": "--scripted-model and --model cannot both be given",
+    "local-models-scripted": "--local-models asks this computer's runner, which --scripted-model's "
+    "stand-in model never does",
+    "local-models-allowlist": "--local-models adds this computer's model servers to "
+    "EXULANICA_EGRESS_ALLOWLIST, which must be a JSON array of origins",
     "scripted-plan-missing": "--scripted-model names no readable plan file",
     "no-second-api": "restart-api --api second names a run that started no second API",
     "moments-backfill-refused": "the moments of a society were not written; the run's logs say which",
@@ -663,6 +667,26 @@ def model_environment(environ: Mapping[str, str] | None = None) -> dict[str, str
             refuse(refusal, REFUSALS[refusal])
         passed[name] = value
     return passed
+
+
+def offered_local_servers(arguments: argparse.Namespace, worktree: Path) -> list[str]:
+    """The model servers on this computer an install asks: a person's own install with no key and no
+    scripted model asks them (A2); a keyed one only when asked (``--local-models``), since a list
+    first loads each of their models to check it (L1)."""
+    asked = arguments.local_models or (arguments.personal and not arguments.model)
+    return local_model_servers(worktree) if asked and arguments.scripted_model is None else []
+
+
+def admitting(allowlist: str, servers: Sequence[str]) -> str:
+    """``allowlist`` (a JSON array of origins) with each of ``servers`` it does not already name,
+    after its own; refused by name where it is not such an array."""
+    try:
+        stated = json.loads(allowlist)
+    except json.JSONDecodeError:
+        stated = None
+    if not isinstance(stated, list):
+        refuse("local-models-allowlist", REFUSALS["local-models-allowlist"])
+    return json.dumps([*stated, *(server for server in servers if server not in stated)])
 
 
 def references_environment(
@@ -1009,10 +1033,17 @@ def api_environment(
         )
     if model:
         environment.update(model_environment(environ))
+        if local_servers:
+            # A keyed install asked for this computer's models too (--local-models): their servers
+            # stand beside the provider's in the person's own list.
+            environment["EXULANICA_EGRESS_ALLOWLIST"] = admitting(
+                environment["EXULANICA_EGRESS_ALLOWLIST"], local_servers
+            )
     elif local_servers:
         # A person's own install with no key may ask the models on this computer, and nothing else:
         # with no credential the API builds a client that asks only those (A2).
         environment["EXULANICA_EGRESS_ALLOWLIST"] = json.dumps(list(local_servers))
+    if local_servers:
         # Each of those models is checked once before a person may choose it, and the check is kept
         # in the install's own store (L1).
         environment["EXULANICA_LOCAL_CHECKS_DIR"] = str(data_dir / "local-checks")
@@ -2049,10 +2080,14 @@ def up(arguments: argparse.Namespace) -> None:
     if arguments.scripted_model is not None:
         if arguments.model:
             refuse("scripted-with-model", REFUSALS["scripted-with-model"])
+        if arguments.local_models:
+            refuse("local-models-scripted", REFUSALS["local-models-scripted"])
         if not Path(arguments.scripted_model).is_file():
             refuse("scripted-plan-missing", str(arguments.scripted_model))
     if arguments.model:
         model_environment()  # refuse before anything starts, not after the database has
+        if arguments.local_models:
+            admitting(model_environment()["EXULANICA_EGRESS_ALLOWLIST"], ())
     if arguments.references:
         if not arguments.model:
             refuse("references-without-model", REFUSALS["references-without-model"])
@@ -2348,12 +2383,7 @@ def up(arguments: argparse.Namespace) -> None:
             worktree, database_port, chosen["spare"], run_dir, logs, state, state_file
         )
         api_exports = through_proxy(exports, chosen["spare"])
-    # A person's own install with no key and no scripted model admits the models on this computer (A2).
-    local_servers = (
-        local_model_servers(worktree)
-        if arguments.personal and not arguments.model and arguments.scripted_model is None
-        else []
-    )
+    local_servers = offered_local_servers(arguments, worktree)
     environment = api_environment(
         exports=api_exports,
         grant=grant,
@@ -3067,6 +3097,13 @@ def build_parser() -> argparse.ArgumentParser:
                 help="pass NEBIUS_API_KEY, EXULANICA_EGRESS_ALLOWLIST, EXULANICA_BUDGET_USD "
                 "and EXULANICA_BUDGET_MAX_CALLS "
                 "through to the API (default: no model)",
+            )
+            command.add_argument(
+                "--local-models",
+                action="store_true",
+                help="with --model, also offer the models this computer's runner holds, each checked "
+                "once on this computer the first time a list shows it, which loads it (a personal "
+                "install with no key offers them already); a restart keeps it",
             )
             command.add_argument(
                 "--no-derivative-worker",

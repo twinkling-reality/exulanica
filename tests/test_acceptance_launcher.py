@@ -501,8 +501,14 @@ def test_a_scripted_run_is_refused_with_a_model_or_without_its_plan(tmp_path, te
         ["up", "--worktree", str(worktree), "--scripted-model", str(tmp_path / "absent.json")]
     )
 
+    local = parser.parse_args(
+        ["up", "--worktree", str(worktree), "--local-models", "--scripted-model", str(plan)]
+    )
+
     assert _refusal(LAUNCH.up, both) == "scripted-with-model"
     assert _refusal(LAUNCH.up, missing) == "scripted-plan-missing"
+    # A stand-in model asks no runner, so this computer's models are not asked of it either.
+    assert _refusal(LAUNCH.up, local) == "local-models-scripted"
     assert parser.parse_args(["up", "--worktree", "w"]).scripted_model is None
     assert not LAUNCH.state_dir(worktree).exists()
 
@@ -840,6 +846,70 @@ def test_the_api_gets_the_model_and_its_bound_only_with_model():
         assert json.loads(environment["EXULANICA_API_TOKENS"]) == {"token": {"permissions": []}}
 
 
+def test_a_keyed_install_offers_this_computer_s_models_only_when_asked(tmp_path):
+    parser = LAUNCH.build_parser()
+    assert parser.parse_args(["up", "--worktree", "w"]).local_models is False
+    assert parser.parse_args(["up", "--worktree", "w", "--local-models"]).local_models is True
+    keyed = {
+        "NEBIUS_API_KEY": "sk-not-a-real-key",
+        "EXULANICA_EGRESS_ALLOWLIST": '["https://model.example", "http://localhost:11434"]',
+        "EXULANICA_BUDGET_USD": "1.00",
+        "EXULANICA_BUDGET_MAX_CALLS": "7000",
+        "EXULANICA_SPENDING": "process",
+    }
+
+    def environment(environ: dict[str, str], local_servers: list[str]) -> dict[str, str]:
+        return LAUNCH.api_environment(
+            exports={
+                name: "postgresql://role@localhost:19200/exulanica"
+                for name in (
+                    "EXULANICA_DATABASE_URL",
+                    "EXULANICA_READONLY_DATABASE_URL",
+                    "EXULANICA_PURGE_DATABASE_URL",
+                )
+            },
+            grant={},
+            data_dir=Path("run/data"),
+            model=True,
+            derivative_worker=False,
+            society_playback={},
+            environ=environ,
+            local_servers=local_servers,
+        )
+
+    servers = ["http://localhost:11434", "http://localhost:8080"]
+    asked = environment(keyed, servers)
+    # The person's own list stands, with each of this computer's servers it does not name after it.
+    assert json.loads(asked["EXULANICA_EGRESS_ALLOWLIST"]) == [
+        "https://model.example",
+        "http://localhost:11434",
+        "http://localhost:8080",
+    ]
+    assert asked["EXULANICA_LOCAL_CHECKS_DIR"] == "run/data/local-checks"
+    # Not asked: the list as the person stated it, and nothing checked.
+    plain = environment(keyed, [])
+    assert plain["EXULANICA_EGRESS_ALLOWLIST"] == keyed["EXULANICA_EGRESS_ALLOWLIST"]
+    assert "EXULANICA_LOCAL_CHECKS_DIR" not in plain
+    # A list that is not a JSON array is refused by name.
+    with pytest.raises(LAUNCH.Refused, match="local-models-allowlist"):
+        environment({**keyed, "EXULANICA_EGRESS_ALLOWLIST": "https://model.example"}, servers)
+    assert LAUNCH.admitting('["a"]', ["a", "b"]) == '["a", "b"]'
+    # Which installs ask this computer's servers at all.
+    servers = LAUNCH.local_model_servers(ROOT)
+
+    def offered(*flags: str) -> list[str]:
+        return LAUNCH.offered_local_servers(
+            parser.parse_args(["up", "--worktree", "w", *flags]), ROOT
+        )
+
+    assert offered("--personal") == servers
+    assert offered("--personal", "--model") == []
+    assert offered("--personal", "--model", "--local-models") == servers
+    assert offered("--model", "--local-models") == servers
+    assert offered() == []
+    assert offered("--personal", "--scripted-model", "plan.json") == []
+
+
 def test_a_personal_install_with_no_key_admits_the_models_on_this_computer(tmp_path):
     # The servers are the manifest's, as data: each provider that takes no credential on localhost.
     worktree = tmp_path / "checkout"
@@ -901,7 +971,12 @@ def test_a_personal_install_with_no_key_admits_the_models_on_this_computer(tmp_p
         "EXULANICA_BUDGET_MAX_CALLS": "7000",
         "EXULANICA_SPENDING": "process",
     }
-    assert environment(True, keyed)["EXULANICA_EGRESS_ALLOWLIST"] == '["https://model.example"]'
+    # With a key, the person's own list stands, and this computer's server is added after it only
+    # where the launcher passes it, as --local-models does.
+    assert json.loads(environment(True, keyed)["EXULANICA_EGRESS_ALLOWLIST"]) == [
+        "https://model.example",
+        "http://localhost:11434",
+    ]
     # A restart keeps what the run started with.
     run = tmp_path / "run"
     (run / "logs").mkdir(parents=True)

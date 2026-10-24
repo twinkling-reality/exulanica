@@ -479,6 +479,11 @@ python3 scripts/acceptance/launch.py up --worktree . --personal --model --tiles
 
 - `--personal` makes it your own install, kept in `~/Exulanica`.
 - `--model` hands the five settings above to the API, and refuses to start, naming the first one that is missing.
+- `--local-models`, optional with `--model`, offers the models this computer's runner holds beside the provider's: the
+  servers the model manifest names are added after your `EXULANICA_EGRESS_ALLOWLIST`, and each model is checked once
+  on this computer the first time a list shows it, which loads it into memory
+  ([every model a person's runner holds](model-and-service-selection.md#every-model-a-persons-runner-holds)). A
+  personal install without `--model` offers them already.
 - `--tiles` lets the install bake the tiles a made town is drawn from. It compiles the tessellator first, offline,
   as the tile worker's image carries it, so each bake starts one Node process rather than compiling it again.
 - `--creatures`, optional, lets the install draft creatures from words.
