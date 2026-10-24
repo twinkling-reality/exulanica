@@ -38,6 +38,7 @@ from exulanica.models.manifest import (
     parse_manifest,
 )
 from exulanica.models.usage import USD_QUANTUM
+from exulanica.world import decision_envelopes
 from exulanica.world.decision_envelopes import PROFILE, read, request_bytes_at_most
 from exulanica.world.decision_roles import decision_roles
 from exulanica.world.society_decision_contract import (
@@ -51,6 +52,7 @@ from exulanica.world.society_planner import initial_purposeful_society
 from exulanica.world.society_things import THINGS_PROFILE, initial_things_society
 
 import living_square_support as square
+from decision_role_support import person_like, registry_in_use, write_registry
 from model_fakes import FakeTransport, RecordingPolicy
 from things_society_support import SEED, SOCIETY, compose, thing
 
@@ -308,6 +310,28 @@ def test_every_terms_the_person_role_asks_under_has_an_envelope():
         if other.key != role.key:
             for terms in other.every_terms():
                 assert request_bytes_at_most(other.key, terms.prompt_version) is None
+
+
+def test_the_shipped_envelopes_are_read_whatever_registry_a_process_puts_in_use(
+    tmp_path, monkeypatch
+):
+    """The catalog names the registry it ships beside. A process that puts another registry in use,
+    here one that registers a role like the person's and no person, nor any earlier prompt, reads
+    the shipped envelopes all the same the first time it asks, and its own role finds none."""
+    role = person_role()
+    prompts = [terms.prompt_version for terms in role.every_terms()]
+    directory, package = write_registry(tmp_path, [person_like("tenant_decision", "tenant")])
+    monkeypatch.syspath_prepend(str(tmp_path))
+    decision_envelopes._shipped.cache_clear()
+    try:
+        with registry_in_use(directory, package) as registry:
+            assert role.key not in registry.roles
+            tenant = registry.role("tenant_decision")
+            for prompt in prompts:
+                assert request_bytes_at_most(role.key, prompt) is not None, prompt
+            assert request_bytes_at_most(tenant.key, tenant.prompt_version) is None
+    finally:
+        decision_envelopes._shipped.cache_clear()
 
 
 @pytest.mark.parametrize(

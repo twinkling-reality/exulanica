@@ -19,6 +19,12 @@ holds it under its terms' envelope, so a prompt, catalog or bound that grows pas
 first. Nothing refuses a request at send by these figures. A terms the catalog does not name is
 priced as before, by its prompt's characters.
 
+The catalog ships beside the registry it names, and is read once against that registry, as the
+registry's own loader reads it from where the product ships it
+(:func:`~exulanica.world.decision_roles.load_decision_roles` with its own directory and adapters),
+whatever registry a process later puts in use: a role only another registry states finds no
+envelope here.
+
 Pure: no connection, no model asked.
 """
 
@@ -31,7 +37,7 @@ from functools import cache
 from pathlib import Path
 from typing import Any, Final
 
-from exulanica.world.decision_roles import RoleRefused, RoleRegistry, decision_roles
+from exulanica.world.decision_roles import RoleRefused, RoleRegistry, load_decision_roles
 
 __all__ = [
     "CATALOG",
@@ -51,11 +57,12 @@ _MOST_BYTES: Final = 1 << 22
 
 def read(document: Any, roles: RoleRegistry | None = None) -> dict[tuple[str, str], int]:
     """Each envelope ``document`` states, in bytes, by role key and prompt version; refused by name
-    where it is no such catalog, names a terms twice, a role ``roles`` does not register or a prompt
-    version that role's terms never stated, or states no whole positive figure."""
+    where it is no such catalog, names a terms twice, a role ``roles`` (left out, the registry the
+    product ships) does not register or a prompt version that role's terms never stated, or states
+    no whole positive figure."""
     if not isinstance(document, Mapping) or document.get("profile") != PROFILE:
         raise ValueError(f"not a catalog of profile {PROFILE}")
-    registry = decision_roles() if roles is None else roles
+    registry = _shipped_roles() if roles is None else roles
     envelopes: dict[tuple[str, str], int] = {}
     for raw in document.get("entries") or ():
         if not isinstance(raw, Mapping) or set(raw) != _ENTRY:
@@ -80,6 +87,13 @@ def read(document: Any, roles: RoleRegistry | None = None) -> dict[tuple[str, st
             raise ValueError(f"invalid decision request envelope for {role.key} {prompt}")
         envelopes[key] = figure
     return envelopes
+
+
+@cache
+def _shipped_roles() -> RoleRegistry:
+    """The registry the product ships, which the catalog names: read by the loader's own defaults,
+    not by whichever registry a process has put in use."""
+    return load_decision_roles()
 
 
 @cache
