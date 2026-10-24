@@ -636,7 +636,7 @@
   "description": "a small farm with a farmhouse, a barn and a duck pond",
   "started_at": "2026-01-01T00:00:00Z",
   "elapsed_seconds": 0,
-  "poll_after_seconds": 3,
+  "poll_after_seconds": 1,
   "deadline_seconds": 1300,
   "tool": null,
   "entry": null,

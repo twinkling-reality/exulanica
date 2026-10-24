@@ -92,8 +92,9 @@ DESCRIPTION_CHARACTERS: Final = 1000
 #: four bytes each as UTF-8, with its envelope.
 DRAFT_BODY_MAXIMUM: Final = 131_072
 #: How often the page asks after a draft, in seconds: choosing takes a few seconds, a town's
-#: draft about ten and a place's twenty or more.
-DRAFT_POLL_SECONDS: Final = 3
+#: draft about ten and a place's twenty or more. Each read is one row, so a second apart costs
+#: little and a made world is seen within a second of being ready, not up to three.
+DRAFT_POLL_SECONDS: Final = 1
 BODY_LIMITS: Final = (("POST", "/worlds/drafts", DRAFT_BODY_MAXIMUM),)
 
 

@@ -257,7 +257,7 @@ def test_a_sentence_becomes_a_place_made_with_no_kind_kept(drafts, fixed_identit
         assert started.status_code == 202, started.text
         body = started.json()
         # The route answered before any model: the job has chosen nothing yet.
-        assert (body["state"], body["poll_after_seconds"], body["entry"]) == ("queued", 3, None)
+        assert (body["state"], body["poll_after_seconds"], body["entry"]) == ("queued", 1, None)
         assert transport.arrived.wait(10), "the job never asked a model"
         assert _read(client, body["draft_id"]).json()["description"] == FARM_WORDS
         transport.release.set()
