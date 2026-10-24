@@ -160,4 +160,7 @@ assert.equal(reasonsOn(called({ name: null, kind: 'Resident' })), "Their reasons
 // A guest's faint row (U2, DESIGN 12:20): one attempt's most and what is left, each to the figure that tells them apart.
 assert.equal(overLine('0.04300000', '0.03000000'), 'Asking it once can cost up to $0.043, more than the $0.03 left for AI models here.');
 assert.equal(overLine('0.01290000', '0.01250000'), 'Asking it once can cost up to $0.0129, more than the $0.0125 left for AI models here.');
+// What is left that rounds to nothing is not shown as $0 (U3b, DESIGN 15:58).
+assert.equal(overLine('0.00270000', '0.00000200'), 'Asking it once can cost up to $0.0027, more than is left for AI models here.');
+assert.equal(overLine('0.00270000', '0'), 'Asking it once can cost up to $0.0027, more than is left for AI models here.');
 console.log('Character words checks passed: names and kinds, the chosen line, the page lines, money and the model list.');

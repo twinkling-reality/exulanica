@@ -520,7 +520,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const offer = offers.get(row.key)?.offer ?? null;
     const assignable = !readOnly && Boolean(inventory && offer && offersModels(subjectReads.models) && assignmentSubject(inventory, row, offer));
     const picking = picker.of(row);
-    if (picking) return modelGroup({ who: view.who, models: choosableModels(subjectReads.models), current: modelOf(row).model, focus: picking.focus, refusal: picking.refusal, busy: picking.busy, waiting: noneRunningHere(subjectReads.models), fromServer: !state.credentials.token, runner: subjectReads.models?.runnerModels ?? [], over: overRows(subjectReads.models) });
+    if (picking) return modelGroup({ who: view.who, models: choosableModels(subjectReads.models), current: modelOf(row).model, focus: picking.focus, refusal: picking.refusal, busy: picking.busy, waiting: noneRunningHere(subjectReads.models), fromServer: !state.credentials.token, runner: subjectReads.models?.runnerModels ?? [], over: overRows(subjectReads.models, modelOf(row).model) });
     if (asking) {
       // J28: the run asks everyone with a model, the chosen character first, each as the tag calls them (J20).
       const askerIds = [row.scene.id, ...(subjectReads.models?.choices ?? []).filter(item => item.model && item.subjectId !== row.scene.id).map(item => item.subjectId)];
@@ -693,7 +693,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         asked: pageView.ask.asked, answer: pageView.ask.answer, failure: pageView.ask.failure } : null,
       personality: pageView.personality ? { character: pageView.personality.character, shown: pageView.personality.shown } : null,
       editing: pageView.editing ? { session: pageView.editing.session, refusal: pageView.editing.refusal, busy: pageView.editing.busy } : null,
-      choosing: pageView.choosing ? { choices, focus: pageView.choosing.focus, refusal: pageView.choosing.refusal, busy: pageView.choosing.busy, waiting: noneRunningHere(subjectReads.models), fromServer: !state.credentials.token, runner: subjectReads.models?.runnerModels ?? [], over: overRows(subjectReads.models) } : null,
+      choosing: pageView.choosing ? { choices, focus: pageView.choosing.focus, refusal: pageView.choosing.refusal, busy: pageView.choosing.busy, waiting: noneRunningHere(subjectReads.models), fromServer: !state.credentials.token, runner: subjectReads.models?.runnerModels ?? [], over: overRows(subjectReads.models, model) } : null,
       canCompare: comparable(pageView) && (pageView.did ?? []).some(modelAnswered),
       compare: pageView.compare ? records.compare(pageView, view.who) : null, ...records.day(pageView, view, Boolean(subjectReads.models)),
     };

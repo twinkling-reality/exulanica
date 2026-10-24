@@ -203,8 +203,11 @@ export const checkingLine = model => `${model.name} · ${CHARACTER_WORDS.checkin
  * what is left never read alike in one line (U2). */
 export const finer = usd => `$${Number(usd).toFixed(4).replace(/\.?0+$/u, '')}`;
 
-/** A guest's faint row (U2, DESIGN 12:20): asking it once can cost more than they have left for AI models here. */
-export const overLine = (most, left) => `Asking it once can cost up to ${finer(most)}, more than the ${finer(left)} left for AI models here.`;
+/** A guest's faint row (U2, DESIGN 12:20): asking it once can cost more than they have left for AI models here; where
+ * what is left rounds to nothing, without its figure (DESIGN 15:58). */
+export const overLine = (most, left) => finer(left) === '$0'
+  ? `Asking it once can cost up to ${finer(most)}, more than is left for AI models here.`
+  : `Asking it once can cost up to ${finer(most)}, more than the ${finer(left)} left for AI models here.`;
 
 /** Why a runner's model is not able to decide for a person here (L1), in one line from its check. */
 export function notAbleLine(model) {

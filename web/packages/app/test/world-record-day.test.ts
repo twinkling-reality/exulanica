@@ -514,6 +514,16 @@ describe("Teo's day keys", () => {
     expect([...root.querySelectorAll('.wu-model-row')].map((row) => row.querySelector('.wu-key')?.textContent)).toEqual(['1', '2']);
     expect(root.querySelector('.wu-gallery-waiting')!.closest('button')).toBeNull();
   });
+
+  it("keeps Current on a faint row that is the person's own model, after its name (U3b)", async () => {
+    const { root, page } = await open();
+    const nemotron = { provider: 'nebius', providerDescription: 'Nebius Token Factory.', modelId: 'nvidia/nemotron', name: NEMOTRON, price: { input: '0.06', output: '0.24' }, card: null };
+    const line = 'Asking it once can cost up to $0.043, more than the $0.03 left for AI models here.';
+    const over = [{ word: 'Nemotron 3 Ultra 550B', sub: 'NVIDIA · 550B', line, current: true }];
+    page.draw(teoState({ choosing: { choices: [{ model: nemotron, current: false }, { model: null, current: false }], focus: 0, refusal: null, busy: false, fromServer: true, over } }));
+    expect(all(root, '.wu-gallery-waiting')).toEqual([`Nemotron 3 Ultra 550BCurrentNVIDIA · 550B${line}`]);
+    expect(all(root, '.wu-gallery-waiting .wu-model-current')).toEqual(['Current']);
+  });
 });
 
 describe("a person's runner's models (L1)", () => {
@@ -563,6 +573,20 @@ describe("a person's runner's models (L1)", () => {
       `tiny${mark}It did not answer with one of the offered choices when checked.`,
     ]);
     expect(all(host, '.cg-group-label')).toEqual(['On this computer, free', 'Also on this computer, not able to decide for a person here']);
+  });
+
+  it("keeps Current on the world list's faint row that is the person's own model (U3b)", async () => {
+    const { runnerRows } = await (import('../../../../tools/previews/world-workspace/' + 'character-group.ts') as Promise<{
+      runnerRows(block: unknown): HTMLElement[];
+    }>);
+    const host = document.createElement('div');
+    const line = 'Asking it once can cost up to $0.043, more than the $0.03 left for AI models here.';
+    host.append(...runnerRows({ checking: [], label: null, notAble: [
+      { word: 'Nemotron 3 Ultra 550B', sub: 'NVIDIA · 550B', line, current: true },
+      { word: 'Nemotron 3 Super 120B', sub: 'NVIDIA · 120B', line, current: false },
+    ] }));
+    expect(all(host, '.cg-waiting .cg-current')).toEqual(['Current']);
+    expect(all(host, '.cg-waiting')[0]).toBe(`Nemotron 3 Ultra 550BCurrentNVIDIA · 550B${line}`);
   });
 });
 

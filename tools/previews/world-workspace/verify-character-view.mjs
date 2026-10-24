@@ -146,6 +146,16 @@ const picked = (tick, model) => ({ subject_id: 't', tick, event_kind: 'decision_
 const named = model => (model.model_id === 'nano' ? 'Nemotron 3 Nano 30B' : 'Nemotron 3 Super 120B');
 assert.deepEqual(inRuns([{ from: 0, to: null }], served([[picked(1, nanoModel)], [aim(2, { kind: 'rest', target_id: 'bench', reason: 'resting' })], [picked(3, nemo)]]), named),
   [['06:02', "Routine, between Nemotron 3 Nano 30B's choices"]], 'the choice before it names the model');
+// A decision with no usable answer is no choice (U3b, DESIGN 15:58): a run of only those leaves the routine "Routine";
+// a choice made too late is still the model's choice.
+const unused = (tick, model, disposition = 'unavailable') => ({ subject_id: 't', tick, event_kind: 'decision_applied',
+  document: { request_id: `u${tick}`, chose: disposition === 'stale' ? 'wait here' : null, disposition, model, goal: { kind: 'stand', target_id: null } } });
+const rest = aim(2, { kind: 'rest', target_id: 'bench', reason: 'resting' });
+assert.deepEqual(didRows({ events: served([[unused(1, nanoModel)]]), subjectId: 't', startMinute: 360, wordGoal: goalWords, modelName: named }).map(row => row.unanswered), ['none'], 'the test decision is a row');
+assert.deepEqual(inRuns([{ from: 0, to: null }], served([[unused(1, nanoModel)], [rest], [unused(3, nanoModel)]]), named),
+  [['06:02', 'Routine']], 'no usable answer is no choice');
+assert.deepEqual(inRuns([{ from: 0, to: null }], served([[unused(1, nanoModel, 'stale')], [rest]]), named),
+  [['06:02', "Routine, between Nemotron 3 Nano 30B's choices"]], 'a choice made too late is a choice');
 // A living society's goal names its spot: the same activity at another spot is somewhere new, and another activity at
 // the same spot is something new.
 const eat = (tick, spot, activity = 'eat') => aim(tick, { activity, destination_id: 'home', spot_id: spot, node_id: null, reason: 'most_pressing_need' }, 'most_pressing_need');

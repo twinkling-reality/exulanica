@@ -263,11 +263,12 @@ export function didRows({ events, subjectId, startMinute = null, wordGoal, model
     }
   }
   // A routine row in a run in which a model chose for the character (P2): the model of the character's nearest choice
-  // in the same run, the one before the row first. A run with no choice of theirs read leaves the row "Routine".
+  // in the same run, the one before the row first. A run with no choice of theirs read leaves the row "Routine"; a
+  // decision with no usable answer is no choice (DESIGN 15:58).
   const runOf = tick => (Number.isSafeInteger(tick) ? runs.find(run => tick > run.from && (run.to === null || tick <= run.to)) ?? null : null);
   for (const row of rows) {
     const run = !row.model && row.sub === CHARACTER_WORDS.routine ? runOf(row.tick) : null;
-    const chose = run ? rows.filter(one => one.model && runOf(one.tick) === run) : [];
+    const chose = run ? rows.filter(one => one.model && one.unanswered !== 'none' && runOf(one.tick) === run) : [];
     const by = chose.find(one => one.tick <= row.tick) ?? chose.at(-1);
     if (by) row.sub = routineBetween(by.model);
   }

@@ -140,7 +140,11 @@ export const UNANSWERED_REASONS = Object.freeze({
 });
 
 /** Such a decision's own words under the ring and in its head: no usable answer, or a choice the world moved past. */
-export const UNANSWERED_WORDS = Object.freeze({ none: 'no usable answer', late: 'chose too late', routine: 'the routine acted', notAsked: 'not asked' });
+export const UNANSWERED_WORDS = Object.freeze({
+  none: 'no usable answer', late: 'chose too late', routine: 'the routine acted', notAsked: 'not asked',
+  /** What happened's note where the routine acted (DESIGN 15:58). */
+  happened: 'What the routine did in the world, at that minute.',
+});
 
 /** Why a model was not asked, in four words or fewer, by its receipt's reason; absent where the reason has none. */
 const NOT_ASKED = Object.freeze({
@@ -192,14 +196,14 @@ export function askedPrint({ asks = 1, latencyMs = null, costUsd = null, costKno
 /**
  * The newcomer's notes for a decision with no usable answer, in place of a choice's: under the head, why the routine
  * acted, by the receipt's reason and whether it was asked; the ring's, what the asks sent took and cost (none where
- * nothing was sent); the choices', that none was taken and why.
+ * nothing was sent); the choices', that none was taken and why; What happened's, that the routine acted.
  */
 export function unansweredNotes({ who, asks = 0, reason = null }) {
   const name = who.within, routine = `so ${possessive(name)} routine acted.`, allowed = `The actions the world allowed ${name} there.`;
   const has = kind => UNANSWERED_REASONS[kind].includes(reason);
   if (asks < 1) {
     const by = has('money') ? 'Asking it would have gone over the money left' : has('noTime') ? 'There was no time to ask it' : 'It could not be asked just then';
-    return Object.freeze({ by: `${by}, ${routine}`, ring: null, choices: `${allowed} The model was not asked, so none was taken.` });
+    return Object.freeze({ by: `${by}, ${routine}`, ring: null, choices: `${allowed} The model was not asked, so none was taken.`, happened: UNANSWERED_WORDS.happened });
   }
   const off = 'Its answer was not one of the actions';
   const by = has('money') ? `${off}, and asking it again would have gone over the money left`
@@ -218,16 +222,17 @@ export function unansweredNotes({ who, asks = 0, reason = null }) {
       : "The model's answer was not one of them, so none was taken.";
   const ring = asks === 1 ? 'How long its one ask took and what it cost.' : asks === 2 ? 'How long its two asks took and what they cost.'
     : 'How long its asks took and what they cost.';
-  return Object.freeze({ by: `${by}, ${routine}`, ring, choices: `${allowed} ${choices}` });
+  return Object.freeze({ by: `${by}, ${routine}`, ring, choices: `${allowed} ${choices}`, happened: UNANSWERED_WORDS.happened });
 }
 
-/** The notes for a choice the world had moved past before it could happen (U3): the head's and the choices'; the
- * ring keeps its answer's own. */
+/** The notes for a choice the world had moved past before it could happen (U3): the head's, the choices' and What
+ * happened's; the ring keeps its answer's own. */
 export function lateNotes({ who }) {
   const name = who.within;
   return Object.freeze({
     by: `The world had moved on before its choice could be acted on, so ${possessive(name)} routine acted.`,
     choices: `The actions the world allowed ${name} there. The model picked one, but the world had moved on before it could happen.`,
+    happened: UNANSWERED_WORDS.happened,
   });
 }
 

@@ -31,7 +31,7 @@ export interface ModelRow {
 export interface RunnerRows {
   readonly checking: readonly { readonly word: string; readonly sub: string | null }[];
   readonly label: string | null;
-  readonly notAble: readonly { readonly word: string; readonly sub: string | null; readonly line: string }[];
+  readonly notAble: readonly { readonly word: string; readonly sub: string | null; readonly line: string; readonly current?: boolean }[];
   /** In the world's list, the not-able rows folded into one line and where their reasons are told (DESIGN 11:58). */
   readonly fold?: { readonly line: string; readonly sub: string } | null;
   readonly group?: string;
@@ -194,7 +194,12 @@ export function runnerRows(block: RunnerRows): HTMLElement[] {
     ...(block.group ? [text('p', 'cg-group-label', block.group)] : []),
     ...block.checking.map(row => faint(row.word, row.sub)),
     ...(block.label ? [text('p', 'cg-group-label', block.label)] : []),
-    ...block.notAble.map(row => faint(row.word, row.sub, row.line)),
+    ...block.notAble.map(row => {
+      const item = faint(row.word, row.sub, row.line);
+      // A faint row that is the person's own model keeps "Current" after its name (U3b).
+      if (row.current) item.firstChild?.after(text('span', 'cg-current', CHARACTER_WORDS.current));
+      return item;
+    }),
     ...(block.fold ? [faint(block.fold.line, block.fold.sub)] : []),
   ];
 }

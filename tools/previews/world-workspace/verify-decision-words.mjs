@@ -214,7 +214,10 @@ assert.equal(unansweredNotes({ who: mara, asks: 0, reason: 'spending_limit_reach
 assert.deepEqual({ ...lateNotes({ who: mara }) }, {
   by: "The world had moved on before its choice could be acted on, so Mara Vale's routine acted.",
   choices: 'The actions the world allowed Mara Vale there. The model picked one, but the world had moved on before it could happen.',
+  happened: 'What the routine did in the world, at that minute.',
 });
+// What happened's note says the routine acted wherever it did (U3b, DESIGN 15:58).
+for (const asks of [0, 1, 2]) assert.equal(unansweredNotes({ who: mara, asks, reason: 'spending_limit_reached' }).happened, 'What the routine did in the world, at that minute.');
 assert.equal(WORDS.chosenNotDone, 'Chosen, not done');
 for (const reason of [...stated, null]) {
   for (const asks of [0, 1, 2]) {

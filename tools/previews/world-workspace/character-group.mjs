@@ -244,9 +244,11 @@ export function overBudget(model, read) {
  * A guest's faint rows (U2, DESIGN 11:29 and 12:20): each model asking which once can cost more than they have
  * left here, in the gallery's order, by its name and maker with why in a line; no number and no focus.
  */
-export function overRows(read) {
+export function overRows(read, current = null) {
   return offeredHere(read).filter(model => overBudget(model, read)).map(model => Object.freeze({
     word: model.name, sub: makerLine(model), line: overLine(model.attemptMostUsd, read.spendHereUsd[model.provider]),
+    // The person's own model keeps "Current" while it stands faint (DESIGN 15:58).
+    current: current !== null && sameModel(model, current),
   }));
 }
 

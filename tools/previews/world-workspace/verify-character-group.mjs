@@ -479,7 +479,11 @@ assert.equal(freeHere(read, []), false);
   const guest = { takesModelChoices: true, models: dear, spendHereUsd: { nebius: '0.03000000' } };
   assert.deepEqual(choosableModels(guest).map(model => model.name), ['Qwen3 4B Instruct', 'Nemotron 3 Nano 30B']);
   assert.deepEqual(overRows(guest), [{ word: 'Qwen3 235B Instruct', sub: 'Qwen · 235B',
-    line: 'Asking it once can cost up to $0.043, more than the $0.03 left for AI models here.' }]);
+    line: 'Asking it once can cost up to $0.043, more than the $0.03 left for AI models here.', current: false }]);
+  // The person's own model keeps "Current" while it stands faint (U3b, DESIGN 15:58).
+  const qwen = dear.find(model => model.modelId === 'qwen/235b');
+  assert.deepEqual(overRows(guest, { provider: qwen.provider, modelId: qwen.modelId }).map(row => row.current), [true]);
+  assert.deepEqual(overRows(guest, { provider: 'nebius', modelId: 'nvidia/nano' }).map(row => row.current), [false]);
   const owner = { takesModelChoices: true, models: dear };
   assert.equal(choosableModels(owner).length, 3, "a person's own install: every model stays choosable");
   assert.deepEqual(overRows(owner), []);

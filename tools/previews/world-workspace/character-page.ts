@@ -118,7 +118,7 @@ export interface CharacterPageState {
     /** This computer's runner's models with their checks (L1): those not offered stand faint after its last row. */
     readonly runner?: readonly RunnerModel[];
     /** A guest's models asking which once can cost more than they have left (character-group.mjs overRows, U2). */
-    readonly over?: readonly { readonly word: string; readonly sub: string | null; readonly line: string }[];
+    readonly over?: readonly { readonly word: string; readonly sub: string | null; readonly line: string; readonly current?: boolean }[];
   } | null;
   /** Whether [C] Compare is offered (frame 12a). */
   readonly canCompare: boolean;
@@ -564,7 +564,7 @@ interface GalleryItem {
 interface RunnerFaint {
   readonly checking: readonly { readonly word: string; readonly sub: string | null }[];
   readonly label: string | null;
-  readonly notAble: readonly { readonly word: string; readonly sub: string | null; readonly line: string }[];
+  readonly notAble: readonly { readonly word: string; readonly sub: string | null; readonly line: string; readonly current?: boolean }[];
 }
 
 function galleryRows(choices: readonly ModelChoice[], focus: number, waiting: boolean, fromServer: boolean, onChoose: (index: number) => void, onUse: (index: number) => void, runner: readonly RunnerModel[] = [], over: NonNullable<CharacterPageState['choosing']>['over'] = []): HTMLElement {
@@ -598,7 +598,12 @@ function galleryRows(choices: readonly ModelChoice[], focus: number, waiting: bo
     };
     list.append(...block.checking.map((one) => row(one.word, one.sub)));
     if (block.label) list.append(groupLabel(block.label));
-    list.append(...block.notAble.map((one) => row(one.word, one.sub, one.line)));
+    list.append(...block.notAble.map((one) => {
+      const item = row(one.word, one.sub, one.line);
+      // A faint row that is the person's own model keeps "Current" after its name (U3b).
+      if (one.current) item.firstChild?.after(element('span', 'wu-model-current', CHARACTER_WORDS.current));
+      return item;
+    }));
   };
   if (faint && lastHere < 0) {
     if (group !== CHARACTER_WORDS.hereFree) list.append(groupLabel(CHARACTER_WORDS.hereFree));
