@@ -373,6 +373,13 @@ def _graph(key: str, ground: str, document: dict[str, Any], *, stated: tuple[int
     }
 
 
+def _line(said: int) -> str:
+    """The ``said``-th line of a run: :data:`LINES` in turn, then each again with its round, so no
+    being is told a line it is about to say (the host refuses a line said or heard before)."""
+    line = LINES[said % len(LINES)]
+    return line if said < len(LINES) else f"{line[:-1]}, {said // len(LINES) + 1}{line[-1]}"
+
+
 class _Acting:
     """Answers every request with one of its own offered options: a hands act or a said line
     whenever either is offered (which first, by the request's digest), else the option the
@@ -399,7 +406,7 @@ class _Acting:
             )
             proposal: dict[str, Any] = {"label": option["label"], "option": option}
             if option["kind"] in SAYING:
-                proposal["line"] = LINES[self.said % len(LINES)]
+                proposal["line"] = _line(self.said)
                 self.said += 1
             results.append(
                 {
