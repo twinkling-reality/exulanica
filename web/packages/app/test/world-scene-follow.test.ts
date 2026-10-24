@@ -56,7 +56,7 @@ function standing(x: number, z: number, width: number, height = 3): object {
     }
     return near <= far && far >= 0;
   };
-  return { mesh, node, visible: true, aabb: { intersectsRay } };
+  return { mesh, node, visible: true, aabb: { intersectsRay, center: { x, y: height / 2, z }, halfExtents: { x: h, y: height / 2, z: h } } };
 }
 
 /**
