@@ -58,6 +58,8 @@ def test_the_listing_names_every_shipped_kind_and_look_with_its_container() -> N
             "class": document["class"],
             "body_plan": document["body"]["plan"],
             "looks": document["looks"],
+            # The worlds it fits, for the placing tray, where its version states them.
+            **({"fits": document["fits"]} if "fits" in document else {}),
         }
     looks = _documents(LOOKS)
     assert [f"{k['look']}.v{k['version']}.json" for k in listing["looks"]] == sorted(looks)

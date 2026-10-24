@@ -60,6 +60,8 @@ export interface LibraryKind {
   readonly bodyPlan: string;
   /** The kind's looks, the first its default. */
   readonly looks: readonly DocumentReference[];
+  /** The worlds it fits, where its version states them: any, or the eras it belongs in (a placing tray orders by them). */
+  readonly fits?: { readonly eras: 'any' | readonly string[] };
 }
 
 export interface LibraryLook {
@@ -194,6 +196,13 @@ function readPlaces(r: ReturnType<typeof reader>, value: unknown, field: string)
   }));
 }
 
+/** A kind's fits as the library lists them: any, or the eras it belongs in, each a key. */
+function readFits(r: ReturnType<typeof reader>, value: unknown, field: string): { readonly eras: 'any' | readonly string[] } {
+  const eras = r.object(value, field)['eras'];
+  if (eras === 'any') return Object.freeze({ eras });
+  return Object.freeze({ eras: Object.freeze(r.list(eras, `${field}.eras`).map((era, i) => r.text(era, `${field}.eras[${i}]`, KEY))) });
+}
+
 /** Read the host's library list, or refuse it by name. */
 export function readThingLibrary(value: unknown): ThingLibraryList {
   const r = reader('thing_library_invalid');
@@ -211,6 +220,7 @@ export function readThingLibrary(value: unknown): ThingLibraryList {
       class: kindClass as 'being' | 'object',
       bodyPlan: r.text(row['body_plan'], `kinds[${i}].body_plan`, PLAN),
       looks: Object.freeze(r.list(row['looks'], `kinds[${i}].looks`).map((look, j) => r.reference(look, `kinds[${i}].looks[${j}]`, 'look'))),
+      ...(row['fits'] === undefined ? {} : { fits: readFits(r, row['fits'], `kinds[${i}].fits`) }),
     });
   });
   const looks = r.list(body['looks'], 'looks').map((value, i): LibraryLook => {

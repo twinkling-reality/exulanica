@@ -159,6 +159,8 @@ def load_thing_library(
                 "class": kind.klass,
                 "body_plan": kind.plan,
                 "looks": [dict(look) for look in kind.looks],
+                # The worlds it fits, which the placing tray orders kinds by, where it states them.
+                **({"fits": dict(kind.document["fits"])} if "fits" in kind.document else {}),
             }
             for kind in kinds
         ],

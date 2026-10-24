@@ -13,6 +13,11 @@
       "sha256": "6f2df36bc18a6b96dfc2d136703d71993c091639860f44a0f5e01b51204e45a9"
     },
     {
+      "kind": "bench",
+      "version": 3,
+      "sha256": "3f8a73bc54ca85937d7bdae74fbfe91d0a3a4b6925138384cbd8bd2124ede8ee"
+    },
+    {
       "kind": "cafe_table",
       "version": 1,
       "sha256": "bffd7159cd2c8a518c31ba2e32798373b427c629496c7b724a3744432ea1c393"
@@ -23,9 +28,19 @@
       "sha256": "2466e6aa9ae71b97075d9cfa8ce258cfa0112ea313bfc6bba7904b31db57a45f"
     },
     {
+      "kind": "cafe_table",
+      "version": 3,
+      "sha256": "ecc15528198fa1226f7df5eb87b338ed050be045a429d78a0cdc44214c9929d6"
+    },
+    {
       "kind": "gate",
       "version": 1,
       "sha256": "2490ce4197acd2ba7e2e3494764187f6040e3fd972bb8118fadf52eacd6dcddc"
+    },
+    {
+      "kind": "gate",
+      "version": 2,
+      "sha256": "fefe7e7ad98d3aee2bcc814e606b94dda4be089985345b45f8692fbd0c85bfe0"
     },
     {
       "kind": "knight",
@@ -53,9 +68,19 @@
       "sha256": "8a4482b81eb6f87cc9e336edf724387b0ca183c52d24f3910697120d3049eb9b"
     },
     {
+      "kind": "lamp_post",
+      "version": 4,
+      "sha256": "e1f8c213f1aca6c49687fcb2d0a3b578dfbdd5b864491e3b6bfadc413b27ca8e"
+    },
+    {
       "kind": "lantern",
       "version": 1,
       "sha256": "5cb77297b677cdf10b67eb20fd4e7845c3f1f9f0dbd1f26fd57066c4bcf973a9"
+    },
+    {
+      "kind": "lantern",
+      "version": 2,
+      "sha256": "580821883bd0cdb405de26ea66b20f2d9781e0983b2d92ed6c4ab78f8d633618"
     },
     {
       "kind": "lantern_spirit",
@@ -73,6 +98,11 @@
       "sha256": "bac65ecab0e73d35d740af8dc6907f7f1b70b12106668e0b32289008875b82d0"
     },
     {
+      "kind": "market_stall",
+      "version": 3,
+      "sha256": "50d97d0f06975768788fab633f2c23341a01c786b41794bd80f349ec5a65e675"
+    },
+    {
       "kind": "planter_tree",
       "version": 1,
       "sha256": "945ba33280f6d67550c8497a6294a2ba228955c32f9032af31083b23ff20152a"
@@ -83,6 +113,11 @@
       "sha256": "6dd011a0373ee29ca760f90feaec8a362d9f5311dd1c6c4f315ad0eb3c3288f8"
     },
     {
+      "kind": "planter_tree",
+      "version": 3,
+      "sha256": "c1fa3335a20058cee0543d8cff5748ea7f60f61df42dc300236a81ddd2a3ea55"
+    },
+    {
       "kind": "seating_planter",
       "version": 1,
       "sha256": "2b6c788a82ef5210050705e8f210f346655463cee60729a114d9a91ac0c321e6"
@@ -91,6 +126,11 @@
       "kind": "seating_planter",
       "version": 2,
       "sha256": "2496798b3d7f3110ae91504a98ce82bd20d7e261067baa7219ad9d2b135c75ce"
+    },
+    {
+      "kind": "seating_planter",
+      "version": 3,
+      "sha256": "08cf633e96c87bd686de3d0c01852be428e22c432a57ead826a6b9d5074f6eef"
     },
     {
       "kind": "sword",
@@ -106,6 +146,11 @@
       "kind": "sword",
       "version": 3,
       "sha256": "d871f4042cc88e598f0dcd2c03f47407b32536e08e71045a4b27433ba11d4df3"
+    },
+    {
+      "kind": "sword",
+      "version": 4,
+      "sha256": "af2042432c3469008f786d7c699be304976f2a39ca7d82c030439dc9c73f2cdb"
     },
     {
       "kind": "traveller",
@@ -141,6 +186,11 @@
       "kind": "well",
       "version": 2,
       "sha256": "498acbe7f30319219238468e561951e59676d581d4714f9ee11e8a5079337ca9"
+    },
+    {
+      "kind": "well",
+      "version": 3,
+      "sha256": "60d2554371d15b84396b19364265fd3735c246782d316e83411ddc9329bf4798"
     }
   ]
 }

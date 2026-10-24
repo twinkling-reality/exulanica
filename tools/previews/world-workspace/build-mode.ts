@@ -74,6 +74,15 @@ const LAYER_RETRY_MS = 5000;
 export type HoldOutcome = { readonly outcome: 'placed'; readonly thingId: string } | { readonly outcome: 'put-back' };
 const PUT_BACK: HoldOutcome = Object.freeze({ outcome: 'put-back' });
 
+/**
+ * Whether a kind fits this world (B4): one that states nothing, or any world, fits; one that lists eras fits a world in
+ * one of them. No world states its eras yet, so a world is taken as in every era of era.v1.json, which a kind's eras
+ * are held to (kinds.py): a kind that lists any era fits, and one that lists none (a story world's sword) comes after.
+ */
+function fitsWorld(fits) {
+  return !fits || fits.eras === 'any' || fits.eras.length > 0;
+}
+
 // `onStart` is called as building starts, by B, the rail's Build or a hold, for the page to let go of whoever it has
 // chosen: the tray hides while `inspecting()` says something stands over it, and B never opens on nothing.
 export function mountBuildMode({ b, root, state, entry, read, send, binding, canvas, corners, inspecting, groundRing = null, people = null, makeCreature = null, onStart = null }) {
@@ -283,7 +292,10 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
 
   // ---------- The tray ----------
 
-  /** The kinds this world may place as tiles: the shipped library's objects, the latest version of each, in its order. */
+  /**
+   * The kinds this world may place as tiles: the shipped library's objects, the latest version of each, in its order,
+   * those that fit the world first and the rest after a wider gap, nothing hidden (B4).
+   */
   function thingTiles() {
     const library = things()?.layer?.maker?.library ?? null;
     if (library === null) { mountLayer(); return layerUnread && layerMounting === null ? [] : null; }
@@ -292,10 +304,12 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     for (const kind of library.list.kinds) {
       if (kind.class === 'object' && (latest.get(kind.kind)?.version ?? 0) < kind.version) latest.set(kind.kind, kind);
     }
-    return [...latest.values()].map(kind => {
+    const tiles = [...latest.values()].map(kind => {
       const named = { kind: kind.kind, version: kind.version, sha256: kind.sha256 };
-      return { id: 'kind:' + kind.kind, name: titled(thingName({ kind: named })), kind: named, picture: pictures.get('kind:' + kind.kind) ?? null };
+      return { id: 'kind:' + kind.kind, name: titled(thingName({ kind: named })), kind: named, picture: pictures.get('kind:' + kind.kind) ?? null, fits: fitsWorld(kind.fits) };
     });
+    const fitting = tiles.filter(tile => tile.fits), rest = tiles.filter(tile => !tile.fits);
+    return [...fitting, ...rest.map((tile, index) => (index === 0 && fitting.length > 0 ? { ...tile, apart: true } : tile))];
   }
   /** Mount the placed things' layer where nothing placed has mounted it, once a pause, and draw the tray again after. */
   function mountLayer() {

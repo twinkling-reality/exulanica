@@ -135,6 +135,43 @@ def test_a_society_reads_a_kind_s_semantics_and_never_its_looks():
     assert "look" not in json.dumps(semantics)
 
 
+#: The eras of era.v1.json, every one a present-day era of a town's buildings.
+PRESENT_DAY = ["contemporary", "interwar", "postwar", "prewar_masonry"]
+#: What each object kind's latest version fits, as ruled for the placing tray (B4, 23 October 2026).
+FITS = {
+    "bench": "any",
+    "cafe_table": "any",
+    "gate": "any",
+    "lantern": "any",
+    "market_stall": "any",
+    "well": "any",
+    "lamp_post": PRESENT_DAY,
+    "planter_tree": PRESENT_DAY,
+    "seating_planter": PRESENT_DAY,
+    "sword": [],
+}
+
+
+def _latest_objects() -> dict[str, Any]:
+    latest: dict[str, Any] = {}
+    for (key, version), kind in shipped_thing_kinds().items():
+        if kind.klass == "object" and version > getattr(latest.get(key), "version", 0):
+            latest[key] = kind
+    return latest
+
+
+def test_every_object_kind_s_latest_version_states_the_worlds_it_fits_with_its_reason():
+    latest = _latest_objects()
+    assert {key: kind.document["fits"]["eras"] for key, kind in latest.items()} == FITS
+    assert all(kind.document["fits"]["reason"] for kind in latest.values())
+
+
+def test_what_a_kind_fits_is_the_tray_s_and_never_a_society_s():
+    sword = _latest_objects()["sword"]
+    assert "fits" in sword.document
+    assert "fits" not in sword.semantics()
+
+
 def _refused(document: Any, **kwargs: Any) -> ThingKindRefused:
     with pytest.raises(ThingKindRefused) as caught:
         read_thing_kind(document, **kwargs)
@@ -210,6 +247,38 @@ def test_an_object_is_refused_by_name_for_each_thing_its_checks_hold(change, cod
     document = copy.deepcopy(_kind("sword"))
     read_thing_kind(copy.deepcopy(document))  # the positive control
     change(document)
+    assert _refused(document).code == code
+
+
+@pytest.mark.parametrize(
+    ("fits", "code"),
+    [
+        pytest.param(
+            {"eras": ["medieval"], "reason": "Knights."},
+            "thing_kind_reference_unknown",
+            id="an-era-the-catalog-lacks",
+        ),
+        pytest.param(
+            {"eras": ["postwar", "postwar"], "reason": "Twice."},
+            "thing_kind_invalid",
+            id="an-era-twice",
+        ),
+        pytest.param(
+            {"eras": "every", "reason": "Neither."},
+            "thing_kind_invalid",
+            id="neither-any-nor-a-list",
+        ),
+        pytest.param({"eras": "any"}, "thing_kind_invalid", id="no-reason"),
+        pytest.param({"eras": "any", "reason": ""}, "thing_kind_invalid", id="an-empty-reason"),
+        pytest.param(
+            {"eras": "any", "reason": "Any.", "weight": 1}, "thing_kind_invalid", id="an-extra-key"
+        ),
+    ],
+)
+def test_what_a_kind_fits_is_refused_by_name_for_each_thing_its_check_holds(fits, code):
+    document = copy.deepcopy(_kind("sword"))
+    read_thing_kind({**copy.deepcopy(document), "fits": {"eras": [], "reason": "No era."}})
+    document["fits"] = fits
     assert _refused(document).code == code
 
 

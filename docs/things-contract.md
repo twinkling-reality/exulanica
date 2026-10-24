@@ -81,6 +81,13 @@ canonical JSON with no floats, and every object in it states exactly its keys:
 | `deciders` | a being's `{default, allowed}`: the [decider](decision-roles-contract.md#who-decides-deciders-and-the-owners-choice) kinds that may run it, among `routine`, `model`, `person` and `external`, the default the routine or an outside program; none for an object |
 | `looks` | at most 16 references `{look, version, sha256}`, each a look of the kind's body plan, the first the default; may be empty |
 | `ext` | source data kept verbatim, at most 8 KiB of canonical bytes, which no engine reads |
+| `fits` | optional: the worlds the kind fits, `{eras, reason}`, `eras` either `any` or the keys of `assets/catalogs/era.v1.json` it belongs in, each once (none for a kind no era fits, such as a story world's sword), with its reason; a placing tray orders its kinds by it and no engine reads it |
+
+The placing tray offers every object kind, the latest version of each: those that fit the world
+first in the library's order, then the rest after a wider gap, unlabelled, so nothing is hidden. A
+kind fits any world, or a world in one of the eras it lists. No world states its eras yet, so a world
+is taken as in every era of `era.v1.json`: a kind that lists any era fits, and one that lists none
+comes after.
 
 A kind's identity is its key and version, and its digest is the SHA-256 of its canonical bytes; a
 version never changes, and a kind that must change gets its next version beside the first. The lock
@@ -91,8 +98,8 @@ three: a world's author places one by its kind in a version's authored plane
 ([world objects contract, section 14](world-objects-contract.md#14-placed-things)), a being only
 where its kind's deciders allow the routine. A kind its workspace keeps (below) is placed by its
 digest alone, never by its key, which a person's words may have made. What a society
-is given of a shipped kind is `ThingKind.semantics()`: every field but `looks`, `origin`, `ext` and
-`summary`, with the kind's reference, so no look reaches a society through its kind. What it is
+is given of a shipped kind is `ThingKind.semantics()`: every field but `looks`, `origin`, `ext`,
+`summary` and `fits`, with the kind's reference, so no look reaches a society through its kind. What it is
 given of a kind its workspace keeps is that kind's run form
 ([a creature in a society](#a-creature-in-a-society)), which holds no word of it.
 

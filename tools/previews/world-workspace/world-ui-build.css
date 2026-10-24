@@ -31,6 +31,8 @@
 .wu-tile[aria-pressed="true"] .wu-tile-picture { box-shadow: 0 0 0 2px #fff, 0 0 18px rgba(191, 233, 240, .6); }
 .wu-tile.wu-make .wu-tile-picture { display: grid; place-items: center; background: rgba(255, 255, 255, .10); font: 200 calc(34 * var(--u))/1 var(--font-sans); }
 .wu-tray[data-offline="true"] .wu-tile { opacity: .55; cursor: default; }
+/* The kinds that do not fit the world follow the rest after a wider gap, unlabelled (B4). */
+.wu-tile[data-apart="true"] { margin-inline-start: calc(32 * var(--u)); }
 .wu-tray-empty { align-self: center; margin: 0; padding: 0 calc(4 * var(--u)); color: var(--ink-2); font: 400 max(12px, calc(14 * var(--u)))/1.4 var(--font-sans); white-space: nowrap; }
 
 /* Names over people near what is held: small soft shades, centred over their heads. */

@@ -63,6 +63,8 @@ export interface TrayTile {
   /** Its picture once drawn (a URL), or null until then. */
   readonly picture: string | null;
   readonly make?: boolean;
+  /** The first of the kinds that do not fit the world, which a wider gap sets apart (B4). */
+  readonly apart?: boolean;
 }
 
 export type TrayTab = 'things' | 'creatures';
@@ -136,6 +138,7 @@ export function tray({ words, onTab, onPick }: {
         button.type = 'button';
         button.disabled = offline;
         button.setAttribute('aria-pressed', String(tile.id === held));
+        if (tile.apart) button.dataset.apart = 'true';
         const picture = element('span', 'wu-tile-picture');
         picture.setAttribute('aria-hidden', 'true');
         if (tile.make) picture.textContent = '+';

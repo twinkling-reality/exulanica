@@ -6,7 +6,9 @@ it and nothing about how it is drawn: its class (a ``being``, which acts and has
 ``object``, which decides nothing), its body plan and the figures that plan bounds, the movement
 modules it moves by, its abilities (what it can do) and offers (what it lets others do to it) from
 the things catalogs, its routine's weights, the deciders that may run it, the looks suggested for
-it, its origin, and source data kept verbatim in ``ext``, which no engine reads.
+it, its origin, and source data kept verbatim in ``ext``, which no engine reads. A later version
+may state the worlds it fits (``fits``: ``any``, or the eras of ``era.v1.json`` it belongs in, with
+the reason), which a placing tray orders its kinds by and no engine reads.
 
 :func:`read_thing_kind` holds a document to its checks and refuses by name
 (:class:`ThingKindRefused`, a code from :data:`THING_KIND_CODES`, the field at fault and a
@@ -28,6 +30,7 @@ Pure: no connection, no store.
 
 from __future__ import annotations
 
+import functools
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -64,6 +67,8 @@ DECIDER_KINDS: Final = ("routine", "model", "person", "external")
 KINDS_DIRECTORY: Final = Path(__file__).resolve().parents[2] / "assets/catalogs/things/kinds"
 #: Every shipped kind version and the digest it shipped with, beside the kinds.
 KINDS_LOCK: Final = KINDS_DIRECTORY.parent / "kinds.lock.json"
+#: The eras a kind's ``fits`` may name: the buildings' own era catalog.
+ERA_CATALOG: Final = KINDS_DIRECTORY.parents[1] / "era.v1.json"
 LOCK_PROFILE: Final = "exulanica.thing-kind-lock/v1"
 #: The most canonical bytes a kind's ``ext`` may hold: source data kept, never read.
 EXT_BYTES_MAXIMUM: Final = 8 * 1024
@@ -125,6 +130,8 @@ _TOP: Final = frozenset(
         "ext",
     }
 )
+#: Keys a kind may state or leave out: what it fits is stated from the version that knows it.
+_OPTIONAL: Final = frozenset({"fits"})
 
 
 class ThingKindRefused(ValueError):
@@ -201,7 +208,7 @@ class ThingKind:
         kept = {
             key: value
             for key, value in self.document.items()
-            if key not in ("looks", "origin", "ext", "summary")
+            if key not in ("looks", "origin", "ext", "summary", "fits")
         }
         return {**kept, "reference": self.reference()}
 
@@ -287,7 +294,8 @@ def read_thing_kind(
     do not state (a workspace's drafted plan) names the plan's digest beside its name and is read
     with ``plan_of``, which resolves the name to the plan. Or :class:`ThingKindRefused`."""
     catalogs = catalogs or thing_catalogs()
-    document = _closed("kind", raw, _TOP)
+    stated = _TOP | (_OPTIONAL & set(raw)) if isinstance(raw, Mapping) else _TOP
+    document = _closed("kind", raw, stated)
     try:
         canonical_json(document)
     except CanonicalisationError as exc:
@@ -449,6 +457,8 @@ def read_thing_kind(
     ext = document["ext"]
     if not isinstance(ext, Mapping) or len(canonical_json(dict(ext))) > EXT_BYTES_MAXIMUM:
         raise _invalid("ext", f"is an object of at most {EXT_BYTES_MAXIMUM} canonical bytes")
+    if "fits" in document:
+        _fits(document["fits"])
     return ThingKind(
         kind=str(kind),
         version=version,
@@ -465,6 +475,32 @@ def read_thing_kind(
 
 
 _PARAMETER: Final = re.compile(r"[a-z][a-z0-9_]{0,47}")
+
+
+@functools.cache
+def _era_keys() -> frozenset[str]:
+    return frozenset(str(entry["key"]) for entry in read_json(ERA_CATALOG)["entries"])
+
+
+def _fits(value: object) -> None:
+    """The worlds a kind fits, which a placing tray orders its kinds by: ``any``, or the eras of
+    ``era.v1.json`` it belongs in, each once (none for a kind no era fits, such as a story world's
+    sword), and the reason, one line."""
+    fits = _closed("fits", value, frozenset({"eras", "reason"}))
+    eras = fits["eras"]
+    if eras != "any":
+        if not isinstance(eras, list) or any(type(era) is not str for era in eras):
+            raise _invalid("fits.eras", "is any, or a list of eras")
+        if len(set(eras)) != len(eras):
+            raise _invalid("fits.eras", "names each era once")
+        for index, era in enumerate(eras):
+            if era not in _era_keys():
+                raise _refuse(
+                    "thing_kind_reference_unknown",
+                    f"fits.eras[{index}]",
+                    f"names an era of era.v1.json: {sorted(_era_keys())}",
+                )
+    _text("fits.reason", fits["reason"], 200)
 
 
 def _move_module(where: str, entry: object) -> str:
