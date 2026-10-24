@@ -33,16 +33,22 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from exulanica.api.decision_host import HOST_REFUSALS
-from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
+from exulanica.api.decision_host import HOST_REFUSALS, ask_bound_usd
+from exulanica.api.dependencies import (
+    CurrentSession,
+    ScopedConnection,
+    get_services,
+    holds_as_guest,
+)
 from exulanica.api.runner_models import runner_model_name, runner_rows
 from exulanica.api.services import Services
 from exulanica.api.world_scope import WorldId
 from exulanica.door.outside import outside_deciders
+from exulanica.models.budget import BudgetGuard
 from exulanica.models.local_runner import checked_ms
 from exulanica.models.manifest import Manifest, load_manifest
 from exulanica.models.model_cards import model_card
-from exulanica.models.usage import usd_string
+from exulanica.models.usage import USD_QUANTUM, usd_string
 from exulanica.spending.status import SpendingRefusals
 from exulanica.world.deciders import is_played
 from exulanica.world.decision_measures import by_being, measures, nearest_rank
@@ -92,6 +98,8 @@ OUTSIDE_LATEST: Final = ("decision_seq", "base_tick", "consumed_tick", "status",
 
 
 _LOG = logging.getLogger(__name__)
+#: Prices a model's stated most for one decision (``ask_bound_usd``); it admits and holds nothing.
+_ESTIMATOR: Final = BudgetGuard(ceiling_usd=Decimal(0), max_calls=0)
 
 
 def _spending(services: Services, connection: Any, workspace: uuid.UUID) -> SpendingRefusals | None:
@@ -105,6 +113,15 @@ def _spending(services: Services, connection: Any, workspace: uuid.UUID) -> Spen
         # Never the exception's text, which may carry a connection string.
         _LOG.warning("the spending state could not be read: %s", type(exc).__qualname__)
         return None
+
+
+def spend_here_usd(spending: SpendingRefusals | None, guest: bool) -> dict[str, str] | None:
+    """What a guest has left for AI models here, by provider, as the host holds each attempt against
+    it; None on a person's own install or where the spending read gave nothing. A guest's chooser
+    sets a model whose stated most for one attempt is above it faint (U2)."""
+    if not guest or spending is None:
+        return None
+    return {provider: format(usd, "f") for provider, usd in sorted(spending.available_usd.items())}
 
 
 def _people_role() -> DecisionRole:
@@ -339,6 +356,7 @@ def offered_models(
     asked under."""
     manifest = load_manifest() if manifest is None else manifest
     contract = role.contract() if contract is None else contract
+    attempts = contract.value("answer_attempts_maximum")
     models = []
     for spec in manifest.offered_models(role.chosen):
         mechanism = contract.mechanism_for(spec)
@@ -348,6 +366,7 @@ def offered_models(
         # The check kept for a model a person's own runner holds, read only for such a model.
         checks = None if spec.served_as is None else services.local_checks
         kept = None if checks is None else checks.kept(spec.model_id)
+        most = ask_bound_usd(role, _ESTIMATOR, spec, contract)
         models.append(
             {
                 "provider": spec.provider,
@@ -372,6 +391,11 @@ def offered_models(
                 "fresh_rates_required": spec.model_id not in load_manifest().models
                 and spec.served_as is None,
                 "card": None if card is None else card.served(),
+                # The most one decision with it may cost: every attempt the contract allows, each at
+                # the role's request envelope and the model's answer bound (E1); and one attempt's,
+                # which a guest's chooser and asking again fade a model at (U2).
+                "decision_most_usd": format(most, "f"),
+                "attempt_most_usd": format((most / attempts).quantize(USD_QUANTUM), "f"),
             }
             # A model a person's own runner holds, as the runner states it: its family and size,
             # the name it serves it by now, and the licence it states, quoted and never classed.
@@ -454,6 +478,8 @@ def society_models_view(
     latest: dict[str, dict[str, Any]] = {}
     for decision in asked_models:
         latest[decision["subject_id"]] = decision
+    spending = _spending(services, connection, session.workspace_id)
+    here = spend_here_usd(spending, holds_as_guest(request))
     return {
         "profile": PROFILE,
         "society_id": str(snapshot["society_id"]),
@@ -464,10 +490,7 @@ def society_models_view(
         # by it.
         "asks_again": services.asks_again,
         "host_refusal": services.model_host_refusal(
-            session.workspace_id,
-            role,
-            snapshot["profile"],
-            spending=_spending(services, connection, session.workspace_id),
+            session.workspace_id, role, snapshot["profile"], spending=spending
         ),
         "contract": {
             **contract.binding(),
@@ -478,6 +501,9 @@ def society_models_view(
         # ``models``), being checked, or not able and why; an optional field, empty where nothing
         # is checked here.
         "runner_models": runner_rows(services, snapshot["profile"]),
+        # A guest's page only: what they have left for AI models here, by provider (U2); an
+        # optional field, absent on a person's own install.
+        **({} if here is None else {"spend_here_usd": here}),
         # Each choice with why its model is not asked here, when it is not: the page says the
         # routine decides for now, and why, rather than naming a model nobody asks.
         # Every model the read mentions carries the name Manifest.model_name gives it, the one the

@@ -113,6 +113,8 @@ export interface CharacterPageState {
     readonly waiting?: boolean; readonly fromServer?: boolean;
     /** This computer's runner's models with their checks (L1): those not offered stand faint after its last row. */
     readonly runner?: readonly RunnerModel[];
+    /** A guest's models asking which once can cost more than they have left (character-group.mjs overRows, U2). */
+    readonly over?: readonly { readonly word: string; readonly sub: string | null; readonly line: string }[];
   } | null;
   /** Whether [C] Compare is offered (frame 12a). */
   readonly canCompare: boolean;
@@ -553,7 +555,7 @@ interface RunnerFaint {
   readonly notAble: readonly { readonly word: string; readonly sub: string | null; readonly line: string }[];
 }
 
-function galleryRows(choices: readonly ModelChoice[], focus: number, waiting: boolean, fromServer: boolean, onChoose: (index: number) => void, onUse: (index: number) => void, runner: readonly RunnerModel[] = []): HTMLElement {
+function galleryRows(choices: readonly ModelChoice[], focus: number, waiting: boolean, fromServer: boolean, onChoose: (index: number) => void, onUse: (index: number) => void, runner: readonly RunnerModel[] = [], over: NonNullable<CharacterPageState['choosing']>['over'] = []): HTMLElement {
   const list = element('ul', 'wu-model-rows wu-gallery');
   list.setAttribute('role', 'listbox');
   list.setAttribute('aria-label', CHARACTER_WORDS.chooseModel);
@@ -590,6 +592,13 @@ function galleryRows(choices: readonly ModelChoice[], focus: number, waiting: bo
     if (group !== CHARACTER_WORDS.hereFree) list.append(groupLabel(CHARACTER_WORDS.hereFree));
     faintRows(faint);
   }
+  // A guest's models asking which once can cost more than they have left (U2) stand faint after the last model
+  // offered, under the server's budget label where that model is not in it, or, with none, here before Routine.
+  const lastModel = items.length - 2;
+  const dear: RunnerFaint | null = over.length
+    ? { checking: [], label: lastModel >= 0 && items[lastModel]!.group === CHARACTER_WORDS.serverBudget ? null : CHARACTER_WORDS.serverBudget, notAble: over }
+    : null;
+  if (dear && lastModel < 0) faintRows(dear);
   items.forEach((item: GalleryItem, index: number) => {
     if (item.group !== null && item.group !== group) list.append(groupLabel(item.group));
     group = item.group;
@@ -619,6 +628,7 @@ function galleryRows(choices: readonly ModelChoice[], focus: number, waiting: bo
     row.addEventListener('dblclick', () => onUse(index));
     list.append(row);
     if (faint && index === lastHere) faintRows(faint);
+    if (dear && index === lastModel) faintRows(dear);
   });
   return list;
 }
@@ -672,7 +682,7 @@ function drawSide(state: CharacterPageState, layout: Layout, width: number, act:
     const choosing = state.choosing;
     side.append(label(CHARACTER_WORDS.chooseModel), element('p', 'wu-small-text wu-model-intro', CHARACTER_WORDS.chooserIntro));
     if (!choosing.choices) side.append(element('p', 'wu-char-note', CHARACTER_WORDS.readingModels));
-    else side.append(galleryRows(choosing.choices, choosing.focus, choosing.waiting === true, choosing.fromServer === true, (index) => act('choose', index), (index) => act('use', index), choosing.runner));
+    else side.append(galleryRows(choosing.choices, choosing.focus, choosing.waiting === true, choosing.fromServer === true, (index) => act('choose', index), (index) => act('use', index), choosing.runner, choosing.over));
     if (choosing.refusal) side.append(refusalLine(choosing.refusal));
     return side;
   }

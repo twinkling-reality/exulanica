@@ -1085,6 +1085,18 @@ read, both the POST and the offer answer 409 `asking_again_off`, and the society
 optional `asks_again` is false, so the page offers no Compare; absent, a read answers as one that
 asks.
 
+Each model the society models read offers carries the most one decision with it can cost
+(`decision_most_usd`): every attempt the contract allows, each at the role's request envelope and
+the model's answer bound (`ask_bound_usd`, the need the process budget and an ask-again bound are
+held to); and the most one of those attempts can cost
+(`attempt_most_usd`, the first over the contract's attempts). On a guest's session the read also
+states what the guest has left for AI models here, by provider (`spend_here_usd`, the spending
+read's remainder). A guest's chooser shows a model whose `attempt_most_usd` is above it faint and
+not choosable, with both figures. The host holds each attempt against the guest's remainder at the
+estimate of the request it builds, so a later attempt of a decision can still be refused for money.
+A person's own install, whose read states no `spend_here_usd`, offers every model as before. Each
+field is optional: an older server states none of them.
+
 ## Model discovery and admission preflight
 
 `GET /models`, with `world.read`, serves `exulanica.model-discovery/v1`: models ordered by

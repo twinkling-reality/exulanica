@@ -2,7 +2,7 @@
 // BUILD-SHEETS-CHARACTER-TALKING-BUILDING.md section 1): what it says, from the reads the page holds, and where
 // it stands. Pure: the reads come in as data and the words from character-words.mjs; character-group.ts draws
 // the answer. verify-character-group.mjs holds it.
-import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, cardWords, checkingLine, decidesPrint, keyGroup, makerLine, modelsDecide, modelsNamed, noModelRunning, notAbleFold, notAbleLine, providerName, quoted, readingRecord, reasonsOn, routineRow, rowPrice, runnerCalls, runnerOpen, saidUnder, stopsAfter } from './character-words.mjs';
+import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, cardWords, checkingLine, decidesPrint, keyGroup, makerLine, modelsDecide, modelsNamed, noModelRunning, notAbleFold, notAbleLine, overLine, providerName, quoted, readingRecord, reasonsOn, routineRow, rowPrice, runnerCalls, runnerOpen, saidUnder, stopsAfter } from './character-words.mjs';
 import { RUN_WORDS, atMost, runFor, runRefusalWords } from './run-words.mjs';
 import { dayWord } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -215,13 +215,39 @@ const PRICE_ORDER = [model => Number(model?.price?.input ?? Infinity), model => 
  * model refused here (a server on this computer the install does not reach, a provider it holds no key for)
  * is never offered, "On this computer · Free" least of all. Both choosers, their number keys too, take this list,
  * in the gallery's order (A3): what this computer runs first, then the rest by price, lowest first, the served
- * order breaking a tie.
+ * order breaking a tie. On a guest's page a model asking which once can cost more than they have left is not
+ * among them: it stands faint (overRows, U2).
  */
 export function choosableModels(read) {
+  return offeredHere(read).filter(model => !overBudget(model, read));
+}
+
+/** Every model the read offers here in the gallery's order, a guest's faint ones among them (U2). */
+function offeredHere(read) {
   const offered = (read?.models ?? []).filter(model => !model.refusal).map((model, at) => ({ model, at }));
   const order = (one, other) => Number(one.model.local !== true) - Number(other.model.local !== true)
     || PRICE_ORDER.reduce((found, price) => found || price(one.model) - price(other.model), 0) || one.at - other.at;
   return offered.sort(order).map(({ model }) => model);
+}
+
+/**
+ * Where the page is a guest's, whose read says what they have left for AI models here by provider (U2): whether one
+ * attempt of a decision with `model` can cost more than that (ROOT 12:20, the nearest knowable to an ask that would be
+ * refused). On a person's own install the read says nothing, and no model is.
+ */
+export function overBudget(model, read) {
+  const left = read?.spendHereUsd?.[model.provider];
+  return left !== undefined && model.attemptMostUsd !== undefined && Number(model.attemptMostUsd) > Number(left);
+}
+
+/**
+ * A guest's faint rows (U2, DESIGN 11:29 and 12:20): each model asking which once can cost more than they have
+ * left here, in the gallery's order, by its name and maker with why in a line; no number and no focus.
+ */
+export function overRows(read) {
+  return offeredHere(read).filter(model => overBudget(model, read)).map(model => Object.freeze({
+    word: model.name, sub: makerLine(model), line: overLine(model.attemptMostUsd, read.spendHereUsd[model.provider]),
+  }));
 }
 
 /** The code a model on this computer is refused by while no server runs there (PROJECT's A2 liveness read). */
@@ -301,14 +327,15 @@ export function freeHere(read, chosen) {
   return chosen.length > 0 && chosen.every(model => model && local.has(`${model.provider}/${model.modelId}`));
 }
 
-/** Whether [M] is offered (F5): the models read takes choices and offers a model this install can ask. */
+/** Whether [M] is offered (F5): the models read takes choices and offers a model this install can ask, a guest's
+ * faint ones too (U2), so the list shows why they cannot be chosen. */
 export function offersModels(read) {
-  return Boolean(read?.takesModelChoices) && choosableModels(read).length > 0;
+  return Boolean(read?.takesModelChoices) && offeredHere(read).length > 0;
 }
 
-/** An open chooser while the models read offers a model to choose (F5): with none, it closes. */
+/** An open chooser while the models read offers a model to choose or a guest's faint one (F5, U2): with none, it closes. */
 export function openWhileOffered(choosing, read) {
-  return choosableModels(read).length ? choosing : null;
+  return offeredHere(read).length ? choosing : null;
 }
 
 /**
@@ -326,12 +353,17 @@ export function openWhileOffered(choosing, read) {
  * `label` the group's where the row starts one in the window, `open` the maker's words on the focused row, `runner`
  * the faint rows after this computer's last row.
  */
-export function modelGroup({ who, models = [], current = null, focus = 0, refusal = null, busy = false, waiting = false, fromServer = false, runner = [] }) {
+export function modelGroup({ who, models = [], current = null, focus = 0, refusal = null, busy = false, waiting = false, fromServer = false, runner = [], over = [] }) {
   const items = galleryItems(models, fromServer, runner);
   // A runner's models not offered (L1) stand faint after this computer's last choosable row, or, with none, under the
   // group's label at the top; those not able fold into one line here.
   const faint = runnerRows(runner, models, who);
   const lastHere = items.reduce((found, item, index) => (item.group === CHARACTER_WORDS.hereFree ? index : found), -1);
+  // A guest's models asking which once can cost more than they have left (U2, overRows) stand faint after the
+  // last model offered, under the server's budget label where that model is not in it, or, with none, first.
+  const lastModel = items.length - 2;
+  const dearLabel = lastModel >= 0 && items[lastModel].group === CHARACTER_WORDS.serverBudget ? null : CHARACTER_WORDS.serverBudget;
+  const dear = over.length ? Object.freeze({ checking: Object.freeze([]), label: dearLabel, notAble: Object.freeze([...over]) }) : null;
   const at = Math.max(0, Math.min(items.length - 1, Number.isSafeInteger(focus) ? focus : 0));
   // Routine stands below the models whatever the window (DESIGN 11:58): the window moves over the models alone.
   const routine = items.length - 1, room = MODEL_ROWS - 1;
@@ -343,6 +375,7 @@ export function modelGroup({ who, models = [], current = null, focus = 0, refusa
     label: item.group !== null && (offset === 0 || shown[offset - 1].item.group !== item.group) ? item.group : null,
     open: index === at ? item.open : null,
     runner: index === lastHere ? faint : null,
+    over: index === lastModel ? dear : null,
   }));
   return Object.freeze({
     name: who.title,
@@ -353,6 +386,7 @@ export function modelGroup({ who, models = [], current = null, focus = 0, refusa
     list: Object.freeze({
       waiting: waiting && first === 0 ? Object.freeze({ label: CHARACTER_WORDS.hereFree, line: CHARACTER_WORDS.noneRunning }) : null,
       runner: faint && lastHere < 0 && first === 0 ? Object.freeze({ ...faint, group: CHARACTER_WORDS.hereFree }) : null,
+      over: dear && lastModel < 0 && first === 0 ? dear : null,
       first, rows: Object.freeze(rows), busy,
       // More models past the window's foot: its foot fades, as the told column's does.
       more: first + room < routine,
@@ -377,16 +411,17 @@ const MOVING_KEYS = Object.freeze(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 
  * Choosing a model in the group (r07): the list's state for the chosen character and its keys. M opens it on their
  * current model, or where Routine is theirs on the first model, opened with its maker's words (focus never chooses);
  * the arrows move; a number (on the window
- * modelGroup shows) or Enter gives that model; Esc closes it unchanged, and it closes when none is left to choose.
+ * modelGroup shows) or Enter gives that model; Esc closes it unchanged, and it closes when `offered()` says none is
+ * left (by default when none is left to choose; a guest's page keeps it while faint ones show, U2).
  * `models()` is the models a person may choose here (choosableModels), `currentOf(row)` the character's model; `write(row, selected, key)` makes the page's own write (selected null for
  * Routine) and answers the models read it verified, or throws the refusal; `refusal(error, row)` words a refusal;
  * `onUsed(verified)` runs after a write. A write keeps its idempotency key until it is refused.
  */
-export function modelPicker({ models, currentOf, write, refusal, onUsed = (verified) => verified, newKey = () => crypto.randomUUID() }) {
+export function modelPicker({ models, currentOf, write, refusal, onUsed = (verified) => verified, newKey = () => crypto.randomUUID(), offered = () => models().length > 0 }) {
   let picking = null;
   const picker = {
     of(row) {
-      if (!models().length) picking = null;
+      if (!offered()) picking = null;
       return picking !== null && picking.row === row ? picking : null;
     },
     open(row) {

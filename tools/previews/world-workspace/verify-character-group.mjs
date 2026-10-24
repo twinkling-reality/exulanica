@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runnerRows } from './character-group.mjs';
-import { GROUP_LAYOUT, MODEL_ROWS, SAID_READ, choosableModels, offersModels, openWhileOffered, deciderOf, freeHere, groupContent, groupHeld, groupPlace, keepLastSaid, lastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, questionGroup, readLastSaid } from './character-group.mjs';
-import { GROUP_WORDS, called, decidesPrint, modelsDecide, noModelRunning, quoted, saidUnder, stopsAfter } from './character-words.mjs';
+import { GROUP_LAYOUT, MODEL_ROWS, SAID_READ, choosableModels, offersModels, openWhileOffered, deciderOf, freeHere, groupContent, groupHeld, groupPlace, keepLastSaid, lastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, overRows, questionGroup, readLastSaid } from './character-group.mjs';
+import { CHARACTER_WORDS, GROUP_WORDS, called, decidesPrint, modelsDecide, noModelRunning, quoted, saidUnder, stopsAfter } from './character-words.mjs';
 import { dayWord } from './talk-words.mjs';
 
 // A chosen character's group (DESIGN's J30, the r05 picture): what it says and where it stands.
@@ -470,5 +470,43 @@ const read = { models: [{ provider: 'ollama_local', modelId: 'm', local: true },
 assert.equal(freeHere(read, [{ provider: 'ollama_local', modelId: 'm' }]), true);
 assert.equal(freeHere(read, [{ provider: 'ollama_local', modelId: 'm' }, { provider: 'nebius', modelId: 'n' }]), false, 'one hosted model costs');
 assert.equal(freeHere(read, []), false);
+
+{
+  // A guest's chooser (U2, DESIGN 11:29 and 12:20, ROOT 12:20): a model asking which once can cost more than they have
+  // left for AI models here stands faint with why, never numbered or chosen; on a person's own install every model stays.
+  const most = { 'qwen/235b': '0.04300000', 'nvidia/nano': '0.00270000', 'qwen/4b': '0' };
+  const dear = served.map(model => ({ ...model, attemptMostUsd: most[model.modelId] }));
+  const guest = { takesModelChoices: true, models: dear, spendHereUsd: { nebius: '0.03000000' } };
+  assert.deepEqual(choosableModels(guest).map(model => model.name), ['Qwen3 4B Instruct', 'Nemotron 3 Nano 30B']);
+  assert.deepEqual(overRows(guest), [{ word: 'Qwen3 235B Instruct', sub: 'Qwen · 235B',
+    line: 'Asking it once can cost up to $0.043, more than the $0.03 left for AI models here.' }]);
+  const owner = { takesModelChoices: true, models: dear };
+  assert.equal(choosableModels(owner).length, 3, "a person's own install: every model stays choosable");
+  assert.deepEqual(overRows(owner), []);
+  // Faint after the last model offered, in its group; never a numbered row.
+  const shown = modelGroup({ who: teo, models: choosableModels(guest), fromServer: true, over: overRows(guest) });
+  assert.equal(shown.list.rows.at(-2).word, 'Nemotron 3 Nano 30B');
+  assert.deepEqual(shown.list.rows.at(-2).over.notAble.map(row => row.word), ['Qwen3 235B Instruct']);
+  assert.equal(shown.list.rows.at(-2).over.label, null, 'in the group of the last model offered');
+  assert.equal(shown.list.rows.filter(row => row.over).length, 1);
+  assert.equal(shown.list.rows.some(row => row.word === 'Qwen3 235B Instruct'), false);
+  // With only this computer's model left to choose, under the server's budget label; with none, first.
+  const poorer = { ...guest, spendHereUsd: { nebius: '0.00100000' } };
+  const onlyHere = modelGroup({ who: teo, models: choosableModels(poorer), fromServer: true, over: overRows(poorer) });
+  assert.equal(onlyHere.list.rows.at(-2).over.label, CHARACTER_WORDS.serverBudget);
+  const noneHere = { ...poorer, models: dear.filter(model => !model.local) };
+  assert.deepEqual(choosableModels(noneHere), []);
+  assert.equal(offersModels(noneHere), true, '[M] still shows, so the list can say why');
+  assert.notEqual(openWhileOffered({ focus: 0 }, noneHere), null);
+  const first = modelGroup({ who: teo, models: [], fromServer: true, over: overRows(noneHere) });
+  assert.equal(first.list.over.label, CHARACTER_WORDS.serverBudget);
+  assert.equal(first.list.over.notAble.length, 2);
+  // The picker stays open on Routine, the one row left to choose, while faint ones show.
+  const picker = modelPicker({ models: () => choosableModels(noneHere), offered: () => offersModels(noneHere),
+    currentOf: () => null, write: async () => 'verified', refusal: () => '' });
+  const row = { key: 'teo' };
+  picker.open(row);
+  assert.equal(picker.of(row)?.focus, 0, 'Routine');
+}
 
 export default true;

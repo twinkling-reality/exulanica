@@ -136,6 +136,21 @@ describe('reading who decides', () => {
     expect(() => parseSocietyModels(read({ latest: [{ ...read().latest[0], name: undefined }] }))).toThrow();
   });
 
+  it("reads the most one decision and one attempt with each model may cost, and on a guest's read what they have left (U2)", () => {
+    const view = parseSocietyModels(read({
+      models: [{ ...read().models[0]!, decision_most_usd: '0.08600000', attempt_most_usd: '0.04300000' }],
+      spend_here_usd: { nebius_token_factory: '0.03000000' },
+    }));
+    expect(view.models[0]!.decisionMostUsd).toBe('0.08600000');
+    expect(view.models[0]!.attemptMostUsd).toBe('0.04300000');
+    expect(view.spendHereUsd).toEqual({ nebius_token_factory: '0.03000000' });
+    // A person's own install, or an older server, says neither.
+    expect(parseSocietyModels(read()).models[0]).not.toHaveProperty('decisionMostUsd');
+    expect(parseSocietyModels(read()).spendHereUsd).toBeUndefined();
+    expect(() => parseSocietyModels(read({ spend_here_usd: { nebius_token_factory: 'a lot' } }))).toThrow();
+    expect(() => parseSocietyModels(read({ models: [{ ...read().models[0]!, decision_most_usd: -1 }] }))).toThrow();
+  });
+
   it('reads which models run on this computer, and none from a server that does not say', () => {
     const laptop = { ...read().models[0]!, provider: 'ollama', model_id: 'qwen3:4b', name: 'Qwen3 4B Instruct', usd_per_mtok: { input: '0', output: '0' }, on_this_computer: true };
     const view = parseSocietyModels(read({ models: [{ ...read().models[0]!, on_this_computer: false }, laptop] }));

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { checkingLine, notAbleFold, notAbleLine, reasonsOn, runnerCalls, runnerOpen } from './character-words.mjs';
+import { checkingLine, notAbleFold, notAbleLine, overLine, reasonsOn, runnerCalls, runnerOpen } from './character-words.mjs';
 import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, askWho, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineBetween, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
@@ -157,4 +157,7 @@ assert.equal(runnerOpen({ runner: { licence: null, checkedMs: null } }), null, '
 assert.equal(notAbleFold(4), 'And 4 more on this computer that cannot decide for a person here.');
 assert.equal(reasonsOn(called({ name: 'Cyra Moss' })), "Their reasons are on Cyra Moss's day page.");
 assert.equal(reasonsOn(called({ name: null, kind: 'Resident' })), "Their reasons are on the resident's day page.");
+// A guest's faint row (U2, DESIGN 12:20): one attempt's most and what is left, each to the figure that tells them apart.
+assert.equal(overLine('0.04300000', '0.03000000'), 'Asking it once can cost up to $0.043, more than the $0.03 left for AI models here.');
+assert.equal(overLine('0.01290000', '0.01250000'), 'Asking it once can cost up to $0.0129, more than the $0.0125 left for AI models here.');
 console.log('Character words checks passed: names and kinds, the chosen line, the page lines, money and the model list.');

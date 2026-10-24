@@ -23,6 +23,8 @@ export interface ModelRow {
   readonly current: boolean; readonly on: boolean; readonly label: string | null; readonly open: { readonly said: string; readonly from: string | null } | null;
   /** After this computer's last choosable row: its runner's models not offered (character-group.mjs runnerRows). */
   readonly runner?: RunnerRows | null;
+  /** After the last model offered: a guest's models one decision with which costs more than they have left (U2). */
+  readonly over?: RunnerRows | null;
 }
 
 /** A runner's models not offered (L1): faint, with no number and no focus; `group` where they stand under its label. */
@@ -40,6 +42,8 @@ export interface ModelList {
   readonly waiting: { readonly label: string; readonly line: string } | null;
   /** This computer's runner's models not offered, under its label at the top, where it offers none (L1). */
   readonly runner?: RunnerRows | null;
+  /** A guest's models one decision with which costs more than they have left, first where no model is offered (U2). */
+  readonly over?: RunnerRows | null;
   readonly first: number;
   /** The rows: the window's models, then Routine, which stands below them whatever the window. */
   readonly rows: readonly ModelRow[];
@@ -201,6 +205,7 @@ function modelList(list: ModelList, onAction: (action: string) => void): HTMLEle
   rows.setAttribute('role', 'listbox');
   if (list.waiting) rows.append(text('p', 'cg-group-label', list.waiting.label), text('p', 'cg-waiting', list.waiting.line));
   if (list.runner) rows.append(...runnerRows(list.runner));
+  if (list.over) rows.append(...runnerRows(list.over));
   // The window's models scroll inside the list, faded at their foot while more lie past it; Routine stands below.
   const models = document.createElement('div');
   models.className = list.more ? 'cg-window cg-more' : 'cg-window';
@@ -232,6 +237,7 @@ function modelList(list: ModelList, onAction: (action: string) => void): HTMLEle
       into.append(open);
     }
     if (row.runner) into.append(...runnerRows(row.runner));
+    if (row.over) into.append(...runnerRows(row.over));
   }
   const keys = document.createElement('p');
   keys.className = 'cg-keys';

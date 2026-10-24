@@ -474,6 +474,19 @@ describe("Teo's day keys", () => {
     expect(all(root, '.wu-gallery-waiting')).toEqual(['None is running yet. Start one with a local model runner, and it shows here, free.']);
     expect([...root.querySelectorAll('.wu-model-row')].map((row) => row.querySelector('.wu-key')?.textContent)).toEqual(['1', '2']);
   });
+
+  it("stands a guest's model asking which once can cost more than they have left faint after the last model, with why and no key (U2)", async () => {
+    const { root, page } = await open();
+    const nemotron = { provider: 'nebius', providerDescription: 'Nebius Token Factory.', modelId: 'nvidia/nemotron', name: NEMOTRON, price: { input: '0.06', output: '0.24' }, card: null };
+    const line = 'Asking it once can cost up to $0.043, more than the $0.03 left for AI models here.';
+    const over = [{ word: 'Nemotron 3 Ultra 550B', sub: 'NVIDIA · 550B', line }];
+    page.draw(teoState({ choosing: { choices: [{ model: nemotron, current: false }, { model: null, current: true }], focus: 0, refusal: null, busy: false, fromServer: true, over } }));
+    expect(all(root, '.wu-gallery-waiting')).toEqual([`Nemotron 3 Ultra 550BNVIDIA · 550B${line}`]);
+    // In the group of the last model offered, under no label of its own; only the models offered and Routine have keys.
+    expect(all(root, '.wu-gallery-label')).toEqual(["From this server's budget, per million tokens"]);
+    expect([...root.querySelectorAll('.wu-model-row')].map((row) => row.querySelector('.wu-key')?.textContent)).toEqual(['1', '2']);
+    expect(root.querySelector('.wu-gallery-waiting')!.closest('button')).toBeNull();
+  });
 });
 
 describe("a person's runner's models (L1)", () => {

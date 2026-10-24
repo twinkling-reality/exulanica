@@ -50,6 +50,7 @@ from exulanica.models.manifest import MANIFEST_PATH, load_manifest, parse_manife
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.inhabitant_words import inhabitant_words_catalog
 from exulanica.selection.society_scene import EVENT_LINES
+from exulanica.spending.status import SpendingRefusals
 from exulanica.world.decision_roles import DecisionRole, load_decision_roles
 from exulanica.world.society import SocietyBytesNotRead, UnavailableSocietyInput
 from exulanica.world.society_controls import LEASE_SECONDS, MAX_CATCHUP_TICKS, ControlClaim
@@ -783,12 +784,35 @@ def test_only_a_caller_who_may_ask_models_changes_whose_model_runs_a_person(app,
     assert [(c["subject_id"], c["model"]) for c in after["choices"]] == [(p, named) for p in people]
     offered = {entry["model_id"]: entry for entry in after["models"]}
     assert offered[model_id]["mechanism"] == "tool_call"
+    # The most one decision with it may cost, the figure admission holds an ask at (E1), so a
+    # guest's chooser can say it before anyone asks (U2); a caller with a token is no guest.
+    role = person_role()
+    asked = role.contract(role.terms(snapshot["profile"]).versions)
+    estimator = BudgetGuard(ceiling_usd=Decimal(0), max_calls=0)
+    most = ask_bound_usd(role, estimator, manifest.spec(model_id), asked)
+    assert Decimal(offered[model_id]["decision_most_usd"]) == most > 0
+    attempts = asked.value("answer_attempts_maximum")
+    assert Decimal(offered[model_id]["attempt_most_usd"]) * attempts == most
+    assert "spend_here_usd" not in after
     # This process has no model client, so it says so for the host and for every provider.
     assert after["host_refusal"] == "provider_credential_absent"
     assert offered[model_id]["refusal"] == "provider_credential_absent"
     callers = _callers(client, world, listed=False)
     unlisted = client.get(society + "/models", headers=callers["owner"][0], params=scope).json()
     assert unlisted["host_refusal"] == "models_not_run_here"
+
+
+def test_a_guest_is_told_what_is_left_for_ai_models_here_and_an_owner_is_not():
+    # U2: by provider, as the host holds each ask against it; nothing where the read gave nothing.
+    spending = SpendingRefusals(
+        by_provider={"nebius_token_factory": None},
+        available_usd={"nebius_token_factory": Decimal("0.03000000")},
+    )
+    assert society_models.spend_here_usd(spending, guest=True) == {
+        "nebius_token_factory": "0.03000000"
+    }
+    assert society_models.spend_here_usd(spending, guest=False) is None
+    assert society_models.spend_here_usd(None, guest=True) is None
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)

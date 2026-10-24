@@ -45,6 +45,10 @@ export interface SocietyModel extends NamedModelRef {
   readonly card?: ModelCard | null;
   /** For a model a person's own runner holds, what the runner states of it; absent for every other model. */
   readonly runner?: RunnerDetails | null;
+  /** The most one decision with it may cost, in US dollars as a decimal string (E1); absent from an older server. */
+  readonly decisionMostUsd?: string;
+  /** The most one attempt of a decision with it may cost, which a guest's chooser fades it at (U2); absent from an older server. */
+  readonly attemptMostUsd?: string;
 }
 
 /**
@@ -315,6 +319,11 @@ export interface SocietyModels {
   readonly byBeing?: readonly BeingDecisionMeasures[];
   /** Every model a person's own runner serves beside the manifest's, with its check's state; absent from an older server. */
   readonly runnerModels?: readonly RunnerModel[];
+  /**
+   * On a guest's page only: what they have left for AI models here, by provider, in US dollars as decimal strings
+   * (U2); absent on a person's own install and from an older server.
+   */
+  readonly spendHereUsd?: Readonly<Record<string, string>>;
 }
 
 const invalid = (): never => { throw new Error('Invalid society models response'); };
@@ -502,6 +511,8 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         local: held['on_this_computer'] === true,
         card: held['card'] === undefined ? null : maybe(held['card'], modelCard),
         ...(held['runner'] === undefined ? {} : { runner: maybe(held['runner'], runnerDetails) }),
+        ...(held['decision_most_usd'] === undefined ? {} : { decisionMostUsd: amount(held['decision_most_usd']) }),
+        ...(held['attempt_most_usd'] === undefined ? {} : { attemptMostUsd: amount(held['attempt_most_usd']) }),
       };
     }),
     choices: list(row['choices']).map((entry) => {
@@ -576,6 +587,9 @@ export function parseSocietyModels(value: unknown): SocietyModels {
     }),
     // Added to the profile as an optional field: absent from an older server.
     ...(row['runner_models'] === undefined ? {} : { runnerModels: list(row['runner_models']).map(runnerModel) }),
+    ...(row['spend_here_usd'] === undefined ? {} : {
+      spendHereUsd: Object.freeze(Object.fromEntries(Object.entries(object(row['spend_here_usd'])).map(([provider, usd]) => [provider, amount(usd)]))),
+    }),
   });
 }
 

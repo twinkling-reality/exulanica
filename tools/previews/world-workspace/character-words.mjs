@@ -199,6 +199,13 @@ export const reasonsOn = who => `Their reasons are on ${possessive(who.within)} 
 /** A runner's model being checked (L1): "Llama · 1.2B · Checking that it can decide for a person here…". */
 export const checkingLine = model => `${model.name} · ${CHARACTER_WORDS.checking}`;
 
+/** A dollar figure to the cent's tenth and hundredth where it has them ("$0.086", "$0.03"), so a decision's most and
+ * what is left never read alike in one line (U2). */
+export const finer = usd => `$${Number(usd).toFixed(4).replace(/\.?0+$/u, '')}`;
+
+/** A guest's faint row (U2, DESIGN 12:20): asking it once can cost more than they have left for AI models here. */
+export const overLine = (most, left) => `Asking it once can cost up to ${finer(most)}, more than the ${finer(left)} left for AI models here.`;
+
 /** Why a runner's model is not able to decide for a person here (L1), in one line from its check. */
 export function notAbleLine(model) {
   if (model?.reason === 'context') return `It reads at most ${Number(model.contextTokens).toLocaleString('en-US')} tokens at once, less than a person is told here.`;
