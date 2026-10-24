@@ -59,6 +59,7 @@ function diagnostics(file: string, text: string): string[] {
 const EXPECTED = [
   /^TS(2307|2792): Cannot find module '\/@fs\/.*\/(contextual-world|front-door|front-door-preview|world-opening|create-world|world-creature)\.ts'/u,
   /^TS(2307|2792): Cannot find module '\.\/composition\/town-land\.js'/u,
+  /^TS(2307|2792): Cannot find module '\/@fs\/.*\/opening-steps\.mjs'/u,
 ];
 function introduced(file: string, before: string, after: string): string[] {
   const left = new Map<string, number>();
@@ -188,6 +189,17 @@ describe('the world workspace preview\'s edits to this app', () => {
     expect(opened.slice(reloads, taken)).toContain('candidate.entryId === again.entryId ? again : candidate');
     expect(opened.slice(taken, mounts)).toMatch(/^reviewEntry = again;\n\s*\}\n\s*if \(reviewEntry\) \{ await openWorldEntryContext\(state, reviewEntry\);/u);
     expect(opened.slice(taken, mounts)).not.toContain('location.reload');
+    // The opening names the bake (C3): its share is shown before the first wait and after each read, from the
+    // tiles the entry serves, and the bake's own report ends it before the fresh entry opens.
+    const first = waiting.indexOf('bakeShown(reviewEntry);');
+    expect(first).toBeGreaterThan(-1);
+    expect(first).toBeLessThan(waiting.indexOf('await new Promise((done) => setTimeout(done'));
+    expect(waiting).toContain('detail: { baking: bakeShare(entry.generatedGround?.tiles) }');
+    expect(waiting.indexOf('if (again) bakeShown(again);')).toBeGreaterThan(waiting.indexOf('await state.worldEntries?.entry(reviewEntry.entryId)'));
+    const made = opened.indexOf("detail: { report: 'land-made' }");
+    expect(made).toBeGreaterThan(reloads);
+    expect(made).toBeLessThan(taken);
+    expect(patched).toContain(`import { bakeShare } from '/@fs/${here}/opening-steps.mjs';`);
     // Its land is asked for before the first wait, and nothing waits on the ask.
     const asks = waiting.indexOf("void import('./composition/town-land.js').then((land) => land.askForTownLand(asking, reviewEntry)");
     expect(asks).toBeGreaterThan(-1);

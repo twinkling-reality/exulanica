@@ -4,7 +4,7 @@
 // it against the real sources, so a change to one of these lines fails a test instead of the
 // preview's start-up.
 
-import { OPENING_EVENT, OPENING_STAGES } from './opening-steps.mjs';
+import { BAKING_STAGE, OPENING_EVENT, OPENING_STAGES } from './opening-steps.mjs';
 
 const MAIN = 'web/packages/app/src/main.ts';
 const SELECTION = 'web/packages/app/src/composition/environment-selection.ts';
@@ -94,6 +94,7 @@ import { mountFrontDoor, frontDoorPicture, openFromFrontDoor } from '/@fs/${here
 import { mountScenePreview, scenePreviewPage } from '/@fs/${here}/front-door-preview.ts';
 import { mountCreateWorld } from '/@fs/${here}/create-world.ts';
 import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
+import { bakeShare } from '/@fs/${here}/opening-steps.mjs';
 ` + code
     .replace(seam('start() deep link'), `    const reviewEntryId = new URLSearchParams(location.search).get('entry');
     if (reviewEntryId) {
@@ -107,11 +108,15 @@ import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
         // Its land is asked for now, so the server makes it beside the bakes; nothing waits on it.
         const asking = state.credentials;
         if (asking) void import('./composition/town-land.js').then((land) => land.askForTownLand(asking, reviewEntry), () => {});
+        // The opening names the bake, and its line moves as the bake's tiles, or their steps, finish.
+        const bakeShown = (entry) => window.dispatchEvent(new CustomEvent('${OPENING_EVENT}', { detail: { baking: bakeShare(entry.generatedGround?.tiles) } }));
+        bakeShown(reviewEntry);
         // Read again every ${BAKE_POLL_MS} ms for up to ${BAKE_READS} reads.
         let again = null;
         for (let read = 0, baking = true; baking && read < ${BAKE_READS}; read += 1) {
           await new Promise((done) => setTimeout(done, ${BAKE_POLL_MS}));
           again = await state.worldEntries?.entry(reviewEntry.entryId).catch(() => null) ?? null;
+          if (again) bakeShown(again);
           baking = again?.generatedGround?.tiles.some((tile) => tile.state === 'baking') ?? true;
         }
         // A tile that failed, or one still baking after every read, opens the page again, which says so.
@@ -121,6 +126,7 @@ import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
         }
         // Baked: the fresh entry opens below, as a baked town opens from its address, with no second page load and
         // its land's ask kept.
+        window.dispatchEvent(new CustomEvent('${OPENING_EVENT}', { detail: { report: '${BAKING_STAGE.report}' } }));
         state.savedWorldEntries = Object.freeze(state.savedWorldEntries.map((candidate) => candidate.entryId === again.entryId ? again : candidate));
         reviewEntry = again;
       }

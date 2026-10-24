@@ -2,7 +2,7 @@
 // the world's picture full screen, "Opening", its name, a line that moves only when the loader
 // reports a real stage (seams.mjs dispatches the reports), the stage's words, and one tip. It ends
 // when the world view mounts (contextual-world.ts) or the front door shows instead (front-door.ts).
-import { OPENING_EVENT, OPENING_HANDOFF_KEY, openingProgress, readHandoff } from './opening-steps.mjs';
+import { BAKING_STAGE, OPENING_EVENT, OPENING_HANDOFF_KEY, OPENING_STAGES, openingProgress, readHandoff } from './opening-steps.mjs';
 import { isScenePreview } from './front-door-routes.mjs';
 import { OPENING_WORDS } from './world-words.mjs';
 import { keyWord, mountUiScale, promptRow } from './world-ui.ts';
@@ -54,16 +54,26 @@ export function mountOpening(): void {
   document.body.append(root);
   mountUiScale(root, lifetime.signal);
   const reports: string[] = [];
+  // A town still baking opens with its bake (C3): the stage is added at its first share, the share
+  // never moves back, and it ends with the bake's report.
+  let stages: readonly { readonly report: string; readonly words: string }[] = OPENING_STAGES, share = 0;
   const draw = (): void => {
-    const now = openingProgress(reports);
+    const now = openingProgress(reports, stages, share);
     fill.style.width = `${(now.fraction * 100).toFixed(1)}%`;
     end.style.left = `${(now.fraction * 100).toFixed(1)}%`;
     step.textContent = now.words ?? '';
   };
   window.addEventListener(OPENING_EVENT, (event) => {
-    const detail = (event as CustomEvent<{ readonly report: string; readonly title?: string }>).detail;
-    if (!detail || typeof detail.report !== 'string') return;
-    reports.push(detail.report);
+    const detail = (event as CustomEvent<{ readonly report?: string; readonly title?: string; readonly baking?: number }>).detail;
+    if (!detail) return;
+    if (typeof detail.baking === 'number') {
+      if (reports.includes(BAKING_STAGE.report)) return;
+      if (stages === OPENING_STAGES) stages = [BAKING_STAGE, ...OPENING_STAGES];
+      share = Math.max(share, detail.baking);
+    } else if (typeof detail.report === 'string') {
+      reports.push(detail.report);
+      if (detail.report === BAKING_STAGE.report) share = 0;
+    } else return;
     if (!name.textContent && typeof detail.title === 'string') name.textContent = detail.title;
     draw();
   }, { signal: lifetime.signal });

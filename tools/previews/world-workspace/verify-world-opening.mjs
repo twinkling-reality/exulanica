@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { OPENING_EVENT, OPENING_STAGES, openingProgress, populationLine, readHandoff, speedBars } from './opening-steps.mjs';
+import { BAKING_STAGE, OPENING_EVENT, OPENING_STAGES, bakeShare, openingProgress, populationLine, readHandoff, speedBars } from './opening-steps.mjs';
 import { OPENING_WORDS } from './world-words.mjs';
 import { SEAMS, patchSource } from './seams.mjs';
 
@@ -11,6 +11,21 @@ assert.deepEqual(openingProgress(['world-read']), { fraction: 1 / 3, words: 'Dra
 assert.deepEqual(openingProgress(['land-drawn']), { fraction: 0, words: 'Reading the world', done: false });
 assert.deepEqual(openingProgress(['world-read', 'land-drawn', 'people-in']), { fraction: 1, words: null, done: true });
 assert.deepEqual(openingProgress(['world-read', 'nothing']), openingProgress(['world-read']));
+// A town still baking opens with its bake (C3): the line moves within that stage by the share the
+// entry's tiles give, and the loader's own stages follow it.
+const baking = [BAKING_STAGE, ...OPENING_STAGES];
+assert.deepEqual(openingProgress([], baking, 0.5), { fraction: 0.5 / 4, words: 'Making the land', done: false });
+assert.deepEqual(openingProgress(['land-made'], baking), { fraction: 1 / 4, words: 'Reading the world', done: false });
+assert.equal(openingProgress([], baking, 7).fraction, 1 / 4);
+assert.equal(openingProgress([], baking, Number.NaN).fraction, 0);
+// Only facts the entry serves move it: a baked tile counts whole, a baking tile the steps it states.
+assert.equal(bakeShare([{ state: 'baking' }, { state: 'baking' }]), 0);
+assert.equal(bakeShare([{ state: 'baked' }, { state: 'baking' }]), 0.5);
+assert.equal(bakeShare([{ state: 'baking', stepsDone: 1, steps: 4 }, { state: 'baking', stepsDone: 3, steps: 4 }]), 0.5);
+assert.equal(bakeShare([{ state: 'baking', stepsDone: 9, steps: 4 }, { state: 'failed' }]), 0.5);
+assert.equal(bakeShare([{ state: 'baking', stepsDone: 2 }]), 0);
+assert.equal(bakeShare([]), 0);
+assert.equal(bakeShare(undefined), 0);
 
 // Every stage the opening shows is reported by a seam of the served app, once, with the event the
 // opening listens for: no stage is shown that the loader does not report.
@@ -19,10 +34,12 @@ const served = patchSource('web/packages/app/src/main.ts', main, '/here');
 // The opening starts from the first script: bootstrap.ts loads it beside the app.
 const boot = patchSource('web/packages/app/src/bootstrap.ts', readFileSync(new URL('../../../web/packages/app/src/bootstrap.ts', import.meta.url), 'utf8'), '/here');
 assert.ok(boot.indexOf("world-opening.ts').then((opening) => opening.mountOpening()") >= 0 && boot.indexOf('world-opening.ts') < boot.indexOf("void import('./main.js')"));
-for (const stage of OPENING_STAGES) {
+for (const stage of [BAKING_STAGE, ...OPENING_STAGES]) {
   assert.equal(served.split(`detail: { report: '${stage.report}'`).length - 1, 1, stage.report);
 }
-assert.equal(served.split(`new CustomEvent('${OPENING_EVENT}'`).length - 1, OPENING_STAGES.length);
+// Every stage's report, and the bake's share, each dispatched in one place.
+assert.equal(served.split(`new CustomEvent('${OPENING_EVENT}'`).length - 1, OPENING_STAGES.length + 2);
+assert.equal(served.split('detail: { baking: bakeShare(').length - 1, 1);
 assert.ok(SEAMS.some((one) => one.seam === 'land drawn'));
 // The land is reported after the renderer mounts and before the people begin.
 assert.ok(served.indexOf("report: 'land-drawn'") > served.indexOf('const renderer = await mountRenderer('));
