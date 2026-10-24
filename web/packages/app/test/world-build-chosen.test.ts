@@ -18,6 +18,8 @@ const PIP = 'a'.repeat(64);
 const MADE = { worldId: 'world-1', authoredVersionId: 'version-1', authoredStateSha256: 'b'.repeat(64), generatedGround: { regionId: 'region:generated' } };
 /** A world drawn otherwise: no region to place new things in. */
 const DRAWN_OTHERWISE = { worldId: 'world-1', authoredVersionId: 'version-1', authoredStateSha256: 'b'.repeat(64) };
+/** A fresh My world, the world Blank opens: the workspace's authored starter, its region its scene's, nothing generated. */
+const STARTER = { ...DRAWN_OTHERWISE, authoredScene: { kind: 'authored-starter', region: { regionId: 'region:starter' } } };
 const saved = { entryId: 'entry-1', revision: 3, authoredStateSha256: 'b'.repeat(64), authoredEditSeq: 7 };
 
 class Point {
@@ -36,7 +38,7 @@ interface Page { chosen: boolean; pageShown: boolean; starts: number }
 
 /**
  * Build mode in `entry` with one creature made; the page has someone chosen when `chosen`, and lets go of them as
- * building starts unless `letsGo` is false (as the page did before). Every note shown is kept.
+ * building starts unless `letsGo` is false (as the page did before). Every note shown and every write sent is kept.
  */
 async function mount({ chosen = false, letsGo = true, entry = MADE }: { chosen?: boolean; letsGo?: boolean; entry?: Record<string, unknown> } = {}) {
   const page: Page = { chosen, pageShown: false, starts: 0 };
@@ -47,8 +49,11 @@ async function mount({ chosen = false, letsGo = true, entry = MADE }: { chosen?:
     if (path.startsWith('/world/versions/version-1?')) return { version_id: 'version-1', world_id: 'world-1', things: [] };
     throw Error(`not read here: ${path}`);
   };
-  const send = async (write: { actionId: string }): Promise<{ body: unknown }> =>
-    ({ body: write.actionId === 'things.place.preview' ? { availability: 'ready', landing: { checked: true } } : {} });
+  const writes: Array<{ actionId: string; body?: Record<string, unknown> }> = [];
+  const send = async (write: { actionId: string; body?: Record<string, unknown> }): Promise<{ body: unknown }> => {
+    writes.push(write);
+    return { body: write.actionId === 'things.place.preview' ? { availability: 'ready', landing: { checked: true } } : {} };
+  };
   const said: string[] = [];
   const notes = { show: (words: string) => { said.push(words); }, clear: () => {}, place: () => {} };
   const corners = { mode: () => {}, keys: () => {}, hints: () => {}, back: () => {}, notes };
@@ -60,7 +65,7 @@ async function mount({ chosen = false, letsGo = true, entry = MADE }: { chosen?:
     inspecting: () => page.pageShown || page.chosen, makeCreature: () => {},
     onStart: letsGo ? () => { page.starts += 1; page.chosen = false; } : null,
   });
-  return { mode: mounted, root, page, said };
+  return { mode: mounted, root, page, said, writes };
 }
 const pressB = (mode: BuildMode): boolean => mode.key(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b', bubbles: true }));
 const tray = (root: HTMLElement): HTMLElement | null => root.querySelector<HTMLElement>('.wu-tray');
@@ -165,5 +170,21 @@ describe('B in a world with nowhere to place a thing', () => {
     const { mode } = await mount({ entry: DRAWN_OTHERWISE });
     await expect(mode.hold({ source: 'workspace', sha256: PIP }, { xMm: 0, zMm: -2000 })).resolves.toBeNull();
     expect(mode.active()).toBe(false);
+  });
+});
+
+describe('B in a fresh My world, the world Blank opens', () => {
+  it('opens build mode with its tray: the starter\'s own region takes things, with nothing generated', async () => {
+    const { mode, root, said } = await mount({ entry: STARTER });
+    expect(pressB(mode)).toBe(true);
+    expect(mode.active()).toBe(true);
+    await vi.waitFor(() => expect(trayShown(root)).toBe(true));
+    expect(said).not.toContain('Nothing can be placed in this world.');
+  });
+
+  it('asks the server about a thing held there in the starter\'s region', async () => {
+    const { mode, writes } = await mount({ entry: STARTER });
+    void mode.hold({ source: 'workspace', sha256: PIP }, { xMm: 0, zMm: -2000 });
+    await vi.waitFor(() => expect(writes.find((write) => write.actionId === 'things.place.preview')?.body?.['region_id']).toBe('region:starter'));
   });
 });

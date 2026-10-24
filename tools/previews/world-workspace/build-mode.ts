@@ -146,8 +146,12 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
   // A site's made parts are its structured drawing's slots; a terrain drawing has none.
   const siteDrawing = () => { const drawing = currentOpenSite()?.drawing() ?? null; return drawing !== null && 'slots' in drawing ? drawing : null; };
   const slotOf = (id) => siteDrawing()?.slots?.find(slot => slot.identity === id.slice(PART.length)) ?? null;
-  /** The region a made world is drawn in, where new things are placed; null in a world drawn otherwise, where B does not open build mode. */
-  const placingRegion = () => entry.generatedSite?.regionId ?? entry.generatedGround?.regionId ?? null;
+  /**
+   * The region new things are placed in: a made world's, else the workspace's starter world's own (My world, which
+   * Blank opens, drawn on its authored ground with nothing generated); null in a world drawn otherwise, where B does
+   * not open build mode.
+   */
+  const placingRegion = () => entry.generatedSite?.regionId ?? entry.generatedGround?.regionId ?? entry.authoredScene?.region?.regionId ?? null;
   const regionRoot = (regionId = entry.generatedSite?.regionId ?? null) => (regionId ? b.regionRoots?.get(regionId) ?? null : null);
   /** The first read of the version's things after B, which a click made before it ends waits for. */
   let reading = null;
