@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { BAKING_STAGE, OPENING_EVENT, OPENING_STAGES, bakeShare, openingProgress, populationLine, readHandoff, speedBars } from './opening-steps.mjs';
+import { BAKING_STAGE, OPENING_EVENT, OPENING_STAGES, STEP_EASE, bakeReach, bakeShare, easedShare, openingProgress, populationLine, readHandoff, speedBars } from './opening-steps.mjs';
 import { OPENING_WORDS } from './world-words.mjs';
 import { SEAMS, patchSource } from './seams.mjs';
 
@@ -26,6 +26,22 @@ assert.equal(bakeShare([{ state: 'baking', stepsFinished: 9, steps: 4 }, { state
 assert.equal(bakeShare([{ state: 'baking', stepsFinished: 2 }]), 0);
 assert.equal(bakeShare([]), 0);
 assert.equal(bakeShare(undefined), 0);
+// Where the bake would stand once each baking tile's running step ends (C3c): one step on, never past all of them.
+assert.equal(bakeReach([{ state: 'baking', stepsFinished: 2, steps: 4 }, { state: 'baking', stepsFinished: 2, steps: 4 }]), 0.75);
+assert.equal(bakeReach([{ state: 'baked' }, { state: 'baking', stepsFinished: 0, steps: 4 }]), 0.625);
+assert.equal(bakeReach([{ state: 'baking', stepsFinished: 4, steps: 4 }]), 1);
+for (const tiles of [[{ state: 'baking' }], [{ state: 'baking', stepsFinished: 2 }], [], undefined]) assert.equal(bakeReach(tiles), bakeShare(tiles));
+// Within a step the line eases toward its end: from where it began at once, half of STEP_EASE.most of the way in
+// halfMs, slower as it nears, never as far as the end; nowhere where the end is not ahead.
+assert.equal(easedShare(0.5, 0.75, 0), 0.5);
+assert.ok(Math.abs(easedShare(0.5, 0.75, STEP_EASE.halfMs) - (0.5 + 0.25 * STEP_EASE.most / 2)) < 1e-12);
+{
+  const at = [1000, 4000, 15000, 60000, 3_600_000].map((ms) => easedShare(0.5, 0.75, ms));
+  for (let i = 1; i < at.length; i++) assert.ok(at[i] > at[i - 1] && at[i] - at[i - 1] < 0.25);
+  assert.ok(at.every((share) => share < 0.5 + 0.25 * STEP_EASE.most + 1e-12 && share < 0.75));
+}
+assert.equal(easedShare(0.75, 0.75, 5000), 0.75);
+assert.equal(easedShare(0.75, 0.5, 5000), 0.75);
 
 // Every stage the opening shows is reported by a seam of the served app, once, with the event the
 // opening listens for: no stage is shown that the loader does not report.
@@ -39,7 +55,7 @@ for (const stage of [BAKING_STAGE, ...OPENING_STAGES]) {
 }
 // Every stage's report, and the bake's share, each dispatched in one place.
 assert.equal(served.split(`new CustomEvent('${OPENING_EVENT}'`).length - 1, OPENING_STAGES.length + 2);
-assert.equal(served.split('detail: { baking: bakeShare(').length - 1, 1);
+assert.equal(served.split('detail: { baking: bakeShare(entry.generatedGround?.tiles), reach: bakeReach(entry.generatedGround?.tiles) }').length - 1, 1);
 assert.ok(SEAMS.some((one) => one.seam === 'land drawn'));
 // The land is reported after the renderer mounts and before the people begin.
 assert.ok(served.indexOf("report: 'land-drawn'") > served.indexOf('const renderer = await mountRenderer('));

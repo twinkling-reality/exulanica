@@ -94,7 +94,7 @@ import { mountFrontDoor, frontDoorPicture, openFromFrontDoor } from '/@fs/${here
 import { mountScenePreview, scenePreviewPage } from '/@fs/${here}/front-door-preview.ts';
 import { mountCreateWorld } from '/@fs/${here}/create-world.ts';
 import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
-import { bakeShare } from '/@fs/${here}/opening-steps.mjs';
+import { bakeReach, bakeShare } from '/@fs/${here}/opening-steps.mjs';
 ` + code
     .replace(seam('start() deep link'), `    const reviewEntryId = new URLSearchParams(location.search).get('entry');
     if (reviewEntryId) {
@@ -108,8 +108,9 @@ import { bakeShare } from '/@fs/${here}/opening-steps.mjs';
         // Its land is asked for now, so the server makes it beside the bakes; nothing waits on it.
         const asking = state.credentials;
         if (asking) void import('./composition/town-land.js').then((land) => land.askForTownLand(asking, reviewEntry), () => {});
-        // The opening names the bake, and its line moves as the bake's tiles, or their steps, finish.
-        const bakeShown = (entry) => window.dispatchEvent(new CustomEvent('${OPENING_EVENT}', { detail: { baking: bakeShare(entry.generatedGround?.tiles) } }));
+        // The opening names the bake, and its line moves as the bake's tiles, or their steps, finish, easing toward
+        // where the steps running now end (C3c).
+        const bakeShown = (entry) => window.dispatchEvent(new CustomEvent('${OPENING_EVENT}', { detail: { baking: bakeShare(entry.generatedGround?.tiles), reach: bakeReach(entry.generatedGround?.tiles) } }));
         bakeShown(reviewEntry);
         // Read again every ${BAKE_POLL_MS} ms for up to ${BAKE_READS} reads.
         let again = null;

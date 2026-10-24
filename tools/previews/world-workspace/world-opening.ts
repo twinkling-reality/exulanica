@@ -2,7 +2,7 @@
 // the world's picture full screen, "Opening", its name, a line that moves only when the loader
 // reports a real stage (seams.mjs dispatches the reports), the stage's words, and one tip. It ends
 // when the world view mounts (contextual-world.ts) or the front door shows instead (front-door.ts).
-import { BAKING_STAGE, OPENING_EVENT, OPENING_HANDOFF_KEY, OPENING_STAGES, openingProgress, readHandoff } from './opening-steps.mjs';
+import { BAKING_STAGE, OPENING_EVENT, OPENING_HANDOFF_KEY, OPENING_STAGES, STEP_EASE, easedShare, openingProgress, readHandoff } from './opening-steps.mjs';
 import { isScenePreview } from './front-door-routes.mjs';
 import { OPENING_WORDS } from './world-words.mjs';
 import { keyWord, mountUiScale, promptRow } from './world-ui.ts';
@@ -58,6 +58,19 @@ export function mountOpening(): void {
   // says so (C3b), else at its first share; the share never moves back, and it ends with the bake's
   // report, or with any later stage's where the town read baked before its bake was waited for.
   let stages: readonly { readonly report: string; readonly words: string }[] = handoff?.baking ? [BAKING_STAGE, ...OPENING_STAGES] : OPENING_STAGES, share = 0;
+  // Within a running step of the bake the line eases from where it stands toward that step's end, as the served steps
+  // state it, never past it nor back (C3c): `served` is the bake's served share, `reach` where its running steps end.
+  let served = 0, reach = 0, from = 0, since = 0, ticker = 0;
+  const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const stop = (): void => { clearInterval(ticker); ticker = 0; };
+  lifetime.signal.addEventListener('abort', stop);
+  const ease = (): void => {
+    if (still || ticker !== 0 || !(reach > share)) return;
+    ticker = window.setInterval(() => {
+      share = Math.max(share, easedShare(from, reach, performance.now() - since));
+      draw();
+    }, STEP_EASE.tickMs);
+  };
   const draw = (): void => {
     const now = openingProgress(reports, stages, share);
     fill.style.width = `${(now.fraction * 100).toFixed(1)}%`;
@@ -65,16 +78,22 @@ export function mountOpening(): void {
     step.textContent = now.words ?? '';
   };
   window.addEventListener(OPENING_EVENT, (event) => {
-    const detail = (event as CustomEvent<{ readonly report?: string; readonly title?: string; readonly baking?: number }>).detail;
+    const detail = (event as CustomEvent<{ readonly report?: string; readonly title?: string; readonly baking?: number; readonly reach?: number }>).detail;
     if (!detail) return;
     if (typeof detail.baking === 'number') {
       if (reports.includes(BAKING_STAGE.report)) return;
       if (stages === OPENING_STAGES) stages = [BAKING_STAGE, ...OPENING_STAGES];
-      share = Math.max(share, detail.baking);
+      const now = Math.max(served, detail.baking);
+      const end = Math.max(reach, now, typeof detail.reach === 'number' && Number.isFinite(detail.reach) ? Math.min(1, detail.reach) : 0);
+      // A step ended, or a step's end is newly stated: the line eases on from where it stands toward the new end.
+      if (now !== served || end !== reach) { served = now; reach = end; from = Math.max(served, share); since = performance.now(); }
+      share = Math.max(share, served);
+      ease();
     } else if (typeof detail.report === 'string') {
       if (stages !== OPENING_STAGES && !reports.includes(BAKING_STAGE.report)) reports.push(BAKING_STAGE.report);
       if (detail.report !== BAKING_STAGE.report) reports.push(detail.report);
-      share = 0;
+      share = 0; served = 0; reach = 0;
+      stop();
     } else return;
     if (!name.textContent && typeof detail.title === 'string') name.textContent = detail.title;
     draw();

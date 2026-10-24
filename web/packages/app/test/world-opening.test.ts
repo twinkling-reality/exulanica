@@ -10,7 +10,7 @@ interface Opening { mountOpening(): void; endOpening(): boolean }
 // module (outside this package) out of the program.
 const opening = async (): Promise<Opening> => import('../../../../tools/previews/world-workspace/' + 'world-opening.ts') as Promise<Opening>;
 
-afterEach(() => { document.body.replaceChildren(); vi.resetModules(); });
+afterEach(() => { document.body.replaceChildren(); vi.resetModules(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('the opening', () => {
   it("shows on a world's own address", async () => {
@@ -52,6 +52,74 @@ describe('the opening', () => {
     window.dispatchEvent(new CustomEvent('exulanica:opening', { detail: { report: 'world-read' } }));
     expect([step(), drawn()]).toEqual(['Drawing the land', '50.0%']);
     sessionStorage.clear();
+  });
+
+  it('eases the line within a running bake step toward that step\'s end, never to it nor back (C3c)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date', 'performance'] });
+    history.replaceState(null, '', '/?entry=01a13bd3-fa95-7c62-8683-42e78f2a0e2c');
+    (await opening()).mountOpening();
+    const say = (detail: object): void => { window.dispatchEvent(new CustomEvent('exulanica:opening', { detail })); };
+    const drawn = (): number => Number.parseFloat((document.querySelector('.wu-opening-fill') as HTMLElement).style.width);
+    // Two of four steps served; the two bakes run: the line starts at 12.5% and eases toward 18.75%, the next step's.
+    say({ baking: 0.5, reach: 0.75 });
+    expect(drawn()).toBe(12.5);
+    vi.advanceTimersByTime(4000);
+    expect(drawn()).toBeCloseTo(15.3, 1);
+    vi.advanceTimersByTime(60_000);
+    expect(drawn()).toBeGreaterThan(17.5);
+    expect(drawn()).toBeLessThan(18.75);
+    // A step ends: the line stands at once where the served steps say, and eases on toward the next step's end.
+    say({ baking: 0.75, reach: 1 });
+    expect(drawn()).toBe(18.8);
+    vi.advanceTimersByTime(4000);
+    expect(drawn()).toBeCloseTo(21.6, 1);
+    // A read that answers the older steps never moves it back.
+    say({ baking: 0.5, reach: 0.75 });
+    vi.advanceTimersByTime(1000);
+    expect(drawn()).toBeGreaterThanOrEqual(21.6);
+    expect(drawn()).toBeLessThan(25);
+    // The bake ends: the loader's own stages, which ease nowhere.
+    say({ report: 'land-made' });
+    expect(drawn()).toBe(25);
+    vi.advanceTimersByTime(10_000);
+    expect(drawn()).toBe(25);
+  });
+
+  it('eases on from where the line stands when one of two tiles ends its step behind it, never back (C3c)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date', 'performance'] });
+    history.replaceState(null, '', '/?entry=01a13bd3-fa95-7c62-8683-42e78f2a0e2c');
+    (await opening()).mountOpening();
+    const say = (detail: object): void => { window.dispatchEvent(new CustomEvent('exulanica:opening', { detail })); };
+    const drawn = (): number => Number.parseFloat((document.querySelector('.wu-opening-fill') as HTMLElement).style.width);
+    say({ baking: 0.5, reach: 0.75 });
+    vi.advanceTimersByTime(60_000);
+    const eased = drawn();
+    // One tile's step ends: the served share (15.6%) is behind the line; it eases on from there toward 21.9%.
+    say({ baking: 0.625, reach: 0.875 });
+    expect(drawn()).toBe(eased);
+    vi.advanceTimersByTime(4000);
+    expect(drawn()).toBeGreaterThan(eased);
+    expect(drawn()).toBeLessThan(21.875);
+  });
+
+  it('eases nowhere without the running step\'s end, nor where motion is reduced (C3c)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date', 'performance'] });
+    history.replaceState(null, '', '/?entry=01a13bd3-fa95-7c62-8683-42e78f2a0e2c');
+    const say = (detail: object): void => { window.dispatchEvent(new CustomEvent('exulanica:opening', { detail })); };
+    const drawn = (): string | undefined => (document.querySelector('.wu-opening-fill') as HTMLElement | null)?.style.width;
+    const first = await opening();
+    first.mountOpening();
+    say({ baking: 0.5 });
+    vi.advanceTimersByTime(10_000);
+    expect(drawn()).toBe('12.5%');
+    first.endOpening();
+    document.body.replaceChildren();
+    vi.resetModules();
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(prefers-reduced-motion: reduce)', media: query }));
+    (await opening()).mountOpening();
+    say({ baking: 0.5, reach: 0.75 });
+    vi.advanceTimersByTime(10_000);
+    expect(drawn()).toBe('12.5%');
   });
 
   it('opens a town the front door does not say is baking on reading the world, as before', async () => {

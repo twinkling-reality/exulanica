@@ -53,6 +53,39 @@ export function bakeShare(tiles) {
   return done / tiles.length;
 }
 
+/**
+ * Where the bake's share would stand once each baking tile's running step ends (0 to 1), from the same served facts as
+ * bakeShare: a baked tile whole, a baking tile one step more than it states finished (never more than all of them),
+ * and a tile stating no steps where bakeShare has it. The line never passes it while that step runs (C3c).
+ */
+export function bakeReach(tiles) {
+  if (!Array.isArray(tiles) || tiles.length === 0) return 0;
+  let reach = 0;
+  for (const tile of tiles) {
+    if (tile?.state === 'baked') reach += 1;
+    else if (tile?.state === 'baking' && Number.isSafeInteger(tile.steps) && tile.steps > 0 && Number.isSafeInteger(tile.stepsFinished)) {
+      reach += Math.min(Math.max(tile.stepsFinished, 0) + 1, tile.steps) / tile.steps;
+    }
+  }
+  return reach / tiles.length;
+}
+
+/**
+ * How the line eases within a running step (C3c): at most `most` of the way to the step's end, half of that in
+ * `halfMs`, drawn again every `tickMs` (the line's own 300 ms transition smooths each move).
+ */
+export const STEP_EASE = Object.freeze({ most: 0.9, halfMs: 4000, tickMs: 250 });
+
+/**
+ * Where the line stands `ms` after a step began at `from` (0 to 1), easing toward `reach`, that step's end: slower as
+ * it nears it, and never more than STEP_EASE.most of the way, so the line moves while the work runs and never says the
+ * step is done. `from` where `reach` is not beyond it.
+ */
+export function easedShare(from, reach, ms, ease = STEP_EASE) {
+  if (!(reach > from) || !(ms > 0)) return from;
+  return from + (reach - from) * ease.most * (1 - 2 ** (-ms / ease.halfMs));
+}
+
 /** The flying speeds the renderer allows (atlas-react controls.ts FLY_SPEED), as defaults. */
 export const SPEED_SCALE = Object.freeze({ least: 2, most: 150, bars: 7 });
 

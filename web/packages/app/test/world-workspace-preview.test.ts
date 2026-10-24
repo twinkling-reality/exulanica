@@ -194,12 +194,12 @@ describe('the world workspace preview\'s edits to this app', () => {
     const first = waiting.indexOf('bakeShown(reviewEntry);');
     expect(first).toBeGreaterThan(-1);
     expect(first).toBeLessThan(waiting.indexOf('await new Promise((done) => setTimeout(done'));
-    expect(waiting).toContain('detail: { baking: bakeShare(entry.generatedGround?.tiles) }');
+    expect(waiting).toContain('detail: { baking: bakeShare(entry.generatedGround?.tiles), reach: bakeReach(entry.generatedGround?.tiles) }');
     expect(waiting.indexOf('if (again) bakeShown(again);')).toBeGreaterThan(waiting.indexOf('await state.worldEntries?.entry(reviewEntry.entryId)'));
     const made = opened.indexOf("detail: { report: 'land-made' }");
     expect(made).toBeGreaterThan(reloads);
     expect(made).toBeLessThan(taken);
-    expect(patched).toContain(`import { bakeShare } from '/@fs/${here}/opening-steps.mjs';`);
+    expect(patched).toContain(`import { bakeReach, bakeShare } from '/@fs/${here}/opening-steps.mjs';`);
     // Its land is asked for before the first wait, and nothing waits on the ask.
     const asks = waiting.indexOf("void import('./composition/town-land.js').then((land) => land.askForTownLand(asking, reviewEntry)");
     expect(asks).toBeGreaterThan(-1);
