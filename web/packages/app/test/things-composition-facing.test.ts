@@ -115,10 +115,17 @@ describe('a resident\'s standing facing', () => {
     }
   });
 
-  it('keeps a placed being at its placement\'s yaw, and is none without a sight or a drawn society', async () => {
+  it('keeps a placed being at its placement\'s yaw where that way is open, turns it from the wall 40 cm off, and is none without a sight or a drawn society', async () => {
     const things = await mount(moved);
-    await things.setPlaced([placed('knight-1', 1_900_000)]);
-    expect(things.crowdFigures.standingFacingOf({ ...resident('p-knight', 0, 19_600), placed_id: 'knight-1' })).toBe(facingOfYaw(1_900_000));
+    await things.setPlaced([placed('knight-1', 0), placed('knight-2', 1_900_000)]);
+    // At yaw 0 it faces south, away from the wall: the way it was placed is kept.
+    expect(things.crowdFigures.standingFacingOf({ ...resident('p-knight', 0, 19_600), placed_id: 'knight-1' })).toBe(facingOfYaw(0));
+    // At 1.9 rad it faces the wall 40 cm off at a slant: as anyone who stops there, it turns where it
+    // stands to an open way.
+    const turned = things.crowdFigures.standingFacingOf({ ...resident('p-knight-2', 0, 19_600), placed_id: 'knight-2' })!;
+    const along = (facing: number) => sight.reach([100, 1.6, 19.6], [-Math.sin(facing), 0, -Math.cos(facing)]);
+    expect(along(facingOfYaw(1_900_000))).toBeLessThan(3);
+    expect(along(turned)).toBeGreaterThanOrEqual(3);
     things.destroy();
     for (const unsaid of [await mount(moved, false), await mount(null)]) {
       expect(unsaid.crowdFigures.standingFacingOf(resident('villager-1', 0, 19_600))).toBeNull();

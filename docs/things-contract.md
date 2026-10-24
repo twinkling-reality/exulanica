@@ -1451,7 +1451,9 @@ is not the people catalog's is drawn by its own figure, in full wherever it is w
 radius and ranked before the world's people for the full places of the measured budget; a placed
 being's standing figure is then not drawn. A placed being faces as it was placed until it first
 walks, by the same rule the layer turns it by before a society holds it: its yaw turns the look's
-front from +Z, so at yaw 0 it faces +Z. Each object stands where the state puts it, its plan point
+front from +Z, so at yaw 0 it faces +Z. As anyone who stops keeps the way they came, it keeps that
+way while it is open ahead; with a wall within 3 m ahead (the door of a shop it was taken in at), it
+turns where it stands to the open way nearest it. Each object stands where the state puts it, its plan point
 turned by its yaw, or is held in the socket the state names, its grip at the socket's place; an
 object the state does not list is not drawn. A thing of a kind its workspace keeps that the state
 lists among neither its things nor its people (a society made before the thing was placed and not

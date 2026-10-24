@@ -211,14 +211,19 @@ export class ThingCrowdFigures implements CrowdFigures {
 
   /**
    * A placed being stands at its placed yaw until it first walks, as the layer draws it before a
-   * society holds it: one rule for both (`facingOfYaw`); a placement not read, null. Anyone nobody
-   * placed stands as `standingFacingAt` says.
+   * society holds it: one rule for both (`facingOfYaw`), kept as anyone who stops keeps the way they
+   * came, while it is open ahead; with a wall close ahead (the door it was taken in at), it turns to
+   * the open way nearest it (`arrivalFacingAt`). A placement not read, null. Anyone nobody placed
+   * stands as `standingFacingAt` says.
    */
   standingFacingOf(person: SocietyInhabitantSnapshot): number | null {
     const placedId = person.placed_id ?? null;
     if (placedId === null) return this.options.standingFacingAt?.(person) ?? null;
     const yaw = this.options.placedYawOf?.(placedId) ?? null;
-    return yaw === null ? null : facingOfYaw(yaw);
+    if (yaw === null) return null;
+    const placed = facingOfYaw(yaw);
+    const at = [person.position_mm[0] / 1000, person.position_mm[1] / 1000] as const;
+    return this.options.arrivalFacingAt?.(person.id, at, placed) ?? placed;
   }
 
   /** Where someone stopped, the way the crowd turns them: as `arrivalFacingAt` says. */

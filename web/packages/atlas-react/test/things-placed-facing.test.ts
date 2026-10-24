@@ -71,7 +71,9 @@ function front(root: pc.Entity): [number, number] {
   return [ahead.x, ahead.z];
 }
 
-async function drawnBothWays(yawMicroradians: number, figuresFirst: boolean) {
+type ArrivalFacing = (id: string, at: readonly [number, number], walked: number) => number | null;
+
+async function drawnBothWays(yawMicroradians: number, figuresFirst: boolean, arrivalFacingAt?: ArrivalFacing) {
   const { served, layer, crowd } = setup();
   const record: PlacedThingRecord = {
     thingId: 'knight-1', kind: served.kindRef('knight', 1), regionId: 'r',
@@ -86,6 +88,7 @@ async function drawnBothWays(yawMicroradians: number, figuresFirst: boolean) {
   const figures = new ThingCrowdFigures({
     maker: layer.maker,
     placedYawOf: (placedId) => (placedId === record.thingId ? record.transform.yawMicroradians : null),
+    ...(arrivalFacingAt === undefined ? {} : { arrivalFacingAt }),
   });
   const knight: SocietyInhabitantSnapshot = {
     id: 'p-knight', synthetic: true, position_mm: [2000, 1000], motion_path_mm: [[2000, 1000]],
@@ -136,5 +139,26 @@ describe('a placed being faces as it was placed, whoever draws it', () => {
     crowd.update(120_200);
     const after = front(figures.figureOf('p-knight')!.root);
     expect(after[0]).toBeCloseTo(1, 6);
+  });
+
+  /*
+   * As anyone who stops: a wall close ahead of the way it was placed (the door of a shop it was taken
+   * in at) turns it where it stands to the open way nearest it. Here a wall stands to the south of
+   * the stand: the way the open-way rule answers is east, every other way is open.
+   */
+  const wallToTheSouth: ArrivalFacing = (_id, _at, walked) => (-Math.cos(walked) > 0.5 ? -Math.PI / 2 : walked);
+
+  it.each([true, false])('turns from a wall close ahead of its placed yaw to the open way (figures first: %s)', async (figuresFirst) => {
+    const { byLayer, byCrowd } = await drawnBothWays(0, figuresFirst, wallToTheSouth);
+    // The layer draws it as it was put down, facing the wall to the south; the crowd turns it east.
+    expect(byLayer[1]).toBeCloseTo(1, 6);
+    expect(byCrowd[0]).toBeCloseTo(1, 6);
+    expect(byCrowd[1]).toBeCloseTo(0, 6);
+  });
+
+  it('keeps its placed yaw where the way it was placed is open ahead', async () => {
+    const { byLayer, byCrowd } = await drawnBothWays(1_900_000, true, wallToTheSouth);
+    expect(byCrowd[0]).toBeCloseTo(byLayer[0], 6);
+    expect(byCrowd[1]).toBeCloseTo(byLayer[1], 6);
   });
 });
