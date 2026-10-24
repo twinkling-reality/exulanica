@@ -110,7 +110,12 @@ export function openComparePage(host: HTMLElement, act: (action: string) => void
 
   function draw(state: ComparePageState) {
     const width = host.clientWidth || window.innerWidth;
-    const layout = compareLayout(width);
+    const rows = state.moment?.rows ?? [];
+    const other = rows.find(row => !row.again && row.tag !== COMPARE_WORDS.asRecorded) ?? null;
+    const { points, times } = lineOf(state, other);
+    const count = points.length;
+    // One moment has no line: it opens in the left column under the head (H1).
+    const layout = compareLayout(width, count < 2);
     const narrow = layout.narrow;
     const key = JSON.stringify([state, width]);
     last = state;
@@ -119,8 +124,6 @@ export function openComparePage(host: HTMLElement, act: (action: string) => void
     sheet.root.classList.toggle('wu-hr-narrow', narrow);
     sheet.root.setAttribute('aria-label', state.title);
     const asking = state.asking ?? null;
-    const rows = state.moment?.rows ?? [];
-    const other = rows.find(row => !row.again && row.tag !== COMPARE_WORDS.asRecorded) ?? null;
     const names = [...rows.map(row => row.model), ...state.lanes.map(lane => lane.name)];
 
     // The head (History's): who, how many and when; the title; how they were asked and what asking again spent.
@@ -133,8 +136,9 @@ export function openComparePage(host: HTMLElement, act: (action: string) => void
     // The answer in words and the rerun's line under it; while the asks run, their progress in its place (C2).
     const answer = element('section', 'wu-rc-answer');
     px(answer, layout.margin, layout.sumTop, layout.sumWidth);
+    let progress: HTMLElement | null = null;
     if (asking) {
-      const progress = element('p', 'wu-rc-asking', asking);
+      progress = element('p', 'wu-rc-asking', asking);
       progress.setAttribute('role', 'status');
       answer.append(progress);
     } else {
@@ -143,8 +147,6 @@ export function openComparePage(host: HTMLElement, act: (action: string) => void
 
     // The moments on History's line: a hollow dot each, the picked one filled, a moment not asked faint; times every
     // third; a different answer hangs below its moment as a dashed branch ending in the model's name over the answer.
-    const { points, times } = lineOf(state, other);
-    const count = points.length;
     const focus = Math.max(0, Math.min(count - 1, state.focus));
     const onLine: Element[] = [];
     if (count >= 2) {
@@ -180,10 +182,12 @@ export function openComparePage(host: HTMLElement, act: (action: string) => void
       }
     }
 
-    // The picked moment opened at the right: each answer with its 2px rule (the recorded one in the line's colour),
-    // the model's name with its tag at the right, and the answer, words said in italic quotes.
+    // The picked moment opened at the right (one moment: in the left column): each answer with its 2px rule (the
+    // recorded one in the line's colour), the model's name with its tag at the right, and the answer, words said in italic.
     const opened = element('section', 'wu-rc-moment');
     px(opened, layout.openLeft, layout.openTop, layout.openWidth);
+    // One moment stands where the answer would: while it is asked, the progress heads it there.
+    if (progress && count < 2) opened.append(progress);
     if (state.moment) {
       // One moment's label is its clock alone, or nothing without one (C3).
       if (state.moment.label) opened.append(element('div', 'wu-rc-at wu-hr-time', state.moment.label));

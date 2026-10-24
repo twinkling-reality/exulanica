@@ -47,8 +47,8 @@ function finished(overrides: Partial<ComparePageState> = {}): ComparePageState {
       label: 'At 06:43 · 3 of 12',
       rows: [
         { model: NANO, again: false, what: 'Said to Ines: “Calm water today, Ines.”', tag: 'As recorded' },
-        { model: QWEN, again: false, what: 'Walk to the lower pools', tag: 'Different' },
-        { model: `${NANO}, again`, again: true, what: 'Said to Ines: “Morning, Ines.”', tag: 'Same' },
+        { model: QWEN, again: false, what: 'Walk to the lower pools', tag: 'Another choice' },
+        { model: `${NANO}, again`, again: true, what: 'Said to Ines: “Morning, Ines.”', tag: 'Same choice' },
       ],
     },
     eachChose: [
@@ -147,8 +147,8 @@ describe('Compare as r12', () => {
     const rows = [...moment.querySelectorAll<HTMLElement>('.wu-rc-row')];
     expect(rows.map(row => [text(row.querySelector('.wu-rc-row-model')), text(row.querySelector('.wu-rc-row-tag')), text(row.querySelector('.wu-rc-row-words'))])).toEqual([
       [NANO, 'As recorded', 'Said to Ines: “Calm water today, Ines.”'],
-      [QWEN, 'Different', 'Walk to the lower pools'],
-      [`${NANO}, again`, 'Same', 'Said to Ines: “Morning, Ines.”'],
+      [QWEN, 'Another choice', 'Walk to the lower pools'],
+      [`${NANO}, again`, 'Same choice', 'Said to Ines: “Morning, Ines.”'],
     ]);
     // The recorded answer's rule is the line's colour; the others' are quiet.
     expect(rows.map(row => row.dataset['recorded'])).toEqual(['true', 'false', 'false']);
@@ -200,6 +200,28 @@ describe('Compare as r12', () => {
     expect(keyWords(root)).toEqual([['Esc', 'Stop']]);
     keyNamed(root, 'Stop')!.click();
     expect(act).toHaveBeenCalledWith('stop');
+  });
+
+  it('opens one moment in the left column under the head, its progress heading it while it is asked (H1)', async () => {
+    // One decision asked again, as contextual-world.ts fills it: no line, no lanes, no sentence.
+    const { line: _line, branchName: _name, ...many } = finished();
+    const one = (overrides: Partial<ComparePageState> = {}): ComparePageState => ({
+      ...many, over: 'Teo · 1 decision, 06:43 · Day 1', title: "Teo's decision, asked again", eachChose: [], lanes: [], times: [], focus: 0,
+      moment: { label: 'At 06:43', rows: many.moment!.rows }, ...overrides,
+    });
+    for (const [width, left, top] of [[1920, '120px', '300px'], [1440, '80px', '260px']] as const) {
+      document.body.replaceChildren();
+      const { root } = await opened(one(), width);
+      const moment = root.querySelector<HTMLElement>('.wu-rc-moment')!;
+      expect([moment.style.left, moment.style.top], `at ${width}`).toEqual([left, top]);
+      expect(root.querySelector('svg.wu-rc-line')).toBeNull();
+      expect(text(moment.querySelector('.wu-rc-at'))).toBe('At 06:43');
+    }
+    document.body.replaceChildren();
+    const asking = 'Asking 1 of 1 · $0 of $0.01';
+    const { root } = await opened(one({ asking }));
+    expect(text(root.querySelector('.wu-rc-moment > .wu-rc-asking'))).toBe(asking);
+    expect(root.querySelector('.wu-rc-answer .wu-rc-asking')).toBeNull();
   });
 
   it('draws a state without a line from the other model\'s lane, as contextual-world.ts fills it', async () => {

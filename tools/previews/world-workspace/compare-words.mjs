@@ -17,8 +17,8 @@ export const COMPARE_WORDS = Object.freeze({
   earlierLater: 'Earlier, later',
   whatEachChose: 'What each chose',
   asRecorded: 'As recorded',
-  different: 'Different',
-  same: 'Same',
+  different: 'Another choice',
+  same: 'Same choice',
   notAsked: 'Not asked',
   again: 'again',
   sameMoments: who => `The same moments, exactly as ${possessive(who.within)} model was told them. Nothing in the world changed.`,
@@ -89,8 +89,9 @@ export function choseWords({ chose = null, line = null, to = null }) {
 }
 
 /**
- * The tag right of an answer: the recorded one "As recorded"; an asked one "Same" where it chose the
- * recorded option (whatever words it said with it) and "Different" where it did not; none unasked.
+ * The tag right of an answer: the recorded one "As recorded"; an asked one "Same choice" where it chose the
+ * recorded option (whatever words it said with it) and "Another choice" where it did not; none unasked. It says what it
+ * compares: never "Same" beside other words (H1).
  */
 export function answerTag(answer) {
   if (answer.recorded) return COMPARE_WORDS.asRecorded;

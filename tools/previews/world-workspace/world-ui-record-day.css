@@ -72,6 +72,8 @@
 .wu-record-day .wu-day-side { position: absolute; }
 .wu-record-day .wu-model-row + .wu-model-row::after { background: rgba(18,23,21,.10); }
 .wu-record-day .wu-model-row[aria-selected="true"] { background: rgba(255,255,255,.72); box-shadow: inset 0 0 0 1.5px var(--hr-line); }
+/* Compare's question: its rules run the rows' full width, so the focused row's outline keeps within the list's edge (H1). */
+.wu-record-day .wu-cmp-ask .wu-model-row + .wu-model-row::after { left: 0; right: 0; }
 .wu-record-day .wu-model-row[data-current="true"] .wu-model-name::before { box-shadow: none; }
 .wu-record-day .wu-orb { color: #fff; }
 .wu-record-day .wu-hairline { background: linear-gradient(90deg, rgba(18,23,21,.22), rgba(18,23,21,.04)); }

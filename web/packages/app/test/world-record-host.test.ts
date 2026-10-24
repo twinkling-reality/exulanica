@@ -387,6 +387,15 @@ describe('Compare, filled', () => {
     expect(ended.spent).toMatch(/0\.0007/);
     expect(ended.use).toBe('Use Qwen3 235B Instruct for Teo');
   });
+
+  it('names each moment by the minute it applied in, as the decision page and the day row do (H1)', async () => {
+    const { recordStates } = await recordHost();
+    // r1 asked in minute 401 (06:41), applied in 402 (06:42); r2 and r3 not applied yet: the minute each was asked in.
+    const records = recordStates(host({ latest: (requestId: string) => (requestId === 'r1' ? { consumedTick: 402 } : null) }).host);
+    const state = records.comparison({ ...teoPage(), comparison: comparison(null) });
+    expect(state.line.map((point: Json) => point.time)).toEqual(['06:42', '06:43', '06:46']);
+    expect(state.over).toBe('Teo · 3 decisions, 06:42 to 06:46 · Day 1');
+  });
 });
 
 describe("a world's pictures", () => {

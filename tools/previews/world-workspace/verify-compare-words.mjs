@@ -59,8 +59,8 @@ const answers = new Map([
 const moments = compareMoments(offered, answers);
 assert.deepEqual(moments.map(moment => moment.requestId), ['a', 'b', 'c']);
 assert.equal(answerTag({ recorded: true }), 'As recorded');
-assert.equal(answerTag(moments[0].other), 'Different');
-assert.equal(answerTag(moments[1].other), 'Same', 'the same option with other words is the same choice');
+assert.equal(answerTag(moments[0].other), 'Another choice');
+assert.equal(answerTag(moments[1].other), 'Same choice', 'the same option with other words is the same choice');
 assert.equal(answerTag(moments[2].again), null, 'not asked: no tag');
 assert.deepEqual(sameCounts(moments, 'other'), { asked: 3, same: 2 });
 assert.deepEqual(sameCounts(moments, 'again'), { asked: 2, same: 2 });

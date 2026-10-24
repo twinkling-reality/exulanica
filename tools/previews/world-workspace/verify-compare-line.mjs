@@ -10,6 +10,12 @@ const NANO = 'Nemotron 3 Nano 30B', QWEN = 'Qwen3 235B Instruct';
 assert.deepEqual([wide.narrow, wide.margin, wide.lineY, wide.lineTo, wide.openLeft, wide.openWidth, wide.sumWidth], [false, 120, 560, 1180, 1260, 540, 1100]);
 assert.deepEqual([narrow.narrow, narrow.margin, narrow.lineY, narrow.lineTo, narrow.openLeft, narrow.openWidth], [true, LAYOUTS.narrow.margin, LAYOUTS.narrow.lineY, 860, 940, 420]);
 assert.equal(compareLayout(NARROW_BELOW).narrow, false);
+// One moment opens in the left column under the head, at the answer's top; the rest of the layout is the same (H1).
+for (const width of [1920, 1440]) {
+  const one = compareLayout(width, true), many = compareLayout(width);
+  assert.deepEqual([one.openLeft, one.openTop, one.openWidth], [many.margin, many.sumTop, many.openWidth], `one moment at the left: ${width}`);
+  assert.deepEqual({ ...one, openLeft: 0 }, { ...many, openLeft: 0 });
+}
 assert.equal(compareLayout(NARROW_BELOW - 1).narrow, true);
 assert.equal(COMPARE_LAYOUTS.wide.margin, LAYOUTS.wide.margin);
 // At every width the opened moment ends a margin from the right edge, never cut by the window (1728 is a laptop's

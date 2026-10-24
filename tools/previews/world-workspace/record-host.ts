@@ -161,6 +161,12 @@ export function recordStates(host: RecordHost) {
       .filter((run: Json) => Number.isSafeInteger(run.from) && (run.to === null || Number.isSafeInteger(run.to)));
   }
 
+  /** The minute a decision applied in, as its row of What Teo did says; the minute it was asked in only where none has
+   * applied it yet. The decision page and Compare both name it (H1). */
+  function appliedTick(events: readonly Json[], requestId: string, asked: number): number {
+    return events.find((event: Json) => event.kind === 'decision_applied' && event.requestId === requestId)?.tick ?? host.latest(requestId)?.consumedTick ?? asked;
+  }
+
   /** The names a moment's words take, as History names them: people as their tags do, placed things as build mode. */
   function names(showing: Json) {
     const thingOf = (id: unknown) => (typeof id === 'string' && showing.things?.has(id) ? thingName(showing.things.get(id), host.label) : null);
@@ -270,7 +276,6 @@ export function recordStates(host: RecordHost) {
       // The choice account's verdict; a record it cannot read says nothing of what came of it.
       let verdict: Json | null = null;
       try { verdict = choiceAccount(detail, latest as never, events).verdict; } catch { verdict = null; }
-      const consumed = events.find((event: Json) => event.kind === 'decision_applied' && event.requestId === decision.requestId)?.tick ?? latest?.consumedTick ?? null;
       const start = view.facts?.startMinute ?? null;
       const moment = ownMoment(showing.moments, decision.requestId, subjectId);
       const said = lineOf(showing, decision.requestId, subjectId, moment);
@@ -280,9 +285,8 @@ export function recordStates(host: RecordHost) {
       const choices = choiceRows(context, proposal?.label ?? null);
       const result = resultLines({ verdict,
         latencyMs: provider?.latency_ms ?? null, costUsd: provider?.cost_usd ?? null, costKnown: provider?.cost_known === true });
-      // One time per decision: the minute it applied in, as its row of What Teo did says; the minute it was asked in
-      // only where none has applied it yet.
-      const at = worldTime(consumed ?? request.base_tick, start);
+      // One time per decision: the minute it applied in (appliedTick).
+      const at = worldTime(appliedTick(events, decision.requestId, request.base_tick), start);
       const applied = (showing.events ?? []).find((event: Json) => (event.event_kind === 'decision_applied' && event.document?.request_id === decision.requestId)
         || (event.event_kind === 'said' && event.document?.thing?.request_id === decision.requestId));
       // Who decided (T7): a model's request names its provider; a person playing or an outside program, its kind.
@@ -352,7 +356,9 @@ export function recordStates(host: RecordHost) {
       const { other, single, focus, asking } = comparison;
       const moments = compareMoments(comparison.decisions, comparison.answers);
       const start = view.facts?.startMinute ?? null;
-      const at = (moment: Json | null | undefined) => (moment ? worldTime(moment.tick, start) : null);
+      // Each moment at the minute it applied in, as the decision page and the day's row name it (H1).
+      const events = parseDecisionEvents({ events: showing.events ?? [] }).events;
+      const at = (moment: Json | null | undefined) => (moment ? worldTime(appliedTick(events, moment.requestId, moment.tick), start) : null);
       const first = at(moments[0]), last = at(moments.at(-1));
       const recordedName = comparison.recordedName;
       const otherName = other.name;

@@ -24,15 +24,16 @@ const LINE_GAP = 80, SUM_GAP = 40;
 /**
  * The layout for a page `width` wide: the opened moment always ends a margin from the right edge (1260 at 1920, 1068 at
  * 1728, 940 at 1440), the line ends 80 before it and the answer in words 40 before it, and the head keeps within the
- * margins. Nothing the page draws runs past the window, whose overflow is hidden.
+ * margins. Nothing the page draws runs past the window, whose overflow is hidden. One moment (`single`) has no line:
+ * it opens in the page's left column under the head, where the answer in words would stand (H1).
  */
-export function compareLayout(width) {
+export function compareLayout(width, single = false) {
   const base = width < NARROW_BELOW ? COMPARE_LAYOUTS.narrow : COMPARE_LAYOUTS.wide;
   const openLeft = Math.round(width - base.margin - base.openWidth);
   return Object.freeze({
     ...base,
     width,
-    openLeft,
+    openLeft: single ? base.margin : openLeft,
     lineTo: Math.max(base.margin + 2 * INSET, openLeft - LINE_GAP),
     sumWidth: Math.max(0, openLeft - SUM_GAP - base.margin),
     headWidth: Math.max(0, Math.min(base.headWidth, width - 2 * base.margin)),
