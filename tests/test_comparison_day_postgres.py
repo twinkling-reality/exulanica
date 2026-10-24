@@ -139,7 +139,8 @@ def _town(request, monkeypatch, tmp_path) -> dict[str, Any]:
             api_key="test-key-not-real",
             manifest=MANIFEST,
             transport=transport,
-            budget=BudgetGuard(ceiling_usd=Decimal("50"), max_calls=1_000_000),
+            # Room for a day of 24 people at the most each ask may cost, beside the part kept.
+            budget=BudgetGuard(ceiling_usd=Decimal("100"), max_calls=1_000_000),
         ),
         society_control_workspaces=(workspace,),
         comparison_seeds=tuple(SEEDS),

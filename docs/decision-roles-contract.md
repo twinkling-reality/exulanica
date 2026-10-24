@@ -870,10 +870,18 @@ models route and, where the host asks models for any workspace, `/readyz` say so
 (`process_share_spent`, or `process_budget_spent` when the whole budget does not fit). Spending only
 grows while the process runs, so either holds until it restarts. A person whose own model needs more
 for one ask than is left is not asked, while a cheaper model may still be asked for others. An ask's
-need is its bound (`ask_bound_usd`): every answer the contract allows, each reserved for the
-instruction of the terms asked under that contract (an engine's own terms where it states them, so
-one engine's longer prompt raises no other's bound), its `not_offered` note and twice the largest
-situation a request may carry, at the model's own answer bound. The models reads judge it the same
+need is its bound (`ask_bound_usd`): every answer the contract allows, each at the model's own
+answer bound and the most a request of the terms asked under that contract may send (an engine's
+own terms where it states them, so one engine's longer prompt raises no other's bound). That most is
+the terms' request envelope, by prompt version
+(`assets/catalogs/request-envelopes/decision-request-envelopes.v1.json`): the most bytes the
+request's JSON may hold with every character outside ASCII escaped, its function or schema with
+every option and the retry's note included, each byte priced as an input token, since a tokenizer
+makes no token of less than one byte. Each figure is measured from the terms' largest request, every
+part it renders at its own most (`tests/test_decision_request_envelopes.py` builds each again and
+holds it under its envelope); nothing refuses a request at send by it. A terms with no envelope (the
+signal's) is bounded by its prompt's characters: its instruction, its `not_offered` note and twice
+the largest situation a request may carry. The models reads judge it the same
 way, under the contract the society's engine is asked under. A call under way can still leave one ask no room for its reservation,
 which that ask's receipt names.
 

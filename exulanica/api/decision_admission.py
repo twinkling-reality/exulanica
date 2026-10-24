@@ -25,6 +25,7 @@ from exulanica.models.client import PROVIDER_CREDENTIAL_ABSENT, ModelClient
 from exulanica.models.errors import ManifestError
 from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec
 from exulanica.things.lines import LineRefused, check_line
+from exulanica.world.decision_envelopes import request_bytes_at_most
 from exulanica.world.decision_roles import DecisionContract, DecisionRole
 
 #: Why a host asks no model for a workspace's subjects at all, by code; the page has words for each.
@@ -88,23 +89,29 @@ def ask_bound_usd(
 ) -> Decimal:
     """The most one ask of ``spec`` for ``role`` may reserve, whatever the subject's situation.
 
-    Every answer the contract allows, each reserved as the client reserves a call, by the prompt's
-    characters and the model's answer bound. The prompt is bounded by the instruction of the terms
-    asked under this contract (every terms the role states where none names its versions), the
-    note a retry adds and twice the largest situation a request may carry, which covers the
-    situation's rendering and each message's framing; tests/test_society_person_decisions.py holds
-    the asks the small square makes under it. So a longer prompt for one engine's people never
-    raises what an ask of another engine's reserves.
+    Every answer the contract allows, each at the model's answer bound and the most its request may
+    send: the envelope of the terms asked under this contract (every terms the role states where
+    none names its versions), each byte a token (:mod:`exulanica.world.decision_envelopes`), so
+    one engine's longer prompt never raises what an ask of another engine's holds. A terms the
+    catalog names no envelope for is reserved as before, by the prompt's characters: its
+    instruction, the note a retry adds and twice the largest situation a request may carry;
+    tests/test_society_person_decisions.py holds the asks the small square makes under either.
     """
     asked = [
         terms for terms in role.every_terms() if dict(terms.versions) == dict(contract.versions)
     ] or list(role.every_terms())
+    attempts = contract.value("answer_attempts_maximum")
+    answer = answer_tokens(spec) or 0
+    envelopes = [request_bytes_at_most(role.key, terms.prompt_version) for terms in asked]
+    stated = [envelope for envelope in envelopes if envelope is not None]
+    if len(stated) == len(envelopes):
+        return attempts * budget.estimate_usd(
+            spec, extra_prompt_tokens=max(stated), max_tokens=answer
+        )
     prompt_chars = max(
         len(terms.instruction) + len(terms.not_offered) for terms in asked
     ) + 2 * contract.value("context_bytes_maximum")
-    return contract.value("answer_attempts_maximum") * budget.estimate_usd(
-        spec, prompt_chars=prompt_chars, max_tokens=answer_tokens(spec) or 0
-    )
+    return attempts * budget.estimate_usd(spec, prompt_chars=prompt_chars, max_tokens=answer)
 
 
 def smallest_ask_usd(

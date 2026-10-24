@@ -405,7 +405,8 @@ def test_a_server_not_set_up_or_asking_no_model_here_starts_nothing(started):
     client.app.state.services = dataclasses.replace(services, society_control_workspaces=())
     unlisted = _start(started, _body())
     assert (unlisted.status_code, unlisted.json()["code"]) == (409, "comparisons_not_run_here")
-    # The process budget of a host playing comparisons itself, with a bound it cannot hold.
+    # The process budget of a host playing comparisons itself, with a bound it cannot hold: room
+    # for two asks beside the part kept for other work, and a bound of three.
     client.app.state.services = dataclasses.replace(
         services,
         runs_comparison_worker=True,
@@ -413,10 +414,10 @@ def test_a_server_not_set_up_or_asking_no_model_here_starts_nothing(started):
             api_key="test-key-not-real",
             manifest=MANIFEST,
             transport=started["transport"],
-            budget=BudgetGuard(ceiling_usd=Decimal("0.02"), max_calls=100_000),
+            budget=BudgetGuard(ceiling_usd=_one_ask() * 4, max_calls=100_000),
         ),
     )
-    over = _start(started, _body(bound_usd="0.015"))
+    over = _start(started, _body(bound_usd=format(_one_ask() * 3, "f")))
     assert (over.status_code, over.json()["code"]) == (409, "bound_over_budget")
     client.app.state.services = services
     assert _counts(world)["society_comparison_start"] == 0
@@ -570,7 +571,7 @@ def test_what_a_comparison_spends_stays_within_its_bound_ask_by_ask(started, mon
         )
 
     monkeypatch.setattr(worker_module, "comparison_cost", admits_anything)
-    bound = (_one_ask() * 3).quantize(Decimal("0.00000001"))
+    bound = (_one_ask() * 3 / 2).quantize(Decimal("0.00000001"))
     body = _body(bound_usd=format(bound, "f"))
     assert _start(started, body).status_code == 201, body
     assert _worker(started).run_once(world["workspace"]) is True

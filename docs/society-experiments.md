@@ -409,7 +409,7 @@ host's process alone.
 a minute, so its asks are at most the protocol's window times those subjects (the arm's group under
 a model arm and, in every arm, anybody outside the group whose owner chose a model), and each ask
 costs at most `ask_bound_usd`, every answer the contract allows at the manifest's prices for the
-longest situation and answer the contract allows. What one like it typically costs is a
+largest request its terms may send (their request envelope) and the longest answer. What one like it typically costs is a
 measurement of the kind of ground its society stands on: in the
 [judged group comparison](evaluation/2026-09-26-society-group-comparison.json), on the small
 square, each model's arms spent, per person and simulated hour, $0.0018 (Nemotron 3.5 Lightning),

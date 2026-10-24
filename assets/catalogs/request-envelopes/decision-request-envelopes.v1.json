@@ -1,0 +1,29 @@
+{
+  "catalog_id": "decision-request-envelopes",
+  "catalog_version": 1,
+  "schema_version": 1,
+  "profile": "exulanica.decision-request-envelopes/v1",
+  "source_build": "Measured: each terms' largest request as the model chain measures it before sending, its whole JSON with every character outside ASCII escaped, the function or schema with every option and the retry's note included, asked through the host's one ask path by each answering mechanism. Every part a request renders is taken to its own most: the most options with the longest labels, every heard and said line at its most characters written in double quotes (escaped twice), a character's name and words at theirs, the noticed and remembered blocks at their byte bounds, and a living person's needs to the context's bound. tests/test_decision_request_envelopes.py builds each again and holds it under its envelope.",
+  "unit": "Bytes of the request's escaped JSON. A tokenizer that works on bytes, or falls back to them, makes no token of less than one byte, and the JSON's keys and quotes outnumber the few tokens a chat template adds to a message, so these bytes bound the request's input tokens.",
+  "fallback": "A terms with no envelope is priced as before: its instruction, its retry's note and twice the largest context its contract allows, in characters.",
+  "entries": [
+    {
+      "role": "society_decision",
+      "prompt_version": "society-person-choice/v1",
+      "request_bytes_at_most": 20480,
+      "reason": "A person asked under the first prompt sends its instruction, the situation, the offered actions and the function or schema with every option: about 16 KB for a living town's person whose needs fill the context's 12,000 bytes, with the most options at the longest labels and the retry's note, and about 7 KB for the small square's. The envelope leaves room above both."
+    },
+    {
+      "role": "society_decision",
+      "prompt_version": "society-person-choice/v9",
+      "request_bytes_at_most": 36864,
+      "reason": "The society of things' earlier prompt, kept for the requests asked under it: a society of things' being sends its instruction, its situation (what it notices and remembers, the lines it heard and said, its character), the offered actions and the function or schema with every option: about 34 KB with every part at its own most, lines written in double quotes and the retry's note, more than the context's 16,000 bytes can carry together. The envelope leaves room above it."
+    },
+    {
+      "role": "society_decision",
+      "prompt_version": "society-person-choice/v10",
+      "request_bytes_at_most": 36864,
+      "reason": "A society of things' being sends its instruction, its situation (where it stands and what it notices, what it remembers, the lines it heard and said, its character), the offered actions and the function or schema with every option: about 34 KB with every part at its own most, lines written in double quotes and the retry's note, more than the context's 16,000 bytes can carry together. The envelope leaves room above it."
+    }
+  ]
+}
