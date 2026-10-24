@@ -12,15 +12,28 @@ its duck pond and barn read from its own records), through the routes as a deplo
 *   the placing's own checks: an id already placed, a stale base, a digest the workspace holds no
     kind at and a version holding as many things as it may are blocked by the codes the placing
     answers.
+
+In a small town whose traffic reads placed things (``tests/test_world_traffic_route.py``'s), a
+bench's place and move previews state what it would close there (``closes``): a lane, or the turns
+into a named street; ``read: false`` when the traffic's worker refuses or answers late; nothing in
+a town made under traffic rules 1, nor on the farm.
 """
 
 from __future__ import annotations
 
+import dataclasses
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from types import MappingProxyType
 from typing import Any
 
 import pytest
-from exulanica.world import object_repository
+from exulanica.world import object_repository, traffic_host
+from exulanica.world import world_recipes as recipe_catalog
+from exulanica.world.composers import city_grammar_town
 from exulanica.world.thing_store import ThingStore
+from exulanica.world.world_recipes import CANDIDATES_MAXIMUM, world_recipes
 
 from test_society_made_kinds import canary_creature
 from test_society_made_world import made as imported_made  # noqa: F401
@@ -37,6 +50,14 @@ from test_thing_landing_postgres import (
     _scope,
     _the_same_farm_on_every_run,  # noqa: F401
     _version,
+)
+from test_world_traffic_route import (
+    BENCH,
+    _driven,
+    _identity,
+    _junction_middle,
+    _lane_middle,
+    _made,
 )
 
 pytestmark = pytest.mark.postgres
@@ -105,6 +126,7 @@ def test_a_well_on_open_ground_is_placed_as_its_preview_said(made):
     )
     assert verdict["would_change"]["subject_id"] == "well"
     assert verdict["would_change"]["before"] is None
+    assert "closes" not in verdict, "the farm has no traffic to close"
     assert _version(api, entry) == before
 
     placed = _place(api, entry, "well", WELL, pose)
@@ -155,3 +177,101 @@ def test_the_placing_s_own_checks_block_its_preview_by_the_placing_s_codes(made,
     assert full["blocked_reason"] == "thing_limit_reached"
     refused = _place(api, entry, "second-well", WELL, elsewhere)
     assert (refused.status_code, refused.json()["code"]) == (409, "thing_limit_reached")
+
+
+# -- what a bench would close of a town's traffic --------------------------------------------------
+
+
+@pytest.fixture(name="town")
+def _town(made, monkeypatch):  # type: ignore[no-untyped-def]
+    """Making a small town whose roads the traffic drives, its traffic's worker in this process."""
+    worker = traffic_host.TrafficEpisodes(lambda: ThreadPoolExecutor(max_workers=1))
+    monkeypatch.setattr(traffic_host, "_episodes", worker)
+    generous = {
+        recipe.key: dataclasses.replace(recipe, candidates=CANDIDATES_MAXIMUM)
+        for recipe in world_recipes()
+    }
+    monkeypatch.setattr(recipe_catalog, "_by_key", lambda: MappingProxyType(generous))
+    _identity(monkeypatch, _driven()[0])
+    yield made, worker
+    worker.close()
+
+
+def _bench_preview(api, entry: dict, point: tuple[int, int]) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+    """A bench's place preview at a plan point (east and north), at the height it rests at there."""
+    pose = {"x_mm": point[0], "y_mm": 0, "z_mm": -point[1], "yaw_microradians": 0}
+    first = _verdict(_preview(api, entry, "bench", BENCH, pose))
+    rest = first["landing"]["rest_y_mm"]
+    return _verdict(_preview(api, entry, "bench", BENCH, {**pose, "y_mm": rest}))
+
+
+def test_a_bench_s_preview_states_the_lane_or_the_turns_it_would_close_in_a_town(town, monkeypatch):
+    api, worker = town
+    entry = _made(api, "A bench's preview")
+    _, lane_point = _lane_middle(api, entry)
+    on_lane = _bench_preview(api, entry, lane_point)
+    assert on_lane["availability"] == "ready"
+    assert on_lane["closes"] == {
+        "rules": 3,
+        "read": True,
+        "lanes": 1,
+        "streets": [],
+        "turns": [],
+        "widest": "lane",
+    }
+    _, junction_point = _junction_middle(api, entry)
+    junction_verdict = _bench_preview(api, entry, junction_point)
+    in_junction = junction_verdict["closes"]
+    in_junction_rest = junction_verdict["landing"]["rest_y_mm"]
+    assert (in_junction["read"], in_junction["lanes"], in_junction["widest"]) == (True, 0, "turn")
+    assert in_junction["turns"] and in_junction["streets"] == []
+    assert all(isinstance(turn["street"], str) and turn["street"] for turn in in_junction["turns"])
+    # A worker that refuses, or answers later than the preview waits, leaves it unread.
+    ask, wait = worker.ask, traffic_host.CLOSING_SECONDS
+
+    def refused(function):  # type: ignore[no-untyped-def]
+        raise traffic_host.TrafficWorkerUnavailable("stopped")
+
+    def late(function):  # type: ignore[no-untyped-def]
+        time.sleep(0.5)
+        return function()
+
+    monkeypatch.setattr(worker, "ask", refused)
+    assert _bench_preview(api, entry, lane_point)["closes"] == {"rules": 3, "read": False}
+    monkeypatch.setattr(worker, "ask", late)
+    monkeypatch.setattr(traffic_host, "CLOSING_SECONDS", 0.1)
+    assert _bench_preview(api, entry, lane_point)["closes"] == {"rules": 3, "read": False}
+    monkeypatch.setattr(worker, "ask", ask)
+    monkeypatch.setattr(traffic_host, "CLOSING_SECONDS", wait)
+    # With as many asks waiting as may, the next is unread at once rather than queued behind them.
+    full = threading.BoundedSemaphore(1)
+    full.acquire()
+    monkeypatch.setattr(traffic_host, "_closing_room", full)
+    assert _bench_preview(api, entry, lane_point)["closes"] == {"rules": 3, "read": False}
+    monkeypatch.setattr(traffic_host, "_closing_room", threading.BoundedSemaphore(2))
+    # A move's preview states it as a placing's does: a bench placed on the lane, moved into the
+    # junction, would close the turns there, read from the open roads whatever already stands.
+    pose = {"x_mm": lane_point[0], "y_mm": 0, "z_mm": -lane_point[1], "yaw_microradians": 0}
+    pose["y_mm"] = on_lane["landing"]["rest_y_mm"]
+    placed = _place(api, entry, "bench", BENCH, pose)
+    assert placed.status_code == 201, placed.text
+    junction_pose = {"x_mm": junction_point[0], "z_mm": -junction_point[1], "yaw_microradians": 0}
+    moved = _verdict(
+        api.post(
+            _root(entry) + "/things/bench/move/preview" + _scope(entry),
+            {
+                "base_state_sha256": _version(api, entry)["state_sha256"],
+                "pose": {**junction_pose, "y_mm": in_junction_rest},
+            },
+        )
+    )
+    assert moved["availability"] == "ready" and moved["closes"] == in_junction
+
+
+def test_a_town_made_under_traffic_rules_1_previews_no_closing(town, monkeypatch):
+    api, _worker = town
+    monkeypatch.setattr(city_grammar_town, "TRAFFIC_RULES", 1)
+    entry = _made(api, "An older town")
+    _, point = _lane_middle(api, entry)
+    verdict = _bench_preview(api, entry, point)
+    assert verdict["availability"] == "ready" and "closes" not in verdict

@@ -628,7 +628,12 @@ arrival height, where its region hangs, or from the city's datum for a town on l
 walking surface's height; on a plane its elevation. In a town it is the highest of that surface
 under the thing's footprint (its centre and its kind box's corners, turned with it), so no foot
 sinks into a kerb: an end over the road stands clear of it, and the landing holds a thing to the
-same height. The base is checked before the object is
+same height. A ready preview of a placing or a move of a thing that blocks walking, in a town whose
+traffic reads placed things, also says `closes`, what its footprint there would close of the town's
+traffic: lanes, whole streets and, under traffic rules 3, the turns into named streets, or
+`read: false` when the traffic did not answer in time
+([traffic](traffic-contract.md#served-traffic)); nothing in a town made under traffic rules 1 or
+outside a town. The base is checked before the object is
 looked up, as the write checks it, and an unknown or foreign version or object answers the write's
 `404 unknown_reference`. A preview does not compose the society input a purposeful society takes
 from every accepted edit, so a write whose preview was ready can still answer

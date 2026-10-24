@@ -532,6 +532,19 @@ the movement package and run the roads module, `exulanica-movement/roads/v1`
   naming the closing rules, and its network's closures name the connections (`exulanica.traffic-closures/v2`); an
   input with no obstacle keeps the first profile and its bytes. A town made under rules 2 keeps its
   junctions open to its things, as it was made.
+- **What a thing would close, before it is placed.** A ready place or move preview of a thing that
+  blocks walking, in a town made from rules 2 on, says what its footprint there would close of the
+  town's open roads, on its own (`closes`, `footprint_closing` in `exulanica/world/traffic_host.py`).
+  The worker answers it from the same computation an episode's input is closed by
+  (`traffic_closures.closing` on the network it keeps for the town's open input, the input's records
+  sent once): `lanes`, how many lane paths it closes; `streets`, each street segment it closes
+  across every lane, by its street's name; under rules 3, `turns`, each street a connection it
+  closes turns into, by name; and `widest`, `street`, else `turn`, else `lane`, else null for a
+  footprint on no lane, which asks the worker nothing. A refused road read, a refusing worker, no
+  answer within `CLOSING_SECONDS` (a quarter of a second: a kept town answers in milliseconds, so the
+  wait is only ever for an episode the worker is computing), or two asks already waiting is
+  `read: false` with nothing else, never a guess, and the preview is otherwise answered as before. A town made under rules 1, and a world with no
+  town records, states no `closes`.
 - **The clock.** Second `n` is the `n`th second since the Unix epoch, so every page showing a city
   shows its vehicles in the same places. A saved world whose clock is coupled keys its traffic by
   its own traffic timeline instead ([world clock](world-clock-contract.md#coupled-traffic)).

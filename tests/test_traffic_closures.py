@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import types
 import uuid
+from collections import OrderedDict
 
 import pytest
 from exulanica.canonical import canonical_json
@@ -30,6 +31,7 @@ from exulanica.world.traffic_closures import (
     JUNCTION_RULES,
     TRAFFIC_RULES,
     closed_connections,
+    closing,
     closures,
     obstacles_on_lanes,
     traffic_rules_of,
@@ -39,6 +41,7 @@ from exulanica.world.traffic_episodes import (
     EPISODE,
     JUNCTION_INPUT_PROFILE,
     MODES,
+    closing_job,
     compute_episode,
     from_wire,
     window_of,
@@ -386,3 +389,71 @@ def test_a_rules_3_input_names_its_rules_only_with_an_obstacle(junction_driven):
     # With nothing in the road a rules-3 version keeps the first profile and its bytes.
     none = with_obstacles(value, (), line_version="v", closing_rules=JUNCTION_RULES)
     assert none.sha256 == value.sha256 and wire(none) == wire(value)
+
+
+# -- what a placed footprint closes, as a place or move preview states it ------------------------
+
+
+def test_a_thing_on_one_lane_of_a_street_closes_that_lane_and_no_street_or_turn(driven):
+    _, centre, lane = driven
+    network = corridor.prepared().network
+    obstacles = obstacles_on_lanes(corridor.records(), [_square(centre)])
+    found = closing(network, corridor.records(), obstacles, JUNCTION_RULES)
+    # Every street of the corridor has two lanes: the other still carries cars.
+    assert found == {"lanes": [lane], "segments": [], "turns": []}
+    assert closing(network, corridor.records(), obstacles, 1) == {
+        "lanes": [],
+        "segments": [],
+        "turns": [],
+    }
+
+
+def test_a_thing_across_every_lane_of_a_street_closes_the_street_it_names(driven):
+    _, _, lane = driven
+    network = corridor.prepared().network
+    segment = network.paths[lane].segment
+    footprints = []
+    for path in network.paths.values():
+        if path.kind == "lane" and path.segment == segment:
+            footprints.append(_square(path.line.point_at(path.length // 2)))
+    obstacles = obstacles_on_lanes(corridor.records(), footprints)
+    found = closing(network, corridor.records(), obstacles, CLOSING_RULES)
+    assert found["segments"] == [segment] and len(found["lanes"]) >= 2
+    assert set(found["lanes"]) == set(closures(network, corridor.records(), obstacles)[0])
+
+
+def test_a_thing_inside_a_junction_closes_the_turns_into_the_streets_it_stands_on(
+    junction_driven,
+):
+    _, centre = junction_driven
+    network = corridor.prepared().network
+    records = corridor.records()
+    obstacles = obstacles_on_lanes(records, [_square(centre)], JUNCTION_RULES)
+    found = closing(network, records, obstacles, JUNCTION_RULES)
+    into = {
+        network.paths[lane].segment
+        for path in closed_connections(network, records, obstacles)
+        for lane in network.paths[path].successors
+    }
+    assert found["lanes"] == [] and found["segments"] == []
+    assert found["turns"] and set(found["turns"]) == into
+    # Under rules 2 a junction closes nothing, so a thing standing there closes nothing.
+    assert closing(network, records, obstacles, CLOSING_RULES) == {
+        "lanes": [],
+        "segments": [],
+        "turns": [],
+    }
+
+
+def test_the_worker_answers_from_the_input_it_holds_and_asks_once_for_one_it_does_not(
+    driven, monkeypatch
+):
+    _, centre, lane = driven
+    monkeypatch.setattr(traffic_episodes, "_closing_inputs", OrderedDict())
+    value = corridor.value()
+    obstacles = obstacles_on_lanes(corridor.records(), [_square(centre)])
+    rings = [[list(point) for point in ring] for ring in obstacles]
+    assert closing_job(value.sha256, None, rings, CLOSING_RULES) is None
+    sent = closing_job(value.sha256, wire(value), rings, CLOSING_RULES)
+    assert sent == {"lanes": [lane], "segments": [], "turns": []}
+    assert closing_job(value.sha256, None, rings, CLOSING_RULES) == sent

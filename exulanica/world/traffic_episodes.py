@@ -72,7 +72,7 @@ from exulanica.traffic.routing import plan_route
 from exulanica.traffic.signal_actuation import SignalTimeline, signal_actuation, signal_observation
 from exulanica.traffic.signals import PEDESTRIAN_INDICATIONS, VEHICLE_INDICATIONS
 from exulanica.traffic.simulation import advance_traffic, initial_traffic, state_sha256
-from exulanica.world.traffic_closures import JUNCTION_RULES, closed_connections, closures
+from exulanica.world.traffic_closures import JUNCTION_RULES, closed_connections, closing, closures
 
 __all__ = [
     "CLOSING_INPUT_PROFILE",
@@ -86,6 +86,7 @@ __all__ = [
     "TrafficInput",
     "TrafficRefused",
     "check_request",
+    "closing_job",
     "compute_band_identities",
     "compute_coupled_segments",
     "compute_episode",
@@ -431,6 +432,34 @@ def prepared(value: TrafficInput) -> Prepared:
     while len(_prepared) > _PREPARED_LIMIT:
         _prepared.popitem(last=False)
     return found
+
+
+#: The open inputs a worker process answered what a footprint closes for, by digest (with their
+#: networks in ``_prepared``): a held drag sends a town's records once.
+_closing_inputs: OrderedDict[str, TrafficInput] = OrderedDict()
+
+
+def closing_job(
+    digest: str,
+    data: Mapping[str, Any] | None,
+    obstacles: Sequence[Sequence[tuple[int, int]]],
+    rules: int,
+) -> dict[str, list[str]] | None:
+    """The worker's job for a placed footprint (:func:`~exulanica.world.traffic_closures.closing`):
+    what ``obstacles`` close of the open network of the input ``digest``, from its kept network;
+    ``data``, its wire form, where the worker holds none for it (``None`` then answers ``None``,
+    and the caller sends the wire form)."""
+    value = _closing_inputs.get(digest)
+    if value is None:
+        if data is None:
+            return None
+        value = from_wire(data)
+        _closing_inputs[digest] = value
+        while len(_closing_inputs) > _PREPARED_LIMIT:
+            _closing_inputs.popitem(last=False)
+    _closing_inputs.move_to_end(digest)
+    held = tuple(tuple((int(x), int(y)) for x, y in ring) for ring in obstacles)
+    return closing(prepared(value).network, value.records, held, rules)
 
 
 # -- an episode ---------------------------------------------------------------------------------

@@ -38,6 +38,7 @@ __all__ = [
     "TRAFFIC_RULES",
     "UNPINNED_RULES",
     "closed_connections",
+    "closing",
     "closures",
     "obstacles_on_lanes",
     "traffic_rules_of",
@@ -177,3 +178,30 @@ def closed_connections(
                 found.append(path_id)
                 break
     return tuple(sorted(found))
+
+
+def closing(
+    network: RoadNetwork, records: Sequence[object], obstacles: Sequence[Ring], rules: int
+) -> dict[str, list[str]]:
+    """What ``obstacles`` (plan frame, :func:`obstacles_on_lanes`) close of ``network`` under
+    traffic ``rules``, by the very computations the traffic reads them with (:func:`closures`,
+    and under rules 3 :func:`closed_connections`): ``lanes``, the lane paths closed;
+    ``segments``, the street segments every lane path of which is closed, so the street is closed
+    there; ``turns``, the segment each closed connection turns into. Each in order; all empty
+    under rules 1."""
+    if rules < CLOSING_RULES or not obstacles:
+        return {"lanes": [], "segments": [], "turns": []}
+    lanes, _spaces = closures(network, records, obstacles)
+    by_segment: dict[str, set[str]] = {}
+    for path_id, path in network.paths.items():
+        if path.kind == "lane" and path.segment:
+            by_segment.setdefault(path.segment, set()).add(path_id)
+    closed = set(lanes)
+    segments = sorted(segment for segment, paths in by_segment.items() if paths <= closed)
+    turns: set[str] = set()
+    if rules >= JUNCTION_RULES:
+        for path_id in closed_connections(network, records, obstacles):
+            for lane in network.paths[path_id].successors:
+                if network.paths[lane].segment:
+                    turns.add(network.paths[lane].segment)
+    return {"lanes": list(lanes), "segments": segments, "turns": sorted(turns)}

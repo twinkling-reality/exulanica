@@ -29,8 +29,8 @@ input names something no longer available, as the society read does.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
-from typing import Annotated, Literal
+from collections.abc import Callable, Mapping
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Path, Request, Response
 from fastapi.responses import JSONResponse
@@ -62,14 +62,16 @@ from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import MAX_YAW_MICRORADIANS, ObjectOrigin, Transform
 from exulanica.world.placed_things import (
     UNSCALED_MILLI,
+    PlacedThing,
     ThingPlacement,
     named_kind,
     workspace_kind_reference,
 )
 from exulanica.world.society import UnavailableSocietyInput
-from exulanica.world.thing_landing import LandingGround
+from exulanica.world.thing_landing import LandingGround, blocking_things
 from exulanica.world.thing_landing_source import prepare_landing, prepare_landing_in_region
 from exulanica.world.thing_looks import ThingLookRefused, look_choices
+from exulanica.world.traffic_host import footprint_closing
 
 router = APIRouter(prefix="/world", tags=["world"])
 
@@ -168,6 +170,28 @@ def _placing_landing(
     return _landing(lambda: prepare_landing_in_region(repository, version_id, body.region_id))
 
 
+def _closing(
+    repository: WriteObjects,
+) -> Callable[[PlacedThing, Mapping[str, Any]], Mapping[str, Any] | None]:
+    """What a placed thing would close of its town's traffic where a preview stands it: its
+    footprint, if its kind blocks walking (as the traffic reads placed things, blocking_things),
+    read by the traffic's own computation (footprint_closing); None for anything else."""
+
+    def closing(placed: PlacedThing, version: Mapping[str, Any]) -> Mapping[str, Any] | None:
+        rings = [part.ring for part in blocking_things([placed], moving="")]
+        if not rings:
+            return None
+        return footprint_closing(
+            repository.connection,
+            repository.workspace_id,
+            str(version["world_id"]),
+            uuid.UUID(str(version["source_snapshot_id"])),
+            rings,
+        )
+
+    return closing
+
+
 def _landing(prepare: Callable[[], LandingGround | None]) -> LandingGround | Response | None:
     """The ground a move or a placing is held to, prepared before any transaction, or the problem
     that stopped it (503 with Retry-After while a site's place is being made)."""
@@ -230,6 +254,7 @@ def add_thing_preview(
         body.placement(),
         base_state_sha256=body.base_state_sha256,
         landing=landing,
+        closing=_closing(repository),
     ).document()
 
 
@@ -288,6 +313,7 @@ def move_thing_preview(
         body.pose.domain(),
         base_state_sha256=body.base_state_sha256,
         landing=landing,
+        closing=_closing(repository),
     ).document()
 
 

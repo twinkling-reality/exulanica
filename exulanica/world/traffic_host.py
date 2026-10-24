@@ -45,7 +45,9 @@ import time
 import uuid
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
-from concurrent.futures import Executor
+from concurrent.futures import Executor, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
+from functools import partial
 from typing import Any, Final
 
 import psycopg
@@ -57,6 +59,7 @@ from exulanica.grammar import shapes
 from exulanica.grammar.grammars.city import CITY_SHAPES_BY_TYPE
 from exulanica.grammar.grammars.city.descriptor import CITY_GENERATING_VERSIONS, CITY_GRAMMAR_ID
 from exulanica.grammar.grammars.city.roads import LaneRecord
+from exulanica.grammar.grammars.city.streets import StreetRecord
 from exulanica.movement.flight_episodes import watch_parent
 from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.baked_tiles import BakedTile, BakedTileRepository, TileBytesMissing
@@ -68,6 +71,7 @@ from exulanica.world.episode_worker import (
     Line,
     worker_pool,
 )
+from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.generated_worlds import generation_receipt, states_records, town_records
 from exulanica.world.traffic_closures import CLOSING_RULES, obstacles_on_lanes, traffic_rules_of
 from exulanica.world.traffic_episodes import (
@@ -76,6 +80,7 @@ from exulanica.world.traffic_episodes import (
     TrafficInput,
     TrafficRefused,
     check_request,
+    closing_job,
     compute_episode,
     road_records,
     traffic_input,
@@ -88,6 +93,7 @@ __all__ = [
     "TrafficEpisodes",
     "TrafficWorkerUnavailable",
     "close_traffic_worker",
+    "footprint_closing",
     "generated_tile_roads",
     "saved_world_roads",
     "served_window",
@@ -416,3 +422,101 @@ def close_traffic_worker() -> None:
 def world_line(value: TrafficInput) -> Mapping[str, str]:
     """The keys a window names its world by."""
     return {"world_id": value.world_id, "version_id": value.version_id}
+
+
+# -- what a placed footprint closes ---------------------------------------------------------------
+
+#: How long a place or move preview waits for what a footprint closes, seconds. A kept town answers
+#: in a few milliseconds; the wait is for the worker computing an episode first, which a held drag
+#: should not wait out. An answer past it is `unread`; the job still finishes in the worker, whose
+#: network the next ask then finds kept.
+CLOSING_SECONDS: Final = 0.25
+#: Asks waiting on the worker for what a footprint closes; one more is answered `unread` at once,
+#: so a drag over a busy worker leaves no queue of asks behind it.
+_CLOSING_ASKS: Final = 2
+_closing_asks = ThreadPoolExecutor(max_workers=_CLOSING_ASKS, thread_name_prefix="traffic-closing")
+_closing_room = threading.BoundedSemaphore(_CLOSING_ASKS)
+
+
+def footprint_closing(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    snapshot_id: uuid.UUID,
+    footprints: Sequence[Sequence[tuple[int, int]]],
+    *,
+    wait_seconds: float | None = None,
+) -> dict[str, Any] | None:
+    """What a placed thing's turned ``footprints`` (the region's frame, east and south, as
+    :func:`~exulanica.world.thing_landing.blocking_things` turns them) would close, on their own,
+    of the traffic of the town made from ``snapshot_id``, under its traffic rules, as the place and
+    move previews state it (``closes``): ``None`` under rules 1, or for a world whose records state
+    no roads.
+
+    Read from the traffic's own computation in its worker
+    (:func:`~exulanica.world.traffic_episodes.closing_job` on the town's open network): ``lanes``,
+    how many lanes; ``streets``, each street segment closed whole, by its street's name; ``turns``,
+    the street each closed turn turns into (rules 3); ``widest``, ``street``, ``turn``, ``lane`` or
+    ``None``. A footprint on no lane asks no worker. A refusal, of the town's roads or by the
+    worker, an answer later than ``wait_seconds`` (:data:`CLOSING_SECONDS` unless given), or an ask
+    while as many wait as may, answers ``read: false`` and nothing else, never a guess."""
+    # A world made from a world kind states no records: no roads to close, nothing generated here.
+    if not states_records(connection, workspace_id, world_id, snapshot_id):
+        return None
+    try:
+        _, receipt = generation_receipt(connection, workspace_id, world_id, snapshot_id)
+    except InvalidStructuralData:
+        return None
+    rules = traffic_rules_of(receipt)
+    if rules < CLOSING_RULES:
+        return None
+    unread = {"rules": rules, "read": False}
+    try:
+        value = saved_world_roads(connection, workspace_id, world_id, snapshot_id)
+    except TrafficRefused:
+        return unread
+    obstacles = obstacles_on_lanes(value.records, footprints, rules)
+    if not obstacles:
+        none: dict[str, Any] = {"lanes": 0, "streets": [], "turns": [], "widest": None}
+        return {"rules": rules, "read": True, **none}
+
+    def ask() -> dict[str, list[str]]:
+        try:
+            found = _episodes.ask(partial(closing_job, value.sha256, None, obstacles, rules))
+            if found is None:
+                found = _episodes.ask(
+                    partial(closing_job, value.sha256, wire(value), obstacles, rules)
+                )
+            return found
+        finally:
+            room.release()
+
+    room = _closing_room
+    if not room.acquire(blocking=False):
+        return unread
+    try:
+        asked = _closing_asks.submit(ask)
+    except RuntimeError:
+        room.release()
+        return unread
+    try:
+        found = asked.result(timeout=CLOSING_SECONDS if wait_seconds is None else wait_seconds)
+    except (FutureTimeout, TrafficRefused):
+        return unread
+    streets = {
+        segment: record.name_text
+        for record in town_records(connection, workspace_id, world_id, snapshot_id).records
+        if isinstance(record, StreetRecord)
+        for segment in record.segment_identities
+    }
+    closed = [{"segment": one, "street": streets.get(one)} for one in found["segments"]]
+    turns = [{"segment": one, "street": streets.get(one)} for one in found["turns"]]
+    widest = "street" if closed else "turn" if turns else "lane" if found["lanes"] else None
+    return {
+        "rules": rules,
+        "read": True,
+        "lanes": len(found["lanes"]),
+        "streets": closed,
+        "turns": turns,
+        "widest": widest,
+    }

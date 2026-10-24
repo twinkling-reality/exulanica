@@ -23,7 +23,7 @@ reported for an object id nobody knows exactly as the write reports it.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Final, Literal
@@ -122,6 +122,9 @@ class ObjectEditPreview:
     #: For a placing or a move of a thing, whether where it would stand was checked, and what
     #: refused it.
     landing: Mapping[str, Any] | None = None
+    #: For a ready placing or move of a thing that blocks walking in a town whose traffic reads
+    #: placed things, what its footprint there would close of the traffic.
+    closes: Mapping[str, Any] | None = None
 
     @property
     def availability(self) -> Literal["ready", "blocked"]:
@@ -144,6 +147,8 @@ class ObjectEditPreview:
             },
             # Stated only for a thing's move, so every other preview keeps the bytes it had.
             **({} if self.landing is None else {"landing": dict(self.landing)}),
+            # Stated only where the town's traffic reads placed things (rules 2 and on).
+            **({} if self.closes is None else {"closes": dict(self.closes)}),
         }
 
 
@@ -220,10 +225,12 @@ def preview_thing_move(
     *,
     base_state_sha256: str,
     landing: LandingGround | None,
+    closing: Callable[[PlacedThing, Mapping[str, Any]], Mapping[str, Any] | None] | None = None,
 ) -> ObjectEditPreview:
     """What ``POST .../things/{thing_id}/move`` would record, held to the same ``landing`` the
-    write is (None: where it would stand is not checked, and the preview says so). Takes no lock
-    and writes nothing."""
+    write is (None: where it would stand is not checked, and the preview says so), and, ready,
+    what ``closing`` says the thing would close of the traffic there (None: not asked). Takes no
+    lock and writes nothing."""
     checked = {"checked": landing is not None}
     with read_only_snapshot(repository.connection):
         version = _version_block(repository, version_id)
@@ -259,6 +266,7 @@ def preview_thing_move(
             placed_thing_document(moved),
             None,
             {**checked, **_rests_at(landing, moved)},
+            None if closing is None else closing(moved, version),
         )
 
 
@@ -269,9 +277,11 @@ def preview_thing_add(
     *,
     base_state_sha256: str,
     landing: LandingGround | None,
+    closing: Callable[[PlacedThing, Mapping[str, Any]], Mapping[str, Any] | None] | None = None,
 ) -> ObjectEditPreview:
     """What ``POST .../things`` would record, held to the same ``landing`` the write is (None: a
-    made creature stands where its maker puts it, unchecked, and the preview says so). Takes no
+    made creature stands where its maker puts it, unchecked, and the preview says so), and, ready,
+    what ``closing`` says the thing would close of the traffic there (None: not asked). Takes no
     lock and writes nothing."""
     checked = {"checked": landing is not None}
     with read_only_snapshot(repository.connection):
@@ -298,6 +308,7 @@ def preview_thing_add(
             placed_thing_document(placed),
             None,
             {**checked, **_rests_at(landing, placed)},
+            None if closing is None else closing(placed, version),
         )
 
 
