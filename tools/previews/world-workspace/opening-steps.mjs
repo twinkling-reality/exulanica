@@ -37,16 +37,17 @@ export function openingProgress(reports, stages = OPENING_STAGES, share = 0) {
 
 /**
  * How much of a town's bake is done (0 to 1), from the tiles its entry serves, each counting the
- * same: a baked tile whole, a baking tile the share of its steps it states finished (stepsDone of
- * steps) or none where it states none. Only facts the entry serves move it.
+ * same: a baked tile whole, a baking tile the share of its steps it states finished (stepsFinished
+ * of steps, the entry's steps_finished and steps) or none where it states none. Only facts the entry
+ * serves move it.
  */
 export function bakeShare(tiles) {
   if (!Array.isArray(tiles) || tiles.length === 0) return 0;
   let done = 0;
   for (const tile of tiles) {
     if (tile?.state === 'baked') done += 1;
-    else if (tile?.state === 'baking' && Number.isSafeInteger(tile.steps) && tile.steps > 0 && Number.isSafeInteger(tile.stepsDone)) {
-      done += Math.min(Math.max(tile.stepsDone, 0), tile.steps) / tile.steps;
+    else if (tile?.state === 'baking' && Number.isSafeInteger(tile.steps) && tile.steps > 0 && Number.isSafeInteger(tile.stepsFinished)) {
+      done += Math.min(Math.max(tile.stepsFinished, 0), tile.steps) / tile.steps;
     }
   }
   return done / tiles.length;

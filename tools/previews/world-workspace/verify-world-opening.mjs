@@ -21,9 +21,9 @@ assert.equal(openingProgress([], baking, Number.NaN).fraction, 0);
 // Only facts the entry serves move it: a baked tile counts whole, a baking tile the steps it states.
 assert.equal(bakeShare([{ state: 'baking' }, { state: 'baking' }]), 0);
 assert.equal(bakeShare([{ state: 'baked' }, { state: 'baking' }]), 0.5);
-assert.equal(bakeShare([{ state: 'baking', stepsDone: 1, steps: 4 }, { state: 'baking', stepsDone: 3, steps: 4 }]), 0.5);
-assert.equal(bakeShare([{ state: 'baking', stepsDone: 9, steps: 4 }, { state: 'failed' }]), 0.5);
-assert.equal(bakeShare([{ state: 'baking', stepsDone: 2 }]), 0);
+assert.equal(bakeShare([{ state: 'baking', stepsFinished: 1, steps: 4 }, { state: 'baking', stepsFinished: 3, steps: 4 }]), 0.5);
+assert.equal(bakeShare([{ state: 'baking', stepsFinished: 9, steps: 4 }, { state: 'failed' }]), 0.5);
+assert.equal(bakeShare([{ state: 'baking', stepsFinished: 2 }]), 0);
 assert.equal(bakeShare([]), 0);
 assert.equal(bakeShare(undefined), 0);
 
