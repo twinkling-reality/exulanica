@@ -152,7 +152,8 @@ def runner_models(catalog: Any) -> tuple[RunnerModel, ...]:
         name, digest = entry.get("name"), _DIGEST.match(str(entry.get("digest") or ""))
         if not isinstance(name, str) or not name or digest is None or digest.group(1) in found:
             continue
-        details = entry.get("details") if isinstance(entry.get("details"), Mapping) else {}
+        stated = entry.get("details")
+        details: Mapping[str, Any] = stated if isinstance(stated, Mapping) else {}
         found[digest.group(1)] = RunnerModel(
             digest=digest.group(1),
             tag=name,
@@ -284,7 +285,8 @@ def runner_answer(spec: ModelSpec, body: Mapping[str, Any]) -> dict[str, Any]:
     the one choice, cut short where the runner says so, its token counts as usage, and the model
     named by its weights only where the runner answered for the name it was asked by.
     """
-    message = body.get("message") if isinstance(body.get("message"), Mapping) else {}
+    said = body.get("message")
+    message: Mapping[str, Any] = said if isinstance(said, Mapping) else {}
     prompt, completion = (int(body.get(key) or 0) for key in ("prompt_eval_count", "eval_count"))
     served = body.get("model")
     return {
@@ -487,7 +489,9 @@ class LocalChecks:
     def _current(self, record: Mapping[str, Any] | None) -> bool:
         """Whether a kept record was made under these cases, this contract and this context, and,
         for a check that could not be made, within :data:`ERROR_KEPT` of now."""
-        return bool(record) and (
+        if not record:
+            return False
+        return (
             record.get("profile") == CHECK_PROFILE
             and record.get("cases_sha256") == self._cases["cases_sha256"]
             and record.get("contract_versions") == self._cases["contract_versions"]
