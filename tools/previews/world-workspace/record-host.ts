@@ -315,7 +315,8 @@ export function recordStates(host: RecordHost) {
         choicesHeading: choicesOver(who),
         // What each part is, for a newcomer (A7); the page shows them until the person hides them.
         notes: decisionNotes({ who, decider, canCompare }),
-        picture: moment ? host.pictures.momentNow(moment as never) : null,
+        // The open page's own picture, drawn ahead of those its day's rows asked for first.
+        picture: moment ? host.pictures.momentNow(moment as never, true) : null,
         portraits: (moment ? titledSubjects(moment) : [subjectId, said?.to].filter(Boolean)).map((id: string) => ({ name: named.subject(id), url: host.pictures.portraitNow(id) })),
       };
     },

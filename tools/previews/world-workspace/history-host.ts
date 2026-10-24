@@ -83,8 +83,11 @@ export interface RecordPictures {
   pictureNow(picture: MomentPicture | null | undefined): string | null;
   /** A moment's missing picture, made once and kept (MOTION's renderMomentPicture), one draw at a time. */
   renderMomentPicture(moment: MomentForPicture, signal?: AbortSignal): Promise<MomentPicture | null>;
-  /** A moment's picture address where it is known; else null, its picture is read or made and `changed` follows. */
-  momentNow(moment: MomentForPicture | null | undefined): string | null;
+  /**
+   * A moment's picture address where it is known; else null, its picture is read or made and `changed` follows.
+   * `lead`: the open page's own picture, drawn ahead of every draw still waiting (never stopping the one drawn now).
+   */
+  momentNow(moment: MomentForPicture | null | undefined, lead?: boolean): string | null;
   /** A character's round portrait, kept or made once from its look; null where it cannot be made. */
   portrait(subjectId: string, signal?: AbortSignal): Promise<string | null>;
   /** A portrait's address where it is made already; else null, it is made and `changed` follows. */
@@ -119,18 +122,37 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
   const portraits = new Map<string, Promise<string | null>>();
   const portraitKnown = new Map<string, string | null>();
   let still: string | null = null;
-  let queue: Promise<unknown> = Promise.resolve();
+  /** The draws waiting their turn (a moment's draw names its moment), and whether one is being drawn now. */
+  const waiting: { readonly moment: string | null; readonly start: () => void }[] = [];
+  let drawing = false;
 
   const keep = (address: string) => {
     made.add(address);
     return address;
   };
   const client = (signal: AbortSignal) => new HistoryPicturesClient({ ...credentials, signal });
-  /** One draw at a time: each waits for the one before it, whatever that one answered. */
-  function serial<T>(task: () => Promise<T>): Promise<T> {
-    const run = queue.then(task, task);
-    queue = run.catch(() => null);
-    return run;
+  /**
+   * One draw at a time, each after the one drawn now, whatever that one answered: in the order asked, except the open
+   * page's own moment (`lead`), which goes ahead of every draw still waiting, the newest lead first. A decision opened
+   * over its day so waits for one draw at most, not for every picture of the day's rows.
+   */
+  function serial<T>(task: () => Promise<T>, moment: string | null = null, lead = false): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const turn = { moment, start: () => { void Promise.resolve().then(task).then(resolve, reject).finally(nextDraw); } };
+      if (lead) waiting.unshift(turn);
+      else waiting.push(turn);
+      if (!drawing) nextDraw();
+    });
+  }
+  function nextDraw(): void {
+    const turn = waiting.shift();
+    drawing = turn !== undefined;
+    turn?.start();
+  }
+  /** A moment asked before and still waiting, moved ahead of every other draw waiting: the open page now shows it. */
+  function hasten(moment: string): void {
+    const at = waiting.findIndex((turn) => turn.moment === moment);
+    if (at > 0) waiting.unshift(...waiting.splice(at, 1));
   }
   function people(): CharacterCatalog | null {
     try {
@@ -205,11 +227,11 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
     return null;
   }
 
-  function renderMoment(moment: MomentForPicture, signal?: AbortSignal): Promise<MomentPicture | null> {
+  function renderMoment(moment: MomentForPicture, signal?: AbortSignal, lead = false): Promise<MomentPicture | null> {
     if (disposed) return Promise.resolve(null);
     const own = lifetime.signal;
     return serial(() => (own.aborted || signal?.aborted ? Promise.resolve(null)
-      : renderMomentPicture({ entry, moment, credentials, signal: signal ?? own })));
+      : renderMomentPicture({ entry, moment, credentials, signal: signal ?? own })), moment.moment_id, lead);
   }
 
   function release() {
@@ -259,15 +281,17 @@ export function recordPictures({ entry, credentials, source, changed = () => {} 
     pictureAddress,
     pictureNow,
     renderMomentPicture: renderMoment,
-    momentNow(moment) {
+    momentNow(moment, lead = false) {
       if (!moment) return null;
       if (moment.picture) return pictureNow(moment.picture);
       const id = moment.moment_id;
       if (rendered.has(id)) return pictureNow(rendered.get(id));
-      if (!rendering.has(id) && !disposed) {
+      if (rendering.has(id)) {
+        if (lead) hasten(id);
+      } else if (!disposed) {
         rendering.add(id);
         const own = lifetime.signal;
-        void renderMoment(moment, own).then((picture) => {
+        void renderMoment(moment, own, lead).then((picture) => {
           if (own.aborted) return;
           rendered.set(id, picture);
           if (picture) void pictureAddress(picture);

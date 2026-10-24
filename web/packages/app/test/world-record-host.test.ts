@@ -9,6 +9,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const reads = vi.hoisted(() => [] as string[]);
 // Whether the people catalog is served, and whose portraits were drawn from it.
 const people = vi.hoisted(() => ({ served: false, drawn: [] as string[] }));
+// Every moment and portrait drawn, in the order drawn, and a gate each draw waits at while one is set.
+const draws = vi.hoisted(() => ({ order: [] as string[], gate: null as Promise<void> | null }));
 vi.mock('../src/decision-record.ts', () => ({ choiceAccount: () => ({ verdict: null }), parseDecisionEvents: () => ({ events: [] }) }));
 vi.mock('../src/config.ts', () => ({ accessHeaders: () => ({}) }));
 vi.mock('../src/composition/world-pictures.ts', () => ({
@@ -26,9 +28,13 @@ vi.mock('../../atlas-react/src/playcanvas/index.ts', () => ({ inhabitantCatalog:
 vi.mock('../../../../tools/previews/world-workspace/moment-pictures.ts', () => ({
   renderBeginningPicture: async () => null,
   // A moment the server would not keep (m6) comes back drawn, with its own bytes; any other comes back kept.
-  renderMomentPicture: async ({ moment }: { moment: { moment_id: string } }) => (moment.moment_id === 'm6'
-    ? { sha256: 'unkept:m6', width: 600, height: 340, unkept: new Blob(['drawn'], { type: 'image/jpeg' }) }
-    : { sha256: 'b'.repeat(64), width: 600, height: 340 }),
+  renderMomentPicture: async ({ moment }: { moment: { moment_id: string } }) => {
+    draws.order.push(moment.moment_id);
+    if (draws.gate) await draws.gate;
+    return moment.moment_id === 'm6'
+      ? { sha256: 'unkept:m6', width: 600, height: 340, unkept: new Blob(['drawn'], { type: 'image/jpeg' }) }
+      : { sha256: 'b'.repeat(64), width: 600, height: 340 };
+  },
 }));
 vi.mock('../../../../tools/previews/world-workspace/portrait-pictures.ts', () => ({
   lookDigest: () => 'd',
@@ -36,6 +42,7 @@ vi.mock('../../../../tools/previews/world-workspace/portrait-pictures.ts', () =>
   // A face the server would not keep (Ines's, on a read-only page) comes back drawn, with its own bytes.
   renderPortrait: async ({ look }: { look: { id: string } }) => {
     people.drawn.push(look.id);
+    draws.order.push(`portrait ${look.id}`);
     return look.id === 'ines'
       ? { sha256: 'unkept:portrait:ines', width: 156, height: 156, unkept: new Blob(['face'], { type: 'image/jpeg' }) }
       : { sha256: 'c'.repeat(64), width: 156, height: 156 };
@@ -92,7 +99,7 @@ function host(extra: Json = {}) {
 
 const teoPage = () => ({ row: { scene: { id: 'teo' } }, events: [], moments: null, things: null, did: null });
 
-afterEach(() => { reads.length = 0; vi.restoreAllMocks(); });
+afterEach(() => { reads.length = 0; draws.order.length = 0; draws.gate = null; vi.restoreAllMocks(); });
 
 describe("a record page's moments", () => {
   it("finds a character's own moment by its request, never someone else's that names the same request", async () => {
@@ -115,6 +122,8 @@ describe("a record page's moments", () => {
     await records.readMoments(showing);
     expect(made.host.read).toHaveBeenCalledWith(`/world/versions/v1/history/moments?world_id=w1&limit=200&recipe=${encodeURIComponent(await recipe())}`);
     expect(records.dayRow(showing, { requestId: 'r1' })).toEqual({ moment: true, title: 'Teo spoke to Ines', said: '“Morning, Ines.”', picture: 'blob:m1' });
+    // A row's picture waits its turn among the day's: it is not the open page's own.
+    expect(made.pictures.momentNow.mock.calls.map((call: unknown[]) => call[1])).toEqual([undefined]);
     // Marco's moment never titles or pictures a row of Teo's, whatever request the row names.
     expect(records.dayRow(showing, { requestId: 'r9' })).toEqual({});
     expect(records.dayRow(showing, { requestId: null, heard: true })).toEqual({});
@@ -297,6 +306,8 @@ describe('a decision, filled', () => {
       picture: 'blob:m1', portraits: [{ name: 'Teo', url: 'blob:portrait-teo' }, { name: 'Ines', url: 'blob:portrait-ines' }],
       ground: 'blob:still', earlier: true, later: false, canCompare: false, toldLabel: "What Teo's model was told",
     });
+    // The decision's picture is the open page's own, drawn ahead of those its day's rows asked for.
+    expect(made.pictures.momentNow).toHaveBeenLastCalledWith(expect.objectContaining({ moment_id: 'm1' }), true);
   });
 
   it('names the minute the decision applied in, as its row does, not the minute it was asked in', async () => {
@@ -514,6 +525,32 @@ describe("a world's pictures", () => {
     reads.length = 0;
     expect(await town.portrait('ines')).toBe('blob:made-3');
     expect(reads).toEqual([]);
+    people.served = false;
+  });
+
+  it("draws the open page's own moment next, after the one drawn now and ahead of every draw still waiting, the newest first", async () => {
+    urls();
+    people.served = true;
+    draws.order.length = 0;
+    let letThrough: () => void = () => {};
+    draws.gate = new Promise((resolve) => { letThrough = resolve; });
+    const pictures = await open();
+    const moment = (id: string) => ({ moment_id: id, scene: { people: [{}] }, picture: null });
+    // Teo's day asks its rows' pictures and Teo's portrait; the first row's is being drawn.
+    for (const id of ['d1', 'd2', 'd3']) expect(pictures.momentNow(moment(id))).toBeNull();
+    expect(pictures.portraitNow('teo')).toBeNull();
+    await vi.waitFor(() => expect(draws.order).toEqual(['d1']));
+    // A decision opens over the day and asks its own moment, then another; then one of the day's rows is opened as one.
+    expect(pictures.momentNow(moment('n1'), true)).toBeNull();
+    expect(pictures.momentNow(moment('n2'), true)).toBeNull();
+    expect(pictures.momentNow(moment('d3'), true)).toBeNull();
+    letThrough();
+    await vi.waitFor(() => expect(draws.order).toHaveLength(6));
+    // The one drawn then is not stopped; the newest lead goes first; the portrait keeps its place among those waiting.
+    expect(draws.order).toEqual(['d1', 'd3', 'n2', 'n1', 'd2', 'portrait teo']);
+    // Each is drawn once, and shown.
+    await vi.waitFor(() => expect(pictures.momentNow(moment('n1'), true)).toMatch(/^blob:made-/));
+    expect(draws.order).toHaveLength(6);
     people.served = false;
   });
 });
