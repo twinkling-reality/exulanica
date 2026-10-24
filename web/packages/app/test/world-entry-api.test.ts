@@ -251,6 +251,22 @@ describe('saved world entry client', () => {
     const baking = { ...ground, tiles: [{ ...ground.tiles[0], state: 'baking' }] };
     await expect(client([wire({ source_kind: 'generated', generated_ground: baking })]).entries())
       .rejects.toThrow('stored bake');
+    // A tile a worker is baking says how many of its bake's steps have ended, of how many: both or
+    // neither, whole, none past the last, and only while it bakes.
+    const stepping = { ...ground, tiles: [{ ...ground.tiles[0], baked_tile_id: null, state: 'baking', steps_finished: 2, steps: 4 }] };
+    const [stepped] = await client([wire({ source_kind: 'generated', generated_ground: stepping })]).entries();
+    expect(stepped!.generatedGround!.tiles[0]).toMatchObject({ state: 'baking', stepsFinished: 2, steps: 4 });
+    const unstated = { ...ground, tiles: [{ ...ground.tiles[0], steps_finished: null, steps: null }] };
+    const [whole] = await client([wire({ source_kind: 'generated', generated_ground: unstated })]).entries();
+    expect(whole!.generatedGround!.tiles[0]).not.toHaveProperty('steps');
+    expect(whole!.generatedGround!.tiles[0]).not.toHaveProperty('stepsFinished');
+    for (const bad of [{ steps_finished: 2.5 }, { steps: null }, { steps_finished: 5 }, { steps: 0, steps_finished: 0 }]) {
+      const tiles = [{ ...stepping.tiles[0], ...bad }];
+      await expect(client([wire({ source_kind: 'generated', generated_ground: { ...stepping, tiles } })]).entries()).rejects.toThrow();
+    }
+    const bakedWithSteps = { ...ground, tiles: [{ ...ground.tiles[0], steps_finished: 4, steps: 4 }] };
+    await expect(client([wire({ source_kind: 'generated', generated_ground: bakedWithSteps })]).entries())
+      .rejects.toThrow('bake steps');
   });
 
   it('reads a world made from a world kind, which declares its site and no tiles', async () => {

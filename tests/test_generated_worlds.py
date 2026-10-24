@@ -49,6 +49,7 @@ from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.generated_worlds import (
     BAKE_JOB_KIND,
     compose_generated_world,
+    generated_tiles,
     generation_receipt,
     town_records,
 )
@@ -544,6 +545,93 @@ def test_a_tile_s_two_bakes_run_at_once(made, tmp_path, monkeypatch):
     count = len(world_recipe("small_town").tiles)
     outcomes = baker.drain([api.repository.workspace_id])
     assert [(o.status, o.detail) for o in outcomes] == [("baked", "stored then identical")] * count
+
+
+def test_a_baking_tile_states_how_far_its_bake_has_come_and_a_baked_one_none(
+    made, tmp_path, monkeypatch
+):
+    """While a worker bakes a tile, the world's tiles say how many of its bake's steps have ended
+    (the town's records, the tile's document, its first and second bakes) of four: both bakes of a
+    tile begin with two ended, a tile not yet taken and a baked one state none, and each job
+    counted all four by its end."""
+    api = made
+    store = tile_store(tmp_path / "data")
+    api.client.app.state.services = dataclasses.replace(api.client.app.state.services, tiles=store)
+    entry = _town(api, "Steps")
+    tiles = entry["generated_ground"]["tiles"]
+    assert [(tile["steps_finished"], tile["steps"]) for tile in tiles] == [(None, None)] * 2
+    baker = _baker(api, store, tmp_path, monkeypatch)
+    stub = GeneratedTileBaker._bake
+    both = threading.Barrier(2, timeout=30)
+    workspace, snapshot = api.repository.workspace_id, uuid.UUID(entry["source_snapshot_id"])
+    seen: list[list[tuple]] = []
+
+    def bake(self, document, container):
+        # Both bakes of the tile read the world's tiles before either ends.
+        both.wait()
+        with api.database.session(workspace) as connection:
+            found = generated_tiles(connection, workspace, entry["world_id"], snapshot)
+        seen.append([(tile.state, tile.steps_finished, tile.steps) for tile in found])
+        both.wait()
+        return stub(self, document, container)
+
+    monkeypatch.setattr(GeneratedTileBaker, "_bake", bake)
+    outcomes = baker.drain([workspace])
+    assert [o.status for o in outcomes] == ["baked", "baked"]
+    assert (
+        seen
+        == [[("baking", 2, 4), ("baking", None, None)]] * 2
+        + [[("baked", None, None), ("baking", 2, 4)]] * 2
+    )
+    tiles = api.entry(entry["entry_id"])["generated_ground"]["tiles"]
+    assert [(t["state"], t["steps_finished"], t["steps"]) for t in tiles] == [
+        ("baked", None, None)
+    ] * 2
+    counted = api.repository.connection.execute(
+        "select progress_completed, progress_total from job where workspace_id=%s and kind=%s "
+        "and payload->>'world_id'=%s",
+        (workspace, BAKE_JOB_KIND, entry["world_id"]),
+    ).fetchall()
+    assert [(row["progress_completed"], row["progress_total"]) for row in counted] == [(4, 4)] * 2
+
+
+def test_a_tile_s_steps_are_its_claimed_job_s_and_start_again_at_each_claim(made):
+    """The steps a baking tile states are its job's while a worker holds it, served on the entry:
+    a claim starts them at none of four, the worker's claim token writes them, a stale token writes
+    nothing, and the job claimed again starts at none."""
+    api = made
+    entry = _town(api, "Claimed")
+    workspace = api.repository.workspace_id
+
+    def steps() -> list[tuple]:
+        tiles = api.entry(entry["entry_id"])["generated_ground"]["tiles"]
+        return [(tile["state"], tile["steps_finished"], tile["steps"]) for tile in tiles]
+
+    with api.database.session(workspace) as connection:
+        job = bake_worker.claim_bake(connection, workspace, worker="probe")
+        assert steps() == [("baking", 0, 4), ("baking", None, None)]
+        bake_worker._stepped(connection, job, 2)
+        bake_worker._stepped(connection, {**job, "claim_token": uuid.uuid4()}, 3)
+        assert steps() == [("baking", 2, 4), ("baking", None, None)]
+        assert bake_worker._requeue(connection, job, delay_seconds=0, error="probe")
+        again = bake_worker.claim_bake(connection, workspace, worker="probe")
+        assert again["job_id"] == job["job_id"]
+        assert steps() == [("baking", 0, 4), ("baking", None, None)]
+        bake_worker._finish(connection, again["job_id"], again["claim_token"], failed="probe")
+
+
+def test_a_bake_step_the_database_refuses_to_record_is_logged_and_the_bake_goes_on(caplog):
+    """A bake's step count is for the page alone: a write of it the database refuses is logged, and
+    the bake goes on to its publish rather than failing the tile."""
+
+    class Refusing:
+        def execute(self, *args, **kwargs):
+            raise psycopg.OperationalError("the server closed the connection")
+
+    job = {"job_id": uuid.uuid4(), "claim_token": uuid.uuid4()}
+    with caplog.at_level("WARNING", logger=bake_worker.__name__):
+        bake_worker._stepped(Refusing(), job, 3)
+    assert f"the bake of job {job['job_id']} could not say 3 of its steps" in caplog.text
 
 
 def test_a_baker_with_two_slots_bakes_a_towns_two_tiles_side_by_side_and_one_slot_one_at_a_time(

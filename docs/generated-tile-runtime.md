@@ -564,8 +564,13 @@ layer; a refusal the server will keep giving is said in words beside the world, 
 cannot load its traffic code opens the world without vehicles and says so
 ([the page's reader](traffic-contract.md#the-pages-reader)). While a tile is still baking, the page draws nothing in its
 place, says the world is being built (`world.generated.baking` in `ui/copy.ts`) and asks for the
-entry again every second, reopening the world once every tile is baked. A tile is drawn only
-once its bake job is done, both of its bakes having agreed. A tile whose two bakes differed is never
+entry again every second, reopening the world once every tile is baked. A baking tile whose job a
+worker has taken also states how far its bake has come: `steps_finished` of `steps`, the four
+`BAKE_STEPS` of `exulanica/ingest/generated_tiles.py` (the town's records generated again, the
+tile's document, its first bake and its second), which the worker writes on the job
+(`progress_completed` of `progress_total`) as each ends, through the job's claim token, so a
+worker whose claim was lost writes nothing; both are null otherwise, and a version's changed tile
+states none. A tile is drawn only once its bake job is done, both of its bakes having agreed. A tile whose two bakes differed is never
 served, a tile whose bake job failed (the tessellator refused it, a publish was refused through
 every claim, or every claim was stranded) is never drawn, and in either case the page says the world
 is not drawn rather than waiting. A failed tile is baked again only when asked:

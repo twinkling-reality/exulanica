@@ -1948,14 +1948,18 @@
       "tile_y": 0,
       "tile_inputs_digest": "0000000000000000000000000000000000000000000000000000000000000000",
       "baked_tile_id": null,
-      "state": "baking"
+      "state": "baking",
+      "steps_finished": null,
+      "steps": null
      },
      {
       "tile_x": 1,
       "tile_y": 0,
       "tile_inputs_digest": "0000000000000000000000000000000000000000000000000000000000000000",
       "baked_tile_id": null,
-      "state": "baking"
+      "state": "baking",
+      "steps_finished": null,
+      "steps": null
      }
     ],
     "specification": "world-specification.v2",

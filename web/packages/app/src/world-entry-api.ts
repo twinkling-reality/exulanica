@@ -234,6 +234,12 @@ export interface GeneratedTile {
   /** The stored bake the page reads through the world's version, once one is stored. */
   readonly bakedTileId: string | null;
   readonly state: 'baked' | 'baking' | 'failed';
+  /**
+   * While it bakes and a worker has taken it: how many of its bake's steps have ended (the town's
+   * records, the tile's document, its first and second bakes), of `steps`; absent otherwise.
+   */
+  readonly stepsFinished?: number;
+  readonly steps?: number;
 }
 
 /** A generated world's drawing, in its region's frame: millimetres east, up and south. */
@@ -1198,12 +1204,21 @@ function parseGeneratedGround(value: unknown): GeneratedGround | null {
       if ((state === 'baked' && bakedTileId === null) || (state === 'baking' && bakedTileId !== null)) {
         throw new TypeError('A baked generated tile names its stored bake, and one still baking none.');
       }
+      const finished = one['steps_finished'] ?? null, steps = one['steps'] ?? null;
+      if ((finished === null) !== (steps === null) || (steps !== null && state !== 'baking')) {
+        throw new TypeError('A generated tile states its finished bake steps and their number together, and only while it bakes.');
+      }
+      const stepped = steps === null ? null : { stepsFinished: integer(finished, 'finished bake steps'), steps: positiveInteger(steps, 'bake steps') };
+      if (stepped !== null && (stepped.stepsFinished < 0 || stepped.stepsFinished > stepped.steps)) {
+        throw new TypeError('Invalid finished bake steps.');
+      }
       return Object.freeze({
         tileX: integer(one['tile_x'], 'tile x'),
         tileY: integer(one['tile_y'], 'tile y'),
         tileInputsDigest: sha256(one['tile_inputs_digest'], 'tile inputs digest'),
         bakedTileId,
         state,
+        ...(stepped ?? {}),
       });
     })),
   });

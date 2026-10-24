@@ -150,6 +150,11 @@ class GeneratedTileView(BaseModel):
     #: ``baked`` when its bytes are served, ``baking`` while none is stored, ``failed`` when a
     #: stored bake was found nondeterministic and is never served.
     state: Literal["baked", "baking", "failed"]
+    #: While it bakes and a worker has taken it: how many of its bake's steps have ended (the
+    #: town's records, the tile's document, its first and second bakes), of ``steps``; null
+    #: otherwise, so a page counts a tile whole where these are absent.
+    steps_finished: int | None = None
+    steps: int | None = None
 
 
 class GeneratedGroundView(BaseModel):

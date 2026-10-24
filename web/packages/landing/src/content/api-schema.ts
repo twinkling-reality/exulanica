@@ -1556,6 +1556,28 @@ export const API_SCHEMA: ApiSpec = {
             "failed"
           ],
           "title": "State"
+        },
+        "steps_finished": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Steps Finished"
+        },
+        "steps": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Steps"
         }
       },
       "additionalProperties": false,

@@ -137,6 +137,11 @@ class GeneratedTile:
     #: tessellator refused the tile, a publish was refused through every claim, or every claim was
     #: stranded).
     state: Literal["baked", "baking", "failed"]
+    #: While ``baking`` and its job is claimed: how many of its bake's steps have ended, of
+    #: ``steps`` (``exulanica.ingest.generated_tiles.BAKE_STEPS``: the town's records, the tile's
+    #: document, its first and second bakes), as its job counts them; None otherwise.
+    steps_finished: int | None = None
+    steps: int | None = None
 
 
 _records_lock = threading.Lock()
@@ -672,7 +677,8 @@ def generated_tiles(
         bake = current_bake(connection, inputs)
         with connection.cursor(row_factory=dict_row) as cursor:
             job = cursor.execute(
-                "select state from job where workspace_id=%s and kind=%s "
+                "select state, progress_completed, progress_total from job "
+                "where workspace_id=%s and kind=%s "
                 "and payload->>'world_id'=%s and payload->'tile'=%s "
                 "order by created_at desc, job_id desc limit 1",
                 (workspace_id, BAKE_JOB_KIND, world_id, Jsonb([tile_x, tile_y])),
@@ -691,6 +697,7 @@ def generated_tiles(
             state = "baked"
         else:
             state = "baking"
+        counted = state == "baking" and job is not None and job["progress_total"] is not None
         found.append(
             GeneratedTile(
                 tile_x=tile_x,
@@ -698,6 +705,8 @@ def generated_tiles(
                 tile_inputs_digest=inputs,
                 baked_tile_id=None if bake is None or state == "baking" else bake.baked_tile_id,
                 state=state,
+                steps_finished=int(job["progress_completed"]) if counted else None,
+                steps=int(job["progress_total"]) if counted else None,
             )
         )
     if changes:

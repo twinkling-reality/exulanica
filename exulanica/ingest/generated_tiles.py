@@ -26,6 +26,11 @@ drains them one workspace at a time, baking as many of a workspace's tiles at on
    A tile is drawn only once its job is done, both bakes agreed and stored
    (:func:`~exulanica.world.generated_worlds.generated_tiles`).
 
+While it bakes, the job says how many of the bake's :data:`BAKE_STEPS` have finished
+(``progress_completed`` of ``progress_total``, set to their number at each claim), written as each
+ends through the job's claim token, so a worker whose claim was lost writes nothing; the world's
+entry serves it on the baking tile, and the page's opening moves its bar on it.
+
 A baked tile is keyed by the digest over its inputs, so a tile two worlds share is baked and stored
 once. A tile whose second bake differs is marked by the database and is never served.
 
@@ -43,6 +48,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import random
 import subprocess
@@ -50,7 +56,7 @@ import tempfile
 import time
 import uuid
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -83,6 +89,7 @@ from exulanica.world.version_tiles import (
 )
 
 __all__ = [
+    "BAKE_STEPS",
     "BAKE_TIMEOUT_SECONDS",
     "LOCK_WAIT_SECONDS",
     "MAXIMUM_CLAIMS",
@@ -96,6 +103,9 @@ __all__ = [
     "claim_bake",
 ]
 
+#: The steps of one tile's bake, in the order they end, as its job counts them for the page: the
+#: town's records generated again, the tile's document, then each of its two bakes as it ends.
+BAKE_STEPS: Final = ("records", "tile document", "first bake", "second bake")
 #: How long one tessellator run may take before it is stopped. One bake of the small town's tile
 #: took 13.3 s on the development machine under load; a tile that takes twenty times that is not
 #: making progress, and the job is failed with the reason rather than left running.
@@ -198,13 +208,14 @@ def claim_bake(
         return cursor.execute(
             "update job set state='running', claimed_by=%s, claimed_at=now(), "
             "attempts=attempts+1, claim_token=gen_random_uuid(), "
-            "lease_expires_at=now()+make_interval(secs => %s) "
+            "lease_expires_at=now()+make_interval(secs => %s), "
+            "progress_completed=0, progress_total=%s "
             "where job_id=(select job_id from job where workspace_id=%s and kind=any(%s) "
             "and ((state='queued' and run_after<=now()) "
             "or (state='running' and lease_expires_at<now() and attempts<%s)) "
             "order by priority, job_id for update skip locked limit 1) "
             "returning job_id, kind, payload, claim_token, attempts",
-            (worker, LEASE_SECONDS, workspace_id, list(kinds), MAXIMUM_CLAIMS),
+            (worker, LEASE_SECONDS, len(BAKE_STEPS), workspace_id, list(kinds), MAXIMUM_CLAIMS),
         ).fetchone()
 
 
@@ -232,6 +243,26 @@ def abandon_stranded(
             "and attempts>=%s returning job_id, payload, last_error",
             (workspace_id, list(kinds), MAXIMUM_CLAIMS),
         ).fetchall()
+
+
+def _stepped(connection: psycopg.Connection, job: Mapping[str, Any], finished: int) -> None:
+    """Say on a claimed job how many of its bake's :data:`BAKE_STEPS` have finished; nothing once
+    its claim is no longer this worker's. The count is for the page alone, so a write the database
+    refuses is logged and the bake goes on: its publish has its own tries, and its end its own
+    record."""
+    try:
+        connection.execute(
+            "update job set progress_completed=%s "
+            "where job_id=%s and claim_token=%s and state='running'",
+            (finished, job["job_id"], job["claim_token"]),
+        )
+    except psycopg.Error as exc:
+        logging.getLogger(__name__).warning(
+            "the bake of job %s could not say %s of its steps had ended: %s",
+            job["job_id"],
+            finished,
+            exc,
+        )
 
 
 def _finish(
@@ -391,11 +422,17 @@ class GeneratedTileBaker:
             payload = job["payload"]
             world_id = str(payload["world_id"])
             tile = (int(payload["tile"][0]), int(payload["tile"][1]))
+
+            def finished(steps: int) -> None:
+                _stepped(connection, job, steps)
+
             try:
                 if job["kind"] == VERSION_BAKE_JOB_KIND:
-                    key, answers = self._bake_version(connection, workspace_id, job)
+                    key, answers = self._bake_version(connection, workspace_id, job, finished)
                 else:
-                    key, answers = self._bake_public(connection, workspace_id, payload, tile)
+                    key, answers = self._bake_public(
+                        connection, workspace_id, payload, tile, finished
+                    )
             except PublishRefused as exc:
                 # Refused for the moment through every try: a reader held the asset read lock or
                 # the connection dropped. Back to the queue while claims remain; a job that used
@@ -428,17 +465,21 @@ class GeneratedTileBaker:
         workspace_id: uuid.UUID,
         payload: Mapping[str, Any],
         tile: tuple[int, int],
+        finished: Callable[[int], None],
     ) -> tuple[uuid.UUID, list[str]]:
-        """Bake a world's public tile from its records as its receipt generates them."""
+        """Bake a world's public tile from its records as its receipt generates them, saying
+        through ``finished`` how many of its :data:`BAKE_STEPS` have ended."""
         generated = town_records(
             connection, workspace_id, str(payload["world_id"]), uuid.UUID(payload["snapshot_id"])
         )
         if generated.receipt_sha256 != payload["receipt_sha256"]:
             raise ValueError("the job names another receipt than the world's snapshot")
+        finished(1)
         composer = generated.receipt["composer"]
         module = composer_module(composer["key"], composer["version"])
         documents = module.tile_documents(generated.receipt, generated.records)
         document = next(d for d in documents if (d.tile.tile_x, d.tile.tile_y) == tile)
+        finished(2)
         return self._bake_and_publish(
             document,
             module,
@@ -452,6 +493,7 @@ class GeneratedTileBaker:
                 }
             },
             lambda fields, container: self._publish(fields),
+            finished,
         )
 
     @staticmethod
@@ -472,12 +514,17 @@ class GeneratedTileBaker:
         return BakeOutcome(job["job_id"], world_id, tile, "baked", " then ".join(answers), key)
 
     def _bake_version(
-        self, connection: psycopg.Connection, workspace_id: uuid.UUID, job: Mapping[str, Any]
+        self,
+        connection: psycopg.Connection,
+        workspace_id: uuid.UUID,
+        job: Mapping[str, Any],
+        finished: Callable[[int], None],
     ) -> tuple[uuid.UUID, list[str]]:
         """Bake a version's changed tile from the town's records with the version's changes, read
         from the version (the job names only the version and their fold, so a person's changes live
         in the version alone and go with it), its tile record carrying their fold, held to the key
-        the job names, and publish both bakes as the workspace's own."""
+        the job names, and publish both bakes as the workspace's own, saying through ``finished``
+        how many of its :data:`BAKE_STEPS` have ended."""
         stores = self._version_stores
         if stores is None:  # claim_bake was not given the kind; a job here is a programming error
             raise RuntimeError("a version bake reached a baker with no version tiles namespaces")
@@ -495,6 +542,7 @@ class GeneratedTileBaker:
         generated = town_records_with(connection, workspace_id, world_id, snapshot_id, changes)
         if generated.receipt_sha256 != payload["receipt_sha256"]:
             raise ValueError("the job names another receipt than the world's snapshot")
+        finished(1)
         composer = generated.receipt["composer"]
         module = composer_module(composer["key"], composer["version"])
         tile = (int(payload["tile"][0]), int(payload["tile"][1]))
@@ -504,6 +552,7 @@ class GeneratedTileBaker:
         )
         if tile_inputs_digest(document.tile) != payload["tile_inputs_digest"]:
             raise ValueError("the job names another key than its changes make of the tile")
+        finished(2)
         store = stores.for_workspace(workspace_id)
 
         def publish(fields: Mapping[str, Any], container: bytes) -> str:
@@ -526,7 +575,7 @@ class GeneratedTileBaker:
                 pending.append(container)
             return self._publish_version(workspace_id, job, fields)
 
-        return self._bake_and_publish(document, module, {}, publish)
+        return self._bake_and_publish(document, module, {}, publish, finished)
 
     def _publish_version(
         self, workspace_id: uuid.UUID, job: Mapping[str, Any], fields: Mapping[str, Any]
@@ -618,8 +667,10 @@ class GeneratedTileBaker:
         module: Any,
         provenance: Mapping[str, Any],
         publish: Callable[[Mapping[str, Any], bytes], str],
+        finished: Callable[[int], None],
     ) -> tuple[uuid.UUID, list[str]]:
-        """Bake ``document`` twice, both at once, and publish each bake in turn with
+        """Bake ``document`` twice, both at once, saying through ``finished`` as each bake ends
+        (the third and fourth of :data:`BAKE_STEPS`), and publish each bake in turn with
         ``publish(fields, container)``; the receipt carries ``provenance`` beside the stage and the
         bake's statement."""
         spec = STAGES["baked_tile"]
@@ -635,11 +686,14 @@ class GeneratedTileBaker:
                 for bake in ("first", "second")
             ]
             # The same work on the same document, a child process each: side by side they take
-            # the time of one. The first is still published first.
+            # the time of one. The first is still published first. Each bake's end is counted on
+            # this thread, the one the job's connection is used from, as it comes.
             with ThreadPoolExecutor(max_workers=len(containers)) as bakes:
-                statements = list(
-                    bakes.map(lambda path: self._bake(document_path, path), containers)
-                )
+                running = [bakes.submit(self._bake, document_path, path) for path in containers]
+                for step, ended in enumerate(as_completed(running), start=3):
+                    ended.result()
+                    finished(step)
+                statements = [bake.result() for bake in running]
             for container_path, statement in zip(containers, statements, strict=True):
                 container = container_path.read_bytes()
                 if hashlib.sha256(container).hexdigest() != statement["container_sha256"]:
