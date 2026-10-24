@@ -298,6 +298,19 @@ export function timeRange(from, to) {
 }
 
 /**
+ * The names an Ask answer's beings are drawn by (D2, DESIGN 13:41 item 2): the society's names for the answer's
+ * version, every being in them named as the page names it inside a sentence (`nameOf`: a made creature "the round
+ * duck", a villager by name), the one asked about (`subjectId`) included; a society read for another version
+ * lends no names and no places, so only the one asked about is drawn.
+ */
+export function askNames({ known, versionId, subjectId, nameOf }) {
+  const same = known?.versionId === versionId;
+  const ids = [...new Set([...(same ? known.people.keys() : []), subjectId])];
+  return { versionId, people: new Map(ids.map(id => [id, nameOf(id) ?? known?.people?.get(id) ?? null]).filter(([, name]) => name)),
+    spots: same ? known.spots : new Map() };
+}
+
+/**
  * Folds the same choice made several times in a row into one row (R5e item 3): consecutive rows, newest first, each
  * a model's or a decider's choice (a row with `chose`) that made no moment of its own (`foldable(row)`), choosing the
  * same thing with the same model. The row keeps the newest decision, which [Enter] opens, spans its oldest to its

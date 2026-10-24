@@ -207,6 +207,16 @@ describe('asking about the people in a world', () => {
     );
   });
 
+  it('opens a sentence with a capital where it draws a name written in lowercase (D2)', () => {
+    const society: SocietyNames = { versionId: VERSION, people: new Map([[ARI, 'the round duck']]), spots: new Map([[BENCH, 'the bench']]) };
+    const pieces = drawSimulated(
+      [{ kind: 'text', text: '[inhabitant A] rested. Then [inhabitant A] sat at [spot A].' }],
+      { inhabitants: { '[inhabitant A]': { versionId: VERSION, inhabitantId: ARI } }, spots: { '[spot A]': BENCH } },
+      society,
+    );
+    expect(pieces.map((piece) => piece.text).join('')).toBe('The round duck rested. Then the round duck sat at the bench.');
+  });
+
   it('offers each simulation citation as simulation, and opens it by its index', async () => {
     const { answer } = await askWhy();
     const opened: number[] = [];

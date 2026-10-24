@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { called } from './character-words.mjs';
-import { chosenCard, chosenDecision, didRows, doingLine, easePose, ownPeople, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords, timeRange } from './character-view.mjs';
+import { askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, ownPeople, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords, timeRange } from './character-view.mjs';
 import { defaultRunLimits } from './run-words.mjs';
 
 // Names: a being named only by its body is called by its kind; a thing by its own name or look.
@@ -228,4 +228,14 @@ assert.equal(easePose({ x: 0, y: 0, z: 0, yaw: 0, pitch: 0 }, { x: 2, y: 2, z: 2
   ], subjectId: 't', wordGoal: () => null, modelName: () => null });
   assert.deepEqual(rows.map(row => row.sub), ['A person playing', 'An outside program']);
 }
+// D2: an Ask answer's beings are drawn as the page names them inside a sentence, a made creature by its own name and
+// the one asked about included; a society read for another version lends neither names nor places.
+const pageNames = { duck: 'the round duck', ari: 'Ari Ash', teo: 'Teo' };
+const societyRead = { versionId: 'v1', people: new Map([['duck', 'Winged two legged creature 2'], ['ari', 'Ari Ash']]), spots: new Map([['bench', 'Bench 2']]) };
+const drawnBy = askNames({ known: societyRead, versionId: 'v1', subjectId: 'teo', nameOf: id => pageNames[id] });
+assert.deepEqual([...drawnBy.people], [['duck', 'the round duck'], ['ari', 'Ari Ash'], ['teo', 'Teo']]);
+assert.equal(drawnBy.spots.get('bench'), 'Bench 2');
+const elsewhere = askNames({ known: societyRead, versionId: 'v2', subjectId: 'teo', nameOf: id => pageNames[id] });
+assert.deepEqual([[...elsewhere.people], elsewhere.spots.size], [[['teo', 'Teo']], 0]);
+assert.deepEqual([...askNames({ known: null, versionId: 'v1', subjectId: 'teo', nameOf: () => null }).people], []);
 console.log('Character view checks passed: names, the doing line, which decision chose, the card, the tag, the ring, the prompt, the run question, the rows and the page camera.');

@@ -47,7 +47,8 @@ export interface SimulatedReferences {
 
 const startsSentence = (before: string): boolean => before.trim() === '' || /[.!?:]\s+$/.test(before);
 
-/** Each text piece with the simulated placeholders it carries drawn from `society`. */
+/** Each text piece with the simulated placeholders it carries drawn from `society`; what is drawn at the start of a
+ * sentence begins with a capital ("The round duck rested."). */
 export function drawSimulated(
   pieces: readonly SpokenPiece[],
   answer: SimulatedReferences,
@@ -74,7 +75,7 @@ export function drawSimulated(
         ? undefined
         : (subject === 'inhabitant' ? society.people : society.spots).get(id);
       const said = name ?? phrase(subject === 'inhabitant' ? 'inhabitant_unresolved' : 'place_gone');
-      const text = name === undefined && startsSentence(before + piece.text.slice(0, start))
+      const text = startsSentence(before + piece.text.slice(0, start))
         ? said.charAt(0).toUpperCase() + said.slice(1)
         : said;
       drawn.push({ kind: 'simulated', text, placeholder, subject, id, drawn: name !== undefined });

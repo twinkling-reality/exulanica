@@ -12,7 +12,7 @@ import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
 import { SAID_READ, choosableModels, deciderOf, freeHere, groupContent, keepLastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, offersModels, openWhileOffered, questionGroup } from './character-group.mjs';
-import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, ownPeople, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
+import { PAGE_FRAMING, PERSON_RING_METRES, askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, ownPeople, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
 import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, outOfViewNote, pageSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
@@ -830,10 +830,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
           return { row: fresh, inventory, offer: await entityOffer(fresh, true) };
         } });
       if (!still()) return;
-      // The answer names people and places by placeholder; they are drawn by this world's names.
-      const known = selection.societyNames?.();
-      const names = known?.versionId === entry.authoredVersionId ? { ...known, people: new Map(known.people) } : { versionId: entry.authoredVersionId, people: new Map(), spots: new Map() };
-      names.people.set(showing.row.scene.id, who.title);
+      // The answer names people and places by placeholder; they are drawn by this world's names, each being as the page names it (D2).
+      const names = askNames({ known: selection.societyNames?.(), versionId: entry.authoredVersionId, subjectId: showing.row.scene.id, nameOf: calledWithin });
       const drawn = text => drawSimulated([{ kind: 'text', text }], answer, names).map(piece => piece.text).join('');
       ask.asked = askWords(aspect, who);
       ask.answer = answer.clauses.map(clause => ({ text: drawn(clause.text), note: clause.type === 'meta' }));
