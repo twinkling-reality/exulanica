@@ -865,14 +865,18 @@ with the account it is charged to (`provider` and `provider_description`) and it
 (`assets/catalogs/request-envelopes/`, the most bytes its request may send, never more than the
 model's context window) and the route's answer bound, at the manifest's prices, for a form and one
 repair, each sent as often as the client may send it (every fallback and retry), at the route's
-dearest model. A draft runs under those two bounds: its client's chain refuses an attempt larger
-than either before sending it, so neither a reported cost nor the reservation an attempt of unknown
-outcome keeps passes the price; a typical draft spends a small part of it. A request's escaped JSON
-bytes bound its input tokens, since a tokenizer that works on bytes makes no token of less than one.
-Where the catalog names no envelope for the drafter, the basis is `full_context_ceiling`, each
-dispatch priced at a whole context window. The
-reservation an attempt holds counts prompt characters at a fixed rate and leaves out the form's
-schema, so it is no bound and the price does not use it. With no model client the price is null. `GET /things/creatures/drafts` lists the requester's own drafts, newest
+dearest model. A draft runs under those two bounds, kept with its job when it is asked for, so a
+catalog changed while it waits changes nothing for it (a job queued before they were kept runs under
+the catalog's): its client's chain refuses an attempt larger than either before sending it, so
+neither a reported cost nor the reservation an attempt of unknown outcome keeps passes the price; a
+typical draft spends a small part of it. A request's escaped JSON bytes bound its input tokens,
+since a tokenizer that works on bytes makes no token of less than one. Under those bounds each
+attempt is reserved, and admitted by the durable authority, at its own worst case: its request's
+bytes as tokens and its whole answer, so a report never passes what the attempt held and a grant is
+never spent past its ceiling. Where the catalog names no envelope for the drafter, the basis is
+`full_context_ceiling`, each dispatch priced at a whole context window, and an attempt is reserved
+at an estimate that counts prompt characters at a fixed rate, which is no bound and which the price
+does not use. With no model client the price is null. `GET /things/creatures/drafts` lists the requester's own drafts, newest
 first, so a reload finds one still running; a draft states when it was asked, when a worker first
 took it and when it ended.
 

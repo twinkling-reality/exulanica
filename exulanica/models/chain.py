@@ -409,6 +409,10 @@ class ModelChain:
                     provider=spec.provider,
                     reason="world_draft_request_limit_exceeded",
                 )
+            # Each attempt is then held at its own worst case, as its price counts it: every byte
+            # it sends as a token (a tokenizer makes no token of less than one), in place of the
+            # characters' estimate, which leaves the schema out and a report could pass.
+            prompt_chars, extra_prompt_tokens = 0, size + extra_prompt_tokens
         for attempt in range(1, self._max_attempts + 1):
             wait = timeout
             cut = False

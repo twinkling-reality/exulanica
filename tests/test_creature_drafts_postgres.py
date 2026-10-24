@@ -296,6 +296,49 @@ def test_a_draft_is_held_to_the_request_envelope_its_price_is_counted_at(served,
         assert failed is not None and failed.status == "failed"
 
 
+def test_a_draft_is_held_to_the_bounds_it_was_asked_under_whatever_the_catalog_says_later(
+    served, monkeypatch
+):
+    """A draft keeps the bounds its price was counted at with its job: a catalog changed while it
+    waits (an upgrade) neither lets it send more than its offer said nor refuses what that offer
+    counted. A job queued before bounds were kept plays under the catalog's (AUDIT's A1 O1)."""
+    database, workspace_id, stores = served
+    shipped = drafts.request_bytes_at_most
+    envelope: dict[str, int | None] = {"bytes": 256}
+    monkeypatch.setattr(
+        drafts,
+        "request_bytes_at_most",
+        lambda role: shipped(role) if envelope["bytes"] is None else envelope["bytes"],
+    )
+    with database.session(workspace_id) as connection:
+        small = _queue(connection, workspace_id, uuid.uuid4())
+        assert _payload(connection, small)["limits"]["request_bytes_at_most"] == 256
+    # The catalog grows before it plays: still held to what it was asked under, nothing sent.
+    envelope["bytes"] = None
+    transport = _transport(form_of("horse", label="hill walker"))
+    assert _worker(database, workspace_id, stores, transport).run_once(workspace_id) == "failed"
+    assert transport.requests == []
+    # Asked under the catalog as shipped, then the catalog shrinks: it plays as its offer counted.
+    with database.session(workspace_id) as connection:
+        whole = _queue(connection, workspace_id, uuid.uuid4())
+        kept = _payload(connection, whole)["limits"]["request_bytes_at_most"]
+        assert kept == shipped(Role.CREATURE_DRAFTER) > 256
+    envelope["bytes"] = 256
+    transport = _transport(form_of("horse", label="hill walker"))
+    assert _worker(database, workspace_id, stores, transport).run_once(workspace_id) == "kept"
+    assert transport.requests
+    # A job that keeps no bounds (queued before they were kept) plays under the catalog's.
+    with database.session(workspace_id) as connection:
+        older = _queue(connection, workspace_id, uuid.uuid4())
+        connection.execute(
+            "update job set payload = payload - 'limits' where job_id=%s", (older.job_id,)
+        )
+        assert "limits" not in _payload(connection, older)
+    transport = _transport(form_of("horse", label="hill walker"))
+    assert _worker(database, workspace_id, stores, transport).run_once(workspace_id) == "failed"
+    assert transport.requests == []
+
+
 def test_what_a_draft_spent_is_read_from_its_own_recorded_attempts(bench, tmp_path):
     workspace_id = uuid.uuid4()
     authority = bench.issue(ceiling="1")

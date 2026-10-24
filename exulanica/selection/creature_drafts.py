@@ -525,11 +525,17 @@ def create_draft(
         raise DraftNotOffered("creatures are not drafted for this workspace here")
     check_line(words, maximum=MAX_WORDS_CHARACTERS)
     draft_id = uuid.uuid4()
-    payload = {
+    payload: dict[str, Any] = {
         "draft_id": str(draft_id),
         "sent": sent,
         "placeholders": {str(entity): label for entity, label in placeholders.items()},
     }
+    # The bounds its offer was priced at, kept with the job, so a catalog changed while it waits
+    # never lets it send more than its offer said.
+    held = draft_limits(load_manifest())
+    if held is not None:
+        request, answer = held[DRAFTER_ROLE]
+        payload["limits"] = {"request_bytes_at_most": request, "answer_tokens_at_most": answer}
     with connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
         lock_workspace(connection, workspace_id)
         if cursor.execute(
@@ -579,6 +585,9 @@ class ClaimedDraft:
     draft: CreatureDraft
     sent: str = field(repr=False)
     placeholders: Mapping[uuid.UUID, str] = field(repr=False)
+    #: The request and answer bounds the draft was started under (its job's payload), or None for
+    #: a job queued before bounds were kept with it, which plays under the catalog's.
+    limits: Mapping[Role, tuple[int, int]] | None = None
 
 
 def _fail_orphan(cursor: psycopg.Cursor[Any], job_id: uuid.UUID) -> None:
@@ -623,6 +632,7 @@ def claim(
                     uuid.UUID(entity): str(label)
                     for entity, label in payload["placeholders"].items()
                 }
+                limits = _limits_of(payload.get("limits"))
             except (AttributeError, KeyError, TypeError, ValueError):
                 _fail_orphan(cursor, job["job_id"])
                 continue
@@ -643,7 +653,19 @@ def claim(
             draft=_draft(row),
             sent=sent,
             placeholders=placeholders,
+            limits=limits,
         )
+
+
+def _limits_of(kept: Any) -> dict[Role, tuple[int, int]] | None:
+    """The bounds a job's payload keeps, or None where it keeps none; a kept value that is not two
+    positive whole numbers is refused (``ValueError``), as any malformed payload is."""
+    if kept is None:
+        return None
+    request, answer = kept["request_bytes_at_most"], kept["answer_tokens_at_most"]
+    if type(request) is not int or type(answer) is not int or request < 1 or answer < 1:
+        raise ValueError("a creature job's kept bounds are not two positive whole numbers")
+    return {DRAFTER_ROLE: (request, answer)}
 
 
 def _claim_held(connection: psycopg.Connection, claimed: ClaimedDraft) -> bool:
@@ -913,8 +935,9 @@ class CreatureDraftWorker:
     def _play(self, claimed: ClaimedDraft) -> str:
         workspace_id = claimed.workspace_id
         client = self._client.with_policy(self._policy_for(workspace_id))
-        # Held to the bounds its price states: an attempt larger than either is refused unsent.
-        held = draft_limits(client.manifest)
+        # Held to the bounds its price stated when it was asked for (else, for a job queued before
+        # they were kept, the catalog's): an attempt larger than either is refused unsent.
+        held = claimed.limits if claimed.limits is not None else draft_limits(client.manifest)
         if held is not None:
             client = client.with_prices({}, limits=held)
         status = "failed"

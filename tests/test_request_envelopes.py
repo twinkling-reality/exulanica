@@ -14,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import datetime as dt
 import json
+import uuid
 from collections.abc import Callable
 from decimal import ROUND_CEILING, Decimal
 from typing import Any
@@ -24,10 +25,11 @@ from exulanica.api.world_draft_offer import operation_sheet, stages
 from exulanica.api.world_draft_worker import limits
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
-from exulanica.models.errors import ProviderRefused
+from exulanica.models.errors import BudgetExceededError, ProviderRefused
 from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.provider_catalog import ProviderPrice
 from exulanica.models.request_envelopes import PROFILE, read, request_bytes_at_most
+from exulanica.models.spending import SpendingTicket, spending_request_key
 from exulanica.models.usage import USD_QUANTUM
 from exulanica.references.render import MAX_BLOCK_BYTES
 from exulanica.selection import (
@@ -256,3 +258,66 @@ def test_a_creature_draft_is_priced_at_its_envelope_and_held_to_it(client, manif
         )
     assert refused.value.reason == "world_draft_request_limit_exceeded"
     assert transport.call_count == 0
+
+
+class _Holds:
+    """A durable authority that admits every attempt, keeping what each was held at."""
+
+    def __init__(self) -> None:
+        self.held: list[Decimal] = []
+
+    def admit(self, request):
+        self.held.append(request.usd)
+        return SpendingTicket(uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), request.usd, request.key)
+
+    def dispatch(self, ticket) -> None:
+        pass
+
+    def settle(self, ticket, usage) -> None:
+        pass
+
+    def release(self, ticket) -> None:
+        pass
+
+
+def test_an_attempt_under_its_priced_bounds_is_held_at_its_own_worst_case(manifest):
+    """Under the bounds its price counts, an attempt is admitted and reserved at its own worst case:
+    every byte of its request as a token and its whole answer, never the characters' estimate (the
+    schema and the escapes left out), which a report could pass. A report at that worst case then
+    settles at no more than was held."""
+    role = creature_drafting.DRAFTER_ROLE
+    binding = manifest[role]
+    answer = binding.default_max_tokens if binding.max_tokens is None else binding.max_tokens.value
+    held = {role: (request_bytes_at_most(role), answer)}
+    words = [{"role": "user", "content": LONGEST * 200}]
+
+    def ask(budget: BudgetGuard) -> tuple[FakeTransport, _Holds]:
+        transport, gate = FakeTransport(), _Holds()
+        client = ModelClient(
+            api_key="test-key-not-real",
+            manifest=manifest,
+            transport=transport,
+            budget=budget,
+            policy=RecordingPolicy(),
+        )
+        with spending_request_key("request-envelope-check"):
+            client.with_prices({}, limits=held).with_spending(gate).chat(
+                role,
+                words,
+                prompt_version="request-envelope-check",
+                max_tokens=answer,
+                use_cache=False,
+            )
+        return transport, gate
+
+    transport, gate = ask(BudgetGuard(ceiling_usd=Decimal(100), max_calls=10))
+    (sent,) = transport.requests
+    size = len(json.dumps(sent["payload"], ensure_ascii=True).encode("ascii"))
+    spec = binding.primary
+    worst = spec.cost_usd(prompt_tokens=size, completion_tokens=answer).quantize(USD_QUANTUM)
+    assert gate.held == [worst]
+    # The characters' estimate it was held at before is less: a report could have passed it.
+    assert BudgetGuard().estimate_usd(spec, prompt_chars=200, max_tokens=answer) < worst
+    # The process's own guard reserves the same: a ceiling a quantum short of it sends nothing.
+    with pytest.raises(BudgetExceededError):
+        ask(BudgetGuard(ceiling_usd=worst - USD_QUANTUM, max_calls=10))

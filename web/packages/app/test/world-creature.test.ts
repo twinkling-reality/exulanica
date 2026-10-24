@@ -69,7 +69,7 @@ describe('making a creature where it will stand', () => {
     expect(calls.marked.length).toBeGreaterThan(0);
     expect(calls.marked.every((marked) => marked === stand)).toBe(true);
     expect(root.textContent).toContain('The creature appears here');
-    expect(root.textContent).toContain('An AI model makes the creature from your words: at most $0.37, about 18 seconds.');
+    expect(root.textContent).toContain('An open model, Nemotron 3 Super 120B, makes the creature from your words: at most $0.37, about 18 seconds, and you see what it really spent.');
   });
 
   it('with no stand open marks nothing, and with no price says only what makes it', async () => {
@@ -78,8 +78,16 @@ describe('making a creature where it will stand', () => {
     await openCreatureScreen(deps);
     expect(calls.marked).toEqual([null]);
     expect(root.textContent).not.toContain('The creature appears here');
-    expect(root.textContent).toContain('An AI model makes the creature from your words.');
+    expect(root.textContent).toContain('An open model, Nemotron 3 Super 120B, makes the creature from your words.');
     expect(root.textContent).not.toContain('seconds');
+    expect(root.textContent).not.toContain('really spent');
+  });
+
+  it('says an open model makes it without a name where the offer names none', async () => {
+    const { openCreatureScreen } = await screen();
+    const { deps, root } = world({ offer: { ...offer, model: null } });
+    await openCreatureScreen(deps);
+    expect(root.textContent).toContain('An open model makes the creature from your words: at most $0.37, about 18 seconds, and you see what it really spent.');
   });
 
   it('makes the words into a draft, follows it until kept, and holds the kind at the stand for build mode to place', async () => {

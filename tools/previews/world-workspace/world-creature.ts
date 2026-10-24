@@ -125,7 +125,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
 
   function lineUnder(): void {
     if (offer !== null && !offer.offered) { field.line(REFUSED[offer.code ?? ''] ?? CREATURE_WORDS.notOffered, true); return; }
-    field.line(makerLine(offer?.priceUsdAtMost ?? null, offer?.timing.typicalSeconds ?? null));
+    field.line(makerLine(offer?.priceUsdAtMost ?? null, offer?.timing.typicalSeconds ?? null, offer?.model?.name ?? null));
   }
   function showStand(): void {
     const at = deps.mark(stand);

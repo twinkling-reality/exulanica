@@ -37,7 +37,10 @@ export const CREATURE_WORDS = Object.freeze({
   wentWrong: 'Something went wrong while making it, so nothing was made. Try again.',
   takingLonger: 'This is taking longer than usual. The creature waits in Creatures when it\'s done.',
   placingNow: 'Placing…',
-  maker: 'An AI model makes the creature from your words',
+  /** The line under the field begins with what makes it: an open model, named where the offer names one (DESIGN, A1). */
+  maker: 'An open model',
+  makes: 'makes the creature from your words',
+  seenSpend: 'and you see what it really spent',
   leave: 'You can leave this page: the making carries on, and the creature waits in Creatures.',
   kept: 'kept in Creatures',
 });
@@ -51,10 +54,16 @@ export function money(usd: string): string {
   return value >= 0.01 ? `$${value.toFixed(2)}` : `$${value.toFixed(4)}`;
 }
 
-/** The line under the field: what makes it, the most it may cost and how long it takes, where served (M1). */
-export function makerLine(priceUsdAtMost: string | null, typicalSeconds: number | null): string {
-  if (priceUsdAtMost === null || typicalSeconds === null) return `${CREATURE_WORDS.maker}.`;
-  return `${CREATURE_WORDS.maker}: at most ${money(priceUsdAtMost)}, about ${typicalSeconds} seconds.`;
+/**
+ * The line under the field: what makes it (the model by its served name, where named), the most it
+ * may cost and how long it takes, where served (M1), and that the made creature says what it really
+ * spent (its small print does): "An open model, Nemotron 3 Super 120B, makes the creature from your
+ * words: at most $0.10, about 18 seconds, and you see what it really spent."
+ */
+export function makerLine(priceUsdAtMost: string | null, typicalSeconds: number | null, modelName: string | null = null): string {
+  const who = modelName === null ? CREATURE_WORDS.maker : `${CREATURE_WORDS.maker}, ${modelName},`;
+  if (priceUsdAtMost === null || typicalSeconds === null) return `${who} ${CREATURE_WORDS.makes}.`;
+  return `${who} ${CREATURE_WORDS.makes}: at most ${money(priceUsdAtMost)}, about ${typicalSeconds} seconds, ${CREATURE_WORDS.seenSpend}.`;
 }
 
 /** The made group's small print: the model, the whole spend where served (M2), and where it is kept. */

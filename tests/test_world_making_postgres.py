@@ -948,15 +948,27 @@ def test_every_call_of_a_draft_is_reserved_and_settled_against_the_workspace_s_g
     durable = DurableSpending(database, witness, holder=holder_label("world-drafts"))
     transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
     with app(spending=durable) as client:
-        assert _offer(client)["offered"] is True
+        offered = _offer(client)
+        assert offered["offered"] is True
         ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
         assert ended["state"] == "ready", ended
         calls = ended["execution"]["calls"]
     with database.session(workspace) as connection:
         reservations = connection.execute(
-            "select state, grant_id from spending_reservation where workspace_id = %s",
+            "select state, grant_id, role, model_id, reserved_usd from spending_reservation "
+            "where workspace_id = %s",
             (workspace,),
         ).fetchall()
+    # Each attempt is held at its stage model's quoted worst case, never an estimate below it.
+    quoted = {
+        (stage["role"], model["model_id"]): Decimal(model["reservation_usd"])
+        for path in offered["operation"]["paths"]
+        for stage in path["stages"]
+        for model in stage["models"]
+    }
+    assert [row["reserved_usd"] for row in reservations] == [
+        quoted[row["role"], row["model_id"]] for row in reservations
+    ]
     assert len(reservations) == len(calls) == len(transport.requests) == 4
     assert {row["state"] for row in reservations} == {"settled"}
     assert {row["grant_id"] for row in reservations} <= grants
