@@ -64,6 +64,8 @@ export interface Corners {
   wake(): void;
   /** Holds the hints shown while true (Tab held). */
   hold(on: boolean): void;
+  /** A list or question open on the page has the keys (V14): the first hint is out of sight meanwhile. */
+  keysTaken(on: boolean): void;
   /** A key was pressed in the world: its rail button's tip shows for a while. */
   pressed(code: string): void;
   /** Closes the keys card if it is open; true when it was (Esc closes it before anything else). */
@@ -271,6 +273,7 @@ export function mountCorners({
   firstHint.hidden = hintSeen;
   let hintStart: number | null = null, hintLeftAt: number | null = null;
   let hintHeld: ReturnType<typeof firstHintMeasure> | null = null;
+  let keysTaken = false;
   // The person's own input: a moving key pressed, the mouse looking (a drag, or moving while it is held
   // to the page). The world's own camera moves before them count as nothing.
   const hintInput = { walked: false, looked: false };
@@ -404,8 +407,11 @@ export function mountCorners({
       if (hintLeftAt !== null && now - hintLeftAt >= screen.firstHint.fadeMs) firstHint.hidden = true;
       return;
     }
-    // Flying, a mode (building) and a mode's own hints take the bottom while they show; the minute counts on.
-    firstHint.style.visibility = flyingNow || handed !== null || modeWordNow !== null ? 'hidden' : '';
+    // Flying, a mode (building) and a mode's own hints take the bottom while they show, and a field, list or question
+    // with the keys (V14) puts its keys aside; the minute counts on.
+    const typing = document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement
+      || (document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable);
+    firstHint.style.visibility = flyingNow || handed !== null || modeWordNow !== null || keysTaken || typing ? 'hidden' : '';
     const at = pose();
     if (at === null) return;
     hintStart ??= now;
@@ -435,6 +441,7 @@ export function mountCorners({
     hints(list, options = {}) { handed = list; vertical = options.vertical === true; drawHints(); corners.wake(); },
     wake() { wokenAt = performance.now(); },
     hold(on) { held = on; },
+    keysTaken(on) { keysTaken = on; },
     pressed(code) {
       const id = railButtonOf(code);
       if (id === null || !railTips.has(id) || rail.hidden) return;

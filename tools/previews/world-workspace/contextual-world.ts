@@ -1307,7 +1307,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const targetFrame = target && screenFrame(target);
     const distance = targetFrame ? reachDistance(target) : Infinity;
     targetReachable = Boolean(target && inspectionReach(distance, targetReachable));
-    corners.frame(now);
+    corners.keysTaken(Boolean(held && (picker.of(held) || asking))); corners.frame(now);
     // The Back corner says Back while something is chosen, the Run question and the model list included (r07, r08):
     // they are the group's own states, and Esc goes back from them.
     if (!build?.active()) corners.back(held ? CORNER_WORDS.back : CORNER_WORDS.yourWorlds); // build mode keeps its own

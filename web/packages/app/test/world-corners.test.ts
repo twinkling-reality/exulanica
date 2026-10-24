@@ -11,6 +11,7 @@ interface Corners {
   hasClock(): boolean;
   run(state: { line: string; onStop: () => void } | null): void;
   runEnded(words: string): void;
+  keysTaken(on: boolean): void;
   dispose(): void;
 }
 interface WorldCorners {
@@ -78,5 +79,36 @@ describe('a run on, in the top pill', () => {
     // After a while the people line returns.
     made.frame(performance.now() + 7000);
     expect(top.textContent).toContain('24 people live here');
+  });
+});
+
+describe('the first hint while something else has the keys (V14)', () => {
+  it('is out of sight while a list or question is open, or a field is typed in, and back after', async () => {
+    const { mountCorners } = await corners();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const state: Clock = { society: 'present', mode: 'paused', minute: null, startMinuteOfDay: null, population: 3, busy: false };
+    const made = mountCorners({ host, people: { clock: () => state, play: vi.fn(async () => {}), pause: vi.fn(async () => {}) }, onLeave: () => {} });
+    const hint = host.querySelector('.wu-first-hint') as HTMLElement;
+    const shown = () => !hint.hidden && hint.style.visibility !== 'hidden';
+    made.frame(performance.now());
+    expect(shown()).toBe(true);
+    // The chosen person's model list or Run question open.
+    made.keysTaken(true);
+    made.frame(performance.now());
+    expect(shown()).toBe(false);
+    made.keysTaken(false);
+    made.frame(performance.now());
+    expect(shown()).toBe(true);
+    // A field typed in: Create's line, a creature's words, Ask.
+    const field = document.createElement('textarea');
+    document.body.append(field);
+    field.focus();
+    made.frame(performance.now());
+    expect(shown()).toBe(false);
+    field.blur();
+    made.frame(performance.now());
+    expect(shown()).toBe(true);
+    made.dispose();
   });
 });
