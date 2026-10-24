@@ -47,6 +47,7 @@ from exulanica.world.style_structure import (
     raise_for_incompatible_structure_style,
 )
 from exulanica.world.terrain_authoring import TERRAIN_COMPOSER_VERSIONS
+from exulanica.world.world_title import TITLE_MAXIMUM
 from exulanica.world.worlds import (
     AUTHORED_STARTER,
     GENERATED,
@@ -111,10 +112,6 @@ class InvalidSavedWorldTitle(ValueError):
 
     A ``ValueError``, so a route that answers a plain one answers this one the same way.
     """
-
-
-#: The most characters a saved world's title holds, once trimmed.
-TITLE_MAXIMUM: Final = 200
 
 
 #: The Unicode categories a title may not hold: control characters (a NUL among them, which the

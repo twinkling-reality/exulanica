@@ -308,7 +308,7 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
             raise ValueError(f"a things input's movement modules: {exc}") from exc
     if "world" in document:
         from exulanica.things.lines import LineRefused, check_line
-        from exulanica.world.saved_entries import TITLE_MAXIMUM
+        from exulanica.world.world_title import TITLE_MAXIMUM
 
         world = document["world"]
         if document["input_seq"] != 1 or not isinstance(world, dict) or set(world) != {"title"}:
