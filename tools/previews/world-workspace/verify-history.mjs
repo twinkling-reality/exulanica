@@ -122,6 +122,14 @@ assert.equal(text(titled({ subjects: ['ines', 'teo'], said: [said(412, 'teo', 'i
 assert.equal(text(titled({ said: [said(411, 'ines', 'teo', 'Morning.', { kind: 'routine', model: null }), said(412, 'teo', 'ines', 'Is the market open?', model('Nemotron 3 Super 120B'))] }).words), 'Teo asked Ines');
 assert.equal(text(titled({ said: [said(412, 'teo', 'ines', 'Morning, Ines.', { kind: 'routine', model: null })] }).words), 'Teo met Ines at the bench');
 assert.equal(text(titled({ said: [], decider: model('Nemotron 3 Super 120B') }).words), 'Teo talked with Ines at the bench');
+// An outside program that is an outside AI agent is named as one, in its moments and its lines (AG1d 4).
+const agentNames = { ...names, agent: (id) => id === 'teo' };
+const byAgent = historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'external', model: null }, branches: [],
+  said: [said(412, 'teo', 'ines', 'Morning, Ines.', { kind: 'external', model: null })] }] }, agentNames, partsOf, clock, now).items.find((item) => item.kind === 'moment');
+assert.deepEqual([text(byAgent.by), text(byAgent.lines[0].by)], ['By an outside AI agent', 'By an outside AI agent']);
+const byGame = historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'external', model: null }, branches: [], said: [] }] },
+  names, partsOf, clock, now).items.find((item) => item.kind === 'moment');
+assert.equal(text(byGame.by), 'By an outside program', "a game's program keeps its words");
 assert.equal(text(titled({ kind: 'talked', subjects: ['ines', 'teo'], said: [said(412, 'teo', 'ines', 'Morning, Ines.', { kind: 'person', model: null })] }).words), 'Teo spoke to Ines at the bench');
 // The first of them: a person playing spoke before the model answered.
 const twoLines = historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'routine', model: null }, branches: [],

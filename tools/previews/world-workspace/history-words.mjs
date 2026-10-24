@@ -13,6 +13,8 @@ export const PATH_WORDS = Object.freeze({
   now: 'Now',
   personPlaying: 'By a person playing',
   outsideProgram: 'By an outside program',
+  /** An outside AI agent at the door decided (AG1d 4). */
+  outsideAgent: 'By an outside AI agent',
   earlierLater: 'Earlier, later',
   openMoment: 'Open this moment',
   // A grouped changes dot, chosen (H15).
@@ -312,14 +314,19 @@ export function answerParts(modelName, same, outcome) {
   return same ? sameChoiceParts(modelName) : [modelPart(modelName), `: ${outcome}`];
 }
 
-/** Who decided, as parts: "By Nemotron 3 Nano 30B", "By a person playing", "By an outside program"; a routine's
+/** Who decided, as parts: "By Nemotron 3 Nano 30B", "By a person playing", "By an outside AI agent" (AG1d), "By an outside program"; a routine's
  * moment has none (null). */
 export function byParts(decider) {
   if (decider?.kind === 'model' && decider.model?.name) return ['By ', modelPart(decider.model.name)];
   if (decider?.kind === 'person') return [PATH_WORDS.personPlaying];
+  if (decider?.kind === 'agent') return [PATH_WORDS.outsideAgent];
   if (decider?.kind === 'external') return [PATH_WORDS.outsideProgram];
   return null;
 }
+
+/** An outside AI agent's turn whose choice was not taken (AG1d 5): "Routine · no answer from the outside AI agent" where
+ * it did not answer at all ('silent'), else "Routine · no usable answer from the outside AI agent". */
+export const agentUnansweredWords = unanswered => `Routine · ${unanswered === 'silent' ? 'no answer' : 'no usable answer'} from the outside AI agent`;
 
 /** A model's decision whose choice was not taken, as parts (U3, DESIGN 12:42): "Routine · no usable answer from Nemotron 3
  * Ultra 550B"; one whose choice came after the world had moved on, "Routine · Qwen3 235B chose too late". */

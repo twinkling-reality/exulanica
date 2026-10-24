@@ -27,6 +27,10 @@
 .cg-group[data-refused="true"] .cg-rows > .wu-row:first-child { opacity: .55; }
 .cg-group > .cg-rows { margin-top: var(--space-24); pointer-events: auto; }
 .cg-print { margin-top: var(--space-16); }
+/* An outside AI agent's own words under the print (AG1d 2): ours in the faint ink, its declared parts in white at 500,
+ * each whole on its line (DESIGN 19:13): the line breaks between parts, and one longer than the line still wraps. */
+.cg-declared { margin-top: var(--space-8); max-width: max(440px, calc(520 * var(--u))); text-wrap: pretty; font: 400 max(12px, calc(13 * var(--u)))/max(18px, calc(20 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .86); }
+.cg-declared-own { display: inline-block; max-width: 100%; color: #fff; font-weight: 500; }
 /* The model list (r07; a gallery that teaches, A3): rows in groups by where the model runs, each group under a small
    label in the faint ink; a row per model (its number key, its name with "Current" after the character's own and under
    it its maker and size in the faint ink, its price), the chosen row's marker 14 px left of its key, the focused row

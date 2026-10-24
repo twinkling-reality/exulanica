@@ -2,7 +2,7 @@
 // BUILD-SHEETS-CHARACTER-TALKING-BUILDING.md section 1): what it says, from the reads the page holds, and where
 // it stands. Pure: the reads come in as data and the words from character-words.mjs; character-group.ts draws
 // the answer. verify-character-group.mjs holds it.
-import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, cardWords, checkingLine, decidesPrint, keyGroup, makerLine, modelsDecide, modelsNamed, noModelRunning, notAbleFold, notAbleLine, overLine, providerName, quoted, readingRecord, reasonsOn, routineRow, rowPrice, runnerCalls, runnerOpen, saidUnder, stopsAfter } from './character-words.mjs';
+import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, cardWords, checkingLine, decidesPrint, declaredParts, keyGroup, makerLine, modelsDecide, modelsNamed, noModelRunning, notAbleFold, notAbleLine, overLine, providerName, quoted, readingRecord, reasonsOn, routineRow, rowPrice, runnerCalls, runnerOpen, saidUnder, stopsAfter } from './character-words.mjs';
 import { RUN_WORDS, atMost, runFor, runRefusalWords } from './run-words.mjs';
 import { dayWord } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -86,7 +86,7 @@ export function keepLastSaid({ readPage, every = SAID_READ.every, pages = SAID_R
  * routine.
  */
 export function deciderOf({ decider = null, model = null }) {
-  if (decider === 'person' || decider === 'external') return decider;
+  if (decider === 'person' || decider === 'external' || decider === 'agent') return decider;
   return plain(model) ? 'model' : 'routine';
 }
 
@@ -96,16 +96,17 @@ export function deciderOf({ decider = null, model = null }) {
  * - `who` (called()'s), `doing` (the society's activity words, or null);
  * - `said` (lastSaid's answer, or null), `toWho` (called()'s for its listener, or null), `startMinute` (the
  *   society clock's first minute, null where it keeps none);
- * - `decider` (deciderOf's: 'person', 'external', 'model' or 'routine'), `model` (the model's served name, or null), `connected` (a model can be asked
+ * - `decider` (deciderOf's: 'person', 'external', 'agent', 'model' or 'routine'), `model` (the model's served name, or null), `connected` (a model can be asked
  *   here), `assignable` (this page may choose their model), `running` (a run is on), `left` (its time left);
  * - `following` (V follows them now); `reading` while their record is still read, when the group holds their
- *   name and that it is reading, and no keys yet.
+ *   name and that it is reading, and no keys yet;
+ * - `declared` (an outside AI agent's own words about itself, its door entry's), drawn under the print (AG1d 2).
  * Each row: { action, key, word, shortcut }. Run only where their model can be asked here (J2); while a run
  * is on, Stop; without a model, Choose only where this page may choose one.
  */
 export function groupContent({ who, doing = null, said = null, toWho = null, startMinute = null, decider = 'routine', model = null,
-  connected = true, assignable = false, running = false, left = null, following = false, reading = false, noModel = null }) {
-  if (reading) return Object.freeze({ name: who.title, doing: readingRecord(who), said: null, note: null, rows: Object.freeze([]), list: null, print: null, after: null, refused: false });
+  connected = true, assignable = false, running = false, left = null, following = false, reading = false, noModel = null, declared = null }) {
+  if (reading) return Object.freeze({ name: who.title, doing: readingRecord(who), said: null, note: null, rows: Object.freeze([]), list: null, print: null, after: null, refused: false, declared: null });
   const hhmm = said && said.tick !== null && Number.isSafeInteger(startMinute) ? worldTime(said.tick, startMinute)?.hhmm ?? null : null;
   const spoken = said ? Object.freeze({ line: quoted(said.line), under: saidUnder({ to: said.to ? toWho : null, hhmm }) }) : null;
   const rows = [{ action: 'details', key: 'Enter', word: dayWord(who), shortcut: 'Enter' }];
@@ -125,6 +126,7 @@ export function groupContent({ who, doing = null, said = null, toWho = null, sta
     // Where [M] is not offered because no model is running on this computer, how to have one, under the small print (A2).
     after: decider === 'routine' && !assignable && noModel ? noModel : null,
     refused: false,
+    declared: decider === 'agent' ? declaredParts(declared) : null,
   });
 }
 

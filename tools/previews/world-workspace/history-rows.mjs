@@ -152,12 +152,14 @@ export function momentTitle(moment, names) {
 function momentItem(moment, names, clock) {
   const subjects = titledSubjects(moment);
   const first = subjects[0];
+  // An outside program that is an outside AI agent is named as one (AG1d 4).
+  const by = (decider, subject) => byParts(decider?.kind === 'external' && names.agent?.(subject) ? { ...decider, kind: 'agent' } : decider);
   const actor = first ? names.subject(first) : '';
   const lines = (moment.said ?? []).map((line) => ({
     tick: line.tick, subject: line.by, request: line.request_id ?? null,
     words: saidWords((names.speaker ?? names.subject)(line.by), line.line),
     quote: `\u201c${line.line}\u201d`,
-    by: byParts(line.decider),
+    by: by(line.decider, line.by),
   }));
   const branches = [...(moment.branches ?? [])];
   const newest = (list) => [...list].sort((a, b) => (at(b.asked_at) ?? 0) - (at(a.asked_at) ?? 0))[0];
@@ -172,7 +174,7 @@ function momentItem(moment, names, clock) {
     shown: lines.slice(0, CARD_LINES).map((line) => line.words),
     more: lines.length > CARD_LINES ? moreLinesWords(lines.length - CARD_LINES) : null,
     // Who chose it, else who chose the first of its lines (H19): a model's words are never shown unnamed.
-    by: byParts(moment.decider) ?? lines.find((line) => line.by)?.by ?? null,
+    by: by(moment.decider, first) ?? lines.find((line) => line.by)?.by ?? null,
     same: same ? sameChoiceParts(same.model?.name ?? '') : null,
     branch: differing ? { head: askedAgainParts(differing.model?.name ?? ''), outcome: answerWords(differing, actor, names) } : null,
     answers: branches.map((branch) => answerParts(branch.model?.name ?? '', branch.same_choice === true, answerWords(branch, actor, names))),

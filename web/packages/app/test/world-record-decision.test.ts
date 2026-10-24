@@ -25,7 +25,7 @@ interface DecisionPageState {
   readonly decided?: string | null;
   readonly said?: string | null;
   readonly action?: string | null;
-  readonly decider?: 'model' | 'person' | 'external' | null;
+  readonly decider?: 'model' | 'person' | 'external' | 'agent' | null;
   readonly answered?: { readonly latencyMs: number | null; readonly costUsd: string | number | null; readonly costKnown: boolean } | null;
   readonly unanswered?: {
     readonly asks: number; readonly latencyMs: number | null; readonly costUsd: string | number | null; readonly costKnown: boolean;
@@ -416,6 +416,22 @@ describe("A model's decision whose choice was not taken (U3)", () => {
     expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Asked Nemotron 3 Nano 30B · chose too late · the routine acted');
     expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose too late', 'answered in 0.9\u00a0s · $0.0003']);
     expect(all(root, '.wu-rd-choice .wu-hr-tag')).toEqual(['Chosen, not done']);
+  });
+});
+
+describe('A decision an outside AI agent made (AG1d 4, 5)', () => {
+  it("says it decided, and under the ring what it is, its choice of nine and its time, never a cost", async () => {
+    const { root } = await open(teo({ decider: 'agent', model: null, answered: { latencyMs: 1600, costUsd: null, costKnown: true } }));
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Decided by an outside AI agent');
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['An outside AI agent', 'chose 1 of 9', 'answered in 1.6\u00a0s']);
+  });
+
+  it('says a turn it did not answer was asked with no answer, and the routine acted', async () => {
+    const { root } = await open(teo({ decider: 'agent', model: null, title: 'Stood a while', choices: choices(NINE, -1), answered: null, canCompare: false,
+      unanswered: { asks: 1, latencyMs: null, costUsd: null, costKnown: true, reason: 'no_answer_in_time' } }));
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Asked the outside AI agent · no answer · the routine acted');
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['An outside AI agent', 'no answer']);
+    expect(root.textContent).not.toMatch(/Chosen|chose 1 of/u);
   });
 });
 

@@ -198,7 +198,7 @@ const refresh = async () => {
 const agent = (id: string) => person(id, { kind: KNIGHT, came_by: 'crossed', placed_id: null, crossing: { arrival_id: `arrival-${id}`, bridge: 'agents', grant_id: 'grant-a' } });
 
 describe('an outside agent in a saved world', () => {
-  it('wears its own name once the world\'s grants are read, and the agent pill until then', async () => {
+  it('is marked an outside AI agent, never by the name it declared (AG1d 7), once the world\'s grants are read', async () => {
     server.people = [agent('agent-0'), crossed('player-0')];
     server.events = [];
     const { mounted } = mount();
@@ -206,13 +206,15 @@ describe('an outside agent in a saved world', () => {
     await settle();
     const marks = FakeMarks.last!;
     const last = () => marks.sets.at(-1)!;
-    expect(last().get('agent-0')!.mark).toEqual({ kind: 'ai', name: 'Scout', full: 'An outside AI agent, Scout', outside: true });
-    expect(last().get('agent-0')!.spoken).toBe('An outside AI agent, Scout');
+    // Its declared name ("Scout") stays for its card: an agent may call itself one of the town's people.
+    expect(last().get('agent-0')!.mark).toEqual({ kind: 'ai', name: 'An outside AI agent', full: 'An outside AI agent', outside: true });
+    expect(last().get('agent-0')!.spoken).toBe('An outside AI agent');
     // A game's player is marked by its game as before; its grant's silence changes nothing.
     expect(last().get('player-0')!.mark).toEqual({ kind: 'from', label: 'from Block Game', full: 'From Block Game, decided from outside' });
-    // Before the grants answered, the agent's pill said only that it is an agent.
-    const before = marks.sets.find((set) => set.get('agent-0')?.mark?.kind === 'ai' && (set.get('agent-0')!.mark as { name: string }).name === 'agent');
-    expect(before).toBeDefined();
+    // Before the grants answered and after, its pill says only what it is, never its declared name.
+    const named = marks.sets.map((set) => (set.get('agent-0')?.mark as { name?: string } | undefined)?.name).filter(Boolean);
+    expect(named.length).toBeGreaterThan(0);
+    expect(new Set(named)).toEqual(new Set(['An outside AI agent']));
     expect(grantReads.worlds.at(-1)).toBe(WORLD);
     const reads = grantReads.count;
     // Named now: read again with nothing new, the grants are not asked again.
@@ -229,7 +231,7 @@ describe('an outside agent in a saved world', () => {
     await settle();
     await refresh();
     await refresh();
-    expect(FakeMarks.last!.sets.at(-1)!.get('quiet-0')!.mark).toEqual({ kind: 'ai', name: 'agent', full: 'An outside AI agent', outside: true });
+    expect(FakeMarks.last!.sets.at(-1)!.get('quiet-0')!.mark).toEqual({ kind: 'ai', name: 'An outside AI agent', full: 'An outside AI agent', outside: true });
     // Its grant says nothing yet: asked once, not on every read within the minute.
     expect(grantReads.count).toBe(reads + 1);
     mounted.dispose();

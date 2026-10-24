@@ -39,6 +39,7 @@ assert.equal(sceneBy(said.by, named), 'By Nemotron 3 Super 120B');
 assert.equal(sceneBy(said.by), 'By nvidia/nemotron-3-super-120b-a12b', 'a model the page cannot name is said by its id');
 assert.equal(sceneBy({ kind: 'person', model: null }), 'By a person playing');
 assert.equal(sceneBy({ kind: 'external', model: null }), 'By an outside program');
+assert.equal(sceneBy({ kind: 'external', model: null }, () => null, true), 'By an outside AI agent', "an outside AI agent's line (AG1d 3)");
 assert.equal(sceneBy(null), null, 'a line no mind chose keeps no who line');
 const [older] = talkActs([{ subject_id: 'h', tick: 8, event_kind: 'said', document: { thing: { request_id: 'r9', line: 'Hello.', to: null } } }]);
 assert.equal(older.by, null, 'a line recorded before deciders were kept names nobody');

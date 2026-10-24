@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { called } from './character-words.mjs';
-import { askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, ownPeople, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords, timeRange } from './character-view.mjs';
+import { askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, outsideDecider, outsideOf, ownPeople, unlistedOutside, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords, timeRange } from './character-view.mjs';
 import { defaultRunLimits } from './run-words.mjs';
 
 // Names: a being named only by its body is called by its kind; a thing by its own name or look.
@@ -52,10 +52,12 @@ assert.deepEqual([thing.title, [...thing.lines], thing.chip, thing.prompts.lengt
 for (const made of [card, thing]) assert.ok(made.prompts.length <= 4, 'a card holds at most four prompts');
 
 // The name tag: a thing shows its name only; a pop hides the doing line; the dot only with a model.
-assert.deepEqual({ ...tagWords({ who: teo, being: true, doing: 'Waiting', model: 'Nano', live: true }) }, { name: 'Teo', doing: 'Waiting', model: 'Nano', live: true });
+assert.deepEqual({ ...tagWords({ who: teo, being: true, doing: 'Waiting', model: 'Nano', live: true }) }, { name: 'Teo', doing: 'Waiting', model: 'Nano', live: true, quiet: false });
+// An outside AI agent's chip in the quiet fill (AG1d 1).
+assert.equal(tagWords({ who: teo, being: true, model: 'An outside AI agent', quiet: true }).quiet, true);
 assert.equal(tagWords({ who: teo, being: true, doing: 'Waiting', popping: true }).doing, null);
 assert.equal(tagWords({ who: teo, being: true, live: true }).live, false);
-assert.deepEqual({ ...tagWords({ who: called({ name: 'Bench', being: false }), being: false, doing: 'x', model: 'y' }) }, { name: 'Bench', doing: null, model: null, live: false });
+assert.deepEqual({ ...tagWords({ who: called({ name: 'Bench', being: false }), being: false, doing: 'x', model: 'y' }) }, { name: 'Bench', doing: null, model: null, live: false, quiet: false });
 
 // The ring keeps a readable size; [E] Inspect sits right of the head, or left near the edge.
 assert.deepEqual(ringRadii({ x: 960, y: 760 }, { x: 1064, y: 760 }, { x: 960, y: 735 }), { rx: 104, ry: 25 });
@@ -101,6 +103,28 @@ assert.deepEqual(untaken.map(row => [row.what, row.chose, row.unanswered, row.re
   ['Wait here', 'wait here', null, 'u7'],
   ['Walking to the quay', null, null, 'u6'],
 ]);
+// An outside AI agent at the door (AG1d): its door entry, named an agent where the door says an AI runs it, a game's
+// program otherwise; a subject the page's rows lack is read for again.
+const read = { outside: [{ subjectId: 'v1', ai: true, connected: true, declared: { name: 'Scout', maker: 'Harbour Lab', mind: null } }, { subjectId: 'v2', ai: false, connected: true, declared: null }] };
+assert.deepEqual([outsideDecider(read, 'v1'), outsideDecider(read, 'v2'), outsideDecider(read, 't'), outsideDecider(null, 'v1')], ['agent', 'external', null, null]);
+assert.equal(outsideOf(read, 'v1').declared.name, 'Scout');
+assert.equal(unlistedOutside(read, [{ scene: { id: 'v1' } }]), true, 'v2 has no row yet');
+assert.equal(unlistedOutside(read, [{ scene: { id: 'v1' } }, { scene: { id: 'v2' } }]), false);
+assert.equal(unlistedOutside({ outside: [] }, []), false);
+// Its rows: its lines and choices by it; a turn it did not answer at all, or whose answer could not be used, the
+// routine's, marked so; a game's program keeps "An outside program".
+const theirs = (events, agent) => didRows({ events, subjectId: 'v1', wordGoal: () => 'Walking to the quay', modelName: () => null, agent });
+const outsideEvents = [
+  { subject_id: 'v1', tick: 9, event_kind: 'decision_applied', document: { request_id: 'o9', chose: null, disposition: 'unavailable', reason: 'no_answer_in_time', origin: 'external', model: null, goal: { kind: 'stand' } } },
+  { subject_id: 'v1', tick: 8, event_kind: 'decision_applied', document: { request_id: 'o8', chose: null, disposition: 'rejected', reason: 'answer_not_offered', origin: 'external', model: null, goal: { kind: 'stand' } } },
+  { subject_id: 'v1', tick: 7, event_kind: 'decision_applied', document: { request_id: 'o7', chose: 'wait here', disposition: 'applied', origin: 'external', model: null } },
+  { subject_id: 'v1', tick: 6, event_kind: 'said', document: { thing: { request_id: 'o6', line: 'Evening.', decider: 'external' } } },
+];
+assert.deepEqual(theirs(outsideEvents, true).map(row => [row.decider, row.unanswered ?? null, row.sub]), [
+  ['agent', 'silent', 'An outside AI agent'], ['agent', 'none', 'An outside AI agent'], ['agent', null, 'An outside AI agent'], ['agent', null, 'An outside AI agent'],
+]);
+assert.deepEqual(theirs(outsideEvents, false).map(row => [row.decider, row.unanswered ?? null]), [['external', null], ['external', null], ['external', null], ['external', null]]);
+assert.deepEqual(theirs(outsideEvents, true).map(modelAnswered), [false, false, false, false], "Compare asks again only a model's");
 // Compare asks again only a decision a model answered: a choice made too late was answered; no usable answer was not.
 assert.deepEqual(untaken.map(modelAnswered), [true, false, true, false]);
 // R5h: a goal the routine set that repeats Teo's goal just before it (a stand after a stand) is no row of its own; the

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { checkingLine, notAbleFold, notAbleLine, overLine, reasonsOn, runnerCalls, runnerOpen } from './character-words.mjs';
-import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, askWho, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineBetween, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
+import { declaredParts, deciderWords, decidesPrint, runSectionLine, CHARACTER_WORDS, amount, askWho, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineBetween, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
 const teo = called({ name: 'Teo' }), resident = called({ name: '  ', kind: 'Resident' }), someone = called({ name: null }), bench = called({ name: null, being: false });
@@ -163,4 +163,14 @@ assert.equal(overLine('0.01290000', '0.01250000'), 'Asking it once can cost up t
 // What is left that rounds to nothing is not shown as $0 (U3b, DESIGN 15:58).
 assert.equal(overLine('0.00270000', '0.00000200'), 'Asking it once can cost up to $0.0027, more than is left for AI models here.');
 assert.equal(overLine('0.00270000', '0'), 'Asking it once can cost up to $0.0027, more than is left for AI models here.');
+// An outside AI agent (AG1d): named as what it is where a model's name stands; its print and chosen line; its own
+// words only where declared; what it costs this world.
+assert.equal(deciderWords('agent'), 'An outside AI agent');
+assert.equal(deciderWords('external'), 'An outside program', "a game's program keeps its words");
+assert.equal(decidesPrint(called({ name: null, kind: 'visitor' }), { decider: 'agent' }), 'An outside AI agent decides for the visitor.');
+assert.equal(chosenLine(called({ name: 'Teo' }), null, 'agent'), 'An outside AI agent chose this.');
+assert.equal(rowSub({ decider: 'agent' }), 'An outside AI agent');
+assert.equal(CHARACTER_WORDS.costsNothing, 'It costs this world nothing.');
+assert.equal(declaredParts({ name: 'Scout', maker: 'Harbour Lab', mind: null }).map(part => part.words).join(''), 'In its own words: Scout, made by Harbour Lab.');
+assert.equal(declaredParts({ name: '  ', maker: 'Harbour Lab', mind: 'x' }), null, 'no name, no line');
 console.log('Character words checks passed: names and kinds, the chosen line, the page lines, money and the model list.');

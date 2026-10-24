@@ -254,6 +254,28 @@ describe("Teo's day", () => {
     expect(all(root, '.wu-day-decided')).toEqual([`Routine · no usable answer from ${NEMOTRON}`, `Routine · ${NEMOTRON} chose too late`, `By ${NEMOTRON} · 6 choices`]);
   });
 
+  it("names an outside AI agent's rows as its, and the routine's where its turn brought no answer it could use (AG1d)", async () => {
+    const { root, page } = await open();
+    page.draw(teoState({ did: [
+      { time: '07:12 · Day 1', what: 'Stood a while', sub: '', decision: true, model: null, decider: 'agent', unanswered: 'silent' },
+      { time: '07:11 · Day 1', what: 'Stood a while', sub: '', decision: true, model: null, decider: 'agent', unanswered: 'none' },
+      { time: '07:10 · Day 1', what: 'Said to Juno Ford: “Evening.”', sub: '', decision: true, model: null, decider: 'agent' },
+      { time: '07:09 · Day 1', what: 'Said to Juno Ford: “Morning.”', sub: '', decision: true, model: null, decider: 'external' },
+    ], didFocus: 0 }));
+    expect(all(root, '.wu-day-decided')).toEqual(['Routine · no answer from the outside AI agent', 'Routine · no usable answer from the outside AI agent', 'By an outside AI agent', 'By an outside program']);
+  });
+
+  it('says an outside AI agent decides on its day page, in its own words, at no cost to this world, with no Model or Run (AG1d 6)', async () => {
+    const { root, page } = await open();
+    const visitor = { title: 'Visitor', start: 'The visitor', within: 'the visitor', named: false };
+    page.draw(teoState({ who: visitor, model: null, decider: 'agent', assignable: false, connected: false, decides: 'An outside AI agent decides for the visitor.',
+      declared: [{ words: 'In its own words: ', declared: false }, { words: 'Scout', declared: true }, { words: '.', declared: false }], lastRun: null, did: [] }));
+    expect(one(root, '.wu-day-decides')).toBe('An outside AI agent decides for the visitor.');
+    expect(one(root, '.wu-day-declared')).toBe('In its own words: Scout.It costs this world nothing.');
+    expect(all(root, '.wu-day-declared-own')).toEqual(['Scout']);
+    expect(keys(root).join(' ')).not.toMatch(/Model|Run/u);
+  });
+
   it('draws the same choice folded into one row: its span of minutes and its decisions counted (R5e)', async () => {
     const { root, page } = await open();
     page.draw(teoState({ did: [

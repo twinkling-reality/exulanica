@@ -191,7 +191,7 @@ describe("a record page's moments", () => {
     const { recordStates } = await recordHost();
     const records = recordStates(host().host);
     const view = { who: who('teo'), doing: 'Waiting by the bench', decider: null, model: 'Nemotron 3 Nano 30B' };
-    expect(records.day(teoPage(), view, true)).toEqual({ portrait: 'blob:portrait-teo', doing: 'Waiting by the bench', decider: null, decides: 'Nemotron 3 Nano 30B decides for Teo', running: null });
+    expect(records.day(teoPage(), view, true)).toEqual({ portrait: 'blob:portrait-teo', doing: 'Waiting by the bench', decider: null, decides: 'Nemotron 3 Nano 30B decides for Teo', running: null, declared: null });
     // A routine keeps the Run section's own line; until the models are read nothing is said of who decides.
     expect(records.day(teoPage(), { ...view, model: null }, true)).not.toHaveProperty('decides');
     expect(records.day(teoPage(), view, false)).not.toHaveProperty('decides');
@@ -360,6 +360,30 @@ describe('a decision, filled', () => {
     expect([state.decider, state.model, state.answered, state.decided]).toEqual(['external', null, null, 'Teo spoke to Ines']);
     // A machine is told, a person is shown (WORDS.md R5c); the program is named as Teo's, never as a model.
     expect(state.toldLabel).toBe("What Teo's outside program was told");
+  });
+
+  it("names an outside AI agent as one: its decision's time and no cost, a turn it did not answer, its own words (AG1d)", async () => {
+    const { recordStates } = await recordHost();
+    const outside = { subjectId: 'teo', ai: true, connected: true, declared: { name: 'Scout', maker: 'Harbour Lab', mind: null } };
+    const agentView = (row: Json) => ({ who: who(row.scene.id), facts: { startMinute: 0 }, doing: 'Waiting by the bench', decider: 'agent', model: null, outside });
+    const records = recordStates(host({ modelName: () => null, subjectView: agentView }).host);
+    const showing = teoPage();
+    await records.readMoments(showing);
+    const config = { kind: 'external', bridge: 'agents', grant_id: 'g1', grant_seq: 1 };
+    const answered = { ...detail('say something to Ines', { kind: 'external', bridge: 'agents', answer_sha256: 'a'.repeat(64), latency_ms: 1600 }) };
+    answered.request = { ...answered.request, provider_config: config } as never;
+    const state = records.decision(showing, { requestId: 'r1', detail: answered, failure: null, record: false });
+    expect([state.decider, state.answered, state.toldLabel, state.unanswered]).toEqual(['agent', { latencyMs: 1600, costUsd: null, costKnown: true }, 'What the outside AI agent was told', null]);
+    expect(state.notes.by).toBe('The outside AI agent that chose for Teo.');
+    // Its program silent past the deadline: asked, no answer, the routine acted.
+    const silent = { ...detail('leave', null), decision: { status: 'unavailable', reason: 'no_answer_in_time', proposal: null, provider: null } };
+    silent.request = { ...silent.request, provider_config: config } as never;
+    const quiet = records.decision(showing, { requestId: 'r5', detail: silent, failure: null, record: false });
+    expect([quiet.decider, quiet.unanswered?.reason, quiet.answered, quiet.choices.some((choice: Json) => choice.chosen)]).toEqual(['agent', 'no_answer_in_time', null, false]);
+    expect(quiet.notes).toMatchObject({ by: "It did not answer in time, so Teo's routine acted.", ring: null,
+      choices: 'The actions the world allowed Teo there. No answer came back from the outside AI agent, so none was taken.' });
+    // Its day page: its own words from its door entry.
+    expect(records.day(showing, agentView(showing.row), true).declared.map((part: Json) => part.words).join('')).toBe('In its own words: Scout, made by Harbour Lab.');
   });
 
   it('names a speaker a kind names in its title form, the sentence around them as their tag does', async () => {

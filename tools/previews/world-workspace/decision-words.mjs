@@ -45,7 +45,8 @@ const list = value => Array.isArray(value) ? value : [];
  */
 export const toldLabel = (who, decider = null) => (decider === 'person'
   ? `What the person playing ${who.within} was shown`
-  : `What ${possessive(who.within)} ${decider === 'external' ? 'outside program' : 'model'} was told`);
+  : decider === 'agent' ? 'What the outside AI agent was told'
+    : `What ${possessive(who.within)} ${decider === 'external' ? 'outside program' : 'model'} was told`);
 
 /** "How Teo is", "Near the resident". */
 export const howIsLabel = who => `How ${who.within} is`;
@@ -102,6 +103,8 @@ export const DECISION_FLOW_WORDS = Object.freeze({
   decidedBy: 'Decided by ',
   decidedByPerson: 'Decided by a person playing',
   decidedByProgram: 'Decided by an outside program',
+  /** An outside AI agent at the door decided (AG1d 4): who decided and nothing else, as D5 holds for a model. */
+  decidedByAgent: 'Decided by an outside AI agent',
 });
 
 /** The keys that hide the newcomer's notes and bring them back (A7). */
@@ -118,7 +121,7 @@ export const DECISION_NOTE_WORDS = Object.freeze({ hide: 'Hide notes', show: 'No
 export function decisionNotes({ who, decider = null, canCompare = false }) {
   const name = who.within, model = decider === 'model', picker = model ? 'The model' : deciderWords(decider);
   return Object.freeze({
-    by: model ? `The open model that chose for ${name}.` : null,
+    by: model ? `The open model that chose for ${name}.` : decider === 'agent' ? `The outside AI agent that chose for ${name}.` : null,
     ring: model ? 'How long it took to answer and what this one choice cost.' : null,
     told: model ? `The prompt ${possessive(name)} model was given: everything it was told about that moment, and nothing more. Full record shows it as it was sent.` : null,
     choices: picker ? `The actions the world allowed ${name} there. ${picker} picked one, and the world checked it before it happened.` : null,
@@ -238,6 +241,30 @@ export function lateNotes({ who }) {
   });
 }
 
+/** A turn an outside program did not answer at all (AG1d 5): its program silent past the deadline, or not connected. */
+export const NO_ANSWER = Object.freeze(['no_answer_in_time', 'decider_disconnected']);
+
+/** The head's small print for an outside AI agent's turn whose choice was not taken (AG1d 5): "Asked the outside AI
+ * agent · no answer · the routine acted"; one whose answer came back and could not be used, "... · no usable answer ·
+ * ...". */
+export function agentUnansweredParts(reason) {
+  return [`Asked the outside AI agent · ${NO_ANSWER.includes(reason) ? 'no answer' : UNANSWERED_WORDS.none} · ${UNANSWERED_WORDS.routine}`];
+}
+
+/** Under the ring for such a turn, after "An outside AI agent": "no answer", or "no usable answer". */
+export const agentUnansweredRing = reason => (NO_ANSWER.includes(reason) ? 'no answer' : UNANSWERED_WORDS.none);
+
+/** The notes for such a turn (AG1d 5): why the routine acted, by its reason; that none was taken; the routine's What
+ * happened. Nothing under the ring: the agent was not paid for and an unanswered turn took no time of its own. */
+export function agentUnansweredNotes({ who, reason = null }) {
+  const name = who.within, routine = `so ${possessive(name)} routine acted.`, allowed = `The actions the world allowed ${name} there.`;
+  const by = reason === 'no_answer_in_time' ? 'It did not answer in time' : reason === 'decider_disconnected' ? 'It was not connected'
+    : 'Its answer could not be used';
+  const choices = NO_ANSWER.includes(reason) ? 'No answer came back from the outside AI agent, so none was taken.'
+    : 'No usable answer came back from the outside AI agent, so none was taken.';
+  return Object.freeze({ by: `${by}, ${routine}`, ring: null, choices: `${allowed} ${choices}`, happened: UNANSWERED_WORDS.happened });
+}
+
 /** Over the column of choices (r10): "Teo's choices", "The resident's choices". */
 export const choicesOver = who => `${possessive(who.start)} choices`;
 
@@ -250,7 +277,8 @@ export const choseOneOf = count => `chose 1 of ${count}`;
  * program" (`decider` 'person' or 'external', T7); nothing where no one is named.
  */
 export function decidedByParts({ decider = null, model = null } = {}) {
-  const who = decider === 'person' ? DECISION_FLOW_WORDS.decidedByPerson : decider === 'external' ? DECISION_FLOW_WORDS.decidedByProgram : null;
+  const who = decider === 'person' ? DECISION_FLOW_WORDS.decidedByPerson : decider === 'external' ? DECISION_FLOW_WORDS.decidedByProgram
+    : decider === 'agent' ? DECISION_FLOW_WORDS.decidedByAgent : null;
   return who ? [who] : plain(model) ? [DECISION_FLOW_WORDS.decidedBy, { model: plain(model) }] : [];
 }
 

@@ -22,10 +22,10 @@ describe('markOf', () => {
       .toEqual({ kind: 'from', label: 'from Block Game', full: 'From Block Game, decided from outside' });
   });
 
-  it('marks an outside agent as AI from outside, in its own name', () => {
+  it('marks an outside agent as AI from outside, never in the name it declared (AG1d 7)', () => {
     expect(markOf({
-      running: null, crossing: { bridge: 'agents' }, bridge: { label: 'Agents', ai: true }, declared: { name: 'Scout' },
-    })).toEqual({ kind: 'ai', name: 'Scout', full: 'An outside AI agent, Scout', outside: true });
+      running: null, crossing: { bridge: 'agents' }, bridge: { label: 'Agents', ai: true }, declared: { name: 'Juno Ford' },
+    })).toEqual({ kind: 'ai', name: 'An outside AI agent', full: 'An outside AI agent', outside: true });
   });
 
   it('never guesses for a bridge the door does not list here', () => {

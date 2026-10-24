@@ -166,7 +166,7 @@ export function mountHistory(host: HistoryHost): History {
 
   async function reads() {
     const generated = host.worldId.startsWith(GENERATED);
-    const [view, parts, models, characters, listed, projects, draft, moments] = await Promise.all([
+    const [view, parts, models, characters, listed, projects, draft, moments, current] = await Promise.all([
       host.read(`${version}${scope}`),
       optional(`${version}/parts${scope}`),
       optional(`${version}/society/models/history${scope}`),
@@ -177,7 +177,10 @@ export function mountHistory(host: HistoryHost): History {
       // The line's story alone (H18): moments a model, a person playing or an outside program decided, and a routine's
       // with someone this person touched; the town's other meetings stay on each person's day.
       optional(`${version}/history/moments${scope}&story=true&recipe=${encodeURIComponent(MOMENT_FRAMING.recipe)}`),
+      // Who decides from outside now, so an outside AI agent's rows are named as its (AG1d 4).
+      optional(`${version}/society/models${scope}`),
     ]);
+    const agents = new Set<string>((current?.outside ?? []).filter((one: Json) => one.ai === true).map((one: Json) => one.subject_id));
     momentsFailed = moments === null;
     lived = Number.isSafeInteger(moments?.now?.tick) && moments.now.tick > 0;
     // Placed things and made parts named as build mode names them: by kind (a made creature by its label, J20),
@@ -226,6 +229,8 @@ export function mountHistory(host: HistoryHost): History {
       place: (place: Json) => thingOf(place?.thing_id),
       // A going's target is a placed thing's use (named as build mode names it) or a destination with no name.
       target: (target: Json) => thingOf(targetObject(target?.target_id)),
+      // Whether an outside AI agent decides for this subject (AG1d): its outside program's rows are named as one.
+      agent: (id: string) => agents.has(id),
     };
     project = projects ? (projects.projects ?? []).find((one: Json) => one.version_id === host.versionId) ?? null : undefined;
     request = (projects?.requests ?? []).find((one: Json) => one.version_id === host.versionId) ?? null;

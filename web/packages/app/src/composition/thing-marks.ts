@@ -19,14 +19,19 @@ import type { NamedModelRef } from '../society-models-api.js';
 
 /**
  * The drawn mark. An AI's `name` is the name over the being: a model's whole served name ("Qwen3
- * 235B Instruct"), or the name an outside agent gave for itself; `full` is what a screen reader
- * says and a line's header names. The drawing layer declares the same shape for the marks it draws.
+ * 235B Instruct"), or for an outside agent what it is, "An outside AI agent", never the name it gave
+ * for itself (the door keeps declared words for its card: an agent may call itself one of the town's
+ * people); `full` is what a screen reader says and a line's header names. The drawing layer declares
+ * the same shape for the marks it draws.
  */
 export type ThingMark =
   | { readonly kind: 'ai'; readonly name: string; readonly full: string; readonly outside?: true; readonly from?: string }
   | { readonly kind: 'from'; readonly label: string; readonly full: string }
   /** Played by a person: `label` the pill's word, `mine` whether the viewer is the one playing. */
   | { readonly kind: 'person'; readonly label: string; readonly full: string; readonly mine: boolean; readonly from?: string };
+
+/** What an outside AI agent's mark says over its body and to a screen reader (AG1d 7). */
+export const OUTSIDE_AGENT = 'An outside AI agent';
 
 /** An outside program's entry as the door lists it for this workspace. */
 export interface MarkBridge {
@@ -42,7 +47,7 @@ export interface MarkInput {
   readonly crossing?: { readonly bridge: string; readonly decided_by?: 'program' | 'world' } | null;
   /** The door's entry for that bridge, or null when the door does not list it here. */
   readonly bridge?: MarkBridge | null;
-  /** What an outside agent says it is, in its own words. */
+  /** What an outside agent says it is, in its own words: kept for its card, never drawn on the mark. */
   readonly declared?: { readonly name: string } | null;
   /** Set while a person plays it (the models read's person choice): whether the viewer is that person. */
   readonly played?: { readonly byYou: boolean } | null;
@@ -82,13 +87,7 @@ export function markOf(input: MarkInput): ThingMark | null {
     const bridge = input.bridge ?? null;
     if (bridge === null) return { kind: 'from', label: 'from outside', full: 'Someone from outside this world' };
     if (!bridge.ai) return { kind: 'from', label: `from ${bridge.label}`, full: `From ${bridge.label}, decided from outside` };
-    const name = input.declared?.name ?? null;
-    return {
-      kind: 'ai',
-      name: name ?? 'agent',
-      full: name === null ? 'An outside AI agent' : `An outside AI agent, ${name}`,
-      outside: true,
-    };
+    return { kind: 'ai', name: OUTSIDE_AGENT, full: OUTSIDE_AGENT, outside: true };
   }
   if (input.running === null) return null;
   return { kind: 'ai', name: input.running.name, full: input.running.name };

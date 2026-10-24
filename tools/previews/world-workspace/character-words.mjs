@@ -18,9 +18,14 @@ export const CHARACTER_WORDS = Object.freeze({
   /** Who decides where a model does not (T7): the chip on the card and tag, and a row's sub-line. */
   personPlaying: 'A person playing',
   outsideProgram: 'An outside program',
+  /** An outside AI agent at the door (AG1d, DESIGN 18:07): where a model's name stands, it is named as what it is. */
+  outsideAgent: 'An outside AI agent',
+  /** Where an outside AI agent decides: what it costs this world (its model is its maker's to pay for). */
+  costsNothing: 'It costs this world nothing.',
   /** The card's line where a person or an outside program chose what the character does (T7). */
   personChose: 'A person chose this.',
   programChose: 'An outside program chose this.',
+  agentChose: 'An outside AI agent chose this.',
   noModel: 'No AI model',
   free: 'Free',
   current: 'Current',
@@ -84,6 +89,7 @@ const choices = count => `${count} ${count === 1 ? 'choice' : 'choices'}`;
 export function chosenLine(who, decision, decider = null) {
   if (decider === 'person') return CHARACTER_WORDS.personChose;
   if (decider === 'external') return CHARACTER_WORDS.programChose;
+  if (decider === 'agent') return CHARACTER_WORDS.agentChose;
   if (!decision) return `${possessive(who.start)} routine.`;
   const options = Number.isSafeInteger(decision.options) && decision.options > 0 ? `, from ${choices(decision.options)}` : '';
   return `${possessive(who.start)} model chose this at ${decision.hhmm}${options}.`;
@@ -122,8 +128,24 @@ export function rowSub(decision) {
  * 120B's choices". */
 export const routineBetween = model => `${CHARACTER_WORDS.routine}, between ${possessive(model)} choices`;
 
-/** Who decides where a model does not (T7): "A person playing", "An outside program", or null. */
-export const deciderWords = decider => decider === 'person' ? CHARACTER_WORDS.personPlaying : decider === 'external' ? CHARACTER_WORDS.outsideProgram : null;
+/** Who decides where a model does not (T7, AG1d): "A person playing", "An outside program", "An outside AI agent", or
+ * null. */
+export const deciderWords = decider => decider === 'person' ? CHARACTER_WORDS.personPlaying : decider === 'external' ? CHARACTER_WORDS.outsideProgram
+  : decider === 'agent' ? CHARACTER_WORDS.outsideAgent : null;
+
+/**
+ * An outside AI agent's own words about itself (AG1d 2), as parts: ours (`declared` false, the faint ink) around its
+ * declared name, maker and mind (`declared` true), each only where it declared one: "In its own words: Scout, made by
+ * Harbour Lab, thinking with Nemotron 3 Nano 30B.", "In its own words: Scout."; null with no name. Shown as sent.
+ */
+export function declaredParts(declared) {
+  if (!plain(declared?.name)) return null;
+  const parts = [{ words: 'In its own words: ', declared: false }, { words: declared.name, declared: true }];
+  if (plain(declared.maker)) parts.push({ words: ', made by ', declared: false }, { words: declared.maker, declared: true });
+  if (plain(declared.mind)) parts.push({ words: ', thinking with ', declared: false }, { words: declared.mind, declared: true });
+  parts.push({ words: '.', declared: false });
+  return Object.freeze(parts.map(part => Object.freeze(part)));
+}
 
 /**
  * US dollars spent or allowed, as a person reads them (WORDS.md rule 5): whole cents to two places,
@@ -331,6 +353,7 @@ export const GROUP_WORDS = Object.freeze({
  */
 export function decidesPrint(who, { decider, model = null, left = null }) {
   if (decider === 'external') return `${who.start} comes from an outside program`;
+  if (decider === 'agent') return `${CHARACTER_WORDS.outsideAgent} decides for ${who.within}.`;
   if (decider === 'person') return `A person is playing ${who.within}`;
   if (decider === 'model' && plain(model)) return left ? `${possessive(who.start)} model is deciding · ${left} left` : `${plain(model)} decides for ${who.within}`;
   return `${who.start} follows a routine`;

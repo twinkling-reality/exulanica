@@ -25,6 +25,8 @@
 .wu-record-day .wu-day-decides { margin: 32px 0 0; font: 400 18px/1.4 var(--font-sans); color: var(--hr-ink); text-wrap: pretty; }
 .wu-record-day .wu-day-small { margin: 6px 0 0; font: 400 13px/1.5 var(--font-sans); color: var(--hr-quiet); }
 .wu-record-day .wu-day-small .wu-nowrap { white-space: nowrap; }
+/* An outside AI agent's own words on its day page (AG1d 6): its declared parts in the ink at 500, each whole on its line. */
+.wu-record-day .wu-day-declared-own { display: inline-block; max-width: 100%; color: var(--hr-ink); font-weight: 500; }
 .wu-record-day .wu-day-refused { margin: 8px 0 0; font: 400 13px/1.5 var(--font-sans); color: var(--hr-refused); }
 
 /* What Teo did: the label, the path and the cards, each placed by the layout; dimmed to .32 while the fields are open. */

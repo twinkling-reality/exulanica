@@ -70,6 +70,8 @@ export interface GroupContent {
   readonly after: string | null;
   /** The print is a refusal: in the refused ink, Run dimmed. */
   readonly refused: boolean;
+  /** Under the print, an outside AI agent's own words about itself as parts, its declared ones marked (AG1d 2). */
+  readonly declared?: readonly { readonly words: string; readonly declared: boolean }[] | null;
 }
 
 /** Where the person stands on screen this frame: the top of their head, their box's sides, and a side to prefer (the talking scene's). */
@@ -153,6 +155,13 @@ export function characterGroup({ scale, onAction }: { readonly scale: () => numb
         if (content.refused) { print.classList.add('cg-refused'); print.setAttribute('role', 'status'); }
         if (content.after) { print.append(document.createElement('br'), text('span', 'cg-after', content.after)); }
         parts.push(print);
+      }
+      if (content.declared) {
+        // Its own words exactly as sent, as text: ours in the faint ink, its declared parts in white.
+        const declared = document.createElement('p');
+        declared.className = 'cg-declared';
+        declared.append(...content.declared.map(part => (part.declared ? text('span', 'cg-declared-own', part.words) : document.createTextNode(part.words))));
+        parts.push(declared);
       }
       group.dataset.refused = String(content.refused);
       group.dataset.list = String(content.list !== null);
@@ -259,7 +268,11 @@ function modelList(list: ModelList, onAction: (action: string) => void): HTMLEle
  * What the label over a looked-at character says (r04): their name (or kind), what they are doing and, where a model
  * decides for them, its name (`model`), with the live dot while a run asks it (`live`).
  */
-export interface LookWords { readonly name: string; readonly doing: string | null; readonly model?: string | null; readonly live?: boolean }
+export interface LookWords {
+  readonly name: string; readonly doing: string | null; readonly model?: string | null; readonly live?: boolean;
+  /** The chip in the quiet fill (an outside AI agent's, AG1d 1). */
+  readonly quiet?: boolean;
+}
 
 export interface LookLabel {
   readonly root: HTMLElement;
@@ -333,6 +346,7 @@ export function lookLabel({ scale, onInspect }: { readonly scale: () => number; 
       doing.hidden = !words.doing;
       model.querySelector('.wu-chip-words')!.textContent = words.model ?? '';
       model.hidden = !words.model;
+      model.classList.toggle('wu-quiet', Boolean(words.quiet));
       setChipLive(model, Boolean(words.model && words.live));
       rows.hidden = !inspectable;
       rows.querySelector('button')?.setAttribute('aria-label', `${CHARACTER_WORDS.inspect} ${words.name}`);

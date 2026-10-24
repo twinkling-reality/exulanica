@@ -106,13 +106,14 @@ export function talkActs(events, quiet = new Set()) {
 
 /**
  * Who chose a said line, as the scene's plate says it under the name (T14), in History's who-line words (H19):
- * "By Nemotron 3 Super 120B", "By a person playing", "By an outside program"; null for a line no mind chose.
- * `modelName` names a recorded `{ provider, model_id }`, the model id where it cannot.
+ * "By Nemotron 3 Super 120B", "By a person playing", "By an outside program", or "By an outside AI agent" where the
+ * speaker's outside program is one (`agent`, AG1d 3); null for a line no mind chose. `modelName` names a recorded
+ * `{ provider, model_id }`, the model id where it cannot.
  */
-export function sceneBy(by, modelName = () => null) {
+export function sceneBy(by, modelName = () => null, agent = false) {
   if (!by) return null;
   const name = by.model ? modelName(by.model) ?? by.model.model_id ?? null : null;
-  const parts = byParts({ kind: by.kind, model: name ? { name } : null });
+  const parts = byParts({ kind: by.kind === 'external' && agent ? 'agent' : by.kind, model: name ? { name } : null });
   return parts ? partsText(parts) : null;
 }
 

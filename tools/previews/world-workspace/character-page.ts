@@ -13,7 +13,7 @@ import { galleryItems, runnerRows } from './character-group.mjs';
 import type { ModelCard, RunnerModel } from '../../../web/packages/app/src/society-models-api.ts';
 import { PERSONALITY_LIMITS, PERSONALITY_WORDS, counter, length, notRead, readsEach, savedNote, writtenWords } from './personality-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
-import { PATH_WORDS, byParts, plural, unansweredParts } from './history-words.mjs';
+import { PATH_WORDS, agentUnansweredWords, byParts, plural, unansweredParts } from './history-words.mjs';
 import { DAY_LAYOUTS, dayLayout, dayView, stepChoice } from './day-rows.mjs';
 import './character-page.css';
 import './world-ui-record-day.css';
@@ -46,9 +46,9 @@ export interface DidRow {
   /** On a row the same choice folded into (R5e), how many decisions it stands for; the newest is the one opened. */
   readonly decisions?: number | null;
   /** Who decided where no model did (T7): a person playing, or an outside program. */
-  readonly decider?: 'person' | 'external' | null;
+  readonly decider?: 'person' | 'external' | 'agent' | null;
   /** A model's choice was not taken (U3): no usable answer, or a choice its minute found the world had moved past; the routine acted. */
-  readonly unanswered?: 'none' | 'late' | null;
+  readonly unanswered?: 'none' | 'late' | 'silent' | null;
 }
 
 export interface ModelChoice {
@@ -151,12 +151,14 @@ export interface CharacterPageState {
    */
   readonly decides?: string | null;
   /** Who decides where a model does not (T7); with one, the model's line carries no Current tag. */
-  readonly decider?: 'person' | 'external' | null;
+  readonly decider?: 'person' | 'external' | 'agent' | null;
   /**
    * While a run is on: J30's "Teo's model is deciding · 9:13 left" in place of the last run, or null where this
    * character's model is not deciding. Absent, the run's own line (`run.big`) while one is on.
    */
   readonly running?: string | null;
+  /** An outside AI agent's own words about itself, as parts, its declared ones marked (AG1d 6); absent or null, none. */
+  readonly declared?: readonly { readonly words: string; readonly declared: boolean }[] | null;
   /** A still of the view the character was chosen in, faded behind the page; absent, the live world shows through. */
   readonly still?: string | null;
 }
@@ -353,6 +355,15 @@ function decidesBlock(state: CharacterPageState): HTMLElement[] {
   else decides.append(CHARACTER_WORDS.readingModels);
   if (state.model && !state.decider) decides.append(element('span', 'wu-hr-tag', CHARACTER_WORDS.current));
   block.append(decides);
+  if (state.decider === 'agent') {
+    // An outside AI agent decides (AG1d 6): its own words as sent, as text, then what it costs this world; no price,
+    // no Run section and no M.
+    const words = element('p', 'wu-day-small wu-day-declared');
+    if (state.declared) words.append(...state.declared.map((part) => (part.declared ? element('span', 'wu-day-declared-own', part.words) : document.createTextNode(part.words))), element('br'));
+    words.append(CHARACTER_WORDS.costsNothing);
+    block.append(words);
+    return [block];
+  }
   const offered = Boolean(state.model) && state.connected;
   const lines: (string | HTMLElement)[] = [];
   if (state.model) lines.push(modelLine(state.model) ?? '');
@@ -392,6 +403,8 @@ function decidesBlock(state: CharacterPageState): HTMLElement[] {
 function decidedBy(row: DidRow): Parts | string | null {
   if (row.decider === 'person') return PATH_WORDS.personPlaying;
   if (row.decider === 'external') return PATH_WORDS.outsideProgram;
+  // An outside AI agent's row (AG1d 4, 5): by it, or the routine where its turn brought no answer it could use.
+  if (row.decider === 'agent') return row.unanswered ? agentUnansweredWords(row.unanswered) : PATH_WORDS.outsideAgent;
   if (row.model === undefined) return row.sub || null;
   if (!row.model) return row.sub || CHARACTER_WORDS.routine;
   if (row.unanswered) return unansweredParts(row.model, row.unanswered === 'late') as Parts;

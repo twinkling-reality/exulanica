@@ -7,6 +7,7 @@ import { RUN_WORDS, atMost, runFor, runRefusalWords, whoDecides } from './run-wo
 import { plural } from './history-words.mjs';
 import { heardRow, saidRow } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
+import { NO_ANSWER } from './decision-words.mjs';
 
 /**
  * The minute of the day a society's state starts at, by which a day's rows say their time of day: a living state and a
@@ -103,9 +104,23 @@ export function chosenCard({ who, being, doing = null, decision = null, model = 
 }
 
 /** The name tag's words (spec 5.3): a thing shows its name only; a pop hides the doing line. */
-export function tagWords({ who, being, doing = null, model = null, live = false, popping = false }) {
-  if (!being) return Object.freeze({ name: who.title, doing: null, model: null, live: false });
-  return Object.freeze({ name: who.title, doing: popping ? null : doing, model, live: Boolean(model && live) });
+export function tagWords({ who, being, doing = null, model = null, live = false, popping = false, quiet = false }) {
+  if (!being) return Object.freeze({ name: who.title, doing: null, model: null, live: false, quiet: false });
+  return Object.freeze({ name: who.title, doing: popping ? null : doing, model, live: Boolean(model && live), quiet: Boolean(model && quiet) });
+}
+
+/** A being's outside decider from the models read (AG1d): its door entry (ai, connected, declared) where one decides for
+ * it, else null. */
+export const outsideOf = (read, subjectId) => read?.outside?.find(item => item.subjectId === subjectId) ?? null;
+
+/** Whether the models read names an outside subject the page's rows lack (AG1d): a visitor that crossed in after the
+ * page read what can be chosen, which the inventory is read again for. */
+export const unlistedOutside = (read, rows) => (read?.outside ?? []).some(item => !rows.some(row => row.scene?.id === item.subjectId));
+
+/** Who decides for a being from outside: 'agent' for an outside AI agent, 'external' for another program, else null. */
+export function outsideDecider(read, subjectId) {
+  const entry = outsideOf(read, subjectId);
+  return entry ? (entry.ai ? 'agent' : 'external') : null;
 }
 
 /** The ring's radius on the ground under a person, in metres: rx 104 px at 4 m in the frame. */
@@ -216,7 +231,9 @@ export function runQuestion({ who, model, limits, refusal = null, busy = false }
  * or on while it plays): a routine row in a run in which a model chose for the character says it lies between that
  * model's choices (P2).
  */
-export function didRows({ events, subjectId, startMinute = null, wordGoal, modelName, options = () => null, who = () => called({ name: null, kind: null }), limit = 7, foldable = () => false, runs = [] }) {
+export function didRows({ events, subjectId, startMinute = null, wordGoal, modelName, options = () => null, who = () => called({ name: null, kind: null }), limit = 7, foldable = () => false, runs = [], agent = false }) {
+  // An outside program at the door that is an outside AI agent (AG1d): its rows name it as one.
+  const outside = decider => (decider === 'external' && agent ? 'agent' : decider);
   const heard = event => event.subject_id !== subjectId && event.event_kind === 'said' && typeof event.document?.thing?.line === 'string'
     && Array.isArray(event.document.thing.heard_by) && event.document.thing.heard_by.includes(subjectId) && (event.document.thing.to === subjectId || !event.document.thing.to);
   const mine = events.map((event, index) => ({ event, index })).filter(({ event }) => event.subject_id === subjectId || heard(event))
@@ -239,18 +256,20 @@ export function didRows({ events, subjectId, startMinute = null, wordGoal, model
     } else if (event.event_kind === 'said' && typeof document.thing?.line === 'string') {
       const model = document.thing.model ? modelName(document.thing.model) : null;
       const to = typeof document.thing.to === 'string' ? who(document.thing.to) : null;
-      push({ time, what: saidRow(to, document.thing.line), sub: rowSub(model ? { model, options: options(document.thing.request_id) } : { decider: document.thing.decider }), requestId: document.thing.request_id ?? null, model,
-        decider: document.thing.decider ?? null, tick: event.tick });
+      push({ time, what: saidRow(to, document.thing.line), sub: rowSub(model ? { model, options: options(document.thing.request_id) } : { decider: outside(document.thing.decider) }), requestId: document.thing.request_id ?? null, model,
+        decider: outside(document.thing.decider) ?? null, tick: event.tick });
     } else if (event.event_kind === 'decision_applied' && !said.has(document.request_id)) {
       // A choice the world had moved past before it applied was not taken (U3): such a row says what the routine did.
       const late = document.disposition === 'stale', kept = !late && typeof document.chose === 'string' && document.chose ? document.chose : null;
       const what = kept ? kept.charAt(0).toUpperCase() + kept.slice(1) : wordGoal(document);
       if (!what) continue;
       const model = document.model ? modelName(document.model) : null;
-      push({ time, what, sub: rowSub(model ? { model, options: options(document.request_id) } : { decider: document.origin }), requestId: document.request_id ?? null, model,
-        decider: document.origin ?? null, did: kept ? event.did ?? null : null, chose: kept, tick: event.tick,
-        // A model was asked and its choice was not taken: no usable answer, or one that came too late.
-        unanswered: model && !kept ? (late ? 'late' : 'none') : null });
+      const decider = outside(document.origin);
+      push({ time, what, sub: rowSub(model ? { model, options: options(document.request_id) } : { decider }), requestId: document.request_id ?? null, model,
+        decider: decider ?? null, did: kept ? event.did ?? null : null, chose: kept, tick: event.tick,
+        // A model was asked and its choice was not taken: no usable answer, or one that came too late; an outside AI
+        // agent's turn with no answer at all (its program silent or gone, AG1d 5) is 'silent'.
+        unanswered: (model || decider === 'agent') && !kept ? (late ? 'late' : decider === 'agent' && NO_ANSWER.includes(document.reason) ? 'silent' : 'none') : null });
     } else if (event.event_kind === 'goal_selected' && document.reason !== 'chosen_by_their_model') {
       const before = earlier.get(event);
       if (sameGoal(document.goal, before?.document?.goal)) {

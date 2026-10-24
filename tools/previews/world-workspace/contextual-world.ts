@@ -13,7 +13,7 @@ import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
 import { SAID_READ, choosableModels, deciderOf, freeHere, groupContent, keepLastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, offersModels, openWhileOffered, overBudget, overRows, questionGroup } from './character-group.mjs';
 import { compareFirst, compareStep } from './compare-words.mjs';
-import { PAGE_FRAMING, PERSON_RING_METRES, askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, ownPeople, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
+import { PAGE_FRAMING, PERSON_RING_METRES, askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, outsideDecider, outsideOf, ownPeople, unlistedOutside, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
 import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, outOfViewNote, overLine, pageSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
@@ -247,7 +247,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         .finally(() => subjectReads.pending.delete(name));
     };
     fetchOne('society', 'societyAt', () => societyClient.read(entry.authoredVersionId, { places: true }));
-    fetchOne('models', 'modelsAt', () => modelsClient.read(entry.authoredVersionId));
+    fetchOne('models', 'modelsAt', () => modelsClient.read(entry.authoredVersionId).then(read => { if (unlistedOutside(read, rows)) void refreshInventory().catch(() => {}); return read; }));
   }
   // A decision whose read failed is asked again after this long, not on every redraw.
   const OPTIONS_RETRY_MS = 30000;
@@ -297,9 +297,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const latest = subjectReads.models?.latest.find(item => item.subjectId === row.scene.id) ?? null;
     const decision = facts ? chosenDecision({ person: facts.person, latest, living: facts.living, startMinute: facts.startMinute,
       options: latest?.requestId && held?.key === row.key ? decisionOptions(latest.requestId) : null }) : null;
-    // Who decides where a model does not (T7): a person playing them, or an outside program at the door.
-    const decider = choice?.played ? 'person' : subjectReads.models?.outside?.some(item => item.subjectId === row.scene.id) ? 'external' : null;
-    return { being, who, offer, facts, decision, model: choice?.model?.name ?? null, decider,
+    // Who decides where a model does not (T7): a person playing them, or an outside program at the door, an outside AI agent's (AG1d) named as one.
+    const decider = choice?.played ? 'person' : outsideDecider(subjectReads.models, row.scene.id);
+    return { being, who, offer, facts, decision, model: choice?.model?.name ?? null, decider, outside: outsideOf(subjectReads.models, row.scene.id),
       deciderChose: facts?.person?.goal?.reason === 'chosen_by_their_model', chip: deciderWords(decider) ?? choice?.model?.name ?? null,
       doing: facts ? doingLine(facts.doing) : null, reading: !offers.has(row.key) || !facts || !subjectReads.models };
   }
@@ -531,7 +531,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const said = saidLines.of(row.scene.id, now);
     return groupContent({ who: view.who, doing: view.doing, said, toWho: said?.to ? whoOf(said.to) : null, startMinute: view.facts?.startMinute ?? null,
       decider: deciderOf({ decider: view.decider ?? null, model: view.model ?? null }), model: view.model ?? null, connected, assignable,
-      running: Boolean(runWatch.run), left: runWatch.run ? timeLeft(runWatch.run.endsBy, Date.now()) : null, following: followView.active(), reading: view.reading, noModel: noModelLine(subjectReads.models, view.who) });
+      running: Boolean(runWatch.run), left: runWatch.run ? timeLeft(runWatch.run.endsBy, Date.now()) : null, following: followView.active(), reading: view.reading, noModel: noModelLine(subjectReads.models, view.who), declared: view.outside?.declared ?? null });
   }
   let groupActions = new Set(), groupFirst = 0;
   // Choose a model in the group (r07, character-group.mjs): the page's own write; the Run question then asks again.
@@ -582,7 +582,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     sceneView.draw({
       before: scened.before ? { speaker: whoOf(scened.before.speaker).start, words: scened.before.words } : null,
       now: scened.now.words,
-      plate: { name: speaker.start, to: plateTo(listener), letter: orbLetter(speaker), portrait: pictures.portraitNow(scened.now.speaker), by: sceneBy(scened.now.by, modelName) },
+      plate: { name: speaker.start, to: plateTo(listener), letter: orbLetter(speaker), portrait: pictures.portraitNow(scened.now.speaker), by: sceneBy(scened.now.by, modelName, outsideDecider(subjectReads.models, scened.now.speaker) === 'agent') },
       day: dayWord(speaker),
       stopFollowing: SCENE_WORDS.stopFollowing,
       dot: head ? speakingDot({ top: targetPoint(row, true), project: (point) => { const at = b.camera.camera.worldToScreen(point); return at.z > 0 ? at : null; }, scale: popScale() }) : null,
@@ -687,7 +687,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         chosen: Boolean(model), chosenRefusal: choice?.refusal ?? null, assignable }) : null,
       run: { open: Boolean(run), big: run ? runningLine(run, Date.now(), runFree()) : runLength(limits, runFree()), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal, view.model ?? null) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
-      did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...(row.heard ? {} : { model: row.model ?? null, choices: row.model ? decisionOptions(row.requestId) ?? null : null, decisions: row.decisions ?? null, decider: row.decider === 'person' || row.decider === 'external' ? row.decider : null, unanswered: row.unanswered ?? null }), ...records.dayRow(pageView, row) })) : null,
+      did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...(row.heard ? {} : { model: row.model ?? null, choices: row.model ? decisionOptions(row.requestId) ?? null : null, decisions: row.decisions ?? null, decider: row.decider === 'person' || row.decider === 'external' || row.decider === 'agent' ? row.decider : null, unanswered: row.unanswered ?? null }), ...records.dayRow(pageView, row) })) : null,
       didFocus: pageView.didFocus, lastRun, lastRunWhy, canAsk: !readOnly,
       ask: pageView.ask ? { questions: ASK_ASPECTS.map(aspect => askWords(aspect, view.who)), focus: pageView.ask.focus, busy: pageView.ask.busy,
         asked: pageView.ask.asked, answer: pageView.ask.answer, failure: pageView.ask.failure } : null,
@@ -727,7 +727,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       // The people its rows name (a line heard, a line said to someone), named as History names them: offers read first.
       await Promise.all([...new Set((since?.fresh ?? events).filter(event => event.event_kind === 'said').map(event => event.subject_id === showing.row.scene.id ? event.document?.thing?.to : event.document?.thing?.heard_by?.includes(showing.row.scene.id) ? event.subject_id : null).map(beingRow).filter(Boolean))].map(one => entityOffer(one).catch(() => null)));
       if (showing !== pageView || showing.events !== events) return;
-      showing.did = didRows({ events, subjectId: showing.row.scene.id, startMinute: facts?.startMinute ?? null, modelName, runs: showing.runs ?? [],
+      showing.did = didRows({ events, subjectId: showing.row.scene.id, startMinute: facts?.startMinute ?? null, modelName, runs: showing.runs ?? [], agent: outsideDecider(subjectReads.models, showing.row.scene.id) === 'agent',
         options: (requestId) => decisionOptions(requestId), who: whoOf, foldable: (row) => records.foldable(showing, row), limit: want,
         wordGoal: (document) => {
           if (!facts) return null;
@@ -1328,7 +1328,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const lookRow = looking ? target : lookedAt && now < lookedAt.until && !pageShown() && !asking && !dragging && lookedAt.key !== held?.key ? rows.find(item => item.key === lookedAt.key) ?? null : null, lookFrame = lookRow && (looking ? targetFrame : screenFrame(lookRow)); if (lookRow && lookFrame?.headInView && seen(lookRow, lookFrame)) {
       const view = subjectView(lookRow);
       if (!view.offer && !offers.has(lookRow.key) && readBackoff.ready(lookRow.key, performance.now())) void entityOffer(lookRow).catch(() => {});
-      presence.look(tagWords({ who: view.who, being: view.being, doing: view.doing, model: view.chip ?? null, live: Boolean(runWatch.run && view.model), popping: shownPops.some(item => item.subjectId === lookRow.scene.id) }), { x: lookFrame.overhead.x, y: lookFrame.overhead.y }, true);
+      presence.look(tagWords({ who: view.who, being: view.being, doing: view.doing, model: view.chip ?? null, live: view.decider === 'agent' ? Boolean(view.outside?.connected) : Boolean(runWatch.run && view.model), quiet: view.decider === 'agent', popping: shownPops.some(item => item.subjectId === lookRow.scene.id) }), { x: lookFrame.overhead.x, y: lookFrame.overhead.y }, true);
     } else presence.look(null);
     // Chosen: the ring at its feet, drawn in the world so walls cover it as they cover the feet (J21),
     // and the card beside it while it is seen, placed from the ring's projected ellipse; both follow it.

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, answeredIn, askedAt, choiceRows, choicesLabel, choicesOver, choseOneOf, costWords, decidedByParts, ringPrint, decisionNotes, decisionTitle,
-  needLine, overLabel, resultLines, toldLabel, toldSections, DECISION_WORDS as WORDS, UNANSWERED_REASONS, askedPrint, lateNotes, notAskedWords, unansweredNotes, unansweredParts,
+  needLine, overLabel, resultLines, toldLabel, toldSections, DECISION_WORDS as WORDS, NO_ANSWER, UNANSWERED_REASONS, agentUnansweredNotes, agentUnansweredParts, agentUnansweredRing, askedPrint, lateNotes, notAskedWords, unansweredNotes, unansweredParts,
 } from './decision-words.mjs';
 import { called } from './character-words.mjs';
 
@@ -230,4 +230,23 @@ for (const reason of [...stated, null]) {
     assert.match(notes.choices, /^The actions the world allowed the resident there\. .*so none was taken\.$/u);
   }
 }
+// An outside AI agent decided (AG1d 4, 5): who decided and nothing else; its told heading; its note; a turn it did not
+// answer read as U3 reads a model's, by its reason.
+assert.deepEqual(decidedByParts({ decider: 'agent' }), ['Decided by an outside AI agent']);
+assert.equal(toldLabel(called({ name: null, kind: 'visitor' }), 'agent'), 'What the outside AI agent was told');
+const visitor = called({ name: null, kind: 'visitor' });
+assert.equal(decisionNotes({ who: visitor, decider: 'agent' }).by, 'The outside AI agent that chose for the visitor.');
+assert.equal(decisionNotes({ who: visitor, decider: 'agent' }).choices, 'The actions the world allowed the visitor there. An outside AI agent picked one, and the world checked it before it happened.');
+assert.deepEqual([...NO_ANSWER], ['no_answer_in_time', 'decider_disconnected']);
+for (const reason of NO_ANSWER) assert.ok(stated.has(reason), reason);
+assert.deepEqual(agentUnansweredParts('no_answer_in_time'), ['Asked the outside AI agent · no answer · the routine acted']);
+assert.deepEqual(agentUnansweredParts('answer_not_offered'), ['Asked the outside AI agent · no usable answer · the routine acted']);
+assert.deepEqual([agentUnansweredRing('decider_disconnected'), agentUnansweredRing('answer_not_offered')], ['no answer', 'no usable answer']);
+assert.deepEqual({ ...agentUnansweredNotes({ who: visitor, reason: 'no_answer_in_time' }) }, {
+  by: "It did not answer in time, so the visitor's routine acted.", ring: null,
+  choices: 'The actions the world allowed the visitor there. No answer came back from the outside AI agent, so none was taken.',
+  happened: 'What the routine did in the world, at that minute.',
+});
+assert.equal(agentUnansweredNotes({ who: visitor, reason: 'decider_disconnected' }).by, "It was not connected, so the visitor's routine acted.");
+assert.equal(agentUnansweredNotes({ who: visitor, reason: 'answer_not_offered' }).by, "Its answer could not be used, so the visitor's routine acted.");
 console.log('decision words: ok');
