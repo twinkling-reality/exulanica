@@ -37,6 +37,8 @@ import type { MountedStatusAndInspector } from './status-and-inspector.js';
 
 export interface RendererDependencies {
   readonly terrainVersionCurrent?: () => boolean;
+  /** Whether the world runs now (people live there and its clock plays): a town's traffic holds while not. */
+  readonly trafficRunning?: () => boolean;
   readonly env: AppEnvironment;
   readonly state: SessionState;
   readonly snapshot: GraphSnapshot;
@@ -49,6 +51,14 @@ export interface RendererDependencies {
   readonly reflectFirstUse: () => void;
   readonly reflectShell: () => void;
   readonly showTravelStatus: (message: string, kind?: 'progress' | 'failure') => void;
+}
+
+/**
+ * Whether a world's traffic runs, from what the world clock shows: while people live there and it
+ * plays, and in a world that shows no society of its own or could not read it, as traffic always ran.
+ */
+export function trafficRuns(clock: { readonly society: string; readonly mode: string | null }): boolean {
+  return clock.society === 'unconnected' || clock.society === 'unavailable' || (clock.society === 'present' && clock.mode === 'playing');
 }
 
 export interface MountedRenderer {
@@ -117,7 +127,7 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       && state.credentials !== null
       ? await (await import('./generated-world.js')).openGeneratedWorld(
         env, state.credentials, state.activeWorldEntry, state.worldStyleConnection?.state.current.stylePack ?? null,
-        standing,
+        standing, deps.trafficRunning,
       )
       : undefined;
     // A saved world made from a world kind draws its site's served drawing, read through its own

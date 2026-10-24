@@ -607,6 +607,7 @@ async function withWorldTraffic(
   tile: LoadedGeneratedTile,
   bodies: () => VehicleBodies | null = () => null,
   bodiesChanged?: (listener: () => void) => () => void,
+  running?: () => boolean,
 ): Promise<LoadedGeneratedTile> {
   const note = (): Element | null => env.shell.querySelector(`[${WORLD_TRAFFIC_NOTE_ATTRIBUTE}]`);
   const explain = (code: string): void => {
@@ -660,6 +661,7 @@ async function withWorldTraffic(
     },
     bodies,
     bodiesChanged,
+    running,
   ), TILE_TRAFFIC_ATTRIBUTE);
 }
 
@@ -675,6 +677,8 @@ export async function openGeneratedWorld(
   bound: WorldStylePackBinding | null = null,
   /** Handed the town's plan of what stands in a sight line, once the town is read and will be drawn. */
   standing: (blockers: readonly SightBlocker[]) => void = () => undefined,
+  /** Whether the world runs now; its traffic holds while not (`trafficRuns` in renderer.ts). */
+  running?: () => boolean,
 ): Promise<LoadedGeneratedTile | null> {
   env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
   const loaded = await loadGeneratedWorld(access, entry, undefined, bound);
@@ -684,7 +688,7 @@ export async function openGeneratedWorld(
     const stated = (look: GeneratedWorld['look']): void => env.shell.setAttribute(WORLD_LOOK_ATTRIBUTE, JSON.stringify(look));
     stated(loaded.look);
     const world = switchableWorld(loaded, stated, env.shell);
-    return withWorldTraffic(env, access, entry, world.tile, world.bodies, world.bodiesChanged);
+    return withWorldTraffic(env, access, entry, world.tile, world.bodies, world.bodiesChanged, running);
   }
   const words = loaded.waiting === 'baking'
     ? fill('world.generated.baking', { recipe: loaded.ground.recipeLabel })

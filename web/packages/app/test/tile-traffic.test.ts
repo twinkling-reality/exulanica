@@ -15,7 +15,7 @@ import type { TrafficRead } from '../src/traffic-api.js';
 
 /**
  * A world's traffic, kept drawn: windows read ahead of the shared clock and handed to the layer,
- * refusals stated. Driven with a fake reader and a fake clock.
+ * refusals stated, held while its world does not run. Driven with a fake reader and a fake clock.
  */
 
 /** A host with the parts the traffic reads: an update event and a root the layer adds itself to. */
@@ -182,6 +182,142 @@ describe('the tile traffic', { timeout: 3 * EVENTUALLY.timeout }, () => {
     await settle();
     expect(asked).toHaveLength(4);
   });
+
+  it('holds while its world does not run, and goes on from the second it held, behind the server\'s clock (V4)', async () => {
+    let nowMs = 0;
+    let running = false;
+    const asked: (number | null)[] = [];
+    let timer: (() => void) | null = null;
+    // The server's clock is the page's real time from second 1000.
+    const traffic = startTileTraffic(host(), tile, {
+      reader: {
+        window: async (from: number | null) => {
+          asked.push(from);
+          const clock = 1000 + Math.floor(nowMs / 1000);
+          return read(from ?? clock, clock);
+        },
+      },
+      now: () => nowMs,
+      running: () => running,
+      setTimer: (callback) => { timer = callback; return 1; },
+      clearTimer: () => { timer = null; },
+    });
+    // Nobody lives there yet: the first window is read and held at its first second, however long it waits.
+    await vi.waitFor(() => expect(asked).toEqual([null]), EVENTUALLY);
+    nowMs = 100_000;
+    timer!();
+    await settle();
+    expect(asked).toEqual([null]);
+    // The world plays from 100 s: thirty-five seconds of it later the traffic is at its second 1035, and reads on from
+    // where its served seconds end, 1060, though the server's clock says 1135.
+    running = true;
+    timer!();
+    await settle();
+    nowMs = 135_000;
+    timer!();
+    await vi.waitFor(() => expect(asked).toEqual([null, 1060]), EVENTUALLY);
+    await settle();
+    // Read 100 s behind the server's clock, the window keeps the page where it held: nothing is due for another
+    // 55 s of play, so the next is read from 1120, not from the clock.
+    nowMs = 140_000;
+    timer!();
+    await settle();
+    expect(asked).toEqual([null, 1060]);
+    nowMs = 191_000;
+    timer!();
+    await vi.waitFor(() => expect(asked).toEqual([null, 1060, 1120]), EVENTUALLY);
+    // Paused again, it holds again from the next look at its clock (each frame, on the page): no read however long.
+    await settle();
+    running = false;
+    timer!();
+    await settle();
+    nowMs = 1_000_000;
+    timer!();
+    await settle();
+    expect(asked).toEqual([null, 1060, 1120]);
+    traffic.stop();
+  });
+
+  it('starts level with the server\'s clock again from a read from its clock, and takes a pause during a read as begun after it', async () => {
+    let nowMs = 0;
+    let running = true;
+    const asked: (number | null)[] = [];
+    let timer: (() => void) | null = null;
+    let answer: (() => void) | null = null;
+    let deferred = false;
+    // The page's frames, each of which draws the traffic at its clock.
+    const listeners = new Set<() => void>();
+    const frame = () => { for (const listener of listeners) listener(); };
+    const traffic = startTileTraffic(host(listeners), tile, {
+      reader: {
+        window: async (from: number | null) => {
+          asked.push(from);
+          const clock = 1000 + Math.floor(nowMs / 1000);
+          if (deferred) await new Promise<void>((resolve) => { answer = resolve; });
+          return read(from ?? clock, clock);
+        },
+      },
+      now: () => nowMs,
+      running: () => running,
+      setTimer: (callback) => { timer = callback; return 1; },
+      clearTimer: () => { timer = null; },
+    });
+    await vi.waitFor(() => expect(asked).toEqual([null]), EVENTUALLY);
+    await settle();
+    // Held 100 s, then a restart (a thing placed) reads from the clock at 1100: the page is level with it again, so
+    // the next window, from 1160, is due 35 s later, not 135.
+    running = false;
+    timer!();
+    await settle();
+    nowMs = 100_000;
+    running = true;
+    timer!();
+    await settle();
+    traffic.restart();
+    await vi.waitFor(() => expect(asked).toEqual([null, null]), EVENTUALLY);
+    await settle();
+    nowMs = 135_000;
+    timer!();
+    await vi.waitFor(() => expect(asked).toEqual([null, null, 1160]), EVENTUALLY);
+    await settle();
+    // The world pauses while the next window is being read, for 500 s before it lands: the window is still taken
+    // where the page was when it asked, so the traffic goes on from 1191 when the world plays again.
+    deferred = true;
+    nowMs = 191_000;
+    timer!();
+    await vi.waitFor(() => expect(asked).toEqual([null, null, 1160, 1220]), EVENTUALLY);
+    running = false;
+    frame();
+    await settle();
+    nowMs = 690_000;
+    answer!();
+    await settle();
+    deferred = false;
+    running = true;
+    frame();
+    await settle();
+    nowMs = 700_000;
+    timer!();
+    await settle();
+    expect(asked).toEqual([null, null, 1160, 1220]);
+    // 65 s of play on, at 1256, the window from 1280 is due.
+    nowMs = 755_000;
+    timer!();
+    await vi.waitFor(() => expect(asked).toEqual([null, null, 1160, 1220, 1280]), EVENTUALLY);
+    traffic.stop();
+  });
+
+  it('runs while people live in the world and it plays, or where the world shows no society of its own', async () => {
+    const { trafficRuns } = await import('../src/composition/renderer.js');
+    expect(trafficRuns({ society: 'present', mode: 'playing' })).toBe(true);
+    expect(trafficRuns({ society: 'present', mode: 'paused' })).toBe(false);
+    // The playback not read yet holds it, as nobody living there does.
+    expect(trafficRuns({ society: 'present', mode: null })).toBe(false);
+    expect(trafficRuns({ society: 'absent', mode: 'playing' })).toBe(false);
+    expect(trafficRuns({ society: 'loading', mode: null })).toBe(false);
+    expect(trafficRuns({ society: 'unconnected', mode: null })).toBe(true);
+    expect(trafficRuns({ society: 'unavailable', mode: null })).toBe(true);
+  }, 3 * EVENTUALLY.timeout);
 
   it('keeps the flags of the tile it wraps, and stops reading and drawing when the tile goes', async () => {
     const listeners = new Set<() => void>();

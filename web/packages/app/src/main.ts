@@ -127,7 +127,7 @@ import { createSegmentSession, mountSegments, segmentsFirst } from './compositio
 import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
 import { disposeCompanionStage, mountCompanion, plannedAnswer } from './composition/companion.js';
 import { disposeFormationWatch, mountFormation } from './composition/formation.js';
-import { disposeRenderer, mountRenderer } from './composition/renderer.js';
+import { disposeRenderer, mountRenderer, trafficRuns } from './composition/renderer.js';
 import { disposeMountListeners, mountInputModes } from './composition/input-modes.js';
 import {
   mountStatusAndInspector,
@@ -1943,6 +1943,7 @@ async function mountWorld(): Promise<void> {
 
   const renderer = await mountRenderer({
     terrainVersionCurrent: terrainVersion.current,
+    trafficRunning: () => trafficRuns(environmentSelection.people.clock()),
     env,
     state,
     snapshot: current,

@@ -417,6 +417,17 @@ window is read, not every frame. In a saved town a refusal the server will keep 
 words on the page (`trafficRefusalWords`, the `world.traffic.*` copy), never left blank, and a page
 that cannot load its traffic code opens the town without vehicles and says so.
 
+A saved town's traffic runs only while the town does: while nobody lives there yet, and while its
+world clock is paused or its playback not yet read, the page's copy of the traffic's clock holds and
+every vehicle and signal head stands as drawn (`trafficRuns` in `composition/renderer.ts`, from the
+people's clock). A town that shows no society of its own, or could not read it, drives as before.
+When the town plays again the traffic goes on from the second it held, reading its next windows from
+there, behind the server's clock by the time it was held; a read from further behind than the
+server's clock reach (`clock_reach_steps`, twenty minutes) is refused, the page reads from the clock
+again, and its vehicles move once to where the traffic now is, as they do on each restart. The
+traffic follows play and pause only: it runs at one second a second whatever speed the people play
+at, since legacy traffic keeps real time.
+
 ## Catalogs
 
 Every number traffic uses about a vehicle, a rule or a signal is in a versioned file under

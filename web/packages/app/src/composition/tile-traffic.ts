@@ -16,6 +16,13 @@
  * server will keep giving for this city (404, 409, 422) or an answer this client cannot read stops
  * the reading and is stated; anything else is tried again later and later, up to `MAX_BACKOFF_MS`.
  *
+ * The traffic runs only while its world does (`running`, V4): while nobody lives in the world or its
+ * clock is paused, the page's copy of the clock holds, so every vehicle and signal stands as drawn.
+ * When the world plays again the clock goes on from the second it held, and windows are read from
+ * there, that far behind the server's clock; past the server's reach (a read refused as too far
+ * from its clock), the next is read from the clock, and the vehicles move once to where traffic is.
+ * A read from the server's clock (the first, and each restart) starts the page level with it again.
+ *
  * What the page draws and does not is stated on the shell as data (`TILE_TRAFFIC_ATTRIBUTE`): the
  * vehicles served, drawn, held without ground, the clock's second, and that no walker's crossing
  * is fed to the traffic.
@@ -66,6 +73,8 @@ export interface TileTrafficDeps {
    */
   readonly bodiesChanged?: (listener: () => void) => () => void;
   readonly now?: () => number;
+  /** Whether the world runs now (someone lives there and its clock plays); the traffic holds while not. None always runs. */
+  readonly running?: () => boolean;
   readonly setTimer?: (callback: () => void, ms: number) => unknown;
   readonly clearTimer?: (handle: unknown) => void;
   readonly report?: (state: TileTrafficState) => void;
@@ -105,13 +114,14 @@ export function withTraffic(
   report: (state: TileTrafficState) => void,
   bodies: () => import('@exulanica/atlas-react/traffic').VehicleBodies | null = () => null,
   bodiesChanged?: (listener: () => void) => () => void,
+  running?: () => boolean,
 ): LoadedGeneratedTile {
   return {
     ...tile,
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
       const attachment = tile.attach(host);
       const traffic = startTileTraffic(host, tile, {
-        reader, report, bodies, ...(bodiesChanged === undefined ? {} : { bodiesChanged }),
+        reader, report, bodies, ...(bodiesChanged === undefined ? {} : { bodiesChanged }), ...(running === undefined ? {} : { running }),
       });
       return {
         metrics: attachment.metrics,
@@ -153,7 +163,23 @@ export function startTileTraffic(
   tile: Pick<LoadedGeneratedTile, 'navigationWorld'>,
   deps: TileTrafficDeps,
 ): TileTraffic {
-  const now = deps.now ?? (() => performance.now());
+  const real = deps.now ?? (() => performance.now());
+  // The traffic's own time: page time less every stretch the world held it, so held vehicles stand still.
+  let heldMs = 0;
+  let heldFrom: number | null = null;
+  const heldNow = (at: number): number => heldMs + (heldFrom === null ? 0 : at - heldFrom);
+  const now = (): number => {
+    const at = real();
+    const holding = deps.running !== undefined && !deps.running();
+    if (holding && heldFrom === null) heldFrom = at;
+    else if (!holding && heldFrom !== null) {
+      heldMs += at - heldFrom;
+      heldFrom = null;
+    }
+    return (heldFrom ?? at) - heldMs;
+  };
+  // How long the traffic was held since it was last read from the server's clock: how far behind it the page is.
+  let levelAtMs = 0;
   const setTimer = deps.setTimer ?? ((callback, ms) => setInterval(callback, ms));
   const clearTimer = deps.clearTimer ?? ((handle) => clearInterval(handle as ReturnType<typeof setInterval>));
   let layer: import('@exulanica/atlas-react/traffic').TrafficLayer | null = null;
@@ -208,9 +234,14 @@ export function startTileTraffic(
     const abort = new AbortController();
     reading = abort;
     try {
+      // The server answers from its clock as it is asked: how long the traffic was held is taken then too.
+      const askedHeldMs = heldNow(real());
       const answer = await deps.reader.window(fromSecond, WINDOW_SECONDS, abort.signal);
       if (stopped || layer === null) return;
-      layer.setWindow(answer.window, now());
+      const at = now();
+      if (fromSecond === null) levelAtMs = askedHeldMs;
+      const behind = (askedHeldMs - levelAtMs) / Math.max(1, answer.window.stepMs);
+      layer.setWindow(behind > 0 ? { ...answer.window, clockSecond: answer.window.clockSecond - behind } : answer.window, at);
       vehicles = answer.window.vehicles.length;
       signals = answer.window.signals.length;
       clockSecond = answer.window.clockSecond;
@@ -231,7 +262,7 @@ export function startTileTraffic(
       } else {
         state = 'retrying';
         backoffMs = Math.min(MAX_BACKOFF_MS, backoffMs === 0 ? POLL_MS : backoffMs * 2);
-        retryAtMs = now() + backoffMs;
+        retryAtMs = real() + backoffMs;
       }
     } finally {
       if (reading === abort) reading = null;
@@ -241,7 +272,7 @@ export function startTileTraffic(
 
   async function poll(): Promise<void> {
     await ready;
-    if (stopped || reading !== null || refused || layer === null || now() < retryAtMs) return;
+    if (stopped || reading !== null || refused || layer === null || real() < retryAtMs) return;
     const next = layer.nextSecond;
     const at = layer.secondAt(now());
     if (next !== null && at !== null && (next - at) * 1000 >= AHEAD_MS) return;
