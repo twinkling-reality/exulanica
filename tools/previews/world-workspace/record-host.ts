@@ -8,7 +8,7 @@ import { COMPARE_WORDS, again as againName, answerTag, askLine, asking as asking
 import { CHARACTER_WORDS, decidesPrint, modelRefusalWords, quoted } from './character-words.mjs';
 import { deciderOf } from './character-group.mjs';
 import { thingName } from './build-words.mjs';
-import { momentTitle, targetObject } from './history-rows.mjs';
+import { momentTitle, targetObject, titledSubjects } from './history-rows.mjs';
 import { didWords, momentWords, saidWords, worldWhen } from './history-words.mjs';
 import { MOMENT_FRAMING } from './moment-framing.mjs';
 import { createReadBackoff } from './read-backoff.mjs';
@@ -316,7 +316,7 @@ export function recordStates(host: RecordHost) {
         // What each part is, for a newcomer (A7); the page shows them until the person hides them.
         notes: decisionNotes({ who, decider, canCompare }),
         picture: moment ? host.pictures.momentNow(moment as never) : null,
-        portraits: (moment?.subjects ?? [subjectId, said?.to].filter(Boolean)).map((id: string) => ({ name: named.subject(id), url: host.pictures.portraitNow(id) })),
+        portraits: (moment ? titledSubjects(moment) : [subjectId, said?.to].filter(Boolean)).map((id: string) => ({ name: named.subject(id), url: host.pictures.portraitNow(id) })),
       };
     },
 

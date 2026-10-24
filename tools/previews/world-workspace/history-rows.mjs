@@ -109,25 +109,49 @@ function answerWords(branch, actor, names) {
   }, branch.by ? names.subject(branch.by) : actor);
 }
 
+/** Whether a decider is a decision: a model's, a person playing's or an outside program's, never the routine's. */
+const decided = (decider) => Boolean(decider?.kind) && decider.kind !== 'routine';
+
+/**
+ * How a moment is titled: its kind, its people in the title's order and the line that says whether it asks. A meeting
+ * a decision opened is titled as that decision (DESIGN, 24 October): where a decision said its line, the speaker
+ * first, "Teo spoke to Ines" (or "asked"); where a decision to talk opened it, "Teo talked with Ines". "met" stays
+ * only where no decision opened it.
+ */
+function titled(moment) {
+  const subjects = moment.subjects ?? [];
+  if (moment.kind === 'met' || (moment.kind === 'talked' && !decided(moment.decider))) {
+    const line = (moment.said ?? []).find((said) => decided(said.decider) && subjects.includes(said.by));
+    if (line) return { kind: 'spoke', subjects: [line.by, ...subjects.filter((id) => id !== line.by)], firstLine: line.line };
+    if (moment.kind === 'met' && decided(moment.decider)) return { kind: 'talked', subjects, firstLine: moment.said?.[0]?.line ?? null };
+  }
+  return { kind: moment.kind, subjects, firstLine: moment.said?.[0]?.line ?? null };
+}
+
+/** A moment's people in its title's order, the decider first: the order its card's portraits follow (DESIGN). */
+export const titledSubjects = (moment) => titled(moment).subjects;
+
 /**
  * A moment's title as History says it, from the moments read's moment and the names the page holds (`names` as
- * historyPath takes them): "Teo met Ines at the bench". Other pages that title a moment read it here.
+ * historyPath takes them): "Teo met Ines at the bench". Other pages that title a moment read it here, so a moment
+ * reads alike on History, the day page and the decision page (`titled`).
  */
 export function momentTitle(moment, names) {
-  const [first, ...rest] = moment.subjects ?? [];
+  const { kind, subjects: [first, ...rest], firstLine } = titled(moment);
   return momentWords({
-    kind: moment.kind,
+    kind,
     place: moment.place ? names.place(moment.place) : null,
     to: moment.target ? names.target(moment.target) : null,
     activity: moment.target?.activity ?? null,
     thing: moment.with?.thing ? names.thing(moment.with.thing) : null,
-    firstLine: moment.said?.[0]?.line ?? null,
+    firstLine,
   }, first ? names.subject(first) : '', rest.map((id) => names.subject(id)));
 }
 
 /** A moment, as the path and its opened view show it (the R1 moments read's shape). */
 function momentItem(moment, names, clock) {
-  const first = moment.subjects?.[0];
+  const subjects = titledSubjects(moment);
+  const first = subjects[0];
   const actor = first ? names.subject(first) : '';
   const lines = (moment.said ?? []).map((line) => ({
     tick: line.tick, subject: line.by, request: line.request_id ?? null,
@@ -152,7 +176,8 @@ function momentItem(moment, names, clock) {
     same: same ? sameChoiceParts(same.model?.name ?? '') : null,
     branch: differing ? { head: askedAgainParts(differing.model?.name ?? ''), outcome: answerWords(differing, actor, names) } : null,
     answers: branches.map((branch) => answerParts(branch.model?.name ?? '', branch.same_choice === true, answerWords(branch, actor, names))),
-    subjects: moment.subjects ?? [],
+    // Its people as its title names them, the decider first: its portraits' order.
+    subjects,
     session: moment.session_id ?? null,
     picture: moment.picture ?? null,
     // What its picture is drawn from where none is kept (MOTION's renderMomentPicture).

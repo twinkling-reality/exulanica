@@ -145,7 +145,7 @@ describe('History', () => {
     // Only the characters the moments name are asked for, to be named as the tag and card name them (J20).
     expect(made.names).toHaveBeenCalledWith({ subjects: ['teo', 'ines', 'marco'], placed: [] });
     expect(made.root.querySelector('.wu-hr-kept')?.textContent).toBe('Kept on GitHub in terraces-on-the-bay, private · up to date');
-    expect(all(made.root, '.wu-hr-card .wu-hr-words')).toEqual(['Made from your words', 'Teo met Ines at the bench', 'Marco asked Teo']);
+    expect(all(made.root, '.wu-hr-card .wu-hr-words')).toEqual(['Made from your words', 'Teo spoke to Ines at the bench', 'Marco asked Teo']);
     // The creation quotes the sentence the world was made from; a change is the person's, in History's "You" form.
     expect(made.root.querySelector('.wu-hr-card.first .wu-hr-said')?.textContent).toBe('“Glass terraces above the sea”');
     expect(all(made.root, '.wu-hr-change-words')).toEqual(['You moved the bench']);
@@ -175,7 +175,7 @@ describe('History', () => {
     await history.open();
     expect(chosen(made.root)).toBe('Marco asked Teo');
     history.key(press('ArrowLeft'));
-    expect(chosen(made.root)).toBe('Teo met Ines at the bench');
+    expect(chosen(made.root)).toBe('Teo spoke to Ines at the bench');
     // Every change is a stop (GH3); a single change says itself whole on the line, so Enter opens nothing there.
     history.key(press('ArrowLeft'));
     const [moved] = all(made.root, '.wu-hr-change .wu-hr-change-words');
@@ -342,7 +342,7 @@ describe('History', () => {
     const history = (await module()).mountHistory(made);
     await history.open();
     history.key(press('ArrowLeft'));
-    expect(chosen(made.root)).toBe('Teo met Ines at the bench');
+    expect(chosen(made.root)).toBe('Teo spoke to Ines at the bench');
     // While more lie before it, the line breaks before the oldest moment held: two short slanted strokes (H17).
     expect(made.root.querySelectorAll('.wu-hr-path .break')).toHaveLength(2);
     // At the oldest moment held, with more before it: the earlier page is read, and the choice moves on to it.
@@ -350,7 +350,7 @@ describe('History', () => {
     await vi.waitFor(() => expect(chosen(made.root)).toBe('Ines left'));
     expect(before).toEqual([`/world/versions/${VERSION}/history/moments?world_id=${encodeURIComponent(WORLD)}&story=true&recipe=${encodeURIComponent(await recipe())}&before=413&limit=51`]);
     // Each moment once, oldest first; with no more before, [←] reads nothing further.
-    expect(all(made.root, '.wu-hr-card .wu-hr-words').filter((words) => words !== 'Made from your words')).toEqual(['Ines left', 'Teo met Ines at the bench', 'Marco asked Teo']);
+    expect(all(made.root, '.wu-hr-card .wu-hr-words').filter((words) => words !== 'Made from your words')).toEqual(['Ines left', 'Teo spoke to Ines at the bench', 'Marco asked Teo']);
     // Nothing more lies before: the break goes.
     expect(made.root.querySelector('.wu-hr-path .break')).toBeNull();
     // Its picture is made as the others were: read at its address once.
@@ -590,7 +590,7 @@ describe('History', () => {
     const history = (await module()).mountHistory(made);
     await history.open();
     history.key(press('ArrowLeft'));
-    expect(chosen(made.root)).toBe('Teo met Ines at the bench');
+    expect(chosen(made.root)).toBe('Teo spoke to Ines at the bench');
     history.close();
     await history.open();
     expect(chosen(made.root)).toBe('Marco asked Teo');
@@ -655,7 +655,7 @@ describe('History', () => {
     // The reader goes back to the oldest moment while the newest is drawn: it is drawn next, not the one between.
     history.key(press('ArrowLeft'));
     history.key(press('ArrowLeft'));
-    expect(chosen(made.root)).toBe('Teo met Ines at the bench');
+    expect(chosen(made.root)).toBe('Teo spoke to Ines at the bench');
     releases[0]!({ sha256: 'c'.repeat(64), width: 600, height: 340 });
     await vi.waitFor(() => expect(renderMomentPicture).toHaveBeenCalledTimes(2));
     expect(renderMomentPicture.mock.calls[1]![0]).toMatchObject({ moment_id: 'm1' });

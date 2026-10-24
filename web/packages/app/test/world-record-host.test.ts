@@ -54,9 +54,10 @@ const NAMES: Record<string, string> = { teo: 'Teo', ines: 'Ines', marco: 'Marco'
 // Named people, and the canopy strider named by its kind (J20's three forms).
 const who = (id: string) => (id in NAMES ? { title: NAMES[id], start: NAMES[id], within: NAMES[id], named: true } : { title: 'Canopy strider', start: 'The canopy strider', within: 'the canopy strider', named: false });
 const KEPT = { sha256: 'f'.repeat(64), width: 600, height: 340 };
-// Teo met Ines and spoke to her under r1; Marco spoke to Teo under r9 (Marco's decision, Teo only spoken to).
+// Teo met Ines and spoke to her under r1, his model's decision, so the moment reads "Teo spoke to Ines" on every page;
+// Marco spoke to Teo under r9 (Marco's decision, Teo only spoken to).
 const MOMENTS = [
-  { moment_id: 'm1', request_id: 'r1', subjects: ['teo', 'ines'], kind: 'met', tick: 412, scene: { people: [{}] }, picture: KEPT, said: [{ by: 'teo', request_id: 'r1', tick: 412, line: 'Morning, Ines.' }] },
+  { moment_id: 'm1', request_id: 'r1', subjects: ['teo', 'ines'], kind: 'met', tick: 412, scene: { people: [{}] }, picture: KEPT, said: [{ by: 'teo', request_id: 'r1', tick: 412, line: 'Morning, Ines.', decider: { kind: 'model', model: null } }] },
   { moment_id: 'm9', request_id: 'r9', subjects: ['marco', 'teo'], kind: 'spoke', tick: 429, scene: { people: [{}] }, picture: KEPT, said: [{ by: 'marco', request_id: 'r9', tick: 429, line: 'Did they bring in anything good?' }] },
   { moment_id: 'm5', request_id: 'r5', subjects: ['teo'], kind: 'left', tick: 391, scene: null, picture: null, said: [] },
   { moment_id: 'm7', request_id: 'r7', subjects: ['strider', 'teo'], kind: 'spoke', tick: 420, scene: null, picture: null, said: [{ by: 'strider', request_id: 'r7', tick: 420, line: 'Rest in my shade.' }] },
@@ -113,7 +114,7 @@ describe("a record page's moments", () => {
     const showing = teoPage();
     await records.readMoments(showing);
     expect(made.host.read).toHaveBeenCalledWith(`/world/versions/v1/history/moments?world_id=w1&limit=200&recipe=${encodeURIComponent(await recipe())}`);
-    expect(records.dayRow(showing, { requestId: 'r1' })).toEqual({ moment: true, title: 'Teo met Ines', said: '“Morning, Ines.”', picture: 'blob:m1' });
+    expect(records.dayRow(showing, { requestId: 'r1' })).toEqual({ moment: true, title: 'Teo spoke to Ines', said: '“Morning, Ines.”', picture: 'blob:m1' });
     // Marco's moment never titles or pictures a row of Teo's, whatever request the row names.
     expect(records.dayRow(showing, { requestId: 'r9' })).toEqual({});
     expect(records.dayRow(showing, { requestId: null, heard: true })).toEqual({});
@@ -158,7 +159,7 @@ describe("a record page's moments", () => {
     expect([records.dayRow(showing, { requestId: 'w4', did: { kind: null, target: null, with: null } }), records.dayRow(showing, { requestId: 'w5', did: null }),
       records.dayRow(showing, { requestId: null, heard: true, did: { kind: 'waited', target: null, with: null } })]).toEqual([{}, {}, {}]);
     // A choice that made Teo's own moment is titled by the moment, whatever it did.
-    expect(records.dayRow(showing, { requestId: 'r1', did: { kind: 'waited', target: null, with: null } }).title).toBe('Teo met Ines');
+    expect(records.dayRow(showing, { requestId: 'r1', did: { kind: 'waited', target: null, with: null } }).title).toBe('Teo spoke to Ines');
   });
 
   it('lets a row fold only where its decision made no moment of Teo\'s and the moments read covers its minute (R5e)', async () => {
@@ -290,7 +291,7 @@ describe('a decision, filled', () => {
     await records.readMoments(showing);
     const state = records.decision(showing, { requestId: 'r1', detail: detail('say something to Ines'), failure: null, record: false }, { earlier: true });
     expect(state).toMatchObject({
-      over: '06:52 · Day 1 · Teo met Ines',
+      over: '06:52 · Day 1 · Teo spoke to Ines',
       decided: 'Teo spoke to Ines', said: 'Teo: “Morning, Ines.”', action: null,
       decider: 'model', answered: { latencyMs: 900, costUsd: '0.0003', costKnown: true }, choicesHeading: "Teo's choices",
       picture: 'blob:m1', portraits: [{ name: 'Teo', url: 'blob:portrait-teo' }, { name: 'Ines', url: 'blob:portrait-ines' }],
@@ -305,11 +306,23 @@ describe('a decision, filled', () => {
     const showing = teoPage();
     await records.readMoments(showing);
     const state = records.decision(showing, { requestId: 'r1', detail: detail('say something to Ines'), failure: null, record: false });
-    expect(state.over).toBe('06:53 · Day 1 · Teo met Ines');
+    expect(state.over).toBe('06:53 · Day 1 · Teo spoke to Ines');
     // Not applied yet: the minute it was asked in.
     const pending = recordStates(host().host);
     await pending.readMoments(showing);
-    expect(pending.decision(showing, { requestId: 'r1', detail: detail('say something to Ines'), failure: null, record: false }).over).toBe('06:52 · Day 1 · Teo met Ines');
+    expect(pending.decision(showing, { requestId: 'r1', detail: detail('say something to Ines'), failure: null, record: false }).over).toBe('06:52 · Day 1 · Teo spoke to Ines');
+  });
+
+  it("titles a meeting the engine began by the decision whose line is in it, its portraits in that order (DESIGN)", async () => {
+    const { recordStates } = await recordHost();
+    const records = recordStates(host().host);
+    const showing: Json = teoPage();
+    await records.readMoments(showing);
+    // Ines's routine began the meeting; Teo's decision said its line.
+    showing.moments = (showing.moments ?? []).map((moment: Json) => (moment.moment_id === 'm1' ? { ...moment, subjects: ['ines', 'teo'] } : moment));
+    const state = records.decision(showing, { requestId: 'r1', detail: detail('say something to Ines'), failure: null, record: false });
+    expect(state.over).toBe('06:52 · Day 1 · Teo spoke to Ines');
+    expect(state.portraits.map((portrait: Json) => portrait.name)).toEqual(['Teo', 'Ines']);
   });
 
   it("says a person playing decided where the request was a person's, with no model, time or cost", async () => {

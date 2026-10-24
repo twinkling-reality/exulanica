@@ -85,7 +85,8 @@ assert.deepEqual(path.items.map((item) => [item.kind, item.when, text(item.words
   ['creation', 'Yesterday · 21:40', 'Made from your words'],
   // No change records the world's time it was made: on the line it carries no time (F12b).
   ['change', null, 'You placed the bench'],
-  ['moment', '06:52 · Day 1', 'Teo met Ines at the bench'],
+  // A meeting whose line a model's decision said is titled as that decision (DESIGN, 24 October).
+  ['moment', '06:52 · Day 1', 'Teo spoke to Ines at the bench'],
   ['moment', '06:55 · Day 1', 'Ines and Teo went to the market'],
   ['moment', '07:09 · Day 1', 'Marco asked Teo'],
 ]);
@@ -108,6 +109,20 @@ assert.deepEqual([text(went.by), text(asked.by)], ['By Nemotron 3 Super 120B', '
 const routineMet = (lineDecider) => historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'routine', model: null }, branches: [],
   said: [said(412, 'teo', 'ines', 'Morning, Ines.', lineDecider)] }] }, names, partsOf, clock, now).items.find((item) => item.kind === 'moment');
 assert.deepEqual([text(routineMet(model('Nemotron 3 Super 120B')).by), routineMet({ kind: 'routine', model: null }).by], ['By Nemotron 3 Super 120B', null]);
+// Its title is that decision's too, the speaker first, wherever the engine's meeting put them; a routine line keeps
+// "met", and a meeting a decision to talk opened says "talked with" (DESIGN, 24 October).
+const titled = (moment) => historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'routine', model: null }, branches: [], ...moment }] },
+  names, partsOf, clock, now).items.find((item) => item.kind === 'moment');
+assert.equal(text(titled({ subjects: ['ines', 'teo'], said: [said(412, 'teo', 'ines', 'Morning, Ines.', model('Nemotron 3 Super 120B'))] }).words), 'Teo spoke to Ines at the bench');
+// Its portraits follow the title, the decider first (DESIGN, 24 October).
+assert.deepEqual(titled({ subjects: ['ines', 'teo'], said: [said(412, 'teo', 'ines', 'Morning, Ines.', model('Nemotron 3 Super 120B'))] }).subjects, ['teo', 'ines']);
+assert.deepEqual(titled({ subjects: ['ines', 'teo'], said: [said(412, 'teo', 'ines', 'Morning, Ines.', { kind: 'routine', model: null })] }).subjects, ['ines', 'teo']);
+assert.equal(text(titled({ subjects: ['ines', 'teo'], said: [said(412, 'teo', 'ines', 'Is the market open?', model('Nemotron 3 Super 120B'))] }).words), 'Teo asked Ines');
+// The decision's own line says whether it asks, not a routine line before it.
+assert.equal(text(titled({ said: [said(411, 'ines', 'teo', 'Morning.', { kind: 'routine', model: null }), said(412, 'teo', 'ines', 'Is the market open?', model('Nemotron 3 Super 120B'))] }).words), 'Teo asked Ines');
+assert.equal(text(titled({ said: [said(412, 'teo', 'ines', 'Morning, Ines.', { kind: 'routine', model: null })] }).words), 'Teo met Ines at the bench');
+assert.equal(text(titled({ said: [], decider: model('Nemotron 3 Super 120B') }).words), 'Teo talked with Ines at the bench');
+assert.equal(text(titled({ kind: 'talked', subjects: ['ines', 'teo'], said: [said(412, 'teo', 'ines', 'Morning, Ines.', { kind: 'person', model: null })] }).words), 'Teo spoke to Ines at the bench');
 // The first of them: a person playing spoke before the model answered.
 const twoLines = historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'routine', model: null }, branches: [],
   said: [said(412, 'teo', 'ines', 'Morning, Ines.', { kind: 'person', model: null }), said(413, 'ines', 'teo', 'Morning.', model('Nemotron 3 Super 120B'))] }] },
