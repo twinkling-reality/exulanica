@@ -111,13 +111,14 @@ export function spentOf(accounting) {
 /**
  * The cards under "Or start from" (N3): the server's recipes, then the workspace's kinds, each
  * { key, name, picture, priceUsd } as served, then Blank last. None is named in code but Blank,
- * which says it opens the workspace's blank world again where that world exists (N27).
+ * which says it opens the workspace's blank world again once that world holds something its person
+ * placed (N27, C4b): a newcomer's My world, made with the install, still reads "Build it yourself".
  */
-export function startCards(recipes = [], kinds = [], { blankExists = false } = {}) {
+export function startCards(recipes = [], kinds = [], { blankHolds = false } = {}) {
   const served = [...recipes, ...kinds]
     .filter(card => card && typeof card.key === 'string' && typeof card.name === 'string' && card.name.trim())
     .map(card => ({ key: card.key, name: card.name, sub: cardSub(card.priceUsd), picture: typeof card.picture === 'string' ? card.picture : null, blank: false }));
-  const sub = blankExists ? CREATE_WORDS.opensMyWorldAgain : CREATE_WORDS.buildItYourself;
+  const sub = blankHolds ? CREATE_WORDS.opensMyWorldAgain : CREATE_WORDS.buildItYourself;
   return [...served, { key: 'blank', name: CREATE_WORDS.blank, sub, picture: null, blank: true }];
 }
 

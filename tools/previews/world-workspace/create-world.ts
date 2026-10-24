@@ -259,7 +259,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   signal.addEventListener('abort', () => refit.disconnect());
 
   const drawCards = (): void => {
-    const shown = startCards([...cardWords.values()], [], { blankExists });
+    const shown = startCards([...cardWords.values()], [], { blankHolds });
     strip = filmStrip(shown, (key) => { void startFrom(key); }, sentenceId === null ? {} : { labelledBy: sentenceId });
     strip.cards.forEach((card) => card.removeAttribute('aria-current'));
     strip.root.addEventListener('focusin', keys);
@@ -269,8 +269,9 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
 
   // The cards: the server's presets and kinds as served, one per kind (its first preset), Blank last.
   const cardWords = new Map<string, { readonly key: string; readonly name: string; readonly picture: string | null }>();
-  // Whether the workspace's blank world (its authored starter) is saved already: Blank then reopens it (N27).
-  let blankExists = false;
+  // Whether the workspace's blank world (its authored starter) holds anything its person placed, by its edits as it
+  // stands: Blank then says it reopens it (N27, C4b). A personal install makes My world at once, still empty.
+  let blankHolds = false;
   const readCards = async (): Promise<void> => {
     const [presets, kinds, saved, pictures] = await Promise.all([
       new WorldSpecificationClient(credentials).specification().then((spec) => spec.presets, () => [] as readonly SpecificationPreset[]),
@@ -278,7 +279,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       entries.entries().then((list) => list, () => [] as readonly SavedWorldEntry[]),
       readCardPictures(),
     ]);
-    blankExists = saved.some((entry) => entry.authoredScene?.kind === 'authored-starter');
+    blankHolds = saved.some((entry) => entry.authoredScene?.kind === 'authored-starter' && entry.currentAuthoredEditSeq > 0);
     const found: StartCard[] = [];
     for (const preset of presets) {
       const key = `recipe:${preset.key}`;

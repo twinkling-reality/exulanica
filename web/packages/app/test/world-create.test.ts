@@ -613,13 +613,18 @@ describe('Create a world as a page', () => {
     expect(opened).toEqual([]);
   });
 
-  it('says Blank opens My world again where the blank world is saved already (N27)', async () => {
+  it('says Blank opens My world again once the blank world holds something its person placed (N27, C4b)', async () => {
     serve(offerOf());
     await mount();
     const sub = () => document.querySelector('.wu-film-card[data-key="blank"] .wu-film-sub')!.textContent;
     expect(sub()).toBe('Build it yourself');
+    // A personal install makes My world at once: saved, but nothing placed in it yet.
     document.body.replaceChildren();
-    saved = [{ entryId: 'other', authoredScene: null }, { entryId: 'starter', authoredScene: { kind: 'authored-starter' } }];
+    saved = [{ entryId: 'other', authoredScene: null, currentAuthoredEditSeq: 3 }, { entryId: 'starter', authoredScene: { kind: 'authored-starter' }, currentAuthoredEditSeq: 0 }];
+    await mount();
+    expect(sub()).toBe('Build it yourself');
+    document.body.replaceChildren();
+    saved = [{ entryId: 'other', authoredScene: null, currentAuthoredEditSeq: 0 }, { entryId: 'starter', authoredScene: { kind: 'authored-starter' }, currentAuthoredEditSeq: 1 }];
     await mount();
     expect(sub()).toBe('Opens My world again');
   });
