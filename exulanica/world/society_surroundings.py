@@ -12,7 +12,9 @@ by a model.
 options use, so a decider can match the two; its kind and what it holds are their kinds' labels;
 what it is doing is its routine's activity words; what a thing is good for is the words the
 offers catalog states for each offer its kind makes, read from the version :class:`NoticeTerms`
-names, so a later catalog never changes what a stored request showed.
+names, so a later catalog never changes what a stored request showed. Under
+:attr:`NoticeTerms.places_named` the town's premises where it stands is named as the day page names
+it, in the told place catalog's words (:func:`told_places`).
 
 **Withheld by construction.** No look (no look reference enters a society's state or input), no
 decider or model of another being, no identifier, position or heading, and no free text: every
@@ -28,22 +30,27 @@ counted) until it fits.
 
 from __future__ import annotations
 
+import functools
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Final
 
 from exulanica.canonical import canonical_json
 from exulanica.things.catalogs import offers_of_version
+from exulanica.world.society_input_policy import TARGET_PLACE_FIELD
 from exulanica.world.society_kinds import kind_here
 
 __all__ = [
     "MORE_MAXIMUM",
     "SURROUNDINGS_VERSION",
     "NoticeTerms",
+    "premises_name",
     "straight_mm",
     "surroundings",
     "surroundings_lines",
+    "told_places",
     "whole_metres",
     "withhold",
 ]
@@ -56,6 +63,27 @@ MORE_MAXIMUM: Final = 99
 _AT_PLACE_MM: Final = 2_000
 #: The offer a place's affordance is read as, for the words of what the place is good for.
 _AFFORDANCE_OFFERS: Final = {"rest": "rest_at", "visit": "visit"}
+#: The told place catalog version a request under ``places_named`` reads.
+TOLD_PLACE_VERSION: Final = 1
+#: Every told place the catalog words: where a being stands, and a premises it remembers by what it
+#: did there (``remembered_any`` for any activity worded on no entry of its own).
+_TOLD_PLACES: Final = frozenset(
+    {
+        "here_at",
+        "here_inside",
+        "here_own_home",
+        "remembered_visit",
+        "remembered_eat_out",
+        "remembered_shop",
+        "remembered_work",
+        "remembered_rest",
+        "remembered_stay_home",
+        "remembered_own_home",
+        "remembered_any",
+    }
+)
+#: The told places that name no premises: one's own home is said as home.
+_OWN_HOME: Final = frozenset({"here_own_home", "remembered_own_home"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +102,8 @@ class NoticeTerms:
     names_as_written: bool = False
     #: Whether a being's activity names whom it is with as written (``activity_names_as_written``).
     activity_names_as_written: bool = False
+    #: Whether the premises where a being stands is told by name (``places_named``).
+    places_named: bool = False
 
     def __post_init__(self) -> None:
         for name in ("reach_mm", "beings_maximum", "things_maximum", "bytes_maximum"):
@@ -82,6 +112,43 @@ class NoticeTerms:
                 raise ValueError(f"{name} is a whole number of at least 1")
         if self.hearing_reach_mm < 0 or self.offers_version < 1:
             raise ValueError("the hearing reach and the offers version are whole numbers")
+
+
+@functools.cache
+def told_places(version: int = TOLD_PLACE_VERSION) -> Mapping[str, str]:
+    """The words a premises is told in, as version ``version`` of the told place catalog states
+    them, checked: every told place once, each naming ``{place}`` once but one's own home, which
+    names none."""
+    from exulanica.grammar.catalogs import load_catalog
+    from exulanica.world.society_catalogs import ROUTINE_DIRECTORY, SCHEMAS
+
+    catalog = load_catalog(
+        ROUTINE_DIRECTORY / f"society-told-place.v{version}.json",
+        SCHEMAS[("society-told-place", version)],
+    )
+    words = {entry.key: str(dict(entry.values)["words"]) for entry in catalog.entries}
+    if set(words) != _TOLD_PLACES or any(
+        text.count("{place}") != (0 if key in _OWN_HOME else 1) for key, text in words.items()
+    ):
+        raise ValueError(
+            "the told place catalog words every told place, each naming the place once"
+        )
+    return MappingProxyType(words)
+
+
+def premises_name(target: Mapping[str, Any] | None) -> str | None:
+    """What the town's place calls a premises target, where its input says, as the day page names
+    it: its label with its address number where it has one ("restaurant at number 7"); None for a
+    target the input names no place for."""
+    place = None if target is None else target.get(TARGET_PLACE_FIELD)
+    if (
+        not isinstance(place, Mapping)
+        or not isinstance(place.get("label"), str)
+        or not place["label"]
+    ):
+        return None
+    number = place.get("address_number")
+    return place["label"] if number is None else f"{place['label']} at number {number}"
 
 
 def straight_mm(a: Sequence[int], b: Sequence[int]) -> int:
@@ -177,10 +244,12 @@ def _at(
     document: Mapping[str, Any],
     routine: Any,
     words: Mapping[str, Any],
+    places_named: bool = False,
 ) -> dict[str, str] | None:
     """The place a being stands at: the enabled place whose access point is nearest it within
-    :data:`_AT_PLACE_MM`, ties by its identifier, as its routine's activity words and the words of
-    what it is good for; None where it stands at none."""
+    :data:`_AT_PLACE_MM`, ties by its identifier, as its routine's activity words, or under
+    ``places_named`` a premises the town names by its name ("at the restaurant at number 7"), and
+    the words of what it is good for; None where it stands at none."""
     from exulanica.world.society_decision_contract import _activity_label
 
     near = sorted(
@@ -190,7 +259,12 @@ def _at(
     if not near or near[0][0] > _AT_PLACE_MM:
         return None
     target = near[0][2]
-    found = {"words": _activity_label(routine, target)[1]}
+    named = premises_name(target) if places_named else None
+    found = {
+        "words": told_places()["here_at"].replace("{place}", named)
+        if named
+        else _activity_label(routine, target)[1]
+    }
     offer = _AFFORDANCE_OFFERS.get(str(target["affordance"]))
     if offer is not None and offer in words:
         found["good_for"] = words[offer].words
@@ -261,15 +335,9 @@ def surroundings(
         )
     block = {
         "at": (
-            {
-                "words": next(
-                    d["label"]
-                    for d in state["day_context"]["destinations"]
-                    if d["destination_id"] == me["location"]["destination_id"]
-                )
-            }
+            _inside(state, me, targets, terms.places_named)
             if inside(me)
-            else _at(me, document, routine, words)
+            else _at(me, document, routine, words, terms.places_named)
         ),
         "beings": listed_beings,
         "more_beings": min(MORE_MAXIMUM, len(beings) - len(listed_beings)),
@@ -277,6 +345,36 @@ def surroundings(
         "more_things": min(MORE_MAXIMUM, len(things) - len(listed_things)),
     }
     return _within(block, [row[0] for row in beings], [row[0] for row in things], terms)
+
+
+def _inside(
+    state: Mapping[str, Any],
+    me: Mapping[str, Any],
+    targets: Mapping[str, Mapping[str, Any]],
+    places_named: bool,
+) -> dict[str, str]:
+    """Where a being inside one of the town's premises stands: the premises' label, or under
+    ``places_named`` the premises by its name ("in the restaurant at number 7"), its own home said
+    as home."""
+    destination = next(
+        d
+        for d in state["day_context"]["destinations"]
+        if d["destination_id"] == me["location"]["destination_id"]
+    )
+    if places_named and me.get("day_home") == destination["destination_id"]:
+        return {"words": told_places()["here_own_home"]}
+    named = next(
+        (
+            name
+            for target in targets.values()
+            if target.get("subject_id") == destination["subject_id"]
+            and (name := premises_name(target)) is not None
+        ),
+        None,
+    )
+    if places_named and named is not None:
+        return {"words": told_places()["here_inside"].replace("{place}", named)}
+    return {"words": destination["label"]}
 
 
 def _within(

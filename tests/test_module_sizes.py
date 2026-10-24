@@ -75,9 +75,10 @@ LIMITS: dict[str, tuple[int, str]] = {
         "reopening a personal world at a saved state, and making a town on its land",
     ),
     "exulanica/world/society_decision_contract.py": (
-        1_583,
+        1_592,
         "the contract a model answers under when it runs a person, with the request's own contract "
-        "threaded through its context builders and the minute told as the world's clock",
+        "threaded through its context builders, the minute told as the world's clock and the "
+        "town's premises told by name",
     ),
     "web/packages/atlas-react/src/playcanvas/society/crowd.ts": (
         1_607,
@@ -99,8 +100,9 @@ LIMITS: dict[str, tuple[int, str]] = {
         "drawing, land, graded top and landscape reads",
     ),
     "exulanica/world/society_catalogs.py": (
-        1_530,
-        "the living society routine model as data, and the day-start catalog's schema",
+        1_539,
+        "the living society routine model as data, and the day-start and told place catalogs' "
+        "schemas",
     ),
 }
 

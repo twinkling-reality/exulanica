@@ -728,6 +728,7 @@ PUBLISHED_REGISTRIES = {
     "decision-roles.v10.json": "36144cb5efe68c11e5cf11c848bbef79c53fc91bc878a05e7837b6f3c33a0380",
     "decision-roles.v11.json": "d743b0b9e83f1c356af7b1c0c307ff09e8e08d2e4470f8d976636cb13cf1b6f7",
     "decision-roles.v12.json": "e2bc7705b493014d63c29fde90bee8e7177fa53eab5223f648099c30b3ed799c",
+    "decision-roles.v13.json": "b3bf2a0b6f4b94b9dee459e263e7d3c5aa1a891883767147a5e4730038b438ae",
 }
 
 
@@ -749,12 +750,14 @@ LABEL_RULES_AS_PUBLISHED = {
         "straight_line_distances": 9,
         "activity_names_as_written": 11,
         "clock_told": 11,
+        "places_named": 12,
     },
     "junction_signal": {
         "names_as_written": 1,
         "straight_line_distances": 1,
         "activity_names_as_written": 1,
         "clock_told": 1,
+        "places_named": 1,
     },
 }
 
@@ -779,11 +782,16 @@ def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
     own, things = person.terms(), person.terms(THINGS)
     assert own == person.terms("exulanica-society/v2") == person.terms("exulanica-society/v5")
     assert own.versions == {"society-decision-action": 2, "society-decision-policy": 2}
-    assert things.versions == {"society-decision-action": 11, "society-decision-policy": 8}
+    assert things.versions == {"society-decision-action": 12, "society-decision-policy": 8}
     assert (own.prompt_version, things.prompt_version) == (
         "society-person-choice/v1",
-        "society-person-choice/v9",
+        "society-person-choice/v10",
     )
+    # The ninth prompt, which every request made under the eleventh catalog records, stays
+    # readable with it, and the tenth says the same over the twelfth.
+    ninth_prompt = person.terms_with_prompt("society-person-choice/v9")
+    assert ninth_prompt is not None and ninth_prompt.instruction == things.instruction
+    assert ninth_prompt.versions == {"society-decision-action": 11, "society-decision-policy": 8}
     # The eighth prompt, which every request made under the ninth catalog records, stays readable
     # with it, and the ninth says the same over the eleventh.
     eighth_prompt = person.terms_with_prompt("society-person-choice/v8")

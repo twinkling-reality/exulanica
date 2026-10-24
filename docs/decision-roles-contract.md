@@ -384,10 +384,11 @@ workspace ([erasing a society](synthetic-society-contract.md#erasing-a-society))
 sent to a hosted model provider or an outside program is beyond any erasure.
 
 A played being's request, its turn and its answer are read under the person's own contract
-(`play_contract`): the engine's terms with the tenth action catalog
-(`assets/catalogs/society/society-decision-action.v10.json`), the seventh's actions and words under
-the label rules the registry holds from the ninth (a being named as the page names it, capitals
-kept, and one straight-line distance, as a model reads them), which states the sixth's `point`,
+(`play_contract`): the engine's terms with the thirteenth action catalog
+(`assets/catalogs/society/society-decision-action.v13.json`), the seventh's actions and words under
+every label rule the registry holds (a being named as the page names it, capitals kept, one
+straight-line distance, whom a noticed being is with as written, the world's clock and the town's
+premises by name, as a model is told them), which states the sixth's `point`,
 "walk to a spot you choose", at the being's choice point wherever the routine has people stand and
 the being's kind does, and adds `follow`, "follow {name}, {metres} m away", toward each other being
 within hearing reach whose kind offers to be followed (nearest first, at most the policy's
@@ -397,8 +398,8 @@ following), where the society runs the follow module and the being's kind lists 
 engine's policy catalog, at least the seventh, which holds the sixth's bounds and that one. No
 model's or outside program's request is asked under it, so none is offered the walk, and every
 stored request keeps the catalog it recorded (a played being's request made before the seventh
-pair recorded the sixth, and one made before the tenth recorded the seventh, in lowercase
-words). Its answer gives the spot
+pair recorded the sixth, one made before the tenth recorded the seventh, in lowercase words,
+and one made before the thirteenth recorded the tenth, told the minute's number). Its answer gives the spot
 as `point: [x_mm, z_mm]`; when the minute comes the host takes the open node nearest it (no
 activity's place, nobody standing at or headed to it, one the being can walk to, within the graph's
 longest step of the spot), and the receipt names that node (`node_id`, which a receipt states for
@@ -673,6 +674,23 @@ Every path that builds or replays a person's request states that day start (`rol
 `day_start`: the host's reservation reads it from the society's first input, a comparison from its
 plan's first input), so a request is rebuilt telling the clock it told. Requests under the ninth and
 tenth catalogs hold neither rule and rebuild to the byte.
+
+Registry version 13 asks new requests of an `exulanica-society/v7` society under action catalog
+version 12 and prompt `society-person-choice/v10`, with policy catalog version 8 and the same
+instruction; the twelfth action catalog keeps the eleventh's actions and words, and the thirteenth
+is a person playing's (above). From version 13 an entry states one more label rule's version
+(`places_named_from_action_version`), from 12 for the person role. Under `places_named` a being
+standing at a premises of the town, by its access point, is told the premises by the name the day
+page gives it, its label and address number from the input's own target ("Where you stand: at the
+restaurant at number 7 (others can visit it)."); one inside a premises "in the restaurant at number
+7", and inside its own home "at home"; and a premises it remembers by what it did there ("visited
+the restaurant at number 7", "ate at", "shopped at", "worked at", "rested at the bench", "was at home"
+for its own home, "was at the home at number 9" for another's, "went to" for any other activity), places
+told in the same words told once, their times added and the latest kept. The words are the
+told place catalog's (`assets/catalogs/society/society-told-place.v1.json`), each with its reason; a
+remembered place keeps its stored words and is named at telling time from the input its minute
+consumed, so no state changes. A place the input names no premises for is told as before. Requests
+under the eleventh catalog hold no such rule and rebuild to the byte.
 
 Version 3 keeps version 2's actions and bounds and adds:
 

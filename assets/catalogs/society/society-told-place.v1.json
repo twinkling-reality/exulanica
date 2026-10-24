@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-told-place",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "here_at",
+      "words": "at the {place}",
+      "reason": "Where a being stands at the door or yard of one of the town's premises: the premises as the day page names it, its label and address number, in place of what is done there; what the place is good for follows as before.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society's told words; see the entry reason"
+      }
+    },
+    {
+      "key": "here_inside",
+      "words": "in the {place}",
+      "reason": "Where a being stands inside one of the town's premises other than its own home: the premises as the day page names it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society's told words; see the entry reason"
+      }
+    },
+    {
+      "key": "here_own_home",
+      "words": "at home",
+      "reason": "Where a being stands inside its own home: at home, as a person says it, never its own address.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society's told words; see the entry reason"
+      }
+    },
+    {
+      "key": "remembered_visit",
+      "words": "visited the {place}",
+      "reason": "A premises a being remembers going to for a visit, said in the past with its name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society's told words; see the entry reason"
+      }
+    },
+    {
+      "key": "remembered_eat_out",
+      "words": "ate at the {place}",
+      "reason": "A premises a being remembers going to for a meal out, said in the past with its name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society's told words; see the entry reason"
+      }
+    },
+    {
+      "key": "remembered_shop",
+      "words": "shopped at the {place}",
+      "reason": "A premises a being remembers going to for shopping, said in the past with its name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society's told words; see the entry reason"
+      }
+    },
+    {
+      "key": "remembered_work",
+      "words": "worked at the {place}",
+      "reason": "A premises a being remembers going to for work, said in the past with its name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society's told words; see the entry reason"
+      }
+    },
+    {
+      "key": "remembered_rest",
+      "words": "rested at the {place}",
+      "reason": "A place a being remembers going to for a rest, a bench among them, said in the past with its name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society's told words; see the entry reason"
+      }
+    },
+    {
+      "key": "remembered_stay_home",
+      "words": "was at the {place}",
+      "reason": "A home other than its own a being remembers staying at, said in the past with its name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society's told words; see the entry reason"
+      }
+    },
+    {
+      "key": "remembered_own_home",
+      "words": "was at home",
+      "reason": "A being's own home remembered, whatever it did there: at home, never its own address.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society's told words; see the entry reason"
+      }
+    },
+    {
+      "key": "remembered_any",
+      "words": "went to the {place}",
+      "reason": "A premises a being remembers going to for any activity the told place catalog does not word on its own, said in the past with its name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society's told words; see the entry reason"
+      }
+    }
+  ]
+}

@@ -104,6 +104,14 @@ assert.deepEqual(toldSections(town, resident), [
 // A society of things' model told the world's clock (clock_told) is shown it as told; before that it was told a minute.
 assert.deepEqual(toldSections({ here: 'on the quay', tick: 27, world_clock: { minute_of_day: 1108, day: 0 } }, resident)[0].lines, ['On the quay · 18:28 · Day 1']);
 assert.deepEqual(toldSections({ here: 'on the quay', tick: 27 }, resident)[0].lines, ['On the quay · Minute 27']);
+// A town's premises told by name (places_named, P3): the page shows where the model stood and what it remembered as
+// told, at a premises' door, inside one, and a premises remembered by what the being did there.
+const town7 = (at) => ({ tick: 638, world_clock: { minute_of_day: 1118, day: 0 },
+  surroundings: { at, beings: [], things: [], more_beings: 0, more_things: 0 },
+  remembers: { beings: [], places: [{ words: 'visited the restaurant at number 7', last_minutes_ago: 10 }], handed: [] } });
+assert.deepEqual(toldSections(town7({ words: 'at the restaurant at number 7', good_for: 'others can visit it' }), teo).map(section => section.lines),
+  [['At the restaurant at number 7 (others can visit it) · 18:38 · Day 1'], ['Visited the restaurant at number 7, 10 minutes ago.']]);
+assert.deepEqual(toldSections(town7({ words: 'in the restaurant at number 7' }), teo)[0].lines, ['In the restaurant at number 7 · 18:38 · Day 1']);
 assert.deepEqual(choiceRows(town, 'wait here a minute'), [
   { number: 1, words: 'Walking, 62 m away', chosen: false },
   { number: 2, words: 'Wait here a minute', chosen: true },

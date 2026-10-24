@@ -273,6 +273,15 @@ RELEASED_CATALOGS = {
     "society-decision-action.v11.json": (
         "91e1be1fdf628dc9ae704b831826140f452a3d211802ab2713d88d92d2f8cfef"
     ),
+    "society-decision-action.v12.json": (
+        "6dafa19f22f201fef0d829dd5c1e6785bbe043427f752f773900f25d65bd1e73"
+    ),
+    "society-decision-action.v13.json": (
+        "bcaf969d2b4bbbfd2011b0b69a2bc17ad7e178ae4607d5f4efb99a9695a2a72c"
+    ),
+    "society-told-place.v1.json": (
+        "35c38a84d8a158fea06b377674aab8de4e9110d14c3991d48cd9ff224d79e2d7"
+    ),
     "society-decision-policy.v5.json": (
         "67744ddc361badc5816f032f87880f05baf15ed25764d9e29fd3e4780c07fbf2"
     ),

@@ -16,6 +16,7 @@ import uuid
 
 import pytest
 from exulanica.world.deciders import DeciderRefused, decider, is_played, receipt_decider
+from exulanica.world.decision_roles import LABEL_RULES
 from exulanica.world.role_decisions import check_role_result, role_request
 from exulanica.world.society_decision_contract import (
     POINT_KIND,
@@ -204,14 +205,17 @@ SEVENTH_PLAY_REQUEST_SHA256 = "343f21b0312924ccfd6e2fd2f1c39f14120d2722d0200b031
 
 
 def test_a_play_reads_names_as_written_and_a_stored_one_keeps_its_words():
-    """A person playing is asked under the tenth action catalog, which the label rules reach: a
-    being named as the page names it and one straight-line distance, as a model reads them. A play
-    stored under the seventh rebuilds to the byte, in lowercase words."""
+    """A person playing is asked under the thirteenth action catalog, which every label rule
+    reaches, as a model's: a being named as the page names it and one straight-line distance among
+    them. A play stored under the tenth keeps the two rules it was told under, and one stored under
+    the seventh rebuilds to the byte, in lowercase words."""
     state, document, knight = _knight_free_to_choose()
     role = person_role()
     played = play_contract(role, "exulanica-society/v7")
-    assert played.versions[role.action_catalog] == PLAY_CATALOG_VERSION == 10
-    assert played.label_rules == {"names_as_written", "straight_line_distances"}
+    assert played.versions[role.action_catalog] == PLAY_CATALOG_VERSION == 13
+    assert played.label_rules == set(LABEL_RULES)
+    tenth = role.contract({**played.versions, role.action_catalog: 10})
+    assert tenth.label_rules == {"names_as_written", "straight_line_distances"}
     stored = role.contract({**played.versions, role.action_catalog: 7})
     assert stored.label_rules == frozenset()
 

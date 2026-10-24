@@ -142,6 +142,9 @@ class RecollectionBounds:
     #: Whether a remembered being is named as written, capitals kept (a request under
     #: ``names_as_written``).
     names_as_written: bool = False
+    #: Whether a remembered premises is told by name, with what the being did there (a request under
+    #: ``places_named``).
+    places_named: bool = False
 
     def __post_init__(self) -> None:
         names = ("beings_maximum", "places_maximum", "handed_maximum", "bytes_maximum")
@@ -644,12 +647,14 @@ def remembered(
     bounds: RecollectionBounds,
     *,
     shown_lines: Collection[tuple[int, str]] = (),
+    document: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """What ``person`` remembers, as a decider is shown it as the coming minute begins: beings
     met, places and hand-overs, each most recent first, a line left out where ``shown_lines``
     (``(tick, line)`` pairs the context already shows as heard or said) holds it; within
     ``bounds.bytes_maximum`` bytes of canonical JSON, the entry noted longest ago dropped first.
-    None for a being that keeps no recollection."""
+    Under ``bounds.places_named`` a place the input ``document`` names is told by its name
+    (:func:`_place_words`). None for a being that keeps no recollection."""
     recollection = person.get("recollection")
     if recollection is None:
         return None
@@ -673,17 +678,28 @@ def remembered(
         if "left_tick" in entry:
             being["left_minutes_ago"] = now - entry["left_tick"]
         beings.append(((entry["last_tick"], 0), being))
+    if bounds.places_named and document is None:
+        raise ValueError("a place told by name is read from the input its minute consumed")
+    targets = (
+        {target["target_id"]: target for target in document["targets"]}
+        if bounds.places_named and document is not None
+        else {}
+    )
     places = [
         (
             (entry["last_tick"], 1),
             {
-                "words": entry["words"],
+                "words": _place_words(state, person, entry, targets)
+                if bounds.places_named
+                else entry["words"],
                 "last_minutes_ago": now - entry["last_tick"],
                 "times": entry["times"],
             },
         )
         for entry in sorted(recollection["places"], key=lambda e: (-e["last_tick"], e["target_id"]))
     ]
+    if bounds.places_named:
+        places = _told_once(places)
     handed = [
         (
             (entry["tick"], 2),
@@ -707,6 +723,51 @@ def remembered(
         for entry in reversed(recollection["choices"])
     ]
     return _within(beings, places, handed, bounds, choices)
+
+
+def _told_once(
+    places: list[tuple[tuple[int, int], dict[str, Any]]],
+) -> list[tuple[tuple[int, int], dict[str, Any]]]:
+    """Remembered places told in the same words told as one (``places_named``): the latest kept, in
+    its place among the rest, its times the sum of theirs, as one place visited again is told."""
+    told: dict[str, dict[str, Any]] = {}
+    kept: list[tuple[tuple[int, int], dict[str, Any]]] = []
+    for key, place in places:
+        same = told.get(place["words"])
+        if same is None:
+            told[place["words"]] = place = dict(place)
+            kept.append((key, place))
+        else:
+            same["times"] = min(TIMES_MAXIMUM, same["times"] + place["times"])
+    return kept
+
+
+def _place_words(
+    state: Mapping[str, Any],
+    person: Mapping[str, Any],
+    entry: Mapping[str, Any],
+    targets: Mapping[str, Mapping[str, Any]],
+) -> str:
+    """A remembered place as a decider is told it under ``places_named``: a premises the town names
+    by what the being did there, in the told place catalog's words ("visited the restaurant at
+    number 7"; its own home "was at home"); any other place in the activity words it was noted
+    with."""
+    from exulanica.world.society_surroundings import premises_name, told_places
+
+    target = targets.get(entry["target_id"])
+    named = premises_name(target)
+    if target is None or named is None:
+        return str(entry["words"])
+    words = told_places()
+    home = person.get("day_home")
+    destinations = (state.get("day_context") or {}).get("destinations", ())
+    if home is not None and any(
+        d["destination_id"] == home and d["subject_id"] == target.get("subject_id")
+        for d in destinations
+    ):
+        return words["remembered_own_home"]
+    told = words.get(f"remembered_{target.get('activity')}", words["remembered_any"])
+    return told.replace("{place}", named)
 
 
 def _shown_choice(entry: Mapping[str, Any], now: int) -> dict[str, Any]:

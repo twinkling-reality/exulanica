@@ -24,7 +24,6 @@ from exulanica.world.role_decisions import role_request
 from exulanica.world.society_decision_contract import choice_options, page_name, person_role
 from exulanica.world.society_recollection import remembered
 from exulanica.world.society_surroundings import surroundings
-from exulanica.world.society_things import THINGS_PROFILE
 
 import test_society_recollection as recollection
 import test_society_surroundings as noticing
@@ -82,10 +81,10 @@ def _request(versions, prompt, *, day_start=None, change=None):
     return request, page_name(ivo, state)
 
 
-def test_a_new_request_is_asked_under_the_eleventh_catalog_with_every_label_rule():
+def test_the_eleventh_catalog_holds_every_label_rule_before_the_places_named():
     role = person_role()
-    terms = role.terms(THINGS_PROFILE)
-    assert (terms.versions, terms.prompt_version) == (ELEVENTH, "society-person-choice/v9")
+    terms = role.terms_with_prompt("society-person-choice/v9")
+    assert terms is not None and terms.versions == ELEVENTH
     assert role.contract(ELEVENTH).label_rules == {
         "names_as_written",
         "straight_line_distances",

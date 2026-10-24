@@ -21,11 +21,13 @@ choices. One that records `exulanica-ability/character/v1` keeps and shows the c
 wrote for each placed being. Every new society records notice, the second memory version and the
 character module. A society whose first input records an earlier set keeps and shows exactly what
 that set does, and its stored requests replay as they were made. The person's terms for
-`exulanica-society/v7` render the blocks from the decision roles registry's version 12 (prompt
-`society-person-choice/v9`, action catalog version 11, policy version 8, whose context bound is
+`exulanica-society/v7` render the blocks from the decision roles registry's version 13 (prompt
+`society-person-choice/v10`, action catalog version 12, policy version 8, whose context bound is
 16,000 bytes), naming each being as the page names it, capitals kept, as a request under the
-ninth action catalog's `names_as_written` does, and from the eleventh whom a noticed being is with
-too (`activity_names_as_written`); a stored request keeps its own words. A society made
+ninth action catalog's `names_as_written` does, from the eleventh whom a noticed being is with
+too (`activity_names_as_written`), and from the twelfth the town's premises where the being stands
+and those it remembers by the names the day page gives them (`places_named`); a stored request
+keeps its own words. A society made
 before the second memory version or the character module is asked under the same prompt, whose
 instruction speaks of a character and of past choices only where they are shown
 ([decision roles](decision-roles-contract.md#a-society-of-things-people)).

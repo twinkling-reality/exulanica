@@ -1017,7 +1017,8 @@ def _things_context(
     notices and remembers are named as written where the request's own contract (``asked``; left
     out, the one a new request records) holds its words to ``names_as_written`` (F9); where it holds
     them to ``clock_told``, the minute is recorded as the world's clock (``world_clock``), the
-    society's own or its people's from ``day_start``, where it keeps either."""
+    society's own or its people's from ``day_start``, where it keeps either; where it holds them to
+    ``places_named``, a premises where it stands and one it remembers is told by name."""
     from exulanica.world.society import told_clock
 
     if not of_things(state["profile"]):
@@ -1027,6 +1028,7 @@ def _things_context(
     as_written = "names_as_written" in (asked or contract).label_rules
     activities = "activity_names_as_written" in (asked or contract).label_rules
     told = "clock_told" in (asked or contract).label_rules
+    places = "places_named" in (asked or contract).label_rules
     return {
         "engine": state["profile"],
         "under_way": not at_choice_point(person),
@@ -1045,8 +1047,8 @@ def _things_context(
         **_character(state, person),
         **_said(state, person),
         **_holding(state, person),
-        **_noticed(state, document, person, as_written, activities),
-        **_remembers(state, person, as_written),
+        **_noticed(state, document, person, as_written, activities, places),
+        **_remembers(state, person, as_written, document if places else None),
         **({"world_clock": clock} if told and (clock := told_clock(state, day_start)) else {}),
     }
 
@@ -1117,6 +1119,7 @@ def _noticed(
     person: Mapping[str, Any],
     as_written: bool = False,
     activities_as_written: bool = False,
+    places_named: bool = False,
 ) -> dict[str, Any]:
     """What the being notices around it (:mod:`exulanica.world.society_surroundings`), where its
     society records the notice module: bounded by the row of the version it recorded, and who hears
@@ -1140,16 +1143,21 @@ def _noticed(
         offers_version=row.value("offers_version"),
         names_as_written=as_written,
         activity_names_as_written=activities_as_written,
+        places_named=places_named,
     )
     return {"surroundings": surroundings(state, document, person["id"], terms)}
 
 
 def _remembers(
-    state: Mapping[str, Any], person: Mapping[str, Any], as_written: bool = False
+    state: Mapping[str, Any],
+    person: Mapping[str, Any],
+    as_written: bool = False,
+    document: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """What the being remembers (:mod:`exulanica.world.society_recollection`), where its society
     records the memory module and it keeps one, a line it already sees as heard or said left out;
-    bounded by the row of the version its society recorded. Stated only there."""
+    bounded by the row of the version its society recorded, a premises told by name where the input
+    ``document`` is given (``places_named``). Stated only there."""
     from exulanica.abilities.registry import recorded_row
     from exulanica.world.society_recollection import RecollectionBounds, remembered
 
@@ -1162,11 +1170,12 @@ def _remembers(
         handed_maximum=row.value("handed_maximum"),
         bytes_maximum=row.value("bytes_maximum"),
         names_as_written=as_written,
+        places_named=document is not None,
     )
     shown = {(line["tick"], line["line"]) for line in person.get("heard", ())} | {
         (line["tick"], line["line"]) for line in person.get("said", ())
     }
-    return {"remembers": remembered(state, person, bounds, shown_lines=shown)}
+    return {"remembers": remembered(state, person, bounds, shown_lines=shown, document=document)}
 
 
 def decision_context(

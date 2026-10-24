@@ -720,12 +720,14 @@ LABEL_RULES_FROM: Final = 11
 #: the being notices and what it remembers; ``straight_line_distances``, an option naming a being
 #: stating the straight-line metres to it; ``activity_names_as_written``, a noticed being's
 #: activity naming whom it is with as the page names them; ``clock_told``, the minute told as the
-#: world's clock where the world keeps one.
+#: world's clock where the world keeps one; ``places_named``, a premises where the being stands and
+#: one it remembers told by the name the day page gives it.
 LABEL_RULES: Final = (
     "names_as_written",
     "straight_line_distances",
     "activity_names_as_written",
     "clock_told",
+    "places_named",
 )
 #: The registry version from which an entry states each label rule's from-version: the first two
 #: from :data:`LABEL_RULES_FROM`, a later one from the version that added it.
@@ -734,6 +736,7 @@ LABEL_RULE_REGISTRY_VERSIONS: Final = {
     "straight_line_distances": LABEL_RULES_FROM,
     "activity_names_as_written": 12,
     "clock_told": 12,
+    "places_named": 13,
 }
 _TERM_FIELDS: Final = frozenset(
     {
