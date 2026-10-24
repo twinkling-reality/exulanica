@@ -123,6 +123,8 @@ export interface WorldDraftOffer {
    * most a draft started now may spend. A draft holds each step as it is sent and stops where this runs out.
    */
   readonly leftUsd: string | null;
+  /** Whether a draft here runs on this person's own key (a person's own install); false where a server's budget pays. */
+  readonly ownKey: boolean;
 }
 
 type Json = Readonly<Record<string, unknown>>;
@@ -226,6 +228,7 @@ export function parseWorldDraftOffer(raw: unknown): WorldDraftOffer {
     runningDraftId: maybeText(held['running_draft_id'], 'running draft'),
     refusals: codes(held['refusals']),
     leftUsd: held['left_usd'] === null || held['left_usd'] === undefined ? null : usd(held['left_usd'], 'draft offer', true),
+    ownKey: held['own_key'] === true,
   });
 }
 

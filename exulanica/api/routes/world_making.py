@@ -285,6 +285,10 @@ class WorldDraftOfferView(BaseModel):
     #: (``EXULANICA_HOST_KEEPS_UNTIL``): the worlds made here and the words typed stay on it until
     #: then. Absent on a host that keeps them, a person's own install among them.
     host_keeps_until: str | None = None
+    #: Whether a draft here runs on this person's own key: true on a person's own install
+    #: (``EXULANICA_PERSONAL_INSTALL``), false on a shared server, where a server's budget pays (a
+    #: guest's allowance among them).
+    own_key: bool = False
 
 
 #: The offer's code where the workspace has less left (``left_usd``) than one step of a draft may
@@ -747,6 +751,7 @@ def read_world_draft_offer(
         host_keeps_until=(
             None if services.host_keeps_until is None else services.host_keeps_until.isoformat()
         ),
+        own_key=services.personal_install,
     )
 
 

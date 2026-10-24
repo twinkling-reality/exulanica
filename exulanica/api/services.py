@@ -396,6 +396,10 @@ class Services(ServiceRefusals, WorkerFactories):
     #: The day this host keeps what is made on it until, which the Create offer states
     #: (:data:`HOST_KEEPS_UNTIL_ENV`); None for a hand-built Services and for a host that keeps it.
     host_keeps_until: date | None = None
+    #: Whether this host is a person's own install (:data:`PERSONAL_INSTALL_ENV`), whose models run
+    #: on its owner's own key, so its offers can name that key; off for a hand-built Services and
+    #: for a shared server, where a server's budget pays.
+    personal_install: bool = False
     #: Whether the kind worker warms the shipped settings' ground below as the instance starts
     #: (:data:`WARM_SETTING_GROUNDS_ENV`); off for a hand-built Services, as for a shared server
     #: that does not set it.
@@ -1358,6 +1362,7 @@ def build_services(
         kinds_from_people=_kinds_from_people(environ),
         worlds_on_land=_worlds_on_land(env_get("WORLDS_ON_LAND", environ)),
         host_keeps_until=_host_keeps_until(env_get("HOST_KEEPS_UNTIL", environ)),
+        personal_install=personal,
         warm_setting_grounds=_warm_setting_grounds(
             env_get("WARM_SETTING_GROUNDS", environ), personal=personal
         ),

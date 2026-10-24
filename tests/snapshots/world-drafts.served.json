@@ -389,7 +389,8 @@
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
   },
   "left_usd": null,
-  "host_keeps_until": null
+  "host_keeps_until": null,
+  "own_key": false
  },
  "started": {
   "draft_id": "00000000-0000-0000-0000-000000000001",
@@ -963,7 +964,8 @@
   ],
   "operation": null,
   "left_usd": null,
-  "host_keeps_until": null
+  "host_keeps_until": null,
+  "own_key": false
  },
  "ready_place": {
   "draft_id": "00000000-0000-0000-0000-000000000001",

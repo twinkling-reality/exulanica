@@ -133,9 +133,15 @@ def _drafts_alias(request, bench, monkeypatch):
 
     monkeypatch.setattr(ModelClient, "provider_prices", price_read)
 
-    def app(*args, on_land: bool = False, keeps_until: dt.date | None = None, **kwargs):
+    def app(
+        *args,
+        on_land: bool = False,
+        keeps_until: dt.date | None = None,
+        personal: bool = False,
+        **kwargs,
+    ):
         """``on_land``: a deployment that makes places from a sentence on land; ``keeps_until``: the
-        day a host keeps what is made on it until."""
+        day a host keeps what is made on it until; ``personal``: a person's own install."""
         if kwargs.get("spending") is None:
             for provider in load_manifest().providers:
                 if bench.query(
@@ -173,6 +179,7 @@ def _drafts_alias(request, bench, monkeypatch):
             readonly_database=bench.runtime,
             worlds_on_land=on_land,
             host_keeps_until=keeps_until,
+            personal_install=personal,
         )
         application = create_app(services, verify=False)
         application.dependency_overrides.update(original.app.dependency_overrides)
@@ -659,6 +666,17 @@ def test_the_offer_says_the_day_a_host_keeps_what_is_made_on_it_until(drafts):
         assert _offer(client)["host_keeps_until"] == "2026-12-15"
         # Stated whatever else the offer says: to one who may not draft too.
         assert _offer(client, NO_MODEL_TOKEN)["host_keeps_until"] == "2026-12-15"
+
+
+def test_the_offer_says_a_draft_runs_on_the_person_s_own_key_only_on_their_own_install(drafts):
+    app, _transport = drafts
+    # A shared server: a server's budget pays (a guest's allowance among them), so no key is named.
+    with app() as client:
+        assert _offer(client)["own_key"] is False
+    # A person's own install: its models run on its owner's key, whatever else the offer says.
+    with app(personal=True) as client:
+        assert _offer(client)["own_key"] is True
+        assert _offer(client, NO_MODEL_TOKEN)["own_key"] is True
 
 
 @pytest.mark.parametrize(

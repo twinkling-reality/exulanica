@@ -77,7 +77,9 @@ workspace's own allowances have something left, but less than that total (each p
 counted up to its ceiling), the offer answers `world_draft_bound_exceeds_left` with `left_usd`, what
 they have left for the draft, so a person is told what it could cost against what is left before a
 word is typed, not that a budget is spent; it states the workspace's figures only, never the
-authority's. The explicit native POST rechecks the sheet and opens idempotent
+authority's. The offer's `own_key` says whose key the draft spends on: true only on a person's own
+install (`EXULANICA_PERSONAL_INSTALL`); a guest's allowance and every other server budget read false.
+The explicit native POST rechecks the sheet and opens idempotent
 `world-draft:<draft id>:<provider>` bounds.
 Every dispatch is fenced by the live durable job claim inside the same witnessed transaction as
 financial dispatch. A cancellation that commits first prevents dispatch; a dispatch that commits

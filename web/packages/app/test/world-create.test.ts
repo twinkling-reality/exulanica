@@ -359,6 +359,26 @@ describe('Create a world as a page', () => {
     expect(document.body.textContent).toContain('An open model makes it from your words: at most $1.43, and you see what it really spent.');
   });
 
+  it('says under the title what a newcomer can do, and names the person\'s own key where the draft runs on it (C4)', async () => {
+    const keyed = (extra: Record<string, unknown> = {}) => offerOf({ own_key: true, operation: { ...offerOf().operation, providers: [{ provider: 'nebius_token_factory', ceiling_usd: '1.4227' }] }, ...extra });
+    serve(keyed());
+    await mount();
+    const sub = document.querySelector('.wu-light-title + .wu-light-sub');
+    expect(sub?.textContent).toBe('People move in, and you choose an open AI model to decide for any of them.');
+    expect(document.body.textContent).toContain('An open model makes it with your Nebius key: at most $1.43, and you see what it really spent.');
+    document.body.replaceChildren();
+    serve(keyed({ left_usd: '0.12' }));
+    await mount();
+    expect(document.body.textContent).toContain('An open model makes it with your Nebius key: at most the $0.12 left for AI models here, and you see what it really spent.');
+    // A guest's page, or any server's budget: the line keeps its words, and the line under the title stands as well.
+    document.body.replaceChildren();
+    serve(keyed({ own_key: false }));
+    await mount();
+    expect(document.querySelector('.wu-light-sub')?.textContent).toBe('People move in, and you choose an open AI model to decide for any of them.');
+    expect(document.body.textContent).toContain('An open model makes it from your words: at most $1.43, and you see what it really spent.');
+    expect(document.body.textContent).not.toContain('your Nebius key');
+  });
+
   describe('a draft held a step at a time (A1b)', () => {
     const STEP = { ...offerOf().operation, step_usd_at_most: '0.0344064' };
     const short = () => offerOf({ offered: false, code: 'world_draft_bound_exceeds_left', left_usd: '0.0085632', operation: { ...STEP } });

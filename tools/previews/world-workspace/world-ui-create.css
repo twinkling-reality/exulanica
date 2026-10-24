@@ -12,6 +12,7 @@
   --l-ink: #121715;
   --l-muted: #344750;
   --l-faint: #5b6b72;
+  --l-sub: #24333a;
   --refused-ink-light: #8f2f25;
   --l-focus: var(--accent);
   --l-rim: linear-gradient(110deg, rgb(100 150 166 / 36%), rgb(255 255 255 / 50%) 57%, rgb(27 48 52 / 20%));
@@ -55,6 +56,9 @@
 .wu-light-title:focus { outline: none; }
 .wu-light-label { display: block; margin: 0 0 calc(12 * var(--u)); font: 500 max(12px, calc(14 * var(--u)))/1 var(--font-sans); letter-spacing: .02em; color: var(--l-muted); }
 .wu-light-title + .wu-light-label, .wu-light-title + .wu-light-sentence-part { margin-top: calc(36 * var(--u)); }
+/* What a newcomer can do with AI here (C4): the page's sub style under the title, left with it; what follows moves down. */
+.wu-light-sub { margin: calc(14 * var(--u)) 0 0; font: 300 calc(22 * var(--u))/calc(32 * var(--u)) var(--font-sans); color: var(--l-sub); }
+.wu-light-sub + .wu-light-label, .wu-light-sub + .wu-light-sentence-part { margin-top: calc(42 * var(--u)); }
 /* The sentence in frame 21's head, in curly quotes, 12 under the label. */
 .wu-light-quote { margin: 0; font: 200 calc(44 * var(--u))/1.22 var(--font-sans); letter-spacing: -.02em; color: var(--l-ink); overflow-wrap: anywhere; }
 /* The whole sentence shows (N24): 28u past three lines, 20u past five. */

@@ -51401,6 +51401,11 @@
        }
       ],
       "title": "Host Keeps Until"
+     },
+     "own_key": {
+      "type": "boolean",
+      "title": "Own Key",
+      "default": false
      }
     },
     "type": "object",

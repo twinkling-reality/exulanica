@@ -7,6 +7,8 @@ import { NOTE_WORDS } from './world-words.mjs';
 export const CREATE_WORDS = Object.freeze({
   wordmark: 'exulanica',
   title: 'Create a world',
+  /** The line under the title: what a newcomer can do with AI here (C4). */
+  peopleMoveIn: 'People move in, and you choose an open AI model to decide for any of them.',
   describeIt: 'Describe it',
   /** Today's placeholder, kept in the faint ink while the field is empty (N2). */
   placeholder: 'A harbour with fishing boats, a market on the quay and a lighthouse',
@@ -175,10 +177,27 @@ export function ceilingAmount(usd) {
  * honest worst case). Where less than that is left here (the offer's `left_usd`), the most is what is
  * left (A1b): each step is held as it is sent, and making stops where it runs out.
  */
-export const priceLine = (maximumUsd, leftUsd = null) =>
-  leftUsd !== null && Number(leftUsd) < Number(maximumUsd)
-    ? `An open model makes it from your words: at most the ${leftAmount(leftUsd)} left for AI models here, and you see what it really spent.`
-    : `An open model makes it from your words: at most ${ceilingAmount(maximumUsd)}, and you see what it really spent.`;
+export const priceLine = (maximumUsd, leftUsd = null, keyName = null) => {
+  // Who pays, where the draft runs on the person's own key (C4): "with your Nebius key"; else the words, as built.
+  const how = keyName ? `with your ${keyName} key` : 'from your words';
+  return leftUsd !== null && Number(leftUsd) < Number(maximumUsd)
+    ? `An open model makes it ${how}: at most the ${leftAmount(leftUsd)} left for AI models here, and you see what it really spent.`
+    : `An open model makes it ${how}: at most ${ceilingAmount(maximumUsd)}, and you see what it really spent.`;
+};
+
+/** Each model provider by the name its key goes by on a page ("with your Nebius key"; G2's key group shares it). */
+export const PROVIDER_NAMES = Object.freeze({ nebius_token_factory: 'Nebius' });
+
+/**
+ * The name of the key a draft's operation spends on, where the draft runs on the person's own key (the offer's
+ * `own_key`) and the operation reserves against one provider this page can name; null otherwise, and the line keeps
+ * its words.
+ */
+export function keyName(ownKey, operationDocument) {
+  const providers = operationDocument?.providers;
+  if (ownKey !== true || !Array.isArray(providers) || providers.length !== 1) return null;
+  return Object.hasOwn(PROVIDER_NAMES, providers[0]?.provider) ? PROVIDER_NAMES[providers[0].provider] : null;
+}
 
 /** The months as a host's date is said in the line under Create's field ("15 December 2026"). */
 const MONTHS = Object.freeze(['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']);

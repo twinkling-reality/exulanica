@@ -16,7 +16,7 @@ import {
   type FilmStrip, type LightPage, type SentenceField,
 } from './world-ui-create.ts';
 import {
-  CREATE_WORDS, STEP_WORDS, budgetShort, ceilingAmount, hostKeepsLine, madeSpent, priceLine, priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine,
+  CREATE_WORDS, STEP_WORDS, budgetShort, ceilingAmount, hostKeepsLine, keyName, madeSpent, priceLine, priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine,
   stepTime, stoppedLine,
 } from './create-words.mjs';
 import {
@@ -145,6 +145,13 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     heading.textContent = CREATE_WORDS.title;
     return heading;
   };
+  // Under the title, what a newcomer can do with AI here (C4).
+  const peopleMoveIn = (): HTMLElement => {
+    const line = document.createElement('p');
+    line.className = 'wu-light-sub';
+    line.textContent = CREATE_WORDS.peopleMoveIn;
+    return line;
+  };
   // A refusal of the last start leaves Create pressable: "Try again" means these words, or new ones.
   const ready = (): boolean => !busy && canCreate(rawOffer, field?.field.value ?? '');
   const keys = (): void => {
@@ -157,7 +164,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     form = 'create';
     page.form('create');
     const state = offerState(rawOffer);
-    const head: Node[] = [title()];
+    const head: Node[] = [title(), peopleMoveIn()];
     sentenceId = null;
     if (rawOffer === null) {
       head.push(lightLine(offerOffline ? CREATE_WORDS.offline : CREATE_WORDS.loading, { live: true }));
@@ -197,7 +204,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
           head.push(lightLine(refusal.words ?? refusalWords(refusal.code), refusal.code === PRICE_UNAVAILABLE ? { live: true } : { tone: 'refused', live: true }));
           if (refusal.spent) head.push(lightLine(refusal.spent, { tone: 'refused' }));
         }
-        if (offer?.operation && !refusal?.stopped) head.push(lightLine(priceLine(offer.operation.maximumUsd, offer.leftUsd)));
+        if (offer?.operation && !refusal?.stopped) head.push(lightLine(priceLine(offer.operation.maximumUsd, offer.leftUsd, keyName(offer.ownKey, offer.operation.document))));
         const left = startsLeftLine(offer?.starts.left ?? Number.NaN);
         if (left) head.push(lightLine(left));
       }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import {
-  CREATE_WORDS, REFUSAL_BY_CODE, REFUSAL_WORDS, STEP_WORDS, budgetShort, cardSub, ceilingAmount, countWords, leftAmount, madeSpent, hostKeepsLine, priceLine,
+  CREATE_WORDS, PROVIDER_NAMES, REFUSAL_BY_CODE, REFUSAL_WORDS, STEP_WORDS, budgetShort, cardSub, ceilingAmount, countWords, keyName, leftAmount, madeSpent, hostKeepsLine, priceLine,
   priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine, stepTime, stoppedLine,
 } from './create-words.mjs';
 
@@ -23,6 +23,21 @@ assert.equal(CREATE_WORDS.spendingPaused, 'Spending on AI models is paused here,
 assert.equal(CREATE_WORDS.offline, 'Not connected to your world. Trying again.');
 assert.equal(priceLine('0.20766720'), 'An open model makes it from your words: at most $0.21, and you see what it really spent.');
 assert.equal(priceLine('0.00410000'), 'An open model makes it from your words: at most $0.01, and you see what it really spent.');
+// What a newcomer can do with AI here, under the title, and who pays where the draft runs on the person's own key (C4).
+assert.equal(CREATE_WORDS.peopleMoveIn, 'People move in, and you choose an open AI model to decide for any of them.');
+assert.equal(priceLine('0.20766720', null, 'Nebius'), 'An open model makes it with your Nebius key: at most $0.21, and you see what it really spent.');
+assert.equal(priceLine('0.20766720', '0.12', 'Nebius'), 'An open model makes it with your Nebius key: at most the $0.12 left for AI models here, and you see what it really spent.');
+{
+  const one = { providers: [{ provider: 'nebius_token_factory', ceiling_usd: '0.20766720' }] };
+  assert.equal(PROVIDER_NAMES.nebius_token_factory, 'Nebius');
+  assert.equal(keyName(true, one), 'Nebius');
+  // A server's budget (a guest's), a provider the page cannot name, two providers or none: the line keeps its words.
+  for (const [ownKey, document] of [[false, one], [undefined, one], [true, { providers: [{ provider: 'someone_else' }] }],
+    [true, { providers: [...one.providers, { provider: 'ollama_local' }] }], [true, { providers: [] }], [true, null]]) {
+    assert.equal(keyName(ownKey, document), null);
+    assert.match(priceLine('0.20766720', null, keyName(ownKey, document)), /^An open model makes it from your words: /);
+  }
+}
 // A1b: less than the whole left, the most is what is left (rounded down); the whole left or more, A1's line.
 assert.equal(priceLine('0.20766720', '0.05'), 'An open model makes it from your words: at most the $0.05 left for AI models here, and you see what it really spent.');
 assert.equal(priceLine('0.20766720', '0.0599'), priceLine('0.20766720', '0.05'));
