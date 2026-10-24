@@ -67,6 +67,9 @@ export function called({ name, kind, being = true }) {
 /** "Teo's", "the resident's". */
 export const possessive = words => words + (words.endsWith("'s") ? '' : "'s");
 
+/** The day page's Q key, naming the person as the card's keys do (DESIGN 03:57): "Ask Teo", "Ask the resident". */
+export const askWho = who => `${CHARACTER_WORDS.ask} ${who.within}`;
+
 const choices = count => `${count} ${count === 1 ? 'choice' : 'choices'}`;
 
 /**

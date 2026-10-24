@@ -368,9 +368,14 @@ describe("Teo's day keys", () => {
   it('offers each key only where it works and says what each asked', async () => {
     const { root, act, page } = await open();
     page.draw(teoState());
-    expect(keys(root)).toEqual(['↑↓Earlier, later', 'MModel', 'NPersonality', 'RRun', 'CCompare', 'QAsk', 'EscBack']);
+    // Ask names the person, as the card's keys do (DESIGN 03:57).
+    expect(keys(root)).toEqual(['↑↓Earlier, later', 'MModel', 'NPersonality', 'RRun', 'CCompare', 'QAsk Teo', 'EscBack']);
     expect(keyNamed(root, 'Back').getAttribute('aria-keyshortcuts')).toBe('Escape');
-    for (const word of ['Model', 'Personality', 'Run', 'Compare', 'Ask', 'Back']) keyNamed(root, word).click();
+    for (const word of ['Model', 'Personality', 'Run', 'Compare', 'Ask Teo', 'Back']) keyNamed(root, word).click();
+    // One with no name is asked by its kind.
+    page.draw(residentState({ canAsk: true }));
+    expect(keys(root)).toContain('QAsk the resident');
+    page.draw(teoState());
     expect(act.mock.calls).toEqual([['model'], ['personality'], ['run'], ['compare'], ['ask'], ['back']]);
     // The arrows' key steps earlier, over a line heard, and from the oldest back to the newest.
     act.mockClear();

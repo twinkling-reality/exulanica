@@ -8,7 +8,7 @@
 // words the words modules'.
 import { label, orb as runOrb, page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orb as portraitOrb, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
-import { CHARACTER_WORDS, modelLine, routineRow, priceWords, whatDid, nothingYet, readingRecord, called } from './character-words.mjs';
+import { CHARACTER_WORDS, askWho, modelLine, routineRow, priceWords, whatDid, nothingYet, readingRecord, called } from './character-words.mjs';
 import { galleryItems } from './character-group.mjs';
 import type { ModelCard } from '../../../web/packages/app/src/society-models-api.ts';
 import { PERSONALITY_LIMITS, PERSONALITY_WORDS, counter, length, notRead, readsEach, savedNote, writtenWords } from './personality-words.mjs';
@@ -483,7 +483,7 @@ function dayKeys(state: CharacterPageState, act: Act): HTMLElement[] {
     ...(state.personality ? [key(['N'], PERSONALITY_WORDS.label, 'N', () => act('personality'))] : []),
     ...(offered ? [key(['R'], state.run.open ? CHARACTER_WORDS.stop : CHARACTER_WORDS.run, 'R', () => act(state.run.open ? 'stop' : 'run'), state.run.busy)] : []),
     ...(state.canCompare ? [key(['C'], COMPARE_WORDS.compare, 'C', () => act('compare'))] : []),
-    ...(state.canAsk ? [key(['Q'], CHARACTER_WORDS.ask, 'Q', () => act('ask'))] : []),
+    ...(state.canAsk ? [key(['Q'], askWho(state.who), 'Q', () => act('ask'))] : []),
     key(['Esc'], CHARACTER_WORDS.back, 'Escape', () => act('back')),
   ];
 }

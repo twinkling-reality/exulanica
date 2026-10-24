@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineBetween, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
+import { deciderWords, runSectionLine, CHARACTER_WORDS, amount, askWho, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineBetween, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
 const teo = called({ name: 'Teo' }), resident = called({ name: '  ', kind: 'Resident' }), someone = called({ name: null }), bench = called({ name: null, being: false });
@@ -17,6 +17,9 @@ assert.equal(chosenLine(teo, { hhmm: '07:09', options: null }), "Teo's model cho
 assert.equal(chosenLine(teo, null), "Teo's routine.");
 assert.equal(chosenLine(resident, null), "The resident's routine.");
 assert.equal(readingRecord(teo), "Reading Teo's record…");
+// The day page's Q key names the person as the card's keys do, by name or by kind.
+assert.equal(askWho(teo), 'Ask Teo');
+assert.equal(askWho(called({ name: null, kind: 'resident' })), 'Ask the resident');
 assert.equal(goneNote(teo), 'Teo is no longer in this world.');
 assert.equal(outOfViewNote(resident), 'The resident went out of view, so following stopped.');
 
