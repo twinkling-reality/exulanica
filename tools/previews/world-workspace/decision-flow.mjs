@@ -99,8 +99,10 @@ export function headBottom(layout, { over = true, lines = 1, by = true } = {}) {
 export const CAP = 21, ABOVE_KEYS = 24;
 /** Half a choice row's height. */
 const ROW_HALF = 12;
+/** A choice's second line (17px at 1.3), and the most lines a choice takes: past two it is cut (D3). */
+export const WRAP = 22, ROW_LINES = 2;
 
-/** The widest a choice row runs: up to 48px short of the card, its words cut with an ellipsis past that. */
+/** The widest a choice row runs: up to 48px short of the card, its words wrapping to a second line past that. */
 export const rowMost = layout => layout.card.x - 48 - (layout.column + layout.words);
 
 /** Where a choice row's words (and the taken one's Chosen tag) end, where the page cannot measure them. */
@@ -109,11 +111,18 @@ export function choiceEnd(layout, words, taken) {
   return layout.column + layout.words + Math.min(width, rowMost(layout));
 }
 
+/** How many lines a choice row takes in the column's width, where the page cannot measure it: one, or two. */
+export function choiceLines(layout, words, taken) {
+  const width = NUMBER + ROW_GAP + Math.round(String(words).length * CHOICE_CHARACTER) + (taken ? ROW_GAP + TAG : 0);
+  return width > rowMost(layout) ? ROW_LINES : 1;
+}
+
 /**
  * The flow for `layout` in a window `height` tall (the size's own by default): `count` choices, `taken` the index of the
  * taken one (-1 where none is), `offset` the first row the column shows (null: the window that first shows the taken
  * one), `toldHeight` the told column's height (null or 0 where nothing was told), `takenEnd` the x where the taken row's
- * words end, `headBottom` where the head ends (null: the size's own place for what was told).
+ * words end, `headBottom` where the head ends (null: the size's own place for what was told), `lines` each choice's
+ * lines, one or two (null: one each).
  *
  * Returns what was told's place (below the head, stopping above the window's foot) and the stored record's (from there
  * to above the keys), the bracket and its line into the ring (null with nothing told), the ring and its words' place,
@@ -121,25 +130,39 @@ export function choiceEnd(layout, words, taken) {
  * lie above and below), the taken one's lit curve (to its row, or to the column's edge toward it while it is scrolled
  * out of view), the card's place, the line on to the card, and where the down arrow's cap sits.
  */
-export function flowLayout(layout, { count, taken = -1, offset = null, toldHeight: told = null, takenEnd = null, height = layout.height, headBottom: headEnd = null }) {
+export function flowLayout(layout, { count, taken = -1, offset = null, toldHeight: told = null, takenEnd = null, height = layout.height, headBottom: headEnd = null, lines = null }) {
   const { card, gap } = layout;
-  const shown = Math.min(Math.max(0, count), layout.shown);
-  const most = Math.max(0, count - layout.shown);
-  const home = taken >= layout.shown ? Math.min(most, taken - layout.shown + 1) : 0;
+  // Rows are spaced by their own heights (D3): a row of two lines stands a second line taller, and a window holds the
+  // rows that fit in the height of the size's most one-line rows, so a column of one-line rows reads as it always did.
+  const extra = index => (Math.min(ROW_LINES, Math.max(1, lines?.[index] ?? 1)) - 1) * WRAP;
+  const step = index => gap + (extra(index) + extra(index + 1)) / 2;
+  const spanOf = (from, rows) => { let span = 0; for (let index = from; index < from + rows - 1; index += 1) span += step(index); return span; };
+  const fit = from => { let rows = Math.min(layout.shown, Math.max(0, count - from)); while (rows > 1 && spanOf(from, rows) > (layout.shown - 1) * gap) rows -= 1; return rows; };
+  let most = 0, home = 0;
+  while (most < count && most + fit(most) < count) most += 1;
+  while (taken >= 0 && home < most && taken >= home + fit(home)) home += 1;
   const first = clamp(offset ?? home, 0, most);
+  const shown = fit(first);
   const keysTop = height - layout.keys.bottom - CAP;
   const toldTop = headEnd === null ? layout.told.top : Math.max(layout.told.top, Math.ceil(headEnd + HEAD.gap));
   const toldMost = Math.max(120, height - layout.told.foot - toldTop);
-  // A short window raises the ring until its lowest row clears the keys.
-  const ring = { ...layout.ring, y: Math.min(layout.ring.y, Math.floor(keysTop - ABOVE_KEYS - ROW_HALF - (shown - 1) * gap / 2)) };
-  const top = ring.y - (shown - 1) * gap / 2;
+  // A short window raises the ring until the lowest row of its tallest window clears the keys; the ring keeps its place
+  // while the column scrolls.
+  const windows = count ? Array.from({ length: most + 1 }, (_, from) => ({ span: spanOf(from, fit(from)), low: extra(from + fit(from) - 1) })) : [];
+  const ringSpan = windows.length ? Math.max(...windows.map(one => one.span)) : (shown - 1) * gap;
+  const lowExtra = windows.length ? Math.max(...windows.map(one => one.low)) : 0;
+  const ring = { ...layout.ring, y: Math.min(layout.ring.y, Math.floor(keysTop - ABOVE_KEYS - ROW_HALF - lowExtra / 2 - ringSpan / 2)) };
+  const top = ring.y - (shown ? spanOf(first, shown) : (shown - 1) * gap) / 2;
   const from = { x: ring.x + ring.r, y: ring.y };
   const rows = [];
+  let y = top;
   for (let at = 0; at < shown; at += 1) {
-    const index = first + at, y = top + at * gap, lit = index === taken;
+    const index = first + at, lit = index === taken;
+    if (at) y += step(index - 1);
     rows.push({ index, y, taken: lit, path: bend(from.x, from.y, layout.column, y, layout.fan.out, layout.fan.into), end: { x: layout.column, y, r: lit ? 4 : 3.5 } });
   }
-  const last = top + (shown - 1) * gap;
+  const last = shown ? rows[shown - 1].y : top + (shown - 1) * gap;
+  const lastEdge = shown ? extra(first + shown - 1) / 2 : 0;
   const seen = rows.find(row => row.taken) ?? null;
 
   let bracket = null;
@@ -155,7 +178,7 @@ export function flowLayout(layout, { count, taken = -1, offset = null, toldHeigh
   }
 
   // The card keeps the place the taken row first had, so scrolling the column never moves it.
-  const homeY = taken >= 0 && taken < count ? top + (taken - home) * gap : ring.y;
+  const homeY = taken >= 0 && taken < count ? ring.y - spanOf(home, fit(home)) / 2 + spanOf(home, taken - home + 1) : ring.y;
   const lowest = Math.max(card.top, keysTop - ABOVE_KEYS - card.block);
   const cardTop = clamp(homeY - card.line, card.top, lowest);
   const meet = y => clamp(y, cardTop + 16, cardTop + card.height - 16);
@@ -168,7 +191,7 @@ export function flowLayout(layout, { count, taken = -1, offset = null, toldHeigh
     onward = onTo(Math.round(end), seen.y);
   } else if (taken >= 0 && taken < count && shown) {
     // Scrolled out of view: the lit curve points to the column's edge on the taken one's side.
-    lit = bend(from.x, from.y, layout.column, taken < first ? top - gap / 2 : last + gap / 2, layout.fan.out, layout.fan.into);
+    lit = bend(from.x, from.y, layout.column, taken < first ? top - gap / 2 - extra(first) / 2 : last + gap / 2 + lastEdge, layout.fan.out, layout.fan.into);
   } else if (!count) {
     // No choices recorded: the decision's own line runs on to the card.
     onward = onTo(from.x, from.y);
@@ -185,6 +208,6 @@ export function flowLayout(layout, { count, taken = -1, offset = null, toldHeigh
     offset: first, home, above: first, below: Math.max(0, count - first - shown),
     lit, onward,
     card: { x: card.x, top: cardTop, width: card.width, height: card.height, text: card.text, orb: card.orb },
-    down: { x: layout.column + layout.words, y: last + gap / 2 },
+    down: { x: layout.column + layout.words, y: last + gap / 2 + lastEdge },
   };
 }

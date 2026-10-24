@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { ABOVE_KEYS, CAP, FLOW_LAYOUTS, HEAD, NARROW_BELOW, TOLD, bend, choiceEnd, flowLayout, flowSize, headBottom, rowMost, run, titleLines, toldHeight } from './decision-flow.mjs';
+import { ABOVE_KEYS, CAP, FLOW_LAYOUTS, HEAD, NARROW_BELOW, TOLD, WRAP, bend, choiceEnd, choiceLines, flowLayout, flowSize, headBottom, rowMost, run, titleLines, toldHeight } from './decision-flow.mjs';
 
 const { wide, narrow } = FLOW_LAYOUTS;
 
@@ -167,5 +167,35 @@ assert.equal(shorter.ring.y, 900 - wide.keys.bottom - CAP - ABOVE_KEYS - 12 - 11
 assert.ok(shorter.rows.at(-1).y + 12 + ABOVE_KEYS <= 900 - wide.keys.bottom - CAP, 'the lowest row clears the keys');
 assert.equal(flowLayout(wide, { count: 9, taken: 0, height: 900 }).ring.y, 614);
 assert.equal(flowLayout(wide, { count: 9, taken: 0, height: 300 }).record.height, 120);
+
+
+// D3: a choice too long for the column wraps to a second line, and the column lays its rows by their own heights; a
+// window holds the rows that fit in the height of the size's most one-line rows, the ring keeps its place while the
+// column scrolls, and the window first shown holds the taken one.
+const long = 'Say something to Ines Brook (a villager), 4 m away';
+assert.deepEqual([choiceLines(narrow, long, false), choiceLines(narrow, 'Wait here a minute', false), choiceLines(wide, long, false)], [2, 1, 1]);
+const tops = layout => layout.rows.map(row => row.y);
+const gaps = ys => ys.slice(1).map((y, at) => y - ys[at]);
+assert.deepEqual(gaps(tops(flowLayout(narrow, { count: 3, lines: [1, 2, 1] }))), [narrow.gap + WRAP / 2, narrow.gap + WRAP / 2]);
+assert.deepEqual(tops(flowLayout(narrow, { count: 9, lines: Array(9).fill(1) })), tops(flowLayout(narrow, { count: 9 })), 'one-line rows read as before');
+const twoLines = Array(12).fill(2);
+const tall = flowLayout(narrow, { count: 12, lines: twoLines });
+assert.deepEqual([tall.rows.length, tall.below], [7, 5]);
+assert.ok(gaps(tops(tall)).every(gap => gap === narrow.gap + WRAP));
+const scrolledDown = flowLayout(narrow, { count: 12, lines: twoLines, offset: 5 });
+assert.deepEqual([scrolledDown.ring.y, scrolledDown.offset, scrolledDown.below], [tall.ring.y, 5, 0]);
+const keysLine = narrow.height - narrow.keys.bottom - CAP - ABOVE_KEYS;
+for (const window of [tall, scrolledDown]) assert.ok(window.rows.at(-1).y + 12 + WRAP / 2 <= keysLine, 'the lowest two-line row clears the keys');
+const takenLate = flowLayout(narrow, { count: 12, taken: 10, lines: twoLines });
+assert.ok(takenLate.rows.some(row => row.taken) && takenLate.lit !== null, 'the taken one is in the window first shown');
+assert.equal(takenLate.down.y, takenLate.rows.at(-1).y + narrow.gap / 2 + WRAP / 2);
+
+// In a short window where the keys hold the ring up, windows of mixed rows stand at different heights; the ring keeps
+// the place of the tallest, so scrolling never moves it.
+const mixed = [...Array(10).fill(1), 2, 2, 2, 2];
+const shortFirst = flowLayout(narrow, { count: 14, lines: mixed, height: 700 });
+const shortLast = flowLayout(narrow, { count: 14, lines: mixed, height: 700, offset: 99 });
+assert.deepEqual([shortLast.ring.y, shortLast.below], [shortFirst.ring.y, 0]);
+assert.ok(shortLast.offset > 0 && shortLast.rows.length !== shortFirst.rows.length);
 
 console.log('decision flow: ok');

@@ -308,13 +308,14 @@ describe('A decision (r10)', () => {
     expect((wide.root.querySelector('.wu-rd-head') as HTMLElement).style.maxWidth).toBe('1220px');
   });
 
-  it('never cuts the chosen choice: its words wrap with Chosen after the last line, the others stay on one line', async () => {
+  it('never cuts the chosen choice, and wraps every other to two lines at most, Chosen after the last line (D3)', async () => {
     const css = readFileSync(`${process.cwd()}/../tools/previews/world-workspace/world-ui-record-decision.css`, 'utf8');
-    // Every rule for exactly this selector, joined (the chosen row's words have two).
-    const rule = (selector: string) => [...css.matchAll(new RegExp(`(?:^|\\n)${selector.replace(/[.[\]"]/g, (c) => `\\${c}`)} \\{([^}]*)\\}`, 'g'))].map((found) => found[1]).join(' ');
-    expect(rule('.wu-record-decision .wu-rd-choice[data-taken="true"]')).toMatch(/white-space: normal;/);
-    expect(rule('.wu-record-decision .wu-rd-choice[data-taken="true"] .wu-rd-choice-words')).toMatch(/overflow: visible;[^]*text-overflow: clip;/);
-    expect(rule('.wu-record-decision .wu-rd-choice-words')).toMatch(/text-overflow: ellipsis;/);
+    // Every rule for exactly this selector, joined.
+    const rule = (selector: string) => [...css.matchAll(new RegExp(`(?:^|\\n)${selector.replace(/[.[\]"():]/g, (c) => `\\${c}`)} \\{([^}]*)\\}`, 'g'))].map((found) => found[1]).join(' ');
+    expect(rule('.wu-record-decision .wu-rd-choice')).toMatch(/white-space: normal;/);
+    expect(rule('.wu-record-decision .wu-rd-choice:not([data-taken="true"])')).toMatch(/-webkit-line-clamp: 2;[^]*overflow: hidden;/);
+    expect(rule('.wu-record-decision .wu-rd-choice[data-taken="true"]')).toBe('');
+    expect(rule('.wu-record-decision .wu-rd-choice-words')).not.toMatch(/ellipsis|nowrap/);
     const long = 'Say something to the eight legged finned creature, 8 m away';
     const { root } = await open(teo({ choices: [{ number: 1, words: long, chosen: true }, { number: 2, words: 'Wait a minute', chosen: false }] }));
     const taken = root.querySelector('.wu-rd-choice[data-taken="true"]') as HTMLElement;
@@ -363,6 +364,22 @@ describe('A decision (r10)', () => {
     expect(root.querySelector('[role="dialog"]')).toBeNull();
     for (const code of ['ArrowDown', 'ArrowUp', 'ArrowDown']) expect(press(code).defaultPrevented).toBe(false);
     expect(act).not.toHaveBeenCalled();
+  });
+});
+
+describe('A long choice wraps rather than losing its end (D3)', () => {
+  it('draws a long choice whole on two lines at 1440 and moves the rows below it down by the second line', async () => {
+    const words = ['Say something to Ines Brook (a villager), 4 m away', 'Wait a minute', 'Stand here'];
+    const { root } = await open(teo({ choices: choices(words, 1) }), 1440);
+    const rows = [...root.querySelectorAll<HTMLElement>('.wu-rd-choice')];
+    const tops = rows.map((row) => Number.parseFloat(row.style.top));
+    expect([tops[1]! - tops[0]!, tops[2]! - tops[1]!]).toEqual([38 + 11, 38]);
+    expect(rows[0]!.querySelector('.wu-rd-choice-words')?.textContent).toBe(words[0]);
+    // At 1920 the same words fit one line, and the rows stand 44 apart as before.
+    document.body.replaceChildren();
+    const wide = await open(teo({ choices: choices(words, 1) }));
+    const wideTops = [...wide.root.querySelectorAll<HTMLElement>('.wu-rd-choice')].map((row) => Number.parseFloat(row.style.top));
+    expect([wideTops[1]! - wideTops[0]!, wideTops[2]! - wideTops[1]!]).toEqual([44, 44]);
   });
 });
 

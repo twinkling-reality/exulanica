@@ -8,7 +8,7 @@
 // decision-words.mjs, the light page's parts from world-ui-record.ts.
 import { CHARACTER_WORDS } from './character-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
-import { FLOW_LAYOUTS, choiceEnd, flowLayout, flowSize, headBottom, rowMost, titleLines, toldHeight } from './decision-flow.mjs';
+import { FLOW_LAYOUTS, choiceEnd, choiceLines, flowLayout, flowSize, headBottom, rowMost, titleLines, toldHeight } from './decision-flow.mjs';
 import { DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, choseOneOf, decidedByParts } from './decision-words.mjs';
 import { page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orbs, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
@@ -116,6 +116,8 @@ const SVG = 'http://www.w3.org/2000/svg';
 /** Where the person's choice to hide the newcomer's notes is kept on this computer (A7): a convenience, so where it
  * cannot be read the notes show. */
 export const NOTES_HIDDEN_KEY = 'exulanica.decision-notes';
+/** Taller than this, a drawn choice row runs to a second line (one line is 22px). */
+const ROW_TWO_LINES = 33;
 const notesHiddenNow = (): boolean => { try { return localStorage.getItem(NOTES_HIDDEN_KEY) === 'hidden'; } catch { return false; } };
 /** The gap between the choices' label and its note, and between the note and the first choice's line. */
 const NOTE_GAP = 8;
@@ -197,6 +199,9 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
   // choices it belongs to; another decision's choices start again from their own window.
   let offset: number | null = null;
   let listed = '';
+  // Each choice's lines as drawn in a window of this key (D3): measured once laid out, so the column is laid again by
+  // the rows' own heights; another window or decision starts from the estimate.
+  let rowLines: { key: string; lines: number[] } | null = null;
   let notesHidden = notesHiddenNow();
   const toggleNotes = (): void => {
     notesHidden = !notesHidden;
@@ -217,7 +222,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     render(last);
   };
 
-  function render(state: DecisionPageState): void {
+  function render(state: DecisionPageState, measuredOnce = false): void {
     const { layout, height, key } = windowOf();
     sized = key;
     sheet.root.classList.toggle('wu-hr-narrow', layout === FLOW_LAYOUTS.narrow);
@@ -229,7 +234,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     const taken = choices.findIndex((choice) => choice.chosen);
     if (read) {
       const identity = JSON.stringify(choices);
-      if (identity !== listed) { listed = identity; offset = null; }
+      if (identity !== listed) { listed = identity; offset = null; rowLines = null; }
     }
     const blocks = sections.map((section) => blocksOf(section, state.personality ?? null));
     const by = smallPrint(state);
@@ -241,8 +246,9 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
       told: blocks.length ? toldHeight(blocks.map((section) => section.map((block) => block.words)), layout.told.width) as number : null,
       end: taken >= 0 ? choiceEnd(layout, choices[taken]!.words, true) as number : null,
     };
+    const rowCounts = rowLines?.key === key ? rowLines.lines : choices.map((choice, at) => choiceLines(layout, choice.words, at === taken) as number);
     const lay = (head: number, told: number | null, end: number | null): Flow =>
-      flowLayout(layout, { count: choices.length, taken, offset, toldHeight: told, takenEnd: end, height, headBottom: head }) as Flow;
+      flowLayout(layout, { count: choices.length, taken, offset, toldHeight: told, takenEnd: end, height, headBottom: head, lines: rowCounts }) as Flow;
     const drawn = lay(estimate.head, estimate.told, estimate.end);
     flow = read ? drawn : null;
     const nodes: Element[] = [...ground(state.ground ?? null)];
@@ -261,6 +267,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
 
     let told: HTMLElement | null = null, record: HTMLElement | null = null, takenRow: HTMLElement | null = null, lines: SVGSVGElement | null = null;
     let over: HTMLElement | null = null, choiceNote: HTMLElement | null = null;
+    const drawnRows: { index: number; item: HTMLElement }[] = [];
     if (state.record !== null) {
       record = element('pre', 'wu-rd-record', state.record);
       record.tabIndex = 0;
@@ -336,6 +343,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
               item.append(element('span', 'wu-hr-tag', DECISION_WORDS.chosen));
               takenRow = item;
             }
+            drawnRows.push({ index: row.index, item });
             list.append(item);
           }
           column.append(over, list);
@@ -402,6 +410,11 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
       px(choiceNote, placed.over.x, noteTop);
       px(over, placed.over.x, noteTop - NOTE_GAP - over.offsetHeight);
     }
+
+    // The rows measured: where one takes another number of lines than the column was laid for, it is laid again (D3).
+    const measured = [...rowCounts];
+    for (const { index, item } of drawnRows) if (item.offsetHeight > 0) measured[index] = item.offsetHeight > ROW_TWO_LINES ? 2 : 1;
+    if (!measuredOnce && measured.some((one, at) => one !== rowCounts[at])) { rowLines = { key, lines: measured }; render(state, true); return; }
 
     // The record takes focus while it shows, so the arrows and Space scroll it.
     if (record) record.focus({ preventScroll: true });
