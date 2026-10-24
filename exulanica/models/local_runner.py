@@ -500,11 +500,13 @@ class LocalChecks:
         )
 
     def _recent(self, record: Mapping[str, Any]) -> bool:
+        """Whether a kept record was made within :data:`ERROR_KEPT` of now. A time that cannot be
+        read, or names no zone, counts as stale, so the model is checked again."""
         try:
             checked = datetime.fromisoformat(str(record["checked_at"]))
         except (KeyError, ValueError):
             return False
-        return self._now() - checked < ERROR_KEPT
+        return checked.tzinfo is not None and self._now() - checked < ERROR_KEPT
 
     @property
     def provider(self) -> Provider:

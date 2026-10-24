@@ -890,6 +890,10 @@ def test_a_check_that_could_not_be_made_is_made_again_after_six_hours(tmp_path):
     assert checks.state(small) == ("not_able", "error") and started == []
     now[0] = at + timedelta(hours=6)
     assert checks.state(small) == ("checking", None) and len(started) == 1
+    # A time that cannot be read, or names no zone, counts as stale: checked again, never an error.
+    for written in ("2026-10-24T12:00:00", "not a time"):
+        store.write({**kept, "able": False, "reason": "error", "checked_at": written})
+        assert checks.state(small) == ("checking", None)
     # Any other verdict stands until the cases, contract or context change.
     store.write({**kept, "checked_at": at.isoformat()})
     assert checks.state(small) == ("able", None)
