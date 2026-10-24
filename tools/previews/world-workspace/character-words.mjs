@@ -36,6 +36,8 @@ export const CHARACTER_WORDS = Object.freeze({
   choose: 'Choose',
   useThisModel: 'Use this model',
   onThisComputer: 'On this computer',
+  /** The Run question's cost where every model it asks runs on this computer (A2, DESIGN). */
+  freeHere: 'Free, on this computer',
   readingModels: 'Reading the models…',
   inspectDecision: 'Inspect decision',
   ask: 'Ask',
@@ -211,7 +213,8 @@ export const modelCannot = (who, assignable) =>
  * Why a character's model does not run here, as the page's Run section says it (DESIGN's J2 and
  * J22), or null where it can run. From the models read: the host's own refusal, each offered model's
  * refusal, and the chosen model's (`chosen` false with none chosen). The host's budget spent wins;
- * then spending held closed (N34); then nothing that can be asked at all; then a chosen model refused while others can be asked; then
+ * then spending held closed (N34); then nothing that can be asked because the models on this computer do not run (A2); then
+ * nothing that can be asked at all; then a chosen model refused while others can be asked; then
  * no model chosen, with how to run only where [M] is drawn (`assignable`).
  */
 export function runSectionLine(who, { hostRefusal = null, offered = [], chosen = false, chosenRefusal = null, assignable = false }) {
@@ -219,6 +222,8 @@ export function runSectionLine(who, { hostRefusal = null, offered = [], chosen =
   if (BUDGET_SPENT.includes(hostRefusal) || BUDGET_SPENT.includes(chosenRefusal)
     || (refusals.length > 0 && refusals.every(code => BUDGET_SPENT.includes(code)))) return budgetSpent(who);
   if (hostRefusal === 'spending_suspended') return spendingPaused(who);
+  const wouldOffer = refusals.filter(code => code !== 'provider_credential_absent');
+  if (!hostRefusal && wouldOffer.length > 0 && wouldOffer.every(code => code === 'provider_not_running')) return notRunningHere(who);
   if (hostRefusal || !refusals.some(code => code === null)) return notConnected(who);
   if (chosen && chosenRefusal) return modelCannot(who, assignable);
   if (!chosen) return assignable ? routineRun(who) : followsRoutine(who);
@@ -227,6 +232,15 @@ export function runSectionLine(who, { hostRefusal = null, offered = [], chosen =
 
 /** The page's Run section where no AI model can be asked here (spec 7, empty). */
 export const notConnected = who => `No AI model is connected here, so ${who.within} follows a routine.`;
+
+/**
+ * Where no model can be offered because none is running on this computer (A2, DESIGN's "A2 amended"): how to have one,
+ * plainly, naming no runner.
+ */
+export const noModelRunning = who => `No AI model is running on this computer yet. Start one with a local model runner, and it can decide for ${who.within}, free.`;
+
+/** The page's Run section in that case (A2, DESIGN's words): why the routine decides, then how to have a model. */
+export const notRunningHere = who => `No AI model is running on this computer yet, so ${who.within} follows a routine. Start one with a local model runner, and it can decide for ${who.within}, free.`;
 
 /** Routine's row in the model list. */
 export const routineRow = () => `${CHARACTER_WORDS.noModel} · ${CHARACTER_WORDS.free}`;

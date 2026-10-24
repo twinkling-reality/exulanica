@@ -193,7 +193,7 @@ export function runQuestion({ who, model, limits, refusal = null, busy = false }
   const answers = [{ action: 'run', keys: ['Enter'], word: RUN_WORDS.run, shortcut: 'Enter' }];
   answers.push({ action: 'back', keys: ['Esc'], word: RUN_WORDS.back, shortcut: 'Escape' });
   return Object.freeze({ label: who.title, title: runFor(limits), lines: [whoDecides(who)], chip: model, orbWord: RUN_WORDS.run,
-    big: atMost(limits, true), small: RUN_WORDS.stopsByItself, refusal: refusal ? runRefusalWords(refusal) : null, answers, busy });
+    big: atMost(limits, true), small: RUN_WORDS.stopsByItself, refusal: refusal ? runRefusalWords(refusal, model) : null, answers, busy });
 }
 
 /**

@@ -97,6 +97,13 @@ for (const spent of [{ hostRefusal: 'process_budget_spent', offered: open }, { o
   { offered: [{ refusal: 'process_budget_spent' }, { refusal: 'process_share_spent' }] }]) {
   assert.equal(runSectionLine(teo, { ...spent, assignable: true }), 'The budget for AI models here is spent, so Teo follows a routine.');
 }
+// A2: the only models offered run on this computer and none runs now: say so, and how to have one.
+assert.equal(runSectionLine(teo, { offered: [{ refusal: 'provider_credential_absent' }, { refusal: 'provider_not_running' }], assignable: true }),
+  'No AI model is running on this computer yet, so Teo follows a routine. Start one with a local model runner, and it can decide for Teo, free.');
+assert.equal(runSectionLine(teo, { hostRefusal: 'models_not_run_here', offered: [{ refusal: 'provider_not_running' }] }),
+  'No AI model is connected here, so Teo follows a routine.', 'a host that asks no model says so first');
+assert.equal(runSectionLine(teo, { offered: [{ refusal: 'process_budget_spent' }, { refusal: 'provider_not_running' }] }),
+  'No AI model is connected here, so Teo follows a routine.', 'a key whose models are spent: never the line about this computer');
 // N34: spending held closed until an operator acts is paused, not spent and not a missing model.
 assert.equal(runSectionLine(teo, { hostRefusal: 'spending_suspended', offered: open, assignable: true }),
   'Spending on AI models is paused here, so Teo follows a routine.');

@@ -235,8 +235,12 @@ def _admitted_here(provider: Provider, transport: Transport | None) -> bool:
     return egress.declares(provider.base_url) and egress.declares(provider.catalog_url)
 
 
-def _local_catalog(provider: Provider, transport: Transport | None) -> tuple[Any, str | None]:
-    """A provider on this computer's catalog, or None with why it was not read."""
+def local_catalog(
+    provider: Provider, transport: Transport | None, *, timeout: float = _LOCAL_TIMEOUT
+) -> tuple[Any, str | None]:
+    """A provider on this computer's catalog, or None with why it was not read: asked within
+    ``timeout`` seconds, and only where the allowlist admits its server. The decision client reads
+    it, with a short timeout, to offer its models only while the server answers."""
     if not _admitted_here(provider, transport):
         return None, (
             "this deployment's egress allowlist does not admit it, so its models are offered "
@@ -245,7 +249,7 @@ def _local_catalog(provider: Provider, transport: Transport | None) -> tuple[Any
     transport = transport or HttpxTransport()
     try:
         response = transport.get_json(
-            provider.catalog_url, headers={"Accept": "application/json"}, timeout=_LOCAL_TIMEOUT
+            provider.catalog_url, headers={"Accept": "application/json"}, timeout=timeout
         )
         if not response.ok:
             raise TransportError(f"HTTP {response.status_code}")
@@ -326,7 +330,7 @@ def run_preflight(
             if catalogs is not None:
                 unread[provider_id] = "no catalog was supplied for it"
                 continue
-            catalog, why = _local_catalog(provider, transport)
+            catalog, why = local_catalog(provider, transport)
             if why is not None:
                 unread[provider_id] = why
                 continue

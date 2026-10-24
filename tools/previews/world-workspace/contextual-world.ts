@@ -11,7 +11,7 @@ import { accessHeaders } from '/src/config.ts';
 import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
-import { SAID_READ, choosableModels, deciderOf, groupContent, keepLastSaid, modelGroup, modelPicker, noneRunningHere, offersModels, openWhileOffered, questionGroup } from './character-group.mjs';
+import { SAID_READ, choosableModels, deciderOf, freeHere, groupContent, keepLastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, offersModels, openWhileOffered, questionGroup } from './character-group.mjs';
 import { PAGE_FRAMING, PERSON_RING_METRES, chosenCard, chosenDecision, didRows, doingLine, easePose, ownPeople, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
 import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, outOfViewNote, pageSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
@@ -523,12 +523,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       // J28: the run asks everyone with a model, the chosen character first, each as the tag calls them (J20).
       const askerIds = [row.scene.id, ...(subjectReads.models?.choices ?? []).filter(item => item.model && item.subjectId !== row.scene.id).map(item => item.subjectId)];
       return questionGroup({ who: view.who, askers: askerIds.map(id => id === row.scene.id ? view.who : whoOf(id)), others: (subjectReads.society?.state?.inhabitants?.length ?? 0) > askerIds.length,
-        models: askerIds.map(id => subjectReads.models?.choices.find(item => item.subjectId === id)?.model?.name), limits: asking.shown, refusal: asking.refusal, busy: asking.busy, anotherModel: assignable && choosableModels(subjectReads.models).length > 1 });
+        models: askerIds.map(id => subjectReads.models?.choices.find(item => item.subjectId === id)?.model?.name), limits: asking.shown, refusal: asking.refusal, busy: asking.busy, anotherModel: assignable && choosableModels(subjectReads.models).length > 1,
+        free: freeHere(subjectReads.models, askerIds.map(id => subjectReads.models?.choices.find(item => item.subjectId === id)?.model)) });
     }
     const said = saidLines.of(row.scene.id, now);
     return groupContent({ who: view.who, doing: view.doing, said, toWho: said?.to ? whoOf(said.to) : null, startMinute: view.facts?.startMinute ?? null,
       decider: deciderOf({ decider: view.decider ?? null, model: view.model ?? null }), model: view.model ?? null, connected, assignable,
-      running: Boolean(runWatch.run), left: runWatch.run ? timeLeft(runWatch.run.endsBy, Date.now()) : null, following: followView.active(), reading: view.reading });
+      running: Boolean(runWatch.run), left: runWatch.run ? timeLeft(runWatch.run.endsBy, Date.now()) : null, following: followView.active(), reading: view.reading, noModel: noModelLine(subjectReads.models, view.who) });
   }
   let groupActions = new Set(), groupFirst = 0;
   // Choose a model in the group (r07, character-group.mjs): the page's own write; the Run question then asks again.
@@ -680,7 +681,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       connected,
       runLine: subjectReads.models ? runSectionLine(view.who, { hostRefusal: subjectReads.models.hostRefusal, offered: subjectReads.models.models,
         chosen: Boolean(model), chosenRefusal: choice?.refusal ?? null, assignable }) : null,
-      run: { open: Boolean(run), big: run ? runningLine(run, Date.now()) : runLength(limits), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal) : null },
+      run: { open: Boolean(run), big: run ? runningLine(run, Date.now()) : runLength(limits), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal, view.model ?? null) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
       did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...(row.heard ? {} : { model: row.model ?? null, choices: row.model ? decisionOptions(row.requestId) ?? null : null, decisions: row.decisions ?? null, decider: row.decider === 'person' || row.decider === 'external' ? row.decider : null }), ...records.dayRow(pageView, row) })) : null,
       didFocus: pageView.didFocus, lastRun, lastRunWhy, canAsk: !readOnly,

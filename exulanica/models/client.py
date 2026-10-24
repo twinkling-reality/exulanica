@@ -83,6 +83,7 @@ exact ones.
 from __future__ import annotations
 
 import copy
+import threading
 import time
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -113,6 +114,7 @@ from exulanica.models.manifest import (
     ChosenRoleBinding,
     Manifest,
     ModelSpec,
+    Provider,
     Role,
     load_manifest,
 )
@@ -168,6 +170,79 @@ _MAX_REFUSAL_REASONS: Final = 8
 #: its origin, or the variable the manifest names for its credential is not set.
 PROVIDER_NOT_ADMITTED: Final = "provider_not_admitted"
 PROVIDER_CREDENTIAL_ABSENT: Final = "provider_credential_absent"
+#: A provider on this computer whose server did not answer its last liveness read: its models are
+#: not offered while it does not run, rather than offered and then asked of a stopped server.
+PROVIDER_NOT_RUNNING: Final = "provider_not_running"
+#: How long one liveness read of a server on this computer may take, and how old the last read may
+#: be before the next one is made. A server that does not run refuses the connection at once.
+LOCAL_LIVENESS_TIMEOUT: Final = 0.5
+LOCAL_LIVENESS_EVERY: Final = 15.0
+
+
+class LocalLiveness:
+    """Whether each provider on this computer answers.
+
+    :meth:`stopped` answers by the last read of each server's catalog (preflight's
+    :func:`~exulanica.models.preflight.local_catalog`, through the client's own egress-checked
+    transport, so a read goes only where the allowlist admits that server). Where that read is
+    older than ``every`` seconds it reads again first, within ``timeout``: one caller at a time
+    for each provider, every other caller meanwhile answered by the last read without waiting, so
+    at most one request every ``every`` seconds pays for a read. Before a server's first read ends
+    it counts as running, as it was offered before a read existed; a read that fails in any way
+    counts as stopped.
+    """
+
+    def __init__(
+        self,
+        providers: Iterable[Provider],
+        transport: Transport,
+        *,
+        every: float = LOCAL_LIVENESS_EVERY,
+        timeout: float = LOCAL_LIVENESS_TIMEOUT,
+        clock: Callable[[], float] = time.monotonic,
+        start: Callable[[Callable[[], None]], object] | None = None,
+    ) -> None:
+        self._providers = {provider.provider_id: provider for provider in providers}
+        self._transport = transport
+        self._every = every
+        self._timeout = timeout
+        self._clock = clock
+        self._start = start or (lambda read: read())
+        self._lock = threading.Lock()
+        self._answered: dict[str, bool] = {}
+        self._read_at: dict[str, float] = {}
+        self._reading: set[str] = set()
+
+    def stopped(self) -> frozenset[str]:
+        """The providers whose server did not answer its last read, each stale one read first."""
+        stale: list[str] = []
+        with self._lock:
+            now = self._clock()
+            for provider_id in self._providers:
+                last = self._read_at.get(provider_id)
+                if (last is None or now - last >= self._every) and provider_id not in self._reading:
+                    self._reading.add(provider_id)
+                    stale.append(provider_id)
+        for provider_id in stale:
+            self._start(lambda provider_id=provider_id: self._read(provider_id))
+        with self._lock:
+            return frozenset(key for key, running in self._answered.items() if not running)
+
+    def _read(self, provider_id: str) -> None:
+        from exulanica.models.preflight import local_catalog
+
+        try:
+            catalog, _why = local_catalog(
+                self._providers[provider_id], self._transport, timeout=self._timeout
+            )
+            running = catalog is not None
+        except Exception:
+            # Any failure to read means the server does not answer.
+            running = False
+        with self._lock:
+            self._answered[provider_id] = running
+            self._read_at[provider_id] = self._clock()
+            self._reading.discard(provider_id)
 
 
 def _refusal_reasons(exc: ValidationError) -> str:
@@ -259,6 +334,9 @@ class ModelClient:
             set() if local_only else {binding.provider for binding in self._manifest.roles.values()}
         )
         self._refusals: dict[str, str] = {}
+        #: Whether each admitted provider on this computer runs: read only through a transport that
+        #: reaches the network (one carrying an allowlist); a test double answers for itself.
+        self._liveness: LocalLiveness | None = None
         for provider in sorted(self._manifest.providers.values(), key=lambda p: p.provider_id):
             if local_only and provider.takes_credential:
                 self._refusals[provider.provider_id] = PROVIDER_CREDENTIAL_ABSENT
@@ -308,6 +386,13 @@ class ModelClient:
                 if provider.provider_id in bound:
                     raise
                 self._refusals[provider.provider_id] = PROVIDER_CREDENTIAL_ABSENT
+        local = [
+            provider
+            for provider in self._manifest.providers.values()
+            if provider.on_this_computer and provider.provider_id not in self._refusals
+        ]
+        if egress is not None and local:
+            self._liveness = LocalLiveness(local, network)
         self._chain = ModelChain(
             manifest=self._manifest,
             transport=network,
@@ -336,8 +421,13 @@ class ModelClient:
 
     @property
     def refusals(self) -> Mapping[str, str]:
-        """Each provider this client refuses, by key, and why, by name."""
-        return MappingProxyType(dict(self._refusals))
+        """Each provider this client refuses, by key, and why, by name: as it was built, and a
+        provider on this computer whose server did not answer its last read
+        (PROVIDER_NOT_RUNNING)."""
+        refused = dict(self._refusals)
+        if self._liveness is not None:
+            refused.update(dict.fromkeys(self._liveness.stopped(), PROVIDER_NOT_RUNNING))
+        return MappingProxyType(refused)
 
     @property
     def spending_source(self) -> SpendingSource | None:

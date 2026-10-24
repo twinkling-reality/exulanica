@@ -2,7 +2,7 @@
 // BUILD-SHEETS-CHARACTER-TALKING-BUILDING.md section 1): what it says, from the reads the page holds, and where
 // it stands. Pure: the reads come in as data and the words from character-words.mjs; character-group.ts draws
 // the answer. verify-character-group.mjs holds it.
-import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, cardWords, decidesPrint, keyGroup, makerLine, modelsDecide, modelsNamed, providerName, quoted, readingRecord, routineRow, rowPrice, saidUnder, stopsAfter } from './character-words.mjs';
+import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, cardWords, decidesPrint, keyGroup, makerLine, modelsDecide, modelsNamed, noModelRunning, providerName, quoted, readingRecord, routineRow, rowPrice, saidUnder, stopsAfter } from './character-words.mjs';
 import { RUN_WORDS, atMost, runFor, runRefusalWords } from './run-words.mjs';
 import { dayWord } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -104,7 +104,7 @@ export function deciderOf({ decider = null, model = null }) {
  * is on, Stop; without a model, Choose only where this page may choose one.
  */
 export function groupContent({ who, doing = null, said = null, toWho = null, startMinute = null, decider = 'routine', model = null,
-  connected = true, assignable = false, running = false, left = null, following = false, reading = false }) {
+  connected = true, assignable = false, running = false, left = null, following = false, reading = false, noModel = null }) {
   if (reading) return Object.freeze({ name: who.title, doing: readingRecord(who), said: null, note: null, rows: Object.freeze([]), list: null, print: null, after: null, refused: false });
   const hhmm = said && said.tick !== null && Number.isSafeInteger(startMinute) ? worldTime(said.tick, startMinute)?.hhmm ?? null : null;
   const spoken = said ? Object.freeze({ line: quoted(said.line), under: saidUnder({ to: said.to ? toWho : null, hhmm }) }) : null;
@@ -122,7 +122,8 @@ export function groupContent({ who, doing = null, said = null, toWho = null, sta
     rows: Object.freeze(rows.map(row => Object.freeze(row))),
     list: null,
     print: decidesPrint(who, { decider, model, left: running && decided ? left : null }),
-    after: null,
+    // Where [M] is not offered because no model is running on this computer, how to have one, under the small print (A2).
+    after: decider === 'routine' && !assignable && noModel ? noModel : null,
     refused: false,
   });
 }
@@ -135,7 +136,7 @@ export function groupContent({ who, doing = null, said = null, toWho = null, sta
  * the chosen character's first) and the cap as small print with when it stops under it. A refusal (`refusal`, the server's code) takes the small print's place in its own
  * sentence and dims Run, which still answers its key; `busy` while the start is asked, when Run does nothing.
  */
-export function questionGroup({ who, askers = [who], others = true, models = [], limits, refusal = null, busy = false, anotherModel = false }) {
+export function questionGroup({ who, askers = [who], others = true, models = [], limits, refusal = null, busy = false, anotherModel = false, free = false }) {
   const rows = [{ action: 'run', key: 'Enter', word: RUN_WORDS.run, shortcut: 'Enter', disabled: busy }];
   if (anotherModel) rows.push({ action: 'model', key: 'M', word: ANOTHER_MODEL, shortcut: 'M' });
   return Object.freeze({
@@ -145,7 +146,8 @@ export function questionGroup({ who, askers = [who], others = true, models = [],
     note: modelsDecide(askers.length ? askers : [who], { others }),
     rows: Object.freeze(rows.map(row => Object.freeze(row))),
     list: null,
-    print: refusal ? runRefusalWords(refusal) : `${modelsNamed(models) ?? ''} \u00b7 ${atMost(limits)}`.replace(/^ \u00b7 /u, ''),
+    // A run whose every model is on this computer costs nothing: it says so in place of its cap (A2).
+    print: refusal ? runRefusalWords(refusal, modelsNamed(models)) : `${modelsNamed(models) ?? ''} \u00b7 ${free ? CHARACTER_WORDS.freeHere : atMost(limits)}`.replace(/^ \u00b7 /u, ''),
     after: refusal ? null : stopsAfter(Math.round(limits.wallSeconds / 60)),
     refused: Boolean(refusal),
   });
@@ -227,6 +229,26 @@ export function galleryItems(models, fromServer = false) {
     model, word: model.name, sub: makerLine(model), price: rowPrice(model), open: cardWords(model),
     group: model.local === true ? CHARACTER_WORDS.hereFree : fromServer ? CHARACTER_WORDS.serverBudget : keyGroup(providerName(model)),
   })), { model: null, word: CHARACTER_WORDS.routine, sub: null, price: routineRow(), open: null, group: null }];
+}
+
+/** The refusals of a model this install would never offer: a hosted one where it holds no key. */
+const NEVER_OFFERED = new Set(['provider_credential_absent']);
+
+/**
+ * How to have a model, said of `who`, where the card offers none because none is running on this computer (A2): the
+ * models read takes choices, and every model this install would offer is refused as not running here. Null otherwise:
+ * a model to choose, one left out by setting (provider_not_admitted), or any other cause.
+ */
+export function noModelLine(read, who) {
+  const refusals = (read?.models ?? []).map(model => model.refusal ?? null).filter(code => !NEVER_OFFERED.has(code));
+  if (!read?.takesModelChoices || !refusals.length || !refusals.every(code => code === 'provider_not_running')) return null;
+  return noModelRunning(who);
+}
+
+/** Whether every model a run asks runs on this computer: `chosen` the models chosen, as the models read names them. */
+export function freeHere(read, chosen) {
+  const local = new Set((read?.models ?? []).filter(model => model.local).map(model => `${model.provider}/${model.modelId}`));
+  return chosen.length > 0 && chosen.every(model => model && local.has(`${model.provider}/${model.modelId}`));
 }
 
 /** Whether [M] is offered (F5): the models read takes choices and offers a model this install can ask. */

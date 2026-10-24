@@ -201,7 +201,7 @@ describe('reading who decides', () => {
       ...Object.entries(MODEL_REFUSAL_WORDS).map(([code, why]) => [read({ choices: [{ ...chosen, refusal: code }] }), why] as const),
     ];
     // A positive control: every cause the server states is among those read here.
-    expect(causes).toHaveLength(12);
+    expect(causes).toHaveLength(13);
     for (const [body, why] of causes) {
       expect(choiceWords(parseSocietyModels(body), 'ada'))
         .toBe(`Their own routine for now, because ${why}. You chose Nemotron 3 Nano 30B.`);

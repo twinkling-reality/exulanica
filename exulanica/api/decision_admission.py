@@ -47,6 +47,7 @@ MODEL_REFUSALS: Final = frozenset(
         "provider_changed",
         "provider_not_admitted",
         "provider_credential_absent",
+        "provider_not_running",
         "process_budget_spent",
         "process_share_spent",
         "question_changed_by_rules",

@@ -30,8 +30,12 @@ export const NOT_CONNECTED = Object.freeze({
   process_share_spent: 'The budget for AI models here is spent.',
 });
 
-/** The words for a refused run by its code; any other code says nothing started. */
-export function runRefusalWords(code) {
+/** A run refused because its model on this computer is not running (A2, DESIGN's words), naming the model where known. */
+export const notRunningRefusal = model => `${model || 'The model'} is not running on this computer now. Start it, then try again.`;
+
+/** The words for a refused run by its code, `model` the model it asks where known; any other code says nothing started. */
+export function runRefusalWords(code, model = null) {
+  if (code === 'provider_not_running') return notRunningRefusal(model);
   if (Object.hasOwn(RUN_REFUSALS, code)) return RUN_REFUSALS[code];
   return Object.hasOwn(NOT_CONNECTED, code) ? NOT_CONNECTED[code] : 'The run did not start. Nothing was spent.';
 }

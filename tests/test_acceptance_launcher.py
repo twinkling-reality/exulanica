@@ -840,6 +840,82 @@ def test_the_api_gets_the_model_and_its_bound_only_with_model():
         assert json.loads(environment["EXULANICA_API_TOKENS"]) == {"token": {"permissions": []}}
 
 
+def test_a_personal_install_with_no_key_admits_the_models_on_this_computer(tmp_path):
+    # The servers are the manifest's, as data: each provider that takes no credential on localhost.
+    worktree = tmp_path / "checkout"
+    (worktree / "exulanica" / "models").mkdir(parents=True)
+    (worktree / "exulanica" / "models" / "models.manifest.json").write_text(
+        json.dumps(
+            {
+                "providers": {
+                    "here": {"base_url": "http://localhost:11434/v1", "api_key_env": None},
+                    "also": {"base_url": "http://127.0.0.1:8080/v1", "api_key_env": None},
+                    "hosted": {"base_url": "https://api.example/v1", "api_key_env": "EXAMPLE"},
+                    "keyed": {"base_url": "http://localhost:9000/v1", "api_key_env": "SOME"},
+                }
+            }
+        )
+    )
+    assert LAUNCH.local_model_servers(worktree) == [
+        "http://127.0.0.1:8080",
+        "http://localhost:11434",
+    ]
+    # The checkout's own manifest names this computer's server (the positive control).
+    assert "http://localhost:11434" in LAUNCH.local_model_servers(ROOT)
+    exports = {
+        name: "postgresql://role@localhost:19200/exulanica"
+        for name in (
+            "EXULANICA_DATABASE_URL",
+            "EXULANICA_READONLY_DATABASE_URL",
+            "EXULANICA_PURGE_DATABASE_URL",
+        )
+    }
+    shell = {"EXULANICA_EGRESS_ALLOWLIST": '["https://elsewhere.example"]'}
+
+    def environment(model: bool, environ: dict[str, str]) -> dict[str, str]:
+        return LAUNCH.api_environment(
+            exports=exports,
+            grant={},
+            data_dir=Path("run/data"),
+            model=model,
+            derivative_worker=False,
+            society_playback={},
+            environ=environ,
+            local_servers=["http://localhost:11434"],
+        )
+
+    # No key: the API may reach this computer's server and nothing else; the shell's list never
+    # reaches it.
+    assert json.loads(environment(False, shell)["EXULANICA_EGRESS_ALLOWLIST"]) == [
+        "http://localhost:11434"
+    ]
+    assert "EXULANICA_EGRESS_ALLOWLIST" not in _api_environment(False, shell)
+    # With a key, the person's own list stands, as --model states it.
+    keyed = {
+        "NEBIUS_API_KEY": "sk-not-a-real-key",
+        "EXULANICA_EGRESS_ALLOWLIST": '["https://model.example"]',
+        "EXULANICA_BUDGET_USD": "1.00",
+        "EXULANICA_BUDGET_MAX_CALLS": "7000",
+        "EXULANICA_SPENDING": "process",
+    }
+    assert environment(True, keyed)["EXULANICA_EGRESS_ALLOWLIST"] == '["https://model.example"]'
+    # A restart keeps what the run started with.
+    run = tmp_path / "run"
+    (run / "logs").mkdir(parents=True)
+    (run / "logs" / "database-serve.txt").write_text(
+        "".join(f"export {name}={url}\n" for name, url in exports.items())
+        + "owner postgresql://owner@localhost:19200/exulanica\n"
+    )
+    state = {"data_dir": str(run / "data"), "workspace_id": "w1"}
+    restarted = LAUNCH.recorded_api_environment(
+        {**state, "local_model_servers": ["http://localhost:11434"]}, run, {}, model=False
+    )
+    assert json.loads(restarted["EXULANICA_EGRESS_ALLOWLIST"]) == ["http://localhost:11434"]
+    assert "EXULANICA_EGRESS_ALLOWLIST" not in LAUNCH.recorded_api_environment(
+        state, run, {}, model=False
+    )
+
+
 def test_decisions_are_asked_again_unless_up_says_not_and_a_restart_keeps_it(tmp_path):
     parser = LAUNCH.build_parser()
     assert parser.parse_args(["up", "--worktree", "w"]).no_ask_again is False

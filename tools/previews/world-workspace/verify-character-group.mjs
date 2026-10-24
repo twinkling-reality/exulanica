@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { GROUP_LAYOUT, MODEL_ROWS, SAID_READ, choosableModels, offersModels, openWhileOffered, deciderOf, groupContent, groupPlace, keepLastSaid, lastSaid, modelGroup, modelPicker, noneRunningHere, questionGroup, readLastSaid } from './character-group.mjs';
-import { GROUP_WORDS, called, decidesPrint, modelsDecide, quoted, saidUnder, stopsAfter } from './character-words.mjs';
+import { GROUP_LAYOUT, MODEL_ROWS, SAID_READ, choosableModels, offersModels, openWhileOffered, deciderOf, freeHere, groupContent, groupPlace, keepLastSaid, lastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, questionGroup, readLastSaid } from './character-group.mjs';
+import { GROUP_WORDS, called, decidesPrint, modelsDecide, noModelRunning, quoted, saidUnder, stopsAfter } from './character-words.mjs';
 import { dayWord } from './talk-words.mjs';
 
 // A chosen character's group (DESIGN's J30, the r05 picture): what it says and where it stands.
@@ -366,5 +366,30 @@ assert.ok(Math.abs(small.leader.to.x - (small.x - 36 * 0.78)) < 1e-9);
 for (const file of ['character-group.mjs', 'character-group.ts', 'character-group.css', 'character-words.mjs']) {
   assert.doesNotMatch(readFileSync(new URL(file, import.meta.url), 'utf8'), /\u2014/u, file);
 }
+
+// A2 (DESIGN's "A2 amended"): where every model this install would offer is refused as not running on this computer,
+// the card says, under its small print, how to have one, naming no runner.
+const lone = called({ name: 'Ada' });
+const local = { refusal: 'provider_not_running' }, hosted = { refusal: 'provider_credential_absent' };
+const runOne = 'No AI model is running on this computer yet. Start one with a local model runner, and it can decide for Ada, free.';
+assert.equal(noModelRunning(lone), runOne);
+assert.equal(noModelLine({ takesModelChoices: true, models: [hosted, local] }, lone), runOne);
+assert.equal(noModelLine({ takesModelChoices: true, models: [hosted, { refusal: null }] }, lone), null, 'a model to choose: [M] is offered instead');
+assert.equal(noModelLine({ takesModelChoices: true, models: [hosted, { refusal: 'provider_not_admitted' }] }, lone), null, 'no model here by setting');
+assert.equal(noModelLine({ takesModelChoices: true, models: [{ refusal: 'process_budget_spent' }, local] }, lone), null, 'a key whose models are spent: not this line');
+assert.equal(noModelLine({ takesModelChoices: true, models: [hosted] }, lone), null, 'no model on this computer at all');
+assert.equal(noModelLine({ takesModelChoices: false, models: [local] }, lone), null, 'people no model runs');
+assert.equal(noModelLine(null, lone), null);
+assert.equal(groupContent({ who: lone, noModel: runOne }).after, runOne);
+assert.equal(groupContent({ who: lone, assignable: true, noModel: runOne }).after, null, 'never beside [M]');
+assert.equal(groupContent({ who: lone }).after, null);
+// A run whose every model is on this computer says it is free in place of its cap.
+const free = questionGroup({ who: lone, models: ['Qwen3 4B Instruct'], limits: { wallSeconds: 600, usd: '0.05000000' }, free: true });
+assert.equal(free.print, 'Qwen3 4B Instruct \u00b7 Free, on this computer');
+assert.match(questionGroup({ who: lone, models: ['Qwen3 4B Instruct'], limits: { wallSeconds: 600, usd: '0.05000000' } }).print, /at most/);
+const read = { models: [{ provider: 'ollama_local', modelId: 'm', local: true }, { provider: 'nebius', modelId: 'n', local: false }] };
+assert.equal(freeHere(read, [{ provider: 'ollama_local', modelId: 'm' }]), true);
+assert.equal(freeHere(read, [{ provider: 'ollama_local', modelId: 'm' }, { provider: 'nebius', modelId: 'n' }]), false, 'one hosted model costs');
+assert.equal(freeHere(read, []), false);
 
 export default true;

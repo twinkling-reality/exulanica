@@ -482,6 +482,9 @@ python3 scripts/acceptance/launch.py up --worktree . --personal --model --tiles
 - `--tiles` lets the install bake the tiles a made town is drawn from. It compiles the tessellator first, offline,
   as the tile worker's image carries it, so each bake starts one Node process rather than compiling it again.
 - `--creatures`, optional, lets the install draft creatures from words.
+- Without `--model`, a personal install asks the free models on this computer and nothing else: the API is given an
+  egress allowlist naming the servers on this computer that the model manifest names (an Ollama server, made with
+  `scripts/laptop_model_recipe.py`), whose models are offered while that server answers.
 - `--no-ask-again`, optional, asks no person's recorded decisions again of another model, so the pages offer no
   Compare, for a recording where no model may be scored against another; a restart keeps it.
 - `--slot N` (0 to 6) moves the install to another set of ports when one is taken.

@@ -263,7 +263,15 @@ sends (`tests/test_laptop_models.py`).
 
 A deployment reaches the server only when its egress allowlist names `http://localhost:11434`;
 otherwise the model is listed and refused as `provider_not_admitted`, and its people are decided
-for by their routine. A deployment with no model credential whose allowlist names the server asks
+for by their routine. Where the list admits it, its models are offered only while the server
+answers: the decision client reads the server's catalog through its own egress-checked transport,
+within half a second and at most every 15 seconds, one request paying for a read and every other
+answered by the last one, and refuses the provider as `provider_not_running` while the last read
+failed (`LocalLiveness` in `exulanica/models/client.py`). A server that starts is offered within a
+period, one that stops is left out within one, and before the first read it is offered as before.
+A person whose world can offer no model because none runs here is told so plainly on the chosen
+person's card and day page. A personal install started with no key admits the servers on this
+computer that the manifest names, and nothing else (the acceptance launcher's `--personal`). A deployment with no model credential whose allowlist names the server asks
 models on this computer and nothing else: it builds a client with `local_only=True`, which reads
 no credential, from the environment or a `.env` file, and refuses every hosted provider as
 `provider_credential_absent` (`Services.choice_client`). Every other model-dependent feature of

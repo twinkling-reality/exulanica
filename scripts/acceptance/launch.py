@@ -205,6 +205,7 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from collections.abc import Mapping, Sequence
@@ -639,6 +640,19 @@ def clean_environment(environ: Mapping[str, str] | None = None) -> dict[str, str
     return {k: v for k, v in source.items() if not k.startswith(SCRUBBED_PREFIXES)}
 
 
+def local_model_servers(worktree: Path) -> list[str]:
+    """The origins of every model server on this computer that the checkout's model manifest names:
+    a provider that takes no credential, reached at ``localhost``. Read from the manifest as data,
+    so a person's own install admits whatever server the manifest serves models from."""
+    manifest = json.loads((worktree / "exulanica" / "models" / "models.manifest.json").read_text())
+    servers: set[str] = set()
+    for provider in manifest["providers"].values():
+        parts = urllib.parse.urlsplit(provider["base_url"])
+        if provider.get("api_key_env") is None and parts.hostname in ("localhost", "127.0.0.1"):
+            servers.add(f"{parts.scheme}://{parts.netloc}")
+    return sorted(servers)
+
+
 def model_environment(environ: Mapping[str, str] | None = None) -> dict[str, str]:
     """What ``--model`` hands the API, or a refusal naming the first variable that is absent."""
     source = os.environ if environ is None else environ
@@ -980,6 +994,7 @@ def api_environment(
     projects: Path | None = None,
     personal: bool = False,
     ask_again_off: bool = False,
+    local_servers: Sequence[str] = (),
 ) -> dict[str, str]:
     environment = clean_environment(environ)
     # The stack states the generated worlds its workspaces may hold, as a deployment does: the
@@ -991,6 +1006,10 @@ def api_environment(
         )
     if model:
         environment.update(model_environment(environ))
+    elif local_servers:
+        # A person's own install with no key may ask the models on this computer, and nothing else:
+        # with no credential the API builds a client that asks only those (A2).
+        environment["EXULANICA_EGRESS_ALLOWLIST"] = json.dumps(list(local_servers))
     environment.update(
         {
             "EXULANICA_DATABASE_URL": exports["EXULANICA_DATABASE_URL"],
@@ -2323,6 +2342,12 @@ def up(arguments: argparse.Namespace) -> None:
             worktree, database_port, chosen["spare"], run_dir, logs, state, state_file
         )
         api_exports = through_proxy(exports, chosen["spare"])
+    # A person's own install with no key and no scripted model admits the models on this computer (A2).
+    local_servers = (
+        local_model_servers(worktree)
+        if arguments.personal and not arguments.model and arguments.scripted_model is None
+        else []
+    )
     environment = api_environment(
         exports=api_exports,
         grant=grant,
@@ -2344,6 +2369,7 @@ def up(arguments: argparse.Namespace) -> None:
         projects=projects,
         personal=arguments.personal,
         ask_again_off=arguments.no_ask_again,
+        local_servers=local_servers,
     )
     environment.update(model_witness_environment(environment, witness))
     plan = None
@@ -2373,6 +2399,7 @@ def up(arguments: argparse.Namespace) -> None:
             "worlds_held": arguments.worlds_held,
             "personal": bool(arguments.personal),
             "ask_again": "off" if arguments.no_ask_again else "on",
+            "local_model_servers": local_servers,
             "spending_witness": str(witness / SPENDING_WITNESS_NAME),
             "society_playback": bool(arguments.society_playback),
             "budget_usd": environment.get("EXULANICA_BUDGET_USD"),
@@ -2728,6 +2755,7 @@ def recorded_api_environment(
         else Path(str(state["project_worker"]["projects"])),
         personal=bool(state.get("personal")),
         ask_again_off=state.get("ask_again") == "off",
+        local_servers=state.get("local_model_servers") or (),
     )
 
 

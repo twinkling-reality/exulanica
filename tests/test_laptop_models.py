@@ -25,6 +25,7 @@ from exulanica.models.choice import ChoiceRequest
 from exulanica.models.client import (
     PROVIDER_CREDENTIAL_ABSENT,
     PROVIDER_NOT_ADMITTED,
+    PROVIDER_NOT_RUNNING,
     ModelClient,
 )
 from exulanica.models.egress import EGRESS_ALLOWLIST_ENV, parse_egress_allowlist
@@ -403,16 +404,19 @@ def test_a_deployment_with_no_credential_asks_only_the_laptop_model(tmp_path, so
     assert services.model_client is None
     assert services.choice_client is not None
     assert services.decision_client is services.choice_client
+    assert any("only models on this computer" in note for note in services.warnings)
+    # Building it opened nothing.
+    assert sockets == []
     manifest = load_manifest()
     keyed = {p.provider_id for p in manifest.providers.values() if p.takes_credential}
     local = {p.provider_id for p in manifest.providers.values() if p.on_this_computer}
     for provider in keyed:
         assert services.provider_refusal(provider) == PROVIDER_CREDENTIAL_ABSENT
+    # Its models are offered only while the server answers (A2): reading the refusals asks this
+    # computer's server alone, which nothing answers here, so its provider is not running.
     for provider in local:
-        assert services.provider_refusal(provider) is None
-    assert any("only models on this computer" in note for note in services.warnings)
-    # Building it opened nothing.
-    assert sockets == []
+        assert services.provider_refusal(provider) == PROVIDER_NOT_RUNNING
+    assert sockets and {address for _how, address in sockets} <= {"localhost", ("localhost", 11434)}
 
 
 # -- the shipped laptop model -------------------------------------------------------------------

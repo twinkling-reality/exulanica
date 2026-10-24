@@ -25,6 +25,7 @@ export const MODEL_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   provider_changed: 'the service that runs the model you chose has changed, so choose it again to use it',
   provider_not_admitted: 'this server may not reach the service that runs the model you chose',
   provider_credential_absent: 'this server has no key for the service that runs the model you chose',
+  provider_not_running: 'the model you chose is not running on this computer now',
   process_budget_spent: 'this server has too little of its model budget left to ask the model you chose, until it restarts',
   process_share_spent: 'this server\'s model budget, less the part kept for its other work, is too little to ask the model you chose, until it restarts',
   question_changed_by_rules: 'this world\'s rules would change the question each person is asked, since a name you saved shares a word with it',
