@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,18 @@ def _worker(
     program = worktree / ".venv" / "bin" / "exulanica-generated-tile-worker"
     program.parent.mkdir(parents=True)
     program.touch()
+    # The checkout's own TypeScript, stood in: run in the tessellator's package, it writes the entry
+    # `tsc --build tsconfig.node.json` writes there; and a node on PATH to run it.
+    (worktree / "web" / "packages" / "loom-tess").mkdir(parents=True)
+    tsc = worktree / "web" / "node_modules" / ".bin" / "tsc"
+    tsc.parent.mkdir(parents=True)
+    tsc.write_text("#!/bin/sh\nmkdir -p dist/src/node && : > dist/src/node/cli.js\n")
+    tsc.chmod(0o755)
+    node = tmp_path / "bin" / "node"
+    node.parent.mkdir(parents=True)
+    node.write_text("#!/bin/sh\n")
+    node.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{node.parent}{os.pathsep}{os.environ['PATH']}")
     logs = tmp_path / "logs"
     logs.mkdir()
     state_file = tmp_path / "state.json"
@@ -66,6 +79,11 @@ def test_worker_uses_runtime_claims_owner_publication_and_one_workspace(tmp_path
         "postgresql://localhost/owner"
     )
     assert observed["environment"]["EXULANICA_DATA_DIR"] == str(tmp_path / "data")
+    # The tessellator compiled from the checkout, run by the node on PATH, as the tiles image does.
+    entry = tmp_path / "checkout" / "web/packages/loom-tess/dist/src/node/cli.js"
+    assert entry.is_file()
+    assert observed["environment"]["EXULANICA_TESS_CLI"] == str(entry)
+    assert observed["environment"]["EXULANICA_NODE"] == str(tmp_path / "bin" / "node")
     assert state["pids"] == {"tile_worker": 12345}
 
 
