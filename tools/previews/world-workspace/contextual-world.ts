@@ -148,7 +148,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     title: entry.title, worldId: entry.worldId, onHistory: () => openHistory(), onFly: () => b.controls.toggleFly(),
     pose: () => { const at = b.controls.state; return at ? { x: at.x, z: at.z, yaw: at.yaw, pitch: at.pitch } : null; } });
   const guidance = corners.hintsRoot, worlds = corners.backRoot, worldNotes = corners.notes;
-  let rows = [], inventory = null, target = null, held = null;
+  let rows = [], inventory = null, target = null, held = null, heldInView = false;
   let dragging = null, serial = 0, lastPick = 0, frameId = 0, lookedAt = null;
   const offers = new Map(), offerReads = new Map(), offerSerials = new Map();
   // Automatic reads of a subject whose read failed wait longer each time (read-backoff.mjs).
@@ -181,10 +181,10 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (!response.ok) throw Error(response.status === 424 ? 'This source is no longer available.' : 'This world could not be read. Try again.');
     return response.json();
   };
-  // Build mode (build-mode.ts), where this page may change the world: B, then point and click.
+  // Build mode (build-mode.ts), where this page may change the world: B, then point and click. Its tray gives way to a chosen subject only while its card or scene is in view (B never opens on nothing).
   const build = writable
     ? mountBuildMode({
-      b, root, state, entry, read, send, binding, canvas, corners, inspecting: () => pageShown() || held !== null,
+      b, root, state, entry, read, send, binding, canvas, corners, inspecting: () => pageShown() || (held !== null && heldInView),
       groundRing: createGroundRing(b.app, { camera: b.camera.camera, invalidate: () => b.invalidate(), look: { ...GROUND_RING, ...THING_RING, live: tokenRgb(root, '--live') ?? GROUND_RING.live } }),
       // Who is drawn and where, for the names over people near what is held; read as the people arrive.
       people: {
@@ -1345,7 +1345,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       presence.choose(view.being ? null : chosenCard({ who: view.who, being: view.being, doing: view.doing, decision: view.decision, model: view.model ?? null, decider: view.decider ?? null, deciderChose: view.deciderChose === true,
         running: Boolean(runWatch.run), connected, following: followView.active(), reading: false, thingLine: view.thingLine ?? null }));
       const heldFrame = screenFrame(held);
-      const ring = heldFrame ? ringAt(heldFrame) : null;
+      const ring = heldFrame ? ringAt(heldFrame) : null; heldInView = scened.showing || Boolean(ring && seen(held, heldFrame));
       // The talking scene draws no ring (r24): it marks whoever speaks with its dot instead.
       if (ring && !scened.showing) groundRing.place(heldFrame.ground, PERSON_RING_METRES); else groundRing.hide();
       if (ring && seen(held, heldFrame) && !scened.showing) {
@@ -1356,7 +1356,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         presence.place({ bounds: { left: Math.min(heldFrame.left, ring.x - half), right: Math.max(heldFrame.right, ring.x + half), top: heldFrame.top, bottom: heldFrame.bottom,
           headY, waistY: headY + (ring.y - headY) * CARD_WAIST }, prefer: awaySide(shownPops, ring.x), head: { x: heldFrame.headInView ? heldFrame.overhead.x : ring.x, y: headY } });
       } else presence.place(null);
-    } else groundRing.hide();
+    } else { groundRing.hide(); heldInView = false; }
     // Lines over whoever said one or whose mind chose something (N28 section 4, T1 to T4), none over a record page
     // (F12): within hearing, 24 px over the head and never nearer an edge of the view than the edge inset; two that
     // would overlap stack, the earlier above. A line said off screen by someone the person attends to sits at the

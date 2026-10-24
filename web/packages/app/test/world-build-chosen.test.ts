@@ -131,6 +131,23 @@ describe('the tray while something stands over it', () => {
     mode.frame(1100);
     await vi.waitFor(() => expect(trayShown(root)).toBe(true));
   });
+
+  it('gives way to someone chosen while building only while their card is in view, and comes back when they walk out of it', async () => {
+    const { mode, root, page } = await mount();
+    pressB(mode);
+    await vi.waitFor(() => expect(trayShown(root)).toBe(true));
+    // Chosen with E: their card stands over the tray.
+    page.chosen = true;
+    mode.frame(1000);
+    expect(trayShown(root)).toBe(false);
+    // They walk out of view, still chosen: the page says nothing stands over it now (contextual-world.ts).
+    page.chosen = false;
+    mode.frame(1100);
+    await vi.waitFor(() => expect(trayShown(root)).toBe(true));
+    page.chosen = true;
+    mode.frame(1200);
+    expect(trayShown(root)).toBe(false);
+  });
 });
 
 describe('B in a world with nowhere to place a thing', () => {
