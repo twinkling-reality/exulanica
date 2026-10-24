@@ -68,6 +68,8 @@
 .wu-record-decision .wu-rd-moment .wu-hr-pic { box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 20px 48px rgba(18,40,44,.22); }
 .wu-record-decision .wu-rd-moment .wu-hr-pic::after { opacity: 1; }
 .wu-record-decision.wu-hr-narrow .wu-rd-moment .wu-hr-orbs { bottom: -21px; }
+/* A decision that made no moment: no frame, its portraits standing above the words (U3c). */
+.wu-record-decision .wu-rd-unframed .wu-hr-orbs { position: static; }
 .wu-record-decision .wu-rd-text { padding: 40px 6px 0 18px; }
 .wu-record-decision .wu-rd-text.wu-rd-bare { padding-top: 18px; }
 .wu-record-decision .wu-rd-said { margin-top: 8px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }

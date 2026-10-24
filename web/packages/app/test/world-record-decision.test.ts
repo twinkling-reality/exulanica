@@ -32,6 +32,7 @@ interface DecisionPageState {
     readonly reason: string | null;
   } | null;
   readonly late?: boolean;
+  readonly moment?: boolean | null;
   readonly choicesHeading?: string | null;
   readonly picture?: string | null;
   readonly portraits?: readonly { readonly name: string; readonly url: string | null }[];
@@ -415,6 +416,26 @@ describe("A model's decision whose choice was not taken (U3)", () => {
     expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Asked Nemotron 3 Nano 30B · chose too late · the routine acted');
     expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose too late', 'answered in 0.9\u00a0s · $0.0003']);
     expect(all(root, '.wu-rd-choice .wu-hr-tag')).toEqual(['Chosen, not done']);
+  });
+});
+
+describe('What happened where a decision made no moment (U3c)', () => {
+  it('draws no picture frame, its portraits above the words, where no moment stands behind the decision', async () => {
+    const { root } = await open(teo({ moment: false, picture: null }));
+    const card = root.querySelector('.wu-rd-moment')!;
+    expect(card.querySelector('.wu-hr-pic')).toBeNull();
+    expect(card.classList.contains('wu-rd-unframed')).toBe(true);
+    // The portraits stand first in the card, then the words.
+    expect(card.firstElementChild?.classList.contains('wu-hr-orbs')).toBe(true);
+    expect(all(card, '.wu-rd-label')).toEqual(['What happened']);
+  });
+
+  it("keeps the frame while a moment's picture is still to come, and while the moments are read", async () => {
+    for (const state of [teo({ moment: true, picture: null }), teo({ moment: null, picture: null }), teo({ picture: null })]) {
+      const { root } = await open(state);
+      expect(root.querySelector('.wu-rd-moment .wu-hr-pic'), String(state.moment)).not.toBeNull();
+      document.body.replaceChildren();
+    }
   });
 });
 

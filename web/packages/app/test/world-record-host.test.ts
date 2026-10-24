@@ -404,6 +404,10 @@ describe('a decision, filled', () => {
     expect(records.decision(showing, { requestId: 'r5', detail: unasked, failure: null, record: false }).unanswered).toMatchObject({ asks: 0 });
     // An answered decision is as before.
     expect(records.decision(showing, { requestId: 'r5', detail: detail('leave'), failure: null, record: false })).toMatchObject({ unanswered: null, late: false });
+    // No moment of Teo's carries this request, once the moments are read: no picture is ever made (U3c).
+    expect(records.decision(showing, { requestId: 'r404', detail: refused, failure: null, record: false }).moment).toBe(false);
+    expect(records.decision(showing, { requestId: 'r5', detail: detail('leave'), failure: null, record: false }).moment).toBe(true);
+    expect(records.decision({ ...showing, moments: null }, { requestId: 'r404', detail: refused, failure: null, record: false }).moment).toBeNull();
   });
 
   it('says a choice its minute found the world had moved past was made too late, titled by what Teo did (U3)', async () => {

@@ -333,6 +333,8 @@ export function recordStates(host: RecordHost) {
         notes: { ...decisionNotes({ who, decider, canCompare }), ...(unanswered ? unansweredNotes({ who, ...unanswered }) : late ? lateNotes({ who }) : {}) },
         // The open page's own picture, drawn ahead of those its day's rows asked for first.
         picture: moment ? host.pictures.momentNow(moment as never, true) : null,
+        // Whether a moment stands behind the decision, once the moments read is in (U3c): with none, no picture is ever made.
+        moment: moment ? true : Array.isArray(showing.moments) ? false : null,
         portraits: (moment ? titledSubjects(moment) : [subjectId, said?.to].filter(Boolean)).map((id: string) => ({ name: named.subject(id), url: host.pictures.portraitNow(id) })),
       };
     },

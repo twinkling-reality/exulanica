@@ -63,6 +63,9 @@ export interface DecisionPageState {
   readonly choicesHeading?: string | null;
   /** The moment's picture (R2), as an image address; absent or null, the quiet tile. */
   readonly picture?: string | null;
+  /** Whether a moment stands behind the decision: false where the moments read has none, so no picture is ever made and
+   * What happened draws no frame (U3c); absent or null while it is read, the frame stands as for a picture still to come. */
+  readonly moment?: boolean | null;
   /** The moment's people, the first who acted first: each name, and its portrait's address or null for its letter (R2). */
   readonly portraits?: readonly { readonly name: string; readonly url: string | null }[];
   /** The world faded behind the page (a still of the view), as an image address; absent, the plain ground. */
@@ -376,19 +379,23 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
           nodes.push(column);
         }
 
-        // What happened: the moment's card, its picture and portraits, the line said or what was done.
-        const card = element('div', 'wu-rd-moment');
+        // What happened: the moment's card, its picture and portraits, the line said or what was done. A decision that
+        // made no moment draws no frame (U3c, DESIGN 15:58): its portraits stand above the words, as a day row that made
+        // no moment shows no tile.
+        const framed = state.moment !== false;
+        const card = element('div', framed ? 'wu-rd-moment' : 'wu-rd-moment wu-rd-unframed');
         px(card, drawn.card.x, drawn.card.top, drawn.card.text);
-        const picture = pictureBox(state.picture ?? null, drawn.card.width, drawn.card.height);
+        const picture = framed ? pictureBox(state.picture ?? null, drawn.card.width, drawn.card.height) : null;
         const people = state.portraits ?? [];
-        if (people.length) picture.append(orbs(people.map((_, at) => String(at)), drawn.card.orb, (id) => people[Number(id)]?.url ?? null, (id) => people[Number(id)]?.name ?? ''));
-        const text = element('div', people.length ? 'wu-rd-text' : 'wu-rd-text wu-rd-bare');
+        const portraits = people.length ? orbs(people.map((_, at) => String(at)), drawn.card.orb, (id) => people[Number(id)]?.url ?? null, (id) => people[Number(id)]?.name ?? '') : null;
+        if (picture && portraits) picture.append(portraits);
+        const text = element('div', people.length && framed ? 'wu-rd-text' : 'wu-rd-text wu-rd-bare');
         text.append(element('div', 'wu-rd-label', DECISION_FLOW_WORDS.whatHappened));
         if (notes?.happened) text.append(element('p', 'wu-rd-hint', notes.happened));
         if (state.said) text.append(element('div', 'wu-hr-said wu-rd-said', state.said));
         else if (state.action || state.title) text.append(element('div', 'wu-rd-action', state.action || state.title));
         if (state.verdict) text.append(element('p', 'wu-rd-verdict', state.verdict));
-        card.append(picture, text);
+        card.append(...(picture ? [picture] : portraits ? [portraits] : []), text);
         nodes.push(card);
       }
     }
