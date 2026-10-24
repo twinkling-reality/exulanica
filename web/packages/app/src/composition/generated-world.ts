@@ -59,7 +59,7 @@ import {
   type GeneratedWorldReady,
 } from './generated-world-ready.js';
 import { committedTextureLibrary } from '../texture-library.js';
-import { arrivalView, parkedFootprint, seatsOf, type PlanFootprint, type SightBlocker, type TownLife } from './arrival-view.js';
+import { arrivalView, lowOf, parkedFootprint, seatsOf, type PlanFootprint, type SightBlocker, type TownLife } from './arrival-view.js';
 import { TOWN_FIRST_VIEW } from '../town-first-view.js';
 import { WORLD_LOOK_ATTRIBUTE, swappableDrawing } from './world-look-redraw.js';
 
@@ -156,13 +156,15 @@ function sightBlockersOfTown(
 
 /**
  * Where a town's life is, for its first view: the seats among its street furniture, found by shape,
- * and its doors onto a footway, each once by identity, from the tiles' own records. Where those
- * cannot be read, none, and the first view is chosen by openness alone.
+ * its doors onto a footway, each once by identity, from the tiles' own records, and its low things,
+ * the furniture standing wholly below the walk's eye height `eyeMm`. Where those cannot be read, none,
+ * and the first view is chosen by openness alone.
  */
 function lifeOfTown(
   route: { readonly doorsOf?: (bytes: Uint8Array) => readonly { readonly identity: string; readonly eastMm: number; readonly southMm: number }[] },
   containers: readonly { readonly bytes: Uint8Array }[],
   furniture: readonly StreetFurniture[],
+  eyeMm: number,
 ): TownLife {
   try {
     const doors = new Map<string, readonly [number, number]>();
@@ -170,7 +172,7 @@ function lifeOfTown(
       for (const door of route.doorsOf?.(bytes) ?? []) if (!doors.has(door.identity)) doors.set(door.identity, [door.eastMm, door.southMm]);
     }
     const rule = TOWN_FIRST_VIEW.life;
-    return { seats: rule === undefined ? [] : seatsOf(furniture, rule), doors: [...doors.values()] };
+    return { seats: rule === undefined ? [] : seatsOf(furniture, rule), doors: [...doors.values()], low: lowOf(furniture, eyeMm) };
   } catch {
     return { seats: [], doors: [] };
   }
@@ -459,7 +461,7 @@ export async function loadGeneratedWorld(
     // The buildings among them, whose fronts a seafront view counts.
     fronts: buildingsOfTown(loaded),
     open: TOWN_FIRST_VIEW,
-    life: lifeOfTown(route, containers, furniture),
+    life: lifeOfTown(route, containers, furniture, loaded.navigationWorld.eyeHeight * 1000),
     ...(sea === undefined || heights === undefined ? {} : {
       sea: {
         groundMm: (e: number, s: number) => heights(e / 1000, s / 1000) * 1000,

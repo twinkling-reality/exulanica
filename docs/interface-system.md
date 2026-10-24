@@ -221,7 +221,7 @@ same way when it is made and each time it is opened again. Whether anything is p
 world's version and waited for; only a town with things placed asks what is parked, with a time limit,
 so a dressed town's standpoint can still differ by what is parked when it opens. Each figure of the rule,
 for a town with things placed in it as for one with none, is a chosen default stated with its reason in
-`assets/catalogs/arrival/town-first-view.v6.json`: the steps tried and how far, the room kept round a
+`assets/catalogs/arrival/town-first-view.v7.json`: the steps tried and how far, the room kept round a
 parked vehicle, how much farther a vehicle in the way must be for another spot to be taken, what
 standing off the walking line is worth, and a seafront view: where a town's entry names a direction
 its first view looks toward (the sea of a town on land that holds one, `arrival_toward_mm`) and its
@@ -234,9 +234,12 @@ fills a band of a twentieth of the frame's height across a quarter of its width 
 beyond a wide field, the town opens on its own first view); the middle third every first view keeps clear, where earlier versions test only its middle sixth;
 and the edges of its frame, where no more than a tenth of the width may show the town's buildings nearer
 than 4 m and no trunk or post may stand nearer than 4 m anywhere, so a view does not stand against a plain
-ground floor or beside a lamp post filling the side of the picture. Versions 1
-to 5 of that catalog (by openness alone;
-by life with no least distance; with one; with the figures of the view of placed things; without the frame's edges) stay beside
+ground floor or beside a lamp post filling the side of the picture; and no low thing (a bin, a bollard,
+a bench: street furniture standing wholly below eye height, counted by its footprint) nearer than 6 m in its
+middle third or nearer than 4 m anywhere in its frame, as no seat stands at its feet. Versions 1
+to 6 of that catalog (by openness alone;
+by life with no least distance; with one; with the figures of the view of placed things; without the frame's edges;
+without the low things) stay beside
 it and are read by the same reader, with those figures at the values version 4 states, so a town
 opens as it did under them. A world
 with people in it that opens paused keeps "The world is paused. Press Play to let it

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  arrivalView, crosses, frontsInView, nearFaceShare, nearestInWedge, nearestSeatInFan, openDistance, parkedFootprint, seatsOf, viewLife, viewOpenness,
+  arrivalView, crosses, frontsInView, lowOf, nearFaceShare, nearestInWedge, nearestSeatInFan, openDistance, parkedFootprint, seatsOf, viewLife, viewOpenness,
   waterInView, type LifeViewRule, type OpenViewRule, type SeaSight, type SightBlocker,
 } from '../src/composition/arrival-view.js';
 import { FIRST_VIEW_DEFAULTS } from '../src/town-first-view.js';
@@ -830,5 +830,81 @@ describe('the near faces at a first view\'s edges', () => {
     // The same square as a building's corner is a wall, judged by its share: under a tenth, the view stands by it.
     const asBuilding = arrivalView({ ...town, blockers: [opposite, behind, lamp], fronts: [opposite, behind, lamp], open: NEAR, life });
     expect(asBuilding).toEqual(asWall);
+  });
+});
+
+describe('a low thing in the near middle of a first view', () => {
+  it('is a piece of street furniture standing wholly below eye height, as the footprint of each of its parts', () => {
+    // Facing east; each part 400 mm along and 200 mm across, centred on its record.
+    const at = (eastMm: number, ...tops: number[]) => ({
+      eastMm, southMm: 0, facing: [1, 0] as const,
+      parts: tops.map((top) => ({ alongMm: 0, leftMm: 0, bottomMm: 0, sizeAlongMm: 400, sizeLeftMm: 200, heightMm: top })),
+    });
+    // A bin (0.9 m), a bench (seat and back, 0.85 m), a lamp (4.5 m), a lamp on a low plinth (0.3 m and 4.5 m:
+    // it reaches eye height, so it is a post), and a record with no parts.
+    const rings = lowOf([at(1_000, 900), at(2_000, 450, 850), at(3_000, 4_500), at(5_000, 300, 4_500), at(4_000)], 1_600);
+    expect(rings).toHaveLength(3);
+    // Left of east is north, south decreasing: the bin's footprint runs 800 to 1,200 east, 100 either side.
+    expect(rings[0]).toEqual([[800, 100], [1_200, 100], [1_200, -100], [800, -100]]);
+  });
+
+  it('passes over a view with a low thing nearer than its least distance in the middle third, or near in its frame', () => {
+    // Arriving facing north across the street, a door one way along it.
+    const town = { eastMm: 0, southMm: 0, facing: [0, -1] as const, targets: [], parked: [], ground: footway };
+    const street = [opposite, behind];
+    const plain = { seats: [], doors: [[20_000, -16_000]] as [number, number][] };
+    const LOW = { ...LIVELY, middleThirdHalf: 23 * DEGREE, lowLeastMm: 6_000 };
+    const { lowLeastMm: _low, ...without } = LOW;
+    const before = arrivalView({ ...town, blockers: street, open: without, life: plain });
+    // A bin 3 m ahead of that view, in the middle of its picture.
+    const ahead = looks(before.yaw);
+    const bin = post(before.eastMm + ahead[0] * 3_000, before.southMm + ahead[1] * 3_000, 500);
+    const life = { ...plain, low: [bin] };
+    // Positive control: without the least distance, the bin moves nothing.
+    expect(arrivalView({ ...town, blockers: street, open: without, life })).toEqual(before);
+    const view = arrivalView({ ...town, blockers: street, open: LOW, life });
+    expect(nearestInWedge([view.eastMm, view.southMm], looks(view.yaw), 23 * DEGREE, [bin])).toBeGreaterThanOrEqual(6_000);
+    // Off the middle third: a bin 30 degrees off and 5 m away moves nothing, one 35 degrees off and 1 m away
+    // stands at the viewer's feet and passes the view over, as a post beside it does.
+    const FRAMED = { ...LOW, nearFace: { nearMm: 4_000, shareMost: 0.1, frameHalf: 51 * DEGREE, postMm: 4_000 } };
+    const { lowLeastMm: _framedLow, ...framedWithout } = FRAMED;
+    const plainView = arrivalView({ ...town, blockers: street, fronts: street, open: framedWithout, life: plain });
+    const look = looks(plainView.yaw);
+    const turn = (degrees: number, mm: number) => [
+      plainView.eastMm + (look[0] * Math.cos(degrees * DEGREE) - look[1] * Math.sin(degrees * DEGREE)) * mm,
+      plainView.southMm + (look[0] * Math.sin(degrees * DEGREE) + look[1] * Math.cos(degrees * DEGREE)) * mm,
+    ] as const;
+    const framed = (low: SightBlocker[]) => arrivalView({ ...town, blockers: street, fronts: street, open: FRAMED, life: { ...plain, low } });
+    expect(framed([post(...turn(30, 5_000), 300)])).toEqual(plainView);
+    const feet = post(...turn(-35, 1_000), 300);
+    const stepped = framed([feet]);
+    expect(nearestInWedge([stepped.eastMm, stepped.southMm], looks(stepped.yaw), 51 * DEGREE, [feet])).toBeGreaterThanOrEqual(4_000);
+  });
+
+  it('counts a low thing by its width, wherever any of it stands inside the frame', () => {
+    // A bench 2.4 m long, 2.5 m off, its middle 56 degrees off the view's middle (outside the 51 degree
+    // frame) and its near end inside it.
+    const town = { eastMm: 0, southMm: 0, facing: [0, -1] as const, targets: [], parked: [], ground: footway };
+    const street = [opposite, behind];
+    const plain = { seats: [], doors: [[20_000, -16_000]] as [number, number][] };
+    const FRAMED = {
+      ...LIVELY, middleThirdHalf: 23 * DEGREE, lowLeastMm: 6_000,
+      nearFace: { nearMm: 4_000, shareMost: 0.1, frameHalf: 51 * DEGREE, postMm: 4_000 },
+    };
+    const { lowLeastMm: _low, ...without } = FRAMED;
+    const plainView = arrivalView({ ...town, blockers: street, fronts: street, open: without, life: plain });
+    const look = looks(plainView.yaw);
+    const angle = 56 * DEGREE;
+    const way = [look[0] * Math.cos(angle) - look[1] * Math.sin(angle), look[0] * Math.sin(angle) + look[1] * Math.cos(angle)] as const;
+    const middle = [plainView.eastMm + way[0] * 2_500, plainView.southMm + way[1] * 2_500] as const;
+    // Laid across the line of sight, so its ends stand about 27 degrees either side of its middle.
+    const across = [-way[1], way[0]] as const;
+    const end = (sign: number, wide: number) => [middle[0] + across[0] * sign * 1_200 + way[0] * wide, middle[1] + across[1] * sign * 1_200 + way[1] * wide] as const;
+    const bench: SightBlocker = [end(-1, -250), end(1, -250), end(1, 250), end(-1, 250)];
+    // Positive control: its middle alone is outside the frame.
+    expect(nearestSeatInFan([plainView.eastMm, plainView.southMm], look, 51 * DEGREE, [middle])).toBe(Number.POSITIVE_INFINITY);
+    expect(nearestInWedge([plainView.eastMm, plainView.southMm], look, 51 * DEGREE, [bench])).toBeLessThan(4_000);
+    const view = arrivalView({ ...town, blockers: street, fronts: street, open: FRAMED, life: { ...plain, low: [bench] } });
+    expect(nearestInWedge([view.eastMm, view.southMm], looks(view.yaw), 51 * DEGREE, [bench])).toBeGreaterThanOrEqual(4_000);
   });
 });

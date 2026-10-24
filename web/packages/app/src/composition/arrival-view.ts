@@ -244,6 +244,48 @@ export function viewOpenness(
 export interface TownLife {
   readonly seats: readonly (readonly [number, number])[];
   readonly doors: readonly (readonly [number, number])[];
+  /**
+   * The plan footprints of the town's low things (`lowOf`), which a view keeps out of its near middle and
+   * frame. Absent, none.
+   */
+  readonly low?: readonly SightBlocker[];
+}
+
+/**
+ * The town's low things: each piece of street furniture whose every part's top stands below `eyeMm`
+ * above its base (a litter bin, a bollard, a bench), as the plan footprint of each of its parts, turned as
+ * its record faces, so a thing counts by its width wherever any of it stands. Below eye height it hides
+ * nothing a sight line meets, so the tests of what stands at eye height do not see it, but near in a view
+ * it stands in the lower part of the picture.
+ */
+export function lowOf(
+  furniture: readonly {
+    readonly eastMm: number; readonly southMm: number; readonly facing: readonly [number, number];
+    readonly parts: readonly {
+      readonly alongMm: number; readonly leftMm: number; readonly bottomMm: number;
+      readonly sizeAlongMm: number; readonly sizeLeftMm: number; readonly heightMm: number;
+    }[];
+  }[],
+  eyeMm: number,
+): SightBlocker[] {
+  const rings: SightBlocker[] = [];
+  for (const item of furniture) {
+    if (item.parts.length === 0 || !item.parts.every((part) => part.bottomMm + part.heightMm < eyeMm)) continue;
+    const length = Math.hypot(item.facing[0], item.facing[1]);
+    if (!(length > 0)) continue;
+    // East and south are a left-handed pair seen from above, so left of (e, s) is (s, -e), as for seats.
+    const along = [item.facing[0] / length, item.facing[1] / length] as const;
+    const left = [along[1], -along[0]] as const;
+    for (const part of item.parts) {
+      const corner = (a: number, l: number): readonly [number, number] => [
+        item.eastMm + (part.alongMm + a) * along[0] + (part.leftMm + l) * left[0],
+        item.southMm + (part.alongMm + a) * along[1] + (part.leftMm + l) * left[1],
+      ];
+      const [da, dl] = [part.sizeAlongMm / 2, part.sizeLeftMm / 2];
+      rings.push([corner(-da, -dl), corner(da, -dl), corner(da, dl), corner(-da, dl)]);
+    }
+  }
+  return rings;
 }
 
 /**
@@ -454,7 +496,9 @@ function distanceToRing(point: readonly [number, number], ring: SightBlocker): n
  * has nothing at eye height dead ahead (across its middle third, under version 5)
  * nearer than the rule's floor, no more of its frame's width than the rule allows showing the town's
  * buildings nearer than its near face and no trunk or post nearer than its near post anywhere in the
- * frame (version 6: so it does not stand against a plain ground floor or a lamp post), and,
+ * frame (version 6: so it does not stand against a plain ground floor or a lamp post), no low thing (a
+ * bin, a bollard) nearer than its least distance in its middle third nor nearer than its near post anywhere
+ * in its frame (version 7), and,
  * where the rule states a
  * least distance (version 3), no seat nearer than that inside its fan (where every view has one or
  * the other, the one with the most room before it, each against what the rule asks); of those the
@@ -554,8 +598,9 @@ interface JudgedView {
   /**
    * How much room the view has before it, as a share of what the rule asks: the nearest thing at
    * eye height dead ahead against the centre floor, the nearest seat in the fan against the least
-   * distance, and (version 6) the share of the frame its near walls may fill against what they fill and
-   * the nearest trunk or post in the frame against the near post, whichever is the least. Clear at 1 or more.
+   * distance, (version 6) the share of the frame its near walls may fill against what they fill and the
+   * nearest trunk or post in the frame against the near post, and (version 7) the nearest low thing in the
+   * middle third against its least distance, whichever is the least. Clear at 1 or more.
    */
   readonly room: number;
   readonly clear: boolean;
@@ -640,7 +685,14 @@ function liveliestView(
           const faces = near === undefined || share === 0 ? Number.POSITIVE_INFINITY : near.shareMost / share;
           const beside = near === undefined
             ? Number.POSITIVE_INFINITY : nearestInWedge(spot, toward, near.frameHalf, posts) / near.postMm;
-          const room = Math.min(centre, feet, faces, beside);
+          // A low thing near in the middle third stands in the lower middle of the picture, and one beside the
+          // viewer anywhere in the frame stands at their feet: the view is passed over as one with a seat at its
+          // feet is, or with a post beside it (version 7).
+          const low = rule.lowLeastMm === undefined ? Number.POSITIVE_INFINITY : Math.min(
+            nearestInWedge(spot, toward, centreHalf, life.low ?? []) / rule.lowLeastMm,
+            near === undefined ? Number.POSITIVE_INFINITY : nearestInWedge(spot, toward, near.frameHalf, life.low ?? []) / near.postMm,
+          );
+          const room = Math.min(centre, feet, faces, beside, low);
           const judged: JudgedView = {
             view: { eastMm: spot[0], southMm: spot[1], yaw: Math.atan2(-toward[0], -toward[1]), moved: back > 0 || step > 0 },
             room,

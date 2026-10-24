@@ -1,6 +1,6 @@
 /**
  * How the first view of a generated town is chosen, read from the data files that state each value
- * with its reason, `assets/catalogs/arrival/town-first-view.v6.json` and the versions before it.
+ * with its reason, `assets/catalogs/arrival/town-first-view.v7.json` and the versions before it.
  * Presentation only.
  *
  * Version 1 chooses the most open view. Version 2 chooses by what of the town's life lies in view
@@ -13,11 +13,12 @@
  * street from its seaward footway, the view turns along the shore, the fronts on the land side and the
  * open view on the other, with nothing near across its middle third, where that open view holds enough
  * water. Version 6 is version 5 with the frame kept clear of near walls and posts, so a view does not
- * stand against a plain ground floor or a lamp post filling the side of the picture; it is the version the page opens a
- * town by. All stay readable: `firstViewRule` reads any of the six files, and an earlier one with the
- * figures version 4 states as `FIRST_VIEW_DEFAULTS` states them.
+ * stand against a plain ground floor or a lamp post filling the side of the picture. Version 7 is version
+ * 6 with a low thing (a bin, a bollard) near in the middle third passing a view over, as a seat at its
+ * feet does; it is the version the page opens a town by. All stay readable: `firstViewRule` reads any of
+ * the seven files, and an earlier one with the figures version 4 states as `FIRST_VIEW_DEFAULTS` states them.
  */
-import catalogText from '../../../../assets/catalogs/arrival/town-first-view.v6.json?raw';
+import catalogText from '../../../../assets/catalogs/arrival/town-first-view.v7.json?raw';
 
 /**
  * How a view is judged by the town's life, as version 2 of the catalog states it: angles in
@@ -112,6 +113,12 @@ export interface OpenViewRule {
    * and no trunk or post may stand nearer than `postMm` anywhere in it; a view that breaks either is
    * passed over as one with a post in its middle third is. Absent before version 6.
    */
+  /**
+   * Version 7: how near a low thing (street furniture standing wholly below eye height) may stand in the
+   * middle third (`middleThirdHalf`) before the view is passed over as one with a seat at its feet is.
+   * Absent before version 7.
+   */
+  readonly lowLeastMm?: number;
   readonly nearFace?: {
     readonly nearMm: number; readonly shareMost: number; readonly frameHalf: number; readonly postMm: number;
   };
@@ -142,9 +149,10 @@ interface FirstViewEntry {
   readonly reason: string;
 }
 
-const PROFILES: ReadonlyMap<unknown, 1 | 2 | 3 | 4 | 5 | 6> = new Map([
+const PROFILES: ReadonlyMap<unknown, 1 | 2 | 3 | 4 | 5 | 6 | 7> = new Map([
   ['exulanica.town-first-view/v1', 1], ['exulanica.town-first-view/v2', 2], ['exulanica.town-first-view/v3', 3],
   ['exulanica.town-first-view/v4', 4], ['exulanica.town-first-view/v5', 5], ['exulanica.town-first-view/v6', 6],
+  ['exulanica.town-first-view/v7', 7],
 ]);
 
 /** The figures of version 4 an earlier version is read with. */
@@ -228,6 +236,7 @@ export function firstViewRule(text: string): OpenViewRule {
         postMm: millimetres('near_post_mm'),
       }),
     }),
+    ...(version < 7 ? {} : { lowLeastMm: millimetres('low_least_mm') }),
   };
   if (version === 1) return Object.freeze(rule);
   const life: LifeViewRule = Object.freeze({
@@ -246,6 +255,7 @@ export function firstViewRule(text: string): OpenViewRule {
   if (!(life.farMm > life.nearMm) || !(life.nearMm > life.leastMm) || !(life.seatTopMaximumMm >= life.seatTopMinimumMm)
     || !(life.centreHalf < Math.PI / 2)
     || (rule.middleThirdHalf !== undefined && !(rule.middleThirdHalf >= life.centreHalf && rule.middleThirdHalf < Math.PI / 2))
+    || (rule.lowLeastMm !== undefined && !(rule.lowLeastMm > 0))
     || (rule.nearFace !== undefined && (!(rule.nearFace.nearMm > 0) || !(rule.nearFace.postMm > 0)
       || !(rule.nearFace.shareMost > 0 && rule.nearFace.shareMost < 1)
       || !(rule.nearFace.frameHalf > 0 && rule.nearFace.frameHalf < Math.PI / 2)))
