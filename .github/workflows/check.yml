@@ -162,6 +162,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      # The repository's scripts/*.mjs and every file they import, type-checked as
+      # tests/test_visual_gate_targets.py checks them: the python job has no web toolchain, so that
+      # test skips there, and pnpm check reads the packages only.
+      - run: pnpm exec tsc -p tsconfig.scripts.json
       # typecheck, the dependency-cruiser contract over 11 packages, and vitest.
       - run: pnpm check
 

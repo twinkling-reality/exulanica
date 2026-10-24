@@ -256,7 +256,12 @@ export async function open({ port, profile, appOrigin, flags = [] }) {
       await page.evaluate(`(() => { const e = ${elementExpression}; e.focus(); e.select?.(); return true; })()`);
       await connection.send('Input.insertText', { text });
     },
-    /** A trusted key press: down, held for `holdMs`, up. `text` is what the key types, if anything. */
+    /**
+     * A trusted key press: down, held for `holdMs`, up. `text` is what the key types, if anything.
+     * @param {string} code
+     * @param {string} key
+     * @param {{ holdMs?: number, text?: string }} [options]
+     */
     async key(code, key, { holdMs = 0, text } = {}) {
       await page.keyDown(code, key, text);
       if (holdMs > 0) await sleep(holdMs);
