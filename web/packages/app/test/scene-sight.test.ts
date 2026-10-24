@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../atlas-react/src/playcanvas/index.ts', () => ({ StaticMeshPicker: class { pick() { return null; } } }));
 
 type Vec = readonly [number, number, number];
-type Mesh = { aabb: { center: { x: number; y: number; z: number }; halfExtents: { x: number; y: number; z: number } } };
+type Mesh = { aabb: { center: { x: number; y: number; z: number }; halfExtents: { x: number; y: number; z: number } }; node?: { tags: { has(tag: string): boolean } } };
 
 /** What these tests use of the preview module, which sits outside this package. */
 interface SceneSight {
@@ -79,5 +79,16 @@ describe('what stands in a camera\'s way', () => {
     expect(hit(origin, ahead)).toBeCloseTo(2.5, 9);
     moved.aabb.center = { x: 20, y: 1, z: 2 };
     expect(hit(origin, ahead)).toBeCloseTo(11, 9);
+  });
+
+  it('never meets a person: a far form, a static mesh tagged as one, is passed as if it were not there (F2)', async () => {
+    const { sceneHit } = await sight();
+    const meshes = town();
+    // A far form 1 m tall standing 3 m ahead, in the ray's way: the same answer as without it, whoever is drawn far.
+    const far = { ...mesh(0, 0.85, 2, 0.25, 0.85, 0.2), node: { tags: { has: (tag: string) => tag === 'person' } } };
+    const origin = [0, 1.6, 5] as const, ahead = [0, 0, -1] as const;
+    expect(sceneHit(appOf([...meshes, far]), { pick: entry })(origin, ahead)).toBeCloseTo(11, 9);
+    // Untagged, the same box is met.
+    expect(sceneHit(appOf([...meshes, { ...far, node: { tags: { has: () => false } } }]), { pick: entry })(origin, ahead)).toBeCloseTo(2.8, 9);
   });
 });

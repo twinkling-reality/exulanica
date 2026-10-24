@@ -14,6 +14,9 @@ import { catalogBase, catalogFamily, type CharacterCatalog, type PostureJoint } 
 import { describeLook, type CharacterLook } from './look.js';
 
 export const FAR_REGIONS = ['skin', 'hair', 'upper', 'lower', 'shoes'] as const;
+
+/** The tag a far form's body carries: a person, never scenery, to what reads the scene's static meshes (scene-sight.ts). */
+export const PERSON_TAG = 'person';
 export type FarRegion = (typeof FAR_REGIONS)[number];
 export type FarPalette = Readonly<Record<FarRegion, string>>;
 
@@ -291,6 +294,7 @@ export class FarPerson {
     this.palette = acquirePalette(device, appearance.palette);
     this.root = new pc.Entity('character-far', app);
     this.body = new pc.Entity('character-far-body', app);
+    this.body.tags.add(PERSON_TAG);
     this.root.addChild(this.body);
     const scale = appearance.heightMetres / TEMPLATE_HEIGHT_METRES;
     this.body.setLocalScale(scale, scale, scale);

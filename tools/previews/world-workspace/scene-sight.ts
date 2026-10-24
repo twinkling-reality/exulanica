@@ -2,6 +2,7 @@
 // meshes, and whether nothing stands between two points. The moment preview (front-door-preview.ts) frames
 // History's pictures by it and the follow view (scene-follow.ts) frames a talking scene by it.
 import { StaticMeshPicker } from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
+import { PERSON_TAG } from '../../../web/packages/atlas-react/src/playcanvas/character/far.ts';
 
 /**
  * How far past a box's faces a ray still asks for its mesh, metres: a ray that grazes a face is asked, as
@@ -13,7 +14,8 @@ const BOX_GRAZE = 1e-6;
  * How far a ray (render space, metres, a unit direction) runs before it meets what the scene draws,
  * or Infinity, up to `most` metres. Tested against the triangles of every visible static mesh, a low
  * wall or a bench as much as a building; skinned and instanced meshes (people, scattered plants, a
- * painted splat) are not tested. A ray asks the picker for a mesh only where its segment, out to the
+ * painted splat) are not tested, nor a person's far form, a static mesh tagged as a person (PERSON_TAG),
+ * so who is drawn near or far never changes what stands in the way. A ray asks the picker for a mesh only where its segment, out to the
  * nearest surface met so far, passes through the mesh's world box as it is now (a mesh moved or placed
  * since, by build mode or on its way, where it is drawn): a box it misses holds nothing nearer, so the
  * answer is the one asking every mesh gives, while most of a town's meshes are passed by a few
@@ -24,7 +26,7 @@ export function sceneHit(app: any, picker: Pick<StaticMeshPicker, 'pick'> = new 
   for (const layer of app.scene?.layers?.layerList ?? []) {
     if (layer.name === 'UI' || layer.name === 'Skybox' || layer.name === 'Immediate') continue;
     for (const instance of layer.meshInstances ?? []) {
-      if (instance.instancingCount > 0 || instance.gsplatInstance || instance.skinInstance) continue;
+      if (instance.instancingCount > 0 || instance.gsplatInstance || instance.skinInstance || instance.node?.tags?.has?.(PERSON_TAG)) continue;
       instances.add(instance);
     }
   }

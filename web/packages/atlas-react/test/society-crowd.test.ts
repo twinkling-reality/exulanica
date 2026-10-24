@@ -5,7 +5,7 @@ import { SocietyCrowd, type PoseInterval } from '../src/playcanvas/society/crowd
 import { CharacterHost } from '../src/playcanvas/character/host.js';
 import { NEAR_CHARACTER_BUDGET, NEAR_INHABITANT_BUDGET, PLAYER_NEAR_PLACES } from '../src/playcanvas/character/budget.js';
 import { CHARACTER_CATALOG } from '../src/playcanvas/character/catalog-data.js';
-import { FAR_REGIONS, farAppearance } from '../src/playcanvas/character/far.js';
+import { FAR_REGIONS, PERSON_TAG, farAppearance } from '../src/playcanvas/character/far.js';
 import { inhabitantLookOf } from '../src/playcanvas/character/inhabitant.js';
 import { abstractInhabitantRenderable } from '../src/playcanvas/society/near-character.js';
 import type {
@@ -366,6 +366,8 @@ describe('society crowd', () => {
       const body = figure.findByName('character-far-body') as pc.Entity;
       expect(body.render!.meshInstances[0]!.material.name).toBe(`far-person:${FAR_REGIONS.map((region) => expected.palette[region]).join('')}`);
       expect(figure.getLocalPosition().x).toBeCloseTo(i * 3, 6);
+      // A person, never scenery, to the sight tests that read the scene's static meshes (F2).
+      expect(body.tags.has(PERSON_TAG)).toBe(true);
     }
     expect(crowd.residentBytes).toBeGreaterThan(0);
     crowd.clear();
