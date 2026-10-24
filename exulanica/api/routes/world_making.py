@@ -751,7 +751,7 @@ def read_world_draft_offer(
         host_keeps_until=(
             None if services.host_keeps_until is None else services.host_keeps_until.isoformat()
         ),
-        own_key=services.personal_install,
+        own_key=services.personal_install and not guest,
     )
 
 

@@ -677,6 +677,9 @@ def test_the_offer_says_a_draft_runs_on_the_person_s_own_key_only_on_their_own_i
     with app(personal=True) as client:
         assert _offer(client)["own_key"] is True
         assert _offer(client, NO_MODEL_TOKEN)["own_key"] is True
+    # A guest let in there spends a guest's allowance, never the owner's key, by construction.
+    with app(personal=True, guest=True) as client:
+        assert _offer(client)["own_key"] is False
 
 
 @pytest.mark.parametrize(
