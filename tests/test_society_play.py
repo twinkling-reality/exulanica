@@ -229,14 +229,14 @@ def sealed_square(monkeypatch):
 
 
 def test_a_play_reads_names_as_written_and_a_stored_one_keeps_its_words(sealed_square):
-    """A person playing is asked under the thirteenth action catalog, which every label rule
+    """A person playing is asked under the fifteenth action catalog, which every label rule
     reaches, as a model's: a being named as the page names it and one straight-line distance among
     them. A play stored under the tenth keeps the two rules it was told under, and one stored under
     the seventh rebuilds to the byte, in lowercase words."""
     state, document, knight = _knight_free_to_choose()
     role = person_role()
     played = play_contract(role, "exulanica-society/v7")
-    assert played.versions[role.action_catalog] == PLAY_CATALOG_VERSION == 13
+    assert played.versions[role.action_catalog] == PLAY_CATALOG_VERSION == 15
     assert played.label_rules == set(LABEL_RULES)
     tenth = role.contract({**played.versions, role.action_catalog: 10})
     assert tenth.label_rules == {"names_as_written", "straight_line_distances"}

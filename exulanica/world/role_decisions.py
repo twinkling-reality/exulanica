@@ -34,7 +34,7 @@ from typing import Any, Final, Protocol
 
 from exulanica.canonical import canonical_json
 from exulanica.models.manifest import AnsweringMechanism
-from exulanica.things.lines import LineRefused, check_line, names_listener
+from exulanica.things.lines import LineRefused, check_line, names_listener, repeats_line
 from exulanica.world.deciders import (
     EXTERNAL_REASONS,
     PERSON_REASONS,
@@ -77,6 +77,7 @@ __all__ = [
     "context_bytes",
     "names_its_listener",
     "play_minutes",
+    "repeats_a_told_line",
     "replay_minutes",
     "resume_minutes",
     "role_receipt",
@@ -410,6 +411,24 @@ def names_its_listener(
     return listener is not None and names_listener(line, listener)
 
 
+def repeats_a_told_line(role: DecisionRole, request: Mapping[str, Any], line: str) -> bool:
+    """Whether a model's ``line`` breaks the rule its request's terms hold lines to: under terms
+    that state ``repeats_no_line`` (found by the prompt version the request records), a line its
+    request told the being it said lately or heard, as
+    :func:`~exulanica.things.lines.repeats_line` compares them. An outside program's line, a
+    person's, and one asked under terms that state no such rule, an earlier prompt's among them,
+    never does."""
+    config = request["provider_config"]
+    if is_external(config) or is_person_ask(config):
+        return False
+    terms = role.terms_with_prompt(config.get("prompt_version"))
+    if terms is None or "repeats_no_line" not in terms.line_rules:
+        return False
+    context = request.get("context") or {}
+    told = [entry["line"] for key in ("said", "heard") for entry in context.get(key) or ()]
+    return repeats_line(line, told)
+
+
 def answer_outcome(
     role: DecisionRole,
     context: Mapping[str, Any],
@@ -420,7 +439,8 @@ def answer_outcome(
     """How the host takes a model's answer to a request of ``context``, asked under its engine's
     terms and ``contract_versions``: ``offered_label`` where it takes it, or the rule
     :func:`check_role_result` holds a proposal to that refuses it (``label_not_offered``,
-    ``line_where_none``, ``no_line_where_one``, ``line_breaks_rule`` or ``line_names_listener``).
+    ``line_where_none``, ``no_line_where_one``, ``line_breaks_rule``, ``line_names_listener`` or
+    ``line_said_before``, a line the request told the being it said lately or heard).
     A model on a person's runner is checked by it before a person may choose it."""
     option = next((o for o in context["options"] if o["label"] == label), None)
     if option is None:
@@ -443,6 +463,8 @@ def answer_outcome(
     }
     if names_its_listener(role, request, option, checked):
         return "line_names_listener"
+    if repeats_a_told_line(role, request, checked):
+        return "line_said_before"
     return "offered_label"
 
 
@@ -484,6 +506,8 @@ def check_role_result(
                 raise ValueError(
                     f"a {role.key} decision's line names or describes the one it is said to"
                 )
+            if repeats_a_told_line(role, request, checked):
+                raise ValueError(f"a {role.key} decision's line says again a line it was told")
     if (result["status"] == "accepted") != (proposal is not None):
         raise ValueError(f"exactly an accepted {role.key} decision carries a proposal")
     provider = result["provider"]

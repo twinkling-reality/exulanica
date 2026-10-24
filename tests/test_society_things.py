@@ -759,8 +759,14 @@ def test_a_line_is_heard_within_reach_and_makes_the_one_it_was_said_to_due():
     ]
     # And its next request shows it, by whom it was said to and how long ago, as not to repeat.
     shown = observed_context(after, document, knight["id"], (), profile="p")
+    # Nobody has answered it yet, and the being is told so (answers_told).
     assert shown["said"] == [
-        {"to": f"{near['display_name']} (a villager)", "line": "good morning", "minutes_ago": 0}
+        {
+            "to": f"{near['display_name']} (a villager)",
+            "line": "good morning",
+            "minutes_ago": 0,
+            "answered": False,
+        }
     ]
     assert "Lines you said lately (do not repeat them):" in situation(shown)
     validate_things_state(after)

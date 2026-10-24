@@ -9,7 +9,9 @@ outside normalises it first and stores the normal form.
 
 A decision's terms may hold a model's lines to more (:data:`LINE_RULES`): under terms that state
 ``names_no_listener``, a line said to one being does not end with that being's name or description
-(:func:`names_listener`), as the option offering it names them.
+(:func:`names_listener`), as the option offering it names them; under terms that state
+``repeats_no_line``, a line is not one the being was told it said lately or heard
+(:func:`repeats_line`).
 
 Pure: no connection, no store.
 """
@@ -17,6 +19,7 @@ Pure: no connection, no store.
 from __future__ import annotations
 
 import unicodedata
+from collections.abc import Iterable
 from typing import Final
 
 __all__ = [
@@ -25,8 +28,10 @@ __all__ = [
     "LINE_RULES",
     "LineRefused",
     "check_line",
+    "line_key",
     "listener_forms",
     "names_listener",
+    "repeats_line",
 ]
 
 #: The most code points one line holds.
@@ -36,7 +41,7 @@ HEARD_LINES_MAXIMUM: Final = 64
 #: Characters no line holds: they would break a line, hide text or carry no meaning a reader sees.
 _REFUSED_CATEGORIES: Final = frozenset({"Cc", "Cf", "Cs", "Co", "Zl", "Zp"})
 #: The rules beside the line rule that a decision's terms may hold a model's lines to, by name.
-LINE_RULES: Final = frozenset({"names_no_listener"})
+LINE_RULES: Final = frozenset({"names_no_listener", "repeats_no_line"})
 #: The articles a being's kind is described with.
 _ARTICLES: Final = ("a ", "an ", "the ")
 
@@ -96,3 +101,16 @@ def names_listener(line: str, listener: str) -> bool:
             if not before or not before[-1].isalnum():
                 return True
     return False
+
+
+def line_key(line: str) -> str:
+    """A line as :func:`repeats_line` compares it: its letters and digits alone, case folded, so the
+    same words with other capitals, spacing or punctuation are the same line."""
+    return "".join(character for character in line.casefold() if character.isalnum())
+
+
+def repeats_line(line: str, lines: Iterable[str]) -> bool:
+    """Whether ``line`` says one of ``lines`` again, as :func:`line_key` compares them: "Have you
+    seen the fence post?" says "have you seen the fence post" again."""
+    key = line_key(line)
+    return any(line_key(other) == key for other in lines)

@@ -92,7 +92,11 @@ from exulanica.world.decision_roles import (
     decision_roles,
 )
 from exulanica.world.minds_budget import MindsBudget, MindsBudgetRepository, default_budget
-from exulanica.world.role_decisions import check_role_result, names_its_listener
+from exulanica.world.role_decisions import (
+    check_role_result,
+    names_its_listener,
+    repeats_a_told_line,
+)
 from exulanica.world.society import asked_again_after_a_race, society_state_sha256
 from exulanica.world.society_control_repository import open_session_receipt
 from exulanica.world.society_controls import LEASE_SECONDS, ControlClaim
@@ -468,10 +472,13 @@ def ask(
             if refused is not None:
                 status, reason, proposal = "rejected", refused, None
                 break
-            if names_its_listener(role, asked.request, option, line):
-                # A line said to one being that names or describes it, under terms holding lines
-                # to that rule, is not an answer to this choice: asked once more, within the
-                # attempts the contract allows, as an option not offered is.
+            if names_its_listener(role, asked.request, option, line) or repeats_a_told_line(
+                role, asked.request, line
+            ):
+                # A line said to one being that names or describes it, or a line the being was
+                # told it said lately or heard, under terms holding lines to those rules, is not an
+                # answer to this choice: asked once more, within the attempts the contract allows,
+                # as an option not offered is.
                 status, reason, proposal = "rejected", "answer_not_offered", None
                 messages = [*messages, {"role": "user", "content": terms.not_offered}]
                 continue

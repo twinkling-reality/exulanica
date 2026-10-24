@@ -219,7 +219,11 @@ NAME = "Hazel Moss"
 
 
 class _Greeter(FakeTransport):
-    """A scripted model that says ``HEARD`` to everyone near when it may, and otherwise waits."""
+    """A scripted model that says ``HEARD`` to everyone near when it may, and otherwise waits;
+    once told it said that, it greets again in new words ("Hello again, Hazel, 2."), as the host
+    would ask it once more for a line it already said."""
+
+    greeted = 0
 
     def post_json(self, url, *, headers, payload, timeout):
         self.requests.append({"url": url, "headers": dict(headers), "payload": dict(payload)})
@@ -227,7 +231,10 @@ class _Greeter(FakeTransport):
         labels = properties["action"]["enum"]
         say = next((label for label in labels if label.startswith("say something to every")), None)
         if say is not None:
-            arguments = {"action": say, "line": HEARD}
+            self.greeted += 1
+            told = any(HEARD in (message.get("content") or "") for message in payload["messages"])
+            line = f"Hello again, Hazel, {self.greeted}." if told else HEARD
+            arguments = {"action": say, "line": line}
         else:
             wait = next(label for label in labels if label.startswith("wait"))
             arguments = {"action": wait, **({"line": None} if "line" in properties else {})}
@@ -318,9 +325,12 @@ def test_a_heard_line_carrying_a_name_saved_later_is_left_out_of_an_outside_ask(
 
         # The visitor stays by the gate, near the knight, so it hears the knight's line the minute
         # the knight is next asked, at once unless a villager's talk holds the knight a while.
+        def greeting(snapshot):
+            return next((line for line in heard(snapshot) if "Hazel" in line), None)
+
         for _ in range(30):
             snapshot = minute(snapshot)
-            if HEARD in heard(snapshot):
+            if (said := greeting(snapshot)) is not None:
                 break
         else:
             raise AssertionError("the visitor never heard the knight in thirty minutes")
@@ -328,7 +338,7 @@ def test_a_heard_line_carrying_a_name_saved_later_is_left_out_of_an_outside_ask(
         door.asked.clear()
         snapshot = minute(snapshot)
         [shown] = [r for r in door.asked if r["subject_id"] == visitor["id"]]
-        assert HEARD in [line["line"] for line in shown["context"]["heard"]]
+        assert said in [line["line"] for line in shown["context"]["heard"]]
         # The account holder saves the name the line carries.
         connection = world["connection"]
         identity = IdentityRepository(connection, world["workspace"])
@@ -353,9 +363,9 @@ def test_a_heard_line_carrying_a_name_saved_later_is_left_out_of_an_outside_ask(
         monkeypatch.setattr(host_module, "ask", recording)
         snapshot = minute(snapshot)
         # Still asked, and never shown the line again, though the visitor still holds it.
-        assert HEARD in heard(snapshot)
+        assert said in heard(snapshot)
         [asked] = [r for r in door.asked if r["subject_id"] == visitor["id"]]
-        assert HEARD not in [line["line"] for line in asked["context"]["heard"]]
+        assert said not in [line["line"] for line in asked["context"]["heard"]]
         assert NAME.split()[0] not in json.dumps(asked["context"])
         # And the knight's model, asked again with a line to everyone near offered, may not say
         # the name now saved: its line carrying it is refused, though the rules alone would let

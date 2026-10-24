@@ -135,8 +135,12 @@ def _reply(arguments: dict, model: str) -> HttpResponse:
     return HttpResponse(200, json.dumps(body))
 
 
-def _ask(replies, *, rules=None, names=()):
+def _ask(replies, *, rules=None, names=(), prepare=None):
+    """The knight of :func:`_asked` asked through the host's path, its model answering
+    ``replies`` in turn; ``prepare`` changes the state first, given it and the knight's id."""
     state, document, knight, contract, options = _asked()
+    if prepare is not None:
+        prepare(state, knight["id"])
     manifest, model_id = _manifest()
     request = _request(state, document, knight["id"], options, contract, model=model_id)
     transport = FakeTransport([_reply(reply, model_id) for reply in replies])
@@ -170,7 +174,7 @@ def test_a_said_line_is_accepted_beside_its_option_and_bound_by_the_receipt():
         "option": say.as_record(),
         "line": "Good morning.",
     }
-    assert result["provider"]["prompt_version"] == "society-person-choice/v10"
+    assert result["provider"]["prompt_version"] == "society-person-choice/v11"
     validate_decision_receipt(receipt_for(request, 1, result), request)
     # Asked under the engine's own terms: a choice with a line, and its instruction.
     (sent,) = transport.requests

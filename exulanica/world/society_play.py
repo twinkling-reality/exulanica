@@ -79,9 +79,11 @@ QUIET_MINUTES: Final = 5
 #: actions and words under the label rules the registry holds from the ninth, so a person playing
 #: reads a being named as written and one straight-line distance, as a model does; the thirteenth
 #: keeps them again under every rule the registry holds from the twelfth, so a person playing is
-#: told the clock, whom another is with as written and the town's premises by name, as a model is.
+#: told the clock, whom another is with as written and the town's premises by name, as a model is;
+#: the fifteenth keeps them again under every rule the registry holds from the fourteenth, so a
+#: person playing is also told which of their own lines went unanswered, as a model is.
 #: A stored play keeps the catalog it recorded.
-PLAY_CATALOG_VERSION: Final = 13
+PLAY_CATALOG_VERSION: Final = 15
 #: The policy version a played being's requests read at least: the seventh, whose bounds the
 #: player's catalog needs (following among them); the engine's own where it is later.
 PLAY_POLICY_VERSION: Final = 7

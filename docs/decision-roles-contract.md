@@ -60,7 +60,7 @@ entry:
 | `subjects_bound` | The policy key bounding how many of its subjects models run at once |
 | `request_profile`, `receipt_profile`, `choice_profile`, `context_profile` | The profiles of its documents |
 | `prompt_version`, `instruction`, `choice_description`, `not_offered` | Its prompt: the one instruction, how the one choice is described, and what a model is told when its answer was not offered |
-| `engine_terms` | From registry version 5: for an engine that hosts the role and asks its own questions, that engine's terms, the two catalog versions its new requests record and its own prompt (version and three texts); empty where every engine is asked under the role's own. From registry version 7 an engine's terms may also state `line_rules`, the rules beside the line rule a model's lines are held to under them (`names_no_listener`, below) |
+| `engine_terms` | From registry version 5: for an engine that hosts the role and asks its own questions, that engine's terms, the two catalog versions its new requests record and its own prompt (version and three texts); empty where every engine is asked under the role's own. From registry version 7 an engine's terms may also state `line_rules`, the rules beside the line rule a model's lines are held to under them (`names_no_listener` and, from registry version 14, `repeats_no_line`, below) |
 
 A request is asked under the terms of the engine whose state it was asked over: the engine's own
 where the entry states them, the role's otherwise (`DecisionRole.terms`). A request names its engine
@@ -692,6 +692,21 @@ remembered place keeps its stored words and is named at telling time from the in
 consumed, so no state changes. A place the input names no premises for is told as before. Requests
 under the eleventh catalog hold no such rule and rebuild to the byte.
 
+Registry version 14 asks new requests of an `exulanica-society/v7` society under action catalog
+version 14 and prompt `society-person-choice/v11`, with policy catalog version 8 and the same
+instruction; the fourteenth action catalog keeps the twelfth's actions and words, and the
+fifteenth is a person playing's (above). From version 14 an entry states one more label rule's
+version (`answers_told_from_action_version`), from 14 for the person role. Under `answers_told`
+each line the being said lately is told with whether the one it was said to has said a line it
+heard since (anyone, for a line said to everyone near), recorded as the entry's `answered`, and a
+line nobody answered is told with "(no answer)" after it ("- 22 minutes ago, you said to Amal
+Sorrel (a villager): \"...\" (no answer)"). Where it is not known, because the being keeps as
+many heard lines as it may and all are newer than the line, the entry states nothing. A routine
+being never says a line, so a model speaking to one is told it was not answered, where before it
+was told only that it spoke. The eleventh prompt's terms hold lines to `repeats_no_line` beside
+`names_no_listener`, and its note says so (below). Requests under the twelfth catalog and the
+tenth prompt hold neither rule and rebuild to the byte.
+
 Version 3 keeps version 2's actions and bounds and adds:
 
 | Action | Kind | Words a model reads |
@@ -756,7 +771,11 @@ its name part, or its kind with or without an article, case and closing punctuat
 that prompt's note, which says so, within the attempts the contract allows; a line that ends with
 the listener's kind while speaking of itself is asked again too. A receipt is held to the rule its
 request's recorded prompt states (`names_its_listener`), so a request asked under an earlier prompt
-reads and replays as it did. Published historical prompt terms remain available when a newer
+reads and replays as it did. Under the eleventh prompt, whose terms also state `repeats_no_line`,
+a line that says again a line its request told the being it said lately or heard, compared on its
+letters and digits alone, case folded (`repeats_line`), is no answer either and is asked once more
+the same way (`repeats_a_told_line`); the instruction already asked for something new, and a
+small model shown its own lines still said one of them again word for word. Published historical prompt terms remain available when a newer
 registry becomes current, including while an earlier request awaits its answer; a newer prompt
 does not remove an earlier request's validation rules. A line that breaks the line rule is
 refused `line_out_of_bounds`, and one the workspace's rules would change, as they change a saved

@@ -155,7 +155,10 @@ def _things_widest() -> dict[str, Any]:
             {"from": NAME, "to_you": False, "line": line, "tick": 0, "minutes_ago": 1439}
             for _ in range(lines)
         ],
-        said=[{"to": NAME, "line": line, "minutes_ago": 1439} for _ in range(lines)],
+        # Each told unanswered, as the newest terms tell a line nobody answered: " (no answer)".
+        said=[
+            {"to": NAME, "line": line, "minutes_ago": 1439, "answered": False} for _ in range(lines)
+        ],
         character={
             "name": QUOTE * _module_value("character", "name_characters_maximum"),
             "about": QUOTE * _module_value("character", "about_characters_maximum"),

@@ -1018,7 +1018,8 @@ def _things_context(
     out, the one a new request records) holds its words to ``names_as_written`` (F9); where it holds
     them to ``clock_told``, the minute is recorded as the world's clock (``world_clock``), the
     society's own or its people's from ``day_start``, where it keeps either; where it holds them to
-    ``places_named``, a premises where it stands and one it remembers is told by name."""
+    ``places_named``, a premises where it stands and one it remembers is told by name; where it
+    holds them to ``answers_told``, each line it said lately says whether it was answered."""
     from exulanica.world.society import told_clock
 
     if not of_things(state["profile"]):
@@ -1029,6 +1030,7 @@ def _things_context(
     activities = "activity_names_as_written" in (asked or contract).label_rules
     told = "clock_told" in (asked or contract).label_rules
     places = "places_named" in (asked or contract).label_rules
+    answers = "answers_told" in (asked or contract).label_rules
     return {
         "engine": state["profile"],
         "under_way": not at_choice_point(person),
@@ -1045,7 +1047,7 @@ def _things_context(
         ],
         **_being(person, state),
         **_character(state, person),
-        **_said(state, person),
+        **_said(state, person, answers),
         **_holding(state, person),
         **_noticed(state, document, person, as_written, activities, places),
         **_remembers(state, person, as_written, document if places else None),
@@ -1073,9 +1075,13 @@ def _character(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str,
     return {"character": dict(character)}
 
 
-def _said(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str, Any]:
+def _said(
+    state: Mapping[str, Any], person: Mapping[str, Any], answers: bool = False
+) -> dict[str, Any]:
     """The lines the being said lately, oldest first, each with to whom and how long ago: stated
-    only once it said one, so its decider is shown what it already said."""
+    only once it said one, so its decider is shown what it already said. With ``answers``
+    (``answers_told``), each also says whether it was answered (:func:`_answered`), where that is
+    known."""
     said = person.get("said")
     if not said:
         return {}
@@ -1091,10 +1097,31 @@ def _said(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str, Any]
                 ),
                 "line": entry["line"],
                 "minutes_ago": _minutes_ago(state, entry["tick"]),
+                **(
+                    {"answered": answered}
+                    if answers and (answered := _answered(person, entry)) is not None
+                    else {}
+                ),
             }
             for entry in said
         ]
     }
+
+
+def _answered(person: Mapping[str, Any], said: Mapping[str, Any]) -> bool | None:
+    """Whether the one a line was said to has said a line the being heard since (anyone, for a
+    line said to everyone near), or None where that is not known: a being keeps only its newest
+    heard lines, so one that keeps as many as it may, all newer than the line, may have let the
+    answer go."""
+    from exulanica.world.society_things import LINES_CONTRACT
+
+    heard = person.get("heard") or ()
+    if any(line["tick"] > said["tick"] and said["to"] in (None, line["from"]) for line in heard):
+        return True
+    kept = person_role().contract(LINES_CONTRACT).value("lines_heard_maximum")
+    if len(heard) >= kept and heard[0]["tick"] > said["tick"]:
+        return None
+    return False
 
 
 def _holding(state: Mapping[str, Any], person: Mapping[str, Any]) -> dict[str, Any]:
@@ -1266,7 +1293,7 @@ def situation(context: Mapping[str, Any]) -> list[str]:
         lines.extend(
             f"- {_when(line)}, you said "
             f"{'to everyone near' if line['to'] is None else 'to ' + line['to']}: "
-            f"{_quoted(line['line'])}"
+            f"{_quoted(line['line'])}" + (" (no answer)" if line.get("answered") is False else "")
             for line in said
         )
     if "remembers" in context:

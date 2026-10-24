@@ -21,7 +21,7 @@ from exulanica.models.manifest import AnsweringMechanism, ModelSpec
 from exulanica.models.provider_catalog import ProviderModel, ProviderPrice
 from exulanica.things.lines import LineRefused, check_line
 from exulanica.world.decision_roles import decision_roles
-from exulanica.world.role_decisions import names_its_listener
+from exulanica.world.role_decisions import names_its_listener, repeats_a_told_line
 from exulanica.world.society_planner import input_sha256
 
 PROFILE: Final = "exulanica.model-probe-definition/v1"
@@ -228,7 +228,9 @@ def answer_valid(definition: Mapping[str, Any], case_seq: int, answer: Any) -> b
                     "contract": {"catalog_versions": definition["contract"]},
                 },
             }
-            if names_its_listener(role, request, option, line):
+            if names_its_listener(role, request, option, line) or repeats_a_told_line(
+                role, request, line
+            ):
                 return False
         return True
     except (ChoiceRefused, LineRefused, ValueError, TypeError, KeyError):

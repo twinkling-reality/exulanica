@@ -729,6 +729,7 @@ PUBLISHED_REGISTRIES = {
     "decision-roles.v11.json": "d743b0b9e83f1c356af7b1c0c307ff09e8e08d2e4470f8d976636cb13cf1b6f7",
     "decision-roles.v12.json": "e2bc7705b493014d63c29fde90bee8e7177fa53eab5223f648099c30b3ed799c",
     "decision-roles.v13.json": "b3bf2a0b6f4b94b9dee459e263e7d3c5aa1a891883767147a5e4730038b438ae",
+    "decision-roles.v14.json": "74964ea314651c01e64e538e1f5cc1dc101fec0e8d8c2693991d0d1083c5c816",
 }
 
 
@@ -751,6 +752,7 @@ LABEL_RULES_AS_PUBLISHED = {
         "activity_names_as_written": 11,
         "clock_told": 11,
         "places_named": 12,
+        "answers_told": 14,
     },
     "junction_signal": {
         "names_as_written": 1,
@@ -758,6 +760,7 @@ LABEL_RULES_AS_PUBLISHED = {
         "activity_names_as_written": 1,
         "clock_told": 1,
         "places_named": 1,
+        "answers_told": 1,
     },
 }
 
@@ -782,11 +785,16 @@ def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
     own, things = person.terms(), person.terms(THINGS)
     assert own == person.terms("exulanica-society/v2") == person.terms("exulanica-society/v5")
     assert own.versions == {"society-decision-action": 2, "society-decision-policy": 2}
-    assert things.versions == {"society-decision-action": 12, "society-decision-policy": 8}
+    assert things.versions == {"society-decision-action": 14, "society-decision-policy": 8}
     assert (own.prompt_version, things.prompt_version) == (
         "society-person-choice/v1",
-        "society-person-choice/v10",
+        "society-person-choice/v11",
     )
+    # The tenth prompt, which every request made under the twelfth catalog records, stays
+    # readable with it, and the eleventh says the same over the fourteenth.
+    tenth_prompt = person.terms_with_prompt("society-person-choice/v10")
+    assert tenth_prompt is not None and tenth_prompt.instruction == things.instruction
+    assert tenth_prompt.versions == {"society-decision-action": 12, "society-decision-policy": 8}
     # The ninth prompt, which every request made under the eleventh catalog records, stays
     # readable with it, and the tenth says the same over the twelfth.
     ninth_prompt = person.terms_with_prompt("society-person-choice/v9")

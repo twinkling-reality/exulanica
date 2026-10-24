@@ -80,11 +80,13 @@ def test_a_society_of_things_is_asked_under_its_newest_prompt_with_the_listener_
     person = decision_roles().role("society_decision")
     things = person.terms(THINGS_PROFILE)
     assert decision_roles().version >= 8
-    assert things.prompt_version == "society-person-choice/v10"
-    assert things.line_rules == frozenset({"names_no_listener"}) <= LINE_RULES
+    assert things.prompt_version == "society-person-choice/v11"
+    assert things.line_rules == frozenset({"names_no_listener", "repeats_no_line"}) <= LINE_RULES
     assert "without naming or describing them" in things.instruction
     assert "(the knight, a villager)" not in things.instruction
-    assert things.not_offered.endswith("never names or describes the one it is said to.")
+    assert things.not_offered.endswith(
+        "never names or describes the one it is said to, nor says again a line already said."
+    )
     # Every other engine's people are asked as before, with no rule beside the line rule.
     assert person.terms().line_rules == frozenset()
     assert person.terms_with_prompt(things.prompt_version) == things

@@ -24,6 +24,7 @@ from exulanica.api.decision_host import ask_bound_usd
 from exulanica.api.society_comparison_start import comparison_cost
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.manifest import load_manifest
+from exulanica.things.lines import repeats_line
 from exulanica.world import society_comparison_reading as reading
 from exulanica.world.society_catalogs import (
     COMPARISON_PROTOCOL_CATALOG,
@@ -109,7 +110,9 @@ FIRST = ("pick_up", "give", "say_to", "say_all")
 
 class _Choosing:
     """A model that picks a thing up or hands it over where it can, else says something, each
-    line different, else goes to the first place offered."""
+    line different, else goes to the first place offered. It never says a line it was told it
+    said or heard, as the host would ask it once more for one: the same words again carry a
+    count ("The sword is here, 3."), so lines still nearly repeat."""
 
     def __init__(self, lines: tuple[str, ...] = ()) -> None:
         self.lines = lines or VARIED
@@ -131,8 +134,13 @@ class _Choosing:
             )
             proposal = {"label": option["label"], "option": option}
             if option["kind"] in ("say_to", "say_all"):
-                proposal["line"] = self.lines[self.said % len(self.lines)]
+                line = self.lines[self.said % len(self.lines)]
                 self.said += 1
+                context = request["context"]
+                told = [e["line"] for key in ("said", "heard") for e in context.get(key) or ()]
+                if repeats_line(line, told):
+                    line = f"{line[:-1]}, {self.said}{line[-1]}"
+                proposal["line"] = line
             results.append(
                 {
                     "status": "accepted",

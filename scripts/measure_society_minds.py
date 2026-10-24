@@ -51,7 +51,9 @@ time until it may ask, and the case states how many minutes (``asker_waited_minu
 **Scoring, by rule.** An answer is valid when the host would take it: the client accepted it (an
 offered action, with a line exactly where that action says something), its line keeps the line rule
 (``check_line`` at the request's bound) and, under terms that state ``names_no_listener``, does not
-end by naming the one it is said to (``names_its_listener``). The host asks once more after such a
+end by naming the one it is said to (``names_its_listener``) and, under terms that state
+``repeats_no_line``, does not say again a line its request told it (``repeats_a_told_line``). The
+host asks once more after such a
 refusal; this measurement asks once in every arm and counts the answer invalid. A fact answer is
 correct when it is valid, its action says something and its line, NFC-normalised and lower-cased,
 holds one of the case's words. A ``give_asked`` answer is correct when it is valid and chooses the
@@ -918,7 +920,7 @@ def _shown(words: Sequence[str], context: Any) -> list[str]:
 def _refused(role, terms, contract, context, option, line) -> str | None:
     """Why the host would not take an accepted answer's line, or None where it would."""
     from exulanica.things.lines import LineRefused, check_line
-    from exulanica.world.role_decisions import names_its_listener
+    from exulanica.world.role_decisions import names_its_listener, repeats_a_told_line
 
     if line is None:
         return None
@@ -927,13 +929,16 @@ def _refused(role, terms, contract, context, option, line) -> str | None:
     except LineRefused:
         return "line_breaks_rule"
     request = {
+        "context": context,
         "provider_config": {
             "prompt_version": terms.prompt_version,
             "contract": contract.binding(),
-        }
+        },
     }
     if names_its_listener(role, request, option, line):
         return "line_names_its_listener"
+    if repeats_a_told_line(role, request, line):
+        return "line_said_before"
     return None
 
 
