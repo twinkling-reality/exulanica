@@ -437,6 +437,11 @@ def test_a_worker_started_again_is_judged_by_its_own_lines_not_its_predecessors(
     monkeypatch.setattr(LAUNCH, "command_of", lambda pid: " ".join(command))
     monkeypatch.setattr(LAUNCH, "process_started_at", lambda pid: "Thu Oct 22 20:00:00 2026")
     monkeypatch.setattr(LAUNCH, "TILE_WORKER_START_SECONDS", 0.2)
+    # The tessellator's build is another test's; this one reads the worker's startup lines.
+    monkeypatch.setattr(LAUNCH, "build_tessellator", lambda checkout: checkout / "cli.js")
+    monkeypatch.setattr(
+        LAUNCH, "tessellator_environment", lambda cli: {"EXULANICA_TESS_CLI": str(cli)}
+    )
 
     def started(name: str, says: str) -> None:
         """Start a worker on a log holding its predecessor's startup; the new one writes `says`."""
@@ -698,6 +703,40 @@ def test_the_production_build_command_writes_into_the_run_directory(tmp_path):
         str(run_dir / "app-build"),
         "--emptyOutDir",
     ]
+
+
+def test_the_tessellator_is_compiled_and_run_as_the_tiles_image_compiles_and_runs_it(tmp_path):
+    """A tile is tessellated by the entry `public.sh build` compiles for the tiles image, with the
+    variables that image sets, not by a cold `tsx` start for each bake."""
+    assert LAUNCH.tessellator_build_command(tmp_path) == [
+        str(tmp_path / "web" / "node_modules" / ".bin" / "tsc"),
+        "--build",
+        "tsconfig.node.json",
+    ]
+    public = (ROOT / "deploy" / "public" / "public.sh").read_text(encoding="utf-8")
+    assert (
+        "cd web/packages/loom-tess && rm -rf dist && "
+        "../../node_modules/.bin/tsc --build tsconfig.node.json" in public
+    )
+    image = (ROOT / "deploy" / "installation" / "tiles.Dockerfile").read_text(encoding="utf-8")
+    assert "COPY web/packages/loom-tess/dist/src /app/tess/src" in image
+    assert "/".join(LAUNCH.TESSELLATOR_CLI) == "web/packages/loom-tess/dist/src/node/cli.js"
+    assert "EXULANICA_TESS_CLI=/app/tess/src/node/cli.js" in image
+    node = tmp_path / "bin" / "node"
+    node.parent.mkdir()
+    node.write_text("#!/bin/sh\n")
+    node.chmod(0o755)
+    cli = tmp_path / "cli.js"
+    told = LAUNCH.tessellator_environment(cli, {"PATH": str(node.parent)})
+    assert told == {"EXULANICA_TESS_CLI": str(cli), "EXULANICA_NODE": str(node)}
+    assert all(f"{name}=" in image for name in told)
+
+
+def test_a_checkout_without_its_typescript_or_node_is_refused_before_a_tile_worker_starts(tmp_path):
+    assert _refusal(LAUNCH.build_tessellator, tmp_path) == "toolchain-missing"
+    assert _refusal(
+        LAUNCH.tessellator_environment, tmp_path / "cli.js", {"PATH": str(tmp_path)}
+    ) == ("toolchain-missing")
 
 
 def test_the_production_build_gets_no_token_and_nothing_that_redirects_it():

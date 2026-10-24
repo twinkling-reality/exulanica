@@ -479,7 +479,8 @@ python3 scripts/acceptance/launch.py up --worktree . --personal --model --tiles
 
 - `--personal` makes it your own install, kept in `~/Exulanica`.
 - `--model` hands the five settings above to the API, and refuses to start, naming the first one that is missing.
-- `--tiles` lets the install bake the tiles a made town is drawn from.
+- `--tiles` lets the install bake the tiles a made town is drawn from. It compiles the tessellator first, offline,
+  as the tile worker's image carries it, so each bake starts one Node process rather than compiling it again.
 - `--creatures`, optional, lets the install draft creatures from words.
 - `--no-ask-again`, optional, asks no person's recorded decisions again of another model, so the pages offer no
   Compare, for a recording where no model may be scored against another; a restart keeps it.

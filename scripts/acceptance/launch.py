@@ -57,7 +57,9 @@ imports the code it starts.
     plays nothing.
 5.  Starts one generated-tile worker for the synthetic workspace, checks its startup event and
     records its process and bake events. It claims jobs as the runtime role and publishes baked
-    tiles through the owner connection.
+    tiles through the owner connection. The tessellator is compiled first from the checkout,
+    offline, as ``public.sh build`` compiles it for the tiles image, and the worker runs that entry
+    with the ``node`` on ``PATH`` (``EXULANICA_TESS_CLI``, ``EXULANICA_NODE``), as the image does.
 6.  Serves the application on the slot's app port. By default that is the Vite development server,
     with the synthetic token built in as ``VITE_EXULANICA_TOKEN``. With ``--production`` it is a
     ``vite build`` into the run directory, made in a clean environment with no ``VITE_`` variable,
@@ -334,6 +336,10 @@ TILE_WORKER_START_SECONDS = 60  # Schema and role checks complete before a tile 
 #: Tiles a personal install's worker bakes at once (EXULANICA_TILE_BAKES_AT_ONCE): a new town's two
 #: tiles side by side.
 PERSONAL_TILE_BAKES_AT_ONCE = "2"
+#: The compiled tessellator's entry, under the checkout: what ``public.sh build`` compiles for the
+#: tiles image (deploy/installation/tiles.Dockerfile), into the package's own ``dist``, which git
+#: ignores.
+TESSELLATOR_CLI = ("web", "packages", "loom-tess", "dist", "src", "node", "cli.js")
 TOKEN_PROBE_SECONDS = 10
 APP_START_SECONDS = 90
 PROXY_SECONDS = 30
@@ -1234,6 +1240,40 @@ def tile_worker_events(log: Path, start: int = 0) -> list[dict[str, object]]:
     return events
 
 
+def tessellator_build_command(worktree: Path) -> list[str]:
+    """The tessellator's Node entry compiled by the checkout's own TypeScript, offline, as
+    ``public.sh build`` compiles it; run in ``web/packages/loom-tess``."""
+    return [
+        str(worktree / "web" / "node_modules" / ".bin" / "tsc"),
+        "--build",
+        "tsconfig.node.json",
+    ]
+
+
+def build_tessellator(worktree: Path) -> Path:
+    """Compile the tessellator afresh from the checkout as it is and answer its entry, so each tile
+    is tessellated by one Node process, as the tiles image does, not by a cold ``tsx`` start."""
+    package = worktree / "web" / "packages" / "loom-tess"
+    command = tessellator_build_command(worktree)
+    if not Path(command[0]).exists():
+        refuse("toolchain-missing", f"the checkout lacks {command[0]}")
+    shutil.rmtree(package / "dist", ignore_errors=True)
+    run(command, package)
+    cli = worktree.joinpath(*TESSELLATOR_CLI)
+    if not cli.is_file():
+        refuse("toolchain-missing", f"the tessellator's build wrote no {cli}")
+    return cli
+
+
+def tessellator_environment(cli: Path, environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    """What tells the tile worker to run that entry, and with which Node: the variables
+    ``exulanica-generated-tile-worker`` reads and the tiles image sets."""
+    node = shutil.which("node", path=clean_environment(environ).get("PATH"))
+    if node is None:
+        refuse("toolchain-missing", "no node on PATH runs the compiled tessellator")
+    return {"EXULANICA_TESS_CLI": str(cli), "EXULANICA_NODE": node}
+
+
 def start_tile_worker(
     worktree: Path,
     exports: Mapping[str, str],
@@ -1258,6 +1298,7 @@ def start_tile_worker(
     if state.get("personal"):
         # Given by the environment, so the command an identity check reads is the worker's own.
         environment["EXULANICA_TILE_BAKES_AT_ONCE"] = PERSONAL_TILE_BAKES_AT_ONCE
+    environment.update(tessellator_environment(build_tessellator(worktree)))
     log = logs / "generated-tile-worker.log"
     # A worker started again appends to the log its predecessor wrote; only what follows counts.
     begun = log.stat().st_size if log.exists() else 0
