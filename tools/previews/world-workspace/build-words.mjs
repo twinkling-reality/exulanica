@@ -430,17 +430,20 @@ export function snapped(mm, free) {
 
 /**
  * What a key does in build mode's state `{ on, selected, placing, confirming, moving, ready, refused,
- * busy, removeRefused, focused }`: an action, 'held' for a key build mode takes and does nothing with
- * now (a held-down B, Backspace with nothing selected), or null when it leaves the key to the page.
+ * busy, removeRefused, focused, canMake }`: an action, 'held' for a key build mode takes and does
+ * nothing with now (a held-down B, Backspace with nothing selected), or null when it leaves the key to
+ * the page.
  * B switches build mode on and off; Esc puts a question away, puts a held thing back (a moved one
  * where it stood, a new one in the tray), lets go of what is selected, then leaves build mode;
  * Backspace or Delete asks to remove what is selected, and while it is being moved puts it back
  * first (a new thing from the tray is not in the world, so it has nothing to remove); `[` and `]`
  * turn it, Alt for a free turn; Enter answers yes to a question, or places what is held where the
- * server said it may stand; Cmd+Z or Ctrl+Z takes back the world's newest change, with Shift does the
- * last one taken back again; Tab and Shift+Tab choose the next or previous placed thing in view,
- * and Tab past the last moves into the tray. While a control of build mode has the focus (a row or a
- * tile), Tab, Enter and Space are that control's and Esc gives the focus back to the world.
+ * server said it may stand, or with nothing held or chosen opens the maker as the tray's first tile,
+ * Make a creature, does when the tray offers it (`canMake`); Cmd+Z or Ctrl+Z takes back the world's
+ * newest change, with Shift does the last one taken back again; Tab and Shift+Tab choose the next or
+ * previous placed thing in view, and Tab past the last moves into the tray. While a control of build
+ * mode has the focus (a row or a tile), Tab, Enter and Space are that control's and Esc gives the focus
+ * back to the world.
  * After the server refused removing what is chosen (`removeRefused`), or the spot a held thing is
  * at (`refused`), Backspace and Delete do nothing: the rows offer what still works. H is the page's:
  * it opens History from anywhere. While a request is on its way only B acts: nothing is sent twice,
@@ -467,7 +470,11 @@ export function keyAction(state, event) {
     return removable ? 'remove' : 'held';
   }
   if (turn !== null) return (state.selected || state.placing) && !state.confirming ? turn : 'held';
-  if (event.code === 'Enter') return state.confirming ? 'confirm' : held ? (state.ready ? 'place' : 'held') : null;
+  if (event.code === 'Enter') {
+    if (state.confirming) return 'confirm';
+    if (held) return state.ready ? 'place' : 'held';
+    return !state.selected && state.canMake && !event.repeat ? 'make' : null;
+  }
   return null;
 }
 

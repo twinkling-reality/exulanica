@@ -266,6 +266,18 @@ assert.equal(keyAction(on, key('Backspace')), 'held');
 assert.equal(keyAction(asking, key('Backspace')), 'held');
 assert.equal(keyAction(asking, key('Enter')), 'confirm');
 assert.equal(keyAction(chosen, key('Enter')), null);
+// With nothing held or chosen, Enter opens the maker as Make a creature's click does, where the tray offers it; every
+// other meaning of Enter comes first, and a focused tile keeps its own.
+const offering = { ...on, canMake: true };
+assert.equal(keyAction(offering, key('Enter')), 'make');
+assert.equal(keyAction(on, key('Enter')), null);
+assert.equal(keyAction({ ...offering, selected: true }, key('Enter')), null);
+assert.equal(keyAction({ ...offering, placing: true, ready: true }, key('Enter')), 'place');
+assert.equal(keyAction({ ...offering, selected: true, confirming: true }, key('Enter')), 'confirm');
+assert.equal(keyAction({ ...offering, focused: true }, key('Enter')), null);
+assert.equal(keyAction({ ...offering, busy: true }, key('Enter')), 'held');
+assert.equal(keyAction(offering, key('Enter', { repeat: true })), null);
+assert.equal(keyAction({ ...offering, on: false }, key('Enter')), null);
 // Cmd+Z or Ctrl+Z undoes, with Shift redoes; Alt with it or a held key does neither.
 assert.equal(keyAction(on, key('KeyZ', { metaKey: true })), 'undo');
 assert.equal(keyAction(on, key('KeyZ', { ctrlKey: true })), 'undo');

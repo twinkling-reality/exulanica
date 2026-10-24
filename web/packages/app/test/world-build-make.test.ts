@@ -18,7 +18,7 @@ interface Hand {
   head(): unknown;
   showing(now: boolean, key?: (event: KeyboardEvent) => void): void;
 }
-interface BuildMode { active(): boolean; key(event: KeyboardEvent): boolean; dispose(): void }
+interface BuildMode { active(): boolean; key(event: KeyboardEvent): boolean; frame(now: number): void; dispose(): void }
 interface Write { readonly actionId: string; readonly path: string; readonly body: Record<string, unknown> }
 const build = async (): Promise<{ mountBuildMode(host: Record<string, unknown>): BuildMode }> =>
   import('../../../../tools/previews/world-workspace/' + 'build-mode.ts') as Promise<{ mountBuildMode(host: Record<string, unknown>): BuildMode }>;
@@ -42,7 +42,7 @@ afterEach(() => { mounted?.dispose(); mounted = null; document.body.replaceChild
  * Build mode in a made world with one creature made and a creature maker that keeps what it is handed; `place`
  * answers the place itself where given (else at once).
  */
-async function mount(place?: () => Promise<{ body: unknown }>): Promise<{ mode: BuildMode; root: HTMLElement; writes: Write[]; hands: Hand[] }> {
+async function mount(place?: () => Promise<{ body: unknown }>, over: { shown: boolean } = { shown: false }): Promise<{ mode: BuildMode; root: HTMLElement; writes: Write[]; hands: Hand[] }> {
   const writes: Write[] = [], hands: Hand[] = [];
   const root = document.createElement('div'), canvas = document.createElement('canvas');
   document.body.append(root, canvas);
@@ -62,7 +62,7 @@ async function mount(place?: () => Promise<{ body: unknown }>): Promise<{ mode: 
   const b = { camera, regionRoots: new Map(), authoredSociety: null, __workspaceThings: () => null, __workspacePick: () => null, interactionRay: () => ({ origin: [0, 10, 0], direction: [0, 0, -1] }) };
   const { mountBuildMode } = await build();
   mounted = mountBuildMode({
-    b, root, state: { activeWorldEntry: entry }, entry, read, send, binding: () => saved, canvas, corners, inspecting: () => false,
+    b, root, state: { activeWorldEntry: entry }, entry, read, send, binding: () => saved, canvas, corners, inspecting: () => over.shown,
     makeCreature: (hand: Hand) => { hands.push(hand); },
   });
   return { mode: mounted, root, writes, hands };
@@ -79,6 +79,30 @@ async function picked(root: HTMLElement, mode: BuildMode): Promise<void> {
   await vi.waitFor(() => expect(makeTile(root)).not.toBeNull());
   makeTile(root)!.click();
 }
+
+describe('Enter on Make a creature, the tray\'s first tile', () => {
+  it('opens the maker straight after B, as the tile\'s click does, with nothing held or chosen', async () => {
+    const { mode, root, hands } = await mount();
+    mode.key(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b', bubbles: true }));
+    await vi.waitFor(() => expect(tray(root).hidden).toBe(false));
+    expect(makeTile(root)).not.toBeNull();
+    expect(mode.key(new KeyboardEvent('keydown', { code: 'Enter', key: 'Enter', bubbles: true }))).toBe(true);
+    expect(hands).toHaveLength(1);
+    expect(typeof hands[0]!.hold).toBe('function');
+  });
+
+  it('opens nothing while something stands over the world and the tray gives way to it', async () => {
+    const over = { shown: false };
+    const { mode, root, hands } = await mount(undefined, over);
+    mode.key(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b', bubbles: true }));
+    await vi.waitFor(() => expect(tray(root).hidden).toBe(false));
+    over.shown = true;
+    mode.frame(1000);
+    expect(tray(root).hidden).toBe(true);
+    mode.key(new KeyboardEvent('keydown', { code: 'Enter', key: 'Enter', bubbles: true }));
+    expect(hands).toHaveLength(0);
+  });
+});
 
 describe('build mode handing a creature maker what places what it makes', () => {
   it('opens the maker from the Make tile with hold, the ground ahead, the stand ring and whether a step shows', async () => {

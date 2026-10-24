@@ -182,6 +182,8 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     on, selected: selected !== null || townChosen !== null, placing: placing !== null, confirming: confirming !== null, moving: moving !== null,
     ready: (placing ?? moving)?.verdict.state === 'ready', refused: (placing ?? moving)?.verdict.state === 'refused',
     busy, removeRefused, focused: focused(),
+    // Make a creature is the tray's first tile while the tray shows and no creature step is open: Enter opens it.
+    canMake: makeCreature !== null && !making && !trayView.root.hidden,
   });
 
   /** The note above the tray; a change it reports can be taken back from it, and an undo done again (W12.3). */
@@ -935,6 +937,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     else if (action === 'next') cycle(1);
     else if (action === 'previous') cycle(-1);
     else if (action === 'unfocus') canvas.focus({ preventScroll: true });
+    else if (action === 'make') pick({ id: MAKE_TILE, make: true });
   }
 
   /**
