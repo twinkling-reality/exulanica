@@ -138,7 +138,7 @@ describe('the traffic layer', () => {
     expect(asked.sort()).toEqual(['plain', 'styled']);
   });
 
-  it('draws a bicycle\'s wheels as discs across it and its frame as rods between their two points', () => {
+  it('draws a bicycle\'s wheels as tyre rings across it round a hub, and its frame as rods between their two points', () => {
     const { root } = setup();
     const layer = new TrafficLayer(root, () => 0, toRenderer);
     const BIKE = { length: 1780, width: 690, height: 1500, wheelbase: 1780, frontOverhang: 0, rearOverhang: 0 };
@@ -147,15 +147,39 @@ describe('the traffic layer', () => {
     const bike = root.findByName('vehicle:bike')!;
     const parts = bike.children as pc.Entity[];
     const wheels = parts.filter((part) => part.name === 'wheel');
-    expect(wheels.map((part) => part.render!.type)).toEqual(['cylinder', 'cylinder']);
-    for (const wheel of wheels) {
+    const looked = VEHICLE_LOOKS.body_families['upright_bicycle']!.boxes.filter((box) => box.role === 'wheel');
+    for (const [index, wheel] of wheels.entries()) {
       // Its axis lies across the bicycle, and it is a round wheel about 660 mm high and long.
       const axis = new pc.Vec3();
       wheel.getLocalRotation().transformVector(pc.Vec3.UP, axis);
       expect(Math.abs(axis.x)).toBeCloseTo(1, 5);
       expect(wheel.getLocalScale().x).toBeCloseTo(0.66, 2);
       expect(wheel.getLocalScale().z).toBeCloseTo(0.66, 2);
+      // A ring: no point of it nearer its axis than the tyre's inside, its tube the share the look states and as thick
+      // across as the wheel's box (60 thousandths of 690 mm).
+      const mesh = wheel.render!.meshInstances[0]!.mesh;
+      const positions: number[] = [];
+      mesh.getPositions(positions);
+      const tube = looked[index]!.tube_permille! / 1000;
+      let inner = Infinity, outer = 0, thick = 0;
+      for (let at = 0; at < positions.length; at += 3) {
+        const radial = Math.hypot(positions[at]!, positions[at + 2]!);
+        inner = Math.min(inner, radial);
+        outer = Math.max(outer, radial);
+        thick = Math.max(thick, Math.abs(positions[at + 1]!));
+      }
+      expect(outer).toBeCloseTo(0.5, 5);
+      expect(inner).toBeCloseTo(0.5 - tube, 5);
+      expect(2 * thick * wheel.getLocalScale().y).toBeCloseTo(0.06 * 0.69, 5);
     }
+    // A hub at each wheel's middle, drawn as a small disc across the bicycle.
+    const hubs = parts.filter((part) => part.name === 'hub');
+    expect(hubs.map((part) => part.render!.type)).toEqual(['cylinder', 'cylinder']);
+    hubs.forEach((hub, index) => {
+      expect(hub.getLocalPosition().y).toBeCloseTo(wheels[index]!.getLocalPosition().y, 2);
+      expect(hub.getLocalPosition().z).toBeCloseTo(wheels[index]!.getLocalPosition().z, 2);
+      expect(hub.getLocalScale().x).toBeLessThan(0.1);
+    });
     // Every rod's two ends are the points its look states, in the body's frame.
     const { boxes } = VEHICLE_LOOKS.body_families['upright_bicycle']!;
     const rods = boxes.filter((box) => box.shape === 'rod');
@@ -188,6 +212,8 @@ describe('the traffic layer', () => {
     // Its head is at the top of the class's envelope, 1.5 m up.
     const head = rider('riding').children.find((child) => child.name === 'rider_head') as pc.Entity;
     expect(head.getLocalPosition().y + head.getLocalScale().y / 2).toBeCloseTo(1.5, 5);
+    // A rounded helmet, the engine's sphere filling the head's box.
+    expect(head.render!.type).toBe('sphere');
     // Arms and legs either side of the frame, by their offsets across the bicycle's width.
     const across = (rider('riding').children as pc.Entity[]).map((part) => Math.round(part.getLocalPosition().x * 1000));
     const stated = VEHICLE_LOOKS.body_families['upright_bicycle']!.rider!.boxes.map((box) => Math.round(((box.across_offset_permille ?? 0) / 1000) * 690));

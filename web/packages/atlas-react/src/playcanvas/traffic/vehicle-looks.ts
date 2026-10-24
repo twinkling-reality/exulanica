@@ -1,5 +1,5 @@
 /**
- * VEHICLE LOOKS, VERSION 2: how the page draws each body family and colour the traffic catalog
+ * VEHICLE LOOKS, VERSION 3: how the page draws each body family and colour the traffic catalog
  * names (`assets/catalogs/traffic/vehicle-class.v1.json`), as data.
  *
  * A figure of parts proportioned to the record's own length, width and height, so a body is
@@ -7,17 +7,23 @@
  * occupants) is drawn. Each part is placed along the body from its rear bumper, up from the road
  * and across its width, in thousandths of the record's dimensions, and drawn inside that box by its
  * shape: a box (the default), a disc filling the box's along and up sides and as thick as it is
- * across (a wheel), or a rod from its first along and up point to its second, as thick as the box is
- * across (a frame's tube, rising or falling as its points say), set off the centre line across by
- * its offset. A family may state a rider, parts drawn only while the vehicle is not parked. Version 2
- * adds the shapes, the offset and the rider; every family drawn in boxes is as version 1 drew it. Presentation only; the simulation reads none of
+ * across (a wheel), a rod from its first along and up point to its second, as thick as the box is
+ * across (a frame's tube, rising or falling as its points say), a dome (a rounded part filling its
+ * box: a helmet) or a ring (a tyre: a ring filling the box's along and up sides, as thick as the box
+ * is across, its tube the share of its size it states, open in the middle), set off the centre line
+ * across by its offset. A family may state a rider, parts drawn only while the vehicle is not parked.
+ * Version 2 added the shapes, the offset and the rider; version 3 adds the dome and the ring, and draws
+ * the bicycle's tyres as rings round a hub and its rider's helmet as a dome; every other family is as
+ * version 2 drew it. Presentation only; the simulation reads none of
  * it. `test/traffic-looks.test.ts` holds its keys to the traffic catalog's, both ways.
  */
 
 export interface LookBox {
   readonly role: string;
   /** How the part is drawn inside its box; a box where it states none. */
-  readonly shape?: 'box' | 'disc' | 'rod';
+  readonly shape?: 'box' | 'disc' | 'rod' | 'dome' | 'ring';
+  /** A ring's tube, thousandths of its box's along size (the ring's outer diameter); every ring states one. */
+  readonly tube_permille?: number;
   /** How far the part's centre stands off the body's centre line across, thousandths of its width, the sign its side; none is 0. */
   readonly across_offset_permille?: number;
   /** A rod's two ends where it states a rod; otherwise the box's extent, the first the lower. */
@@ -39,9 +45,9 @@ export interface VehicleLooks {
   }>>;
 }
 
-export const VEHICLE_LOOKS_V2: VehicleLooks = {
-  "profile": "exulanica.vehicle-looks/v2",
-  "reason": "How the page draws each body family and colour the traffic catalog names (assets/catalogs/traffic/vehicle-class.v1.json): a figure of parts proportioned to the record's own length, width and height, so a body is exactly the size the simulation drove, and nothing the record does not state (lamps, doors, occupants) is drawn. Each part is placed along the body from its rear bumper, up from the road and across its width, in thousandths of the record's dimensions, and drawn in that box as a box, a disc (a wheel) or a rod between two of its points. Presentation only; the simulation reads none of it.",
+export const VEHICLE_LOOKS_V3: VehicleLooks = {
+  "profile": "exulanica.vehicle-looks/v3",
+  "reason": "How the page draws each body family and colour the traffic catalog names (assets/catalogs/traffic/vehicle-class.v1.json): a figure of parts proportioned to the record's own length, width and height, so a body is exactly the size the simulation drove, and nothing the record does not state (lamps, doors, occupants) is drawn. Each part is placed along the body from its rear bumper, up from the road and across its width, in thousandths of the record's dimensions, and drawn in that box as a box, a disc (a wheel), a rod between two of its points, a dome (a helmet) or a ring (a tyre, open in the middle). Presentation only; the simulation reads none of it.",
   "roles": {
     "body": {
       "colour": "vehicle",
@@ -54,6 +60,10 @@ export const VEHICLE_LOOKS_V2: VehicleLooks = {
     "wheel": {
       "colour": "#16171a",
       "reason": "Tyres are drawn dark; the record states no wheel angle, so they do not turn."
+    },
+    "hub": {
+      "colour": "#7d838b",
+      "reason": "A bicycle wheel's hub is drawn in a plain metal grey where the frame meets it, so the wheel reads open round it."
     },
     "seat": {
       "colour": "#16171a",
@@ -69,7 +79,7 @@ export const VEHICLE_LOOKS_V2: VehicleLooks = {
     },
     "rider_head": {
       "colour": "#2b2d33",
-      "reason": "A rider's head is drawn as a dark helmet; the record states no person, so no face or skin is drawn."
+      "reason": "A rider's head is drawn as a dark rounded helmet; the record states no person, so no face or skin is drawn."
     },
     "frame": {
       "colour": "vehicle",
@@ -354,7 +364,8 @@ export const VEHICLE_LOOKS_V2: VehicleLooks = {
       "boxes": [
         {
           "role": "wheel",
-          "shape": "disc",
+          "shape": "ring",
+          "tube_permille": 90,
           "along_permille": [
             0,
             371
@@ -367,7 +378,8 @@ export const VEHICLE_LOOKS_V2: VehicleLooks = {
         },
         {
           "role": "wheel",
-          "shape": "disc",
+          "shape": "ring",
+          "tube_permille": 90,
           "along_permille": [
             629,
             1000
@@ -377,6 +389,32 @@ export const VEHICLE_LOOKS_V2: VehicleLooks = {
             440
           ],
           "across_permille": 60
+        },
+        {
+          "role": "hub",
+          "shape": "disc",
+          "along_permille": [
+            163,
+            208
+          ],
+          "up_permille": [
+            193,
+            247
+          ],
+          "across_permille": 145
+        },
+        {
+          "role": "hub",
+          "shape": "disc",
+          "along_permille": [
+            792,
+            837
+          ],
+          "up_permille": [
+            193,
+            247
+          ],
+          "across_permille": 145
         },
         {
           "role": "frame",
@@ -606,6 +644,7 @@ export const VEHICLE_LOOKS_V2: VehicleLooks = {
           },
           {
             "role": "rider_head",
+            "shape": "dome",
             "along_permille": [
               530,
               610
@@ -617,9 +656,9 @@ export const VEHICLE_LOOKS_V2: VehicleLooks = {
             "across_permille": 260
           }
         ],
-        "reason": "A rider drawn only while the bicycle is on the move (any mode but parked): seated on the saddle, the hands on the bar, the feet on the cranks, the head's top at the class's envelope (a rider's eye height of 1,500 mm), in plain parts: one clothing colour that is no frame's, a dark helmet."
+        "reason": "A rider drawn only while the bicycle is on the move (any mode but parked): seated on the saddle, the hands on the bar, the feet on the cranks, the head's top at the class's envelope (a rider's eye height of 1,500 mm), in plain parts: one clothing colour that is no frame's, a dark rounded helmet."
       },
-      "reason": "Two wheels drawn as discs, a frame of rods between the hubs, the saddle and the handlebar near a metre up, nothing of the bicycle above it; its height is a rider's eye envelope, which the rider fills while it moves."
+      "reason": "Two wheels drawn as tyre rings, open round a hub, a frame of rods between the hubs, the saddle and the handlebar near a metre up, nothing of the bicycle above it; its height is a rider's eye envelope, which the rider fills while it moves."
     }
   }
 };

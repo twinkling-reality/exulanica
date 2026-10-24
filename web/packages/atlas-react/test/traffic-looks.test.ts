@@ -29,21 +29,33 @@ describe('the vehicle looks', () => {
     }
   });
 
-  it('draw a bicycle as two wheels, a frame of rods, a saddle and a handlebar, nothing above a metre', () => {
+  it('draw a bicycle as two tyre rings round their hubs, a frame of rods, a saddle and a handlebar, nothing above a metre', () => {
     const catalog = JSON.parse(
       readFileSync(new URL('../../../../assets/catalogs/traffic/vehicle-class.v1.json', import.meta.url), 'utf8'),
     ) as { entries: { key: string; length_mm: number; height_mm: number }[] };
     const bicycle = catalog.entries.find((entry) => entry.key === 'bicycle')!;
     const { boxes } = VEHICLE_LOOKS.body_families['upright_bicycle']!;
     const wheels = boxes.filter((box) => box.role === 'wheel');
-    expect(wheels.map((box) => box.shape)).toEqual(['disc', 'disc']);
-    for (const wheel of wheels) {
-      // Round: as long along as it is high, about 660 mm across.
+    expect(wheels.map((box) => box.shape)).toEqual(['ring', 'ring']);
+    const hubs = boxes.filter((box) => box.role === 'hub');
+    expect(hubs.map((box) => box.shape)).toEqual(['disc', 'disc']);
+    const middle = (pair: readonly [number, number]) => (pair[0] + pair[1]) / 2;
+    wheels.forEach((wheel, index) => {
+      // Round: as long along as it is high, about 660 mm across, its tyre 40 to 80 mm thick, open round its hub.
       const along = ((wheel.along_permille[1] - wheel.along_permille[0]) / 1000) * bicycle.length_mm;
       const up = ((wheel.up_permille[1] - wheel.up_permille[0]) / 1000) * bicycle.height_mm;
       expect(Math.abs(along - up)).toBeLessThan(5);
       expect(Math.abs(along - 660)).toBeLessThan(10);
-    }
+      const tyre = (wheel.tube_permille! / 1000) * along;
+      expect(tyre).toBeGreaterThanOrEqual(40);
+      expect(tyre).toBeLessThanOrEqual(80);
+      // The hub stands at the wheel's middle, well inside the tyre.
+      const hub = hubs[index]!;
+      expect(Math.abs(middle(hub.along_permille) - middle(wheel.along_permille))).toBeLessThanOrEqual(1);
+      expect(Math.abs(middle(hub.up_permille) - middle(wheel.up_permille))).toBeLessThanOrEqual(1);
+      const hubAlong = ((hub.along_permille[1] - hub.along_permille[0]) / 1000) * bicycle.length_mm;
+      expect(hubAlong).toBeLessThan(along - 2 * tyre - 300);
+    });
     expect(boxes.filter((box) => box.role === 'frame' && box.shape === 'rod').length).toBeGreaterThanOrEqual(5);
     expect(boxes.some((box) => box.role === 'seat') && boxes.some((box) => box.role === 'handlebar')).toBe(true);
     // The record's height is a rider's eye envelope; no rider is drawn, so nothing stands above a metre.
@@ -59,7 +71,7 @@ describe('the vehicle looks', () => {
     }
   });
 
-  it('seat a riding bicycle\'s rider with the head at the class\'s envelope, in no frame colour', () => {
+  it('seat a riding bicycle\'s rider with a rounded helmet at the class\'s envelope, in no frame colour', () => {
     const catalog = JSON.parse(
       readFileSync(new URL('../../../../assets/catalogs/traffic/vehicle-class.v1.json', import.meta.url), 'utf8'),
     ) as { entries: { key: string; height_mm: number }[] };
@@ -68,6 +80,8 @@ describe('the vehicle looks', () => {
     const head = rider.boxes.filter((box) => box.role === 'rider_head');
     expect(head).toHaveLength(1);
     expect((head[0]!.up_permille[1] / 1000) * height).toBe(1500);
+    // The helmet is rounded, not a box.
+    expect(head[0]!.shape).toBe('dome');
     // Two arms and two legs, one either side of the frame.
     const sides = rider.boxes.filter((box) => box.shape === 'rod' && box.across_offset_permille !== undefined).map((box) => Math.sign(box.across_offset_permille!));
     expect(sides.filter((side) => side > 0).length).toBe(3);

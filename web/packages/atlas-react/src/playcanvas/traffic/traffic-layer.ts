@@ -1,6 +1,6 @@
 import * as pc from 'playcanvas';
 import { SignalLights } from './signal-lights.js';
-import { type LookBox, VEHICLE_LOOKS_V2 } from './vehicle-looks.js';
+import { type LookBox, VEHICLE_LOOKS_V3 } from './vehicle-looks.js';
 import type { GroundAt, ToRenderer, TrafficWindow, VehicleSamples } from './types.js';
 
 /**
@@ -38,7 +38,7 @@ const BEHIND_SECONDS = 2;
 
 type Point = readonly [number, number];
 
-export const VEHICLE_LOOKS = VEHICLE_LOOKS_V2;
+export const VEHICLE_LOOKS = VEHICLE_LOOKS_V3;
 
 export class VehicleLookError extends Error {}
 
@@ -129,6 +129,8 @@ export class TrafficLayer {
   private readonly drawn = new Map<string, Drawn>();
   private readonly windows = new Map<number, { window: TrafficWindow; rows: Map<string, VehicleSamples>; late: Set<string> }>();
   private readonly materials = new Map<string, pc.StandardMaterial>();
+  /** A tyre's ring of each stated tube, made once: a torus of outer diameter 1 about its y axis. */
+  private readonly rings = new Map<number, pc.Mesh>();
   private inputSha256: string | null = null;
   private stepMs = 0;
   private startMs: number | null = null;
@@ -280,6 +282,8 @@ export class TrafficLayer {
     this.materials.clear();
     this.destroyed = true;
     this.root.destroy();
+    for (const ring of this.rings.values()) ring.destroy();
+    this.rings.clear();
   }
 
   private forget(before: number): void {
@@ -411,8 +415,9 @@ export class TrafficLayer {
   /**
    * One part of a vehicle's figure in the body's frame (across `x`, up `y`, forward `-z`), drawn by
    * its shape inside its box: a box; a disc, the engine's cylinder turned to lie across the body,
-   * filling the box's along and up sides; or a rod, the cylinder from the part's first along and up
-   * point to its second, as thick as the box is across.
+   * filling the box's along and up sides; a rod, the cylinder from the part's first along and up
+   * point to its second, as thick as the box is across; a dome, the engine's sphere filling the box;
+   * or a ring, a torus of the part's tube turned as a disc is, as thick as the box is across.
    */
   private part(box: LookBox, row: VehicleSamples): pc.Entity {
     const { length, width, height } = row.dimensionsMm;
@@ -426,7 +431,19 @@ export class TrafficLayer {
     const y0 = metres(u0, height), y1 = metres(u1, height);
     part.setLocalPosition(metres(box.across_offset_permille ?? 0, width), (y0 + y1) / 2, (z0 + z1) / 2);
     const shape = box.shape ?? 'box';
-    if (shape === 'disc') {
+    if (shape === 'ring') {
+      // The torus's axis (y) turned onto x, as a disc's; its tube, across the axis, is as thick as the box is across.
+      const tube = (box.tube_permille ?? 0) / PERMILLE;
+      part.setLocalEulerAngles(0, 0, 90);
+      part.setLocalScale(Math.abs(y1 - y0), across / Math.max(tube, 1e-6), Math.abs(z1 - z0));
+      const device = pc.AppBase.getApplication()?.graphicsDevice;
+      if (device !== undefined) {
+        part.addComponent('render', { meshInstances: [new pc.MeshInstance(this.ring(device, tube), this.materialFor(box.role, row.colour))] });
+        return part;
+      }
+    } else if (shape === 'dome') {
+      part.setLocalScale(across, Math.abs(y1 - y0), Math.abs(z1 - z0));
+    } else if (shape === 'disc') {
       // The cylinder's axis (y) turned onto x: its local x then runs up and its z along.
       part.setLocalEulerAngles(0, 0, 90);
       part.setLocalScale(Math.abs(y1 - y0), across, Math.abs(z1 - z0));
@@ -437,8 +454,18 @@ export class TrafficLayer {
     } else {
       part.setLocalScale(across, Math.abs(y1 - y0), Math.abs(z1 - z0));
     }
-    part.addComponent('render', { type: shape === 'box' ? 'box' : 'cylinder', material: this.materialFor(box.role, row.colour) });
+    const type = shape === 'box' ? 'box' : shape === 'dome' ? 'sphere' : shape === 'ring' ? 'torus' : 'cylinder';
+    part.addComponent('render', { type, material: this.materialFor(box.role, row.colour) });
     return part;
+  }
+
+  /** The ring of `tube` (a share of its outer diameter), made once: outer diameter 1 in the xz plane, as thick as its tube. */
+  private ring(device: pc.GraphicsDevice, tube: number): pc.Mesh {
+    const made = this.rings.get(tube);
+    if (made !== undefined) return made;
+    const mesh = pc.Mesh.fromGeometry(device, new pc.TorusGeometry({ tubeRadius: tube / 2, ringRadius: (1 - tube) / 2, segments: 32, sides: 8 }));
+    this.rings.set(tube, mesh);
+    return mesh;
   }
 
   private bodyBoxes(family: string): readonly LookBox[] {

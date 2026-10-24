@@ -387,12 +387,13 @@ The body families and colours the catalog states:
 
 `@exulanica/atlas-react/traffic` (`web/packages/atlas-react/src/playcanvas/traffic/`) is the reader
 both pages use. `TrafficLayer` draws each vehicle as the figure of parts its looks
-(`vehicle-looks.ts`, `exulanica.vehicle-looks/v2`) state for its body family, proportioned to the
+(`vehicle-looks.ts`, `exulanica.vehicle-looks/v3`) state for its body family, proportioned to the
 record's own dimensions and coloured by its colour: each part inside its box as a box, a disc (a
-bicycle's wheels) or a rod between two of its points (a bicycle's frame), every other family in
-boxes. A parked bicycle is drawn with nothing above a metre; one on the move (any mode but parked)
-carries a rider in plain parts (the family's `rider`), the head at the class's height, which is a
-rider's eye envelope. The layer refuses a body family or colour the looks
+bicycle's hubs), a rod between two of its points (a bicycle's frame), a dome (a rider's helmet) or a
+ring (a bicycle's tyres, open round the hub, the tube a stated share of the wheel), every other
+family in boxes as version 2 drew it. A parked bicycle is drawn with nothing above a metre; one on
+the move (any mode but parked) carries a rider in plain parts (the family's `rider`), the helmet's
+top at the class's height, which is a rider's eye envelope. The layer refuses a body family or colour the looks
 do not state (`VehicleLookError`) before it draws anything; a test holds the looks to exactly the
 families and colours the catalog names. Between two seconds it moves the front along the served
 path by distance and places the rear axle a wheelbase back along the trail the front left. It
