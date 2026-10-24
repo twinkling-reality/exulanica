@@ -479,6 +479,24 @@ def job_lines(text: str, job: str) -> list[tuple[int, str]]:
     return [(index + 1, lines[index]) for index in range(start, end)]
 
 
+#: The repository scripts' type check, the one tests/test_visual_gate_targets.py runs. The python
+#: job installs no web toolchain, so that test skips there, and pnpm check reads the packages only:
+#: the web job runs it after its install, from web/, where its configuration lives.
+SCRIPTS_CHECK = "pnpm exec tsc -p tsconfig.scripts.json"
+
+
+def scripts_check_problems(text: str) -> list[str]:
+    """Why the web job would not type-check the repository's scripts, as sentences."""
+    numbers = {number for number, _ in job_lines(text, "web")}
+    runs = [command.text for command in run_commands(text) if command.line in numbers]
+    if SCRIPTS_CHECK not in runs:
+        return [f"the web job does not run {SCRIPTS_CHECK!r}"]
+    installs = [index for index, run in enumerate(runs) if run.startswith("pnpm install")]
+    if not installs or runs.index(SCRIPTS_CHECK) < installs[0]:
+        return [f"the web job runs {SCRIPTS_CHECK!r} before its pnpm install"]
+    return []
+
+
 def escape_problems(text: str) -> list[str]:
     """Every key in the suite's job that lets a part stop counting without failing the run."""
     problems = []
@@ -896,6 +914,24 @@ def test_the_workflows_check_fails_a_planted_skip_nothing_accepts(tmp_path, monk
         f"  {module}::{planted}: planted, and named by nothing\n"
         "    refused: no entry names this test, and no cause names its reason"
     ) in capsys.readouterr().out
+
+
+def test_the_web_job_type_checks_the_scripts_the_suite_skips_without_a_web_toolchain():
+    """Nothing else on CI type-checks scripts/*.mjs and what they import: a script that brought a
+    latent error into that check (scripts/rehearsal/cdp.mjs, 23 October) failed only where web/ was
+    installed. A workflow that drops the step, or runs it before the install, is refused."""
+    assert scripts_check_problems(WORKFLOW_TEXT) == []
+    assert (ROOT / "web" / "tsconfig.scripts.json").is_file()
+    step = f"      - run: {SCRIPTS_CHECK}\n"
+    assert step in WORKFLOW_TEXT
+    assert scripts_check_problems(WORKFLOW_TEXT.replace(step, "")) == [
+        f"the web job does not run {SCRIPTS_CHECK!r}"
+    ]
+    install = "      - run: pnpm install --frozen-lockfile\n"
+    early = WORKFLOW_TEXT.replace(step, "").replace(install, step + install)
+    assert scripts_check_problems(early) == [
+        f"the web job runs {SCRIPTS_CHECK!r} before its pnpm install"
+    ]
 
 
 def test_the_web_job_installs_the_pnpm_its_workspace_declares():
