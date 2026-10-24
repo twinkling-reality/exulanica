@@ -223,6 +223,23 @@ this product's claim, and nothing in a card compares one model with another.
 `tests/test_model_cards.py` fails by name when a card names a model the manifest does not declare
 or a model a chosen role offers has no card, so a card is read again when its model changes.
 
+Beyond the models the manifest offers, a person may add a model the provider serves once its
+licence has been classed (`exulanica/models/provider_catalog.py`). What the provider states of
+each model is data, a dated catalog version in `assets/catalogs/provider-models/`: the server reads
+the newest version, and every older one stays readable. An operator writes the next version with
+`scripts/refresh_provider_models.py` on their own machine, with the provider's key in the
+variable the manifest names; the server never does. The script reads the provider's public catalog
+(each model's type, use cases and licence as the provider words them), the provider's priced list
+of models (the key in that request's Authorization header and nowhere else, never printed or
+written), and each model's Hugging Face card as metadata (its revision, licence, pipeline,
+parameters and the day it was made), through a transport whose egress allowlist holds those three
+origins and no other. It fetches no weights and no README, and asks no model anything. From
+version 2 (profile `exulanica.provider-models/v2`) a version states the day it was read and each
+entry's price and card, null where none was read. A version that exists is never rewritten, a
+refused read writes nothing, every licence class stays as a person authored it, and a model new to
+the provider arrives not classified. The script then prints, for each decision role, the models it
+can offer: chat models holding every use case the role requires whose licence is classed accepted.
+
 Four open models were probed on six recorded choices each, once by each mechanism
 ([probe record](evaluation/2026-09-25-society-person-models-probe.json)), under one
 [pre-registration](evaluation/2026-09-25-society-person-models-preregistration.json) that states

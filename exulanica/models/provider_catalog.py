@@ -4,11 +4,15 @@ A person may add a model the provider serves to the models that can decide for a
 anything is spent the server must know two things no price list answers: whether the model can
 decide at all (a chat model with the use cases a decision role requires), and whether its licence
 lets this product call it. Both are data every deployment ships
-(``assets/catalogs/provider-models/provider-models.v<N>.json``):
+(``assets/catalogs/provider-models/provider-models.v<N>.json``); the server reads the newest
+version, and every version it can read stays readable:
 
 *   ``entries``: for each model id its type, its use cases and its licence as the provider words
-    it, with where that was read and on what day. An operator's command rewrites them from the
-    provider's public catalog (``python -m exulanica.models.provider_catalog refresh``); the
+    it, with where that was read and on what day; from version 2 (profile
+    ``exulanica.provider-models/v2``) also its price as the provider's API stated it and what its
+    Hugging Face card states as metadata, each null where none was read (:class:`StatedFacts`).
+    An operator's script writes each new version from the provider's own catalogs and the cards
+    (``scripts/refresh_provider_models.py``), never rewriting a version that exists; the
     server never does.
 *   ``licence_classes``: for each model id somebody has read the licence of, the class this
     product gives it, authored from that model's own row of ``docs/license-matrix.md`` with the
@@ -19,7 +23,7 @@ What this module holds by construction:
 *   **A licence is never guessed.** A class is the matrix's verdict for that model id and nothing
     else. A model with no authored class is *not classified*, whatever label the provider gives
     its licence: the matrix calls that label derived and not authoritative.
-*   **Refreshing cannot admit a model.** The refresh rewrites what the provider states. A model
+*   **Refreshing cannot admit a model.** A refresh restates what the provider states. A model
     that is new to the provider arrives not classified, and stays so until a person reads its
     licence into the matrix and authors its class.
 *   **Nothing here asks a model.** The provider's catalog is public and read with no key; a
@@ -35,12 +39,9 @@ What this module holds by construction:
 
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
-import os
 import re
-import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -51,7 +52,7 @@ from typing import Any, Final
 from urllib.parse import urlsplit
 
 from exulanica.models.manifest import load_manifest
-from exulanica.models.preflight import catalog_flavors, fetch_catalog
+from exulanica.models.preflight import catalog_flavors
 from exulanica.models.transport import Transport
 
 __all__ = [
@@ -62,24 +63,47 @@ __all__ = [
     "CONDITIONAL",
     "NOT_CLASSIFIED",
     "PROFILE",
+    "PROFILE_WITH_FACTS",
     "REJECTED",
     "VERDICT_CLASSES",
+    "CardFacts",
     "ProviderModel",
     "ProviderPrice",
     "ProviderPricesUnreadable",
+    "StatedFacts",
+    "StatedPrice",
     "catalog_sha256",
+    "catalog_versions",
     "decision_capable",
     "licence_class",
     "prices",
     "provider_model",
     "provider_models",
     "read",
+    "read_facts",
     "refreshed",
+    "stated_facts",
 ]
 
 _ROOT: Final = Path(__file__).resolve().parents[2]
-CATALOG: Final = _ROOT / "assets/catalogs/provider-models/provider-models.v1.json"
+CATALOG_DIRECTORY: Final = _ROOT / "assets/catalogs/provider-models"
 PROFILE: Final = "exulanica.provider-models/v1"
+#: The profile of a version that also states each model's price and card facts (version 2 on).
+PROFILE_WITH_FACTS: Final = "exulanica.provider-models/v2"
+
+
+def catalog_versions(directory: Path = CATALOG_DIRECTORY) -> dict[int, Path]:
+    """Every version of the catalog ``directory`` holds, by its number."""
+    found = {}
+    for path in directory.glob("provider-models.v*.json"):
+        number = re.fullmatch(r"provider-models\.v([1-9][0-9]*)\.json", path.name)
+        if number is not None:
+            found[int(number.group(1))] = path
+    return found
+
+
+#: The newest version, the one the server reads.
+CATALOG: Final = catalog_versions()[max(catalog_versions())]
 #: The types of model that answer in words, so can be asked a choice.
 CHAT_TYPES: Final = ("text2text", "image2text")
 #: How a model's licence is classed for this product calling it.
@@ -102,6 +126,11 @@ VERDICT_CLASSES: Final[Mapping[str, str]] = {
 _ENTRY: Final = frozenset(
     {"key", "provider", "model_id", "type", "use_cases", "licence_stated", "licence_url"}
     | {"source", "read_on", "reason"}
+)
+_ENTRY_WITH_FACTS: Final = _ENTRY | {"price", "card"}
+_PRICE: Final = frozenset({"input_usd_per_mtok", "output_usd_per_mtok", "context_window_tokens"})
+_CARD: Final = frozenset(
+    {"repo", "revision", "url", "licence", "pipeline_tag", "parameters", "created"}
 )
 _CLASS: Final = frozenset({"provider", "model_id", "class", "verdict", "matrix", "row"})
 PROVIDER_PATTERN: Final = r"[a-z][a-z0-9_]{0,62}"
@@ -161,19 +190,126 @@ class ProviderModel:
     read_on: str
 
 
+@dataclass(frozen=True, slots=True)
+class StatedPrice:
+    """What one model costs as its provider's API stated it on the catalog's day, in dollars a
+    million tokens asked and answered, and the most tokens one request may hold."""
+
+    input_usd_per_mtok: Decimal
+    output_usd_per_mtok: Decimal
+    context_window_tokens: int
+
+
+@dataclass(frozen=True, slots=True)
+class CardFacts:
+    """What a model's Hugging Face card states as metadata on the catalog's day, at a revision:
+    the licence and pipeline as the card names them (empty where it names none), its parameters
+    as its weights count them (None where they state none) and the day the card was made."""
+
+    repo: str
+    revision: str
+    url: str
+    licence: str
+    pipeline_tag: str
+    parameters: int | None
+    created: str
+
+
+@dataclass(frozen=True, slots=True)
+class StatedFacts:
+    """A model's price and card facts as a version 2 catalog states them, each None where none
+    was read."""
+
+    price: StatedPrice | None
+    card: CardFacts | None
+
+
 def _key(provider: str, model_id: str) -> str:
     return f"{provider}|{model_id}"
+
+
+def _price(raw: Any) -> StatedPrice | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping) or set(raw) != _PRICE:
+        raise ValueError(f"a price states exactly {sorted(_PRICE)}")
+    asked, answered = _figure(raw["input_usd_per_mtok"]), _figure(raw["output_usd_per_mtok"])
+    window = raw["context_window_tokens"]
+    if (
+        not isinstance(raw["input_usd_per_mtok"], str)
+        or not isinstance(raw["output_usd_per_mtok"], str)
+        or asked is None
+        or answered is None
+        or type(window) is not int
+        or window <= 0
+    ):
+        raise ValueError("a price is two figures in dollars as text and a whole window")
+    return StatedPrice(asked, answered, window)
+
+
+def _card(raw: Any) -> CardFacts | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping) or set(raw) != _CARD:
+        raise ValueError(f"a card states exactly {sorted(_CARD)}")
+    parameters, created = raw["parameters"], raw["created"]
+    plain = (
+        isinstance(raw["repo"], str)
+        and re.fullmatch(MODEL_PATTERN, raw["repo"]) is not None
+        and isinstance(raw["revision"], str)
+        and re.fullmatch(r"[0-9a-f]{40}", raw["revision"]) is not None
+        and raw["url"] == f"https://huggingface.co/{raw['repo']}"
+        and _text(raw["licence"], 128, empty=True)
+        and _text(raw["pipeline_tag"], 63, empty=True)
+        and (parameters is None or (type(parameters) is int and parameters > 0))
+        and _text(created, 10, empty=True)
+    )
+    if not plain:
+        raise ValueError(f"invalid card {raw.get('repo')!r}")
+    if created:
+        date.fromisoformat(created)
+    return CardFacts(
+        repo=raw["repo"],
+        revision=raw["revision"],
+        url=raw["url"],
+        licence=raw["licence"],
+        pipeline_tag=raw["pipeline_tag"],
+        parameters=parameters,
+        created=created,
+    )
 
 
 def read(document: Any) -> tuple[dict[str, ProviderModel], dict[str, str]]:
     """The models ``document`` states and the licence class it authors for each, by
     ``provider|model_id``; refused by name where it is no such catalog."""
-    if not isinstance(document, Mapping) or document.get("profile") != PROFILE:
-        raise ValueError(f"not a catalog of profile {PROFILE}")
+    models, classes, _ = _read(document)
+    return models, classes
+
+
+def read_facts(document: Any) -> dict[str, StatedFacts]:
+    """Each model's price and card facts as ``document`` states them, by ``provider|model_id``:
+    none for a version 1 catalog, which states neither."""
+    return _read(document)[2]
+
+
+def _read(
+    document: Any,
+) -> tuple[dict[str, ProviderModel], dict[str, str], dict[str, StatedFacts]]:
+    profile = document.get("profile") if isinstance(document, Mapping) else None
+    if profile not in (PROFILE, PROFILE_WITH_FACTS):
+        raise ValueError(f"not a catalog of profile {PROFILE} or {PROFILE_WITH_FACTS}")
+    with_facts = profile == PROFILE_WITH_FACTS
+    if with_facts:
+        read_on = document.get("read_on")
+        if not _text(read_on, 10):
+            raise ValueError("a catalog with facts states the day it was read")
+        date.fromisoformat(read_on)
+    fields = _ENTRY_WITH_FACTS if with_facts else _ENTRY
     models: dict[str, ProviderModel] = {}
+    facts: dict[str, StatedFacts] = {}
     for raw in document.get("entries") or ():
-        if not isinstance(raw, Mapping) or set(raw) != _ENTRY:
-            raise ValueError(f"a provider model states exactly {sorted(_ENTRY)}")
+        if not isinstance(raw, Mapping) or set(raw) != fields:
+            raise ValueError(f"a provider model states exactly {sorted(fields)}")
         key = _key(str(raw["provider"]), str(raw["model_id"]))
         uses = raw["use_cases"]
         plain = (
@@ -203,6 +339,8 @@ def read(document: Any) -> tuple[dict[str, ProviderModel], dict[str, str]]:
             source=raw["source"],
             read_on=raw["read_on"],
         )
+        if with_facts:
+            facts[key] = StatedFacts(price=_price(raw["price"]), card=_card(raw["card"]))
     classes: dict[str, str] = {}
     for raw in document.get("licence_classes") or ():
         if not isinstance(raw, Mapping) or set(raw) != _CLASS:
@@ -218,14 +356,14 @@ def read(document: Any) -> tuple[dict[str, ProviderModel], dict[str, str]]:
         if not str(raw["row"]).strip() or not str(raw["matrix"]).strip():
             raise ValueError(f"the licence class for {key} names no row of the matrix")
         classes[key] = str(raw["class"])
-    return models, classes
+    return models, classes, facts
 
 
 @cache
-def _shipped() -> tuple[dict[str, ProviderModel], dict[str, str], str]:
+def _shipped() -> tuple[dict[str, ProviderModel], dict[str, str], str, dict[str, StatedFacts]]:
     raw = CATALOG.read_bytes()
-    models, classes = read(json.loads(raw))
-    return models, classes, hashlib.sha256(raw).hexdigest()
+    models, classes, facts = _read(json.loads(raw))
+    return models, classes, hashlib.sha256(raw).hexdigest(), facts
 
 
 def catalog_sha256() -> str:
@@ -241,6 +379,12 @@ def provider_models() -> Mapping[str, ProviderModel]:
 def provider_model(provider: str, model_id: str) -> ProviderModel | None:
     """What the provider states of one model, or None where the catalog does not hold it."""
     return _shipped()[0].get(_key(provider, model_id))
+
+
+def stated_facts(provider: str, model_id: str) -> StatedFacts | None:
+    """One model's price and card facts as the shipped catalog states them, or None where its
+    version states none or it does not hold the model."""
+    return _shipped()[3].get(_key(provider, model_id))
 
 
 def licence_class(provider: str, model_id: str) -> str:
@@ -375,7 +519,9 @@ def refreshed(
     """``document`` with ``provider``'s entries rewritten from its public ``catalog`` as read
     from ``source`` on ``read_on``. Every other provider's entries and every licence class are as
     they were: a model new to the provider arrives with no class, and a model the provider no
-    longer lists leaves the entries and keeps its class, which names a licence somebody read."""
+    longer lists leaves the entries and keeps its class, which names a licence somebody read. In
+    a catalog with facts each rewritten entry states no price and no card, which the operator's
+    script then reads."""
     read(document)
     if not catalog:
         raise ValueError("the provider catalog is empty")
@@ -407,6 +553,7 @@ def refreshed(
     earlier = {
         entry["model_id"]: entry for entry in document["entries"] if entry["provider"] == provider
     }
+    with_facts = document["profile"] == PROFILE_WITH_FACTS
     stated = []
     for model_id, flavor in sorted(catalog_flavors(catalog).items()):
         before = earlier.get(model_id)
@@ -429,57 +576,9 @@ def refreshed(
                 else "Stated by the provider's public catalog on the day it was read; listed so "
                 "that a person may ask for this model, which is not classified until its "
                 "licence is read into the licence matrix.",
+                **({"price": None, "card": None} if with_facts else {}),
             }
         )
     result = {**document, "entries": [*kept, *stated]}
     read(result)
     return result
-
-
-def main(argv: Sequence[str] | None = None, *, transport: Transport | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    commands = parser.add_subparsers(dest="command", required=True)
-    refresh = commands.add_parser("refresh", help="rewrite the entries from the public catalog")
-    refresh.add_argument("--provider", default="nebius_token_factory")
-    refresh.add_argument("--out", type=Path, default=CATALOG)
-    arguments = parser.parse_args(argv)
-    provider = load_manifest().providers.get(arguments.provider)
-    if provider is None:
-        parser.error("provider is not served by this installation")
-    catalog = fetch_catalog(provider.catalog_url, transport=transport)
-    document = refreshed(
-        json.loads(CATALOG.read_text(encoding="utf-8")),
-        arguments.provider,
-        catalog,
-        source=provider.catalog_url,
-        read_on=date.today().isoformat(),
-    )
-    _write_catalog(arguments.out, document)
-    models, classes = read(document)
-    stated = [model for model in models.values() if model.provider == arguments.provider]
-    unclassed = sum(1 for model in stated if _key(model.provider, model.model_id) not in classes)
-    print(f"{len(stated)} models stated; {unclassed} of them not classified")
-    return 0
-
-
-def _write_catalog(path: Path, document: Mapping[str, Any]) -> None:
-    """Replace a validated catalog atomically; a refused write leaves its old bytes intact."""
-    read(document)
-    temporary: str | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=path.parent, delete=False
-        ) as stream:
-            temporary = stream.name
-            stream.write(json.dumps(document, indent=2) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.chmod(temporary, path.stat().st_mode & 0o777 if path.exists() else 0o644)
-        os.replace(temporary, path)
-    finally:
-        if temporary is not None and os.path.exists(temporary):
-            os.unlink(temporary)
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

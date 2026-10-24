@@ -319,43 +319,102 @@ def test_a_refresh_rewrites_what_the_provider_states_and_never_a_class():
     ]
 
 
-class _Scripted:
-    """A transport that answers the provider's public catalog and records what it was asked."""
+# -- versions, and the facts a version 2 catalog states -------------------------------------------
 
-    def __init__(self, body: list[dict]) -> None:
-        self.body = body
-        self.asked: list[tuple[str, dict]] = []
+PRICE = {
+    "input_usd_per_mtok": "0.06",
+    "output_usd_per_mtok": "0.24",
+    "context_window_tokens": 131072,
+}
+CARD = {
+    "repo": "someone/New-Model-9B",
+    "revision": "0123456789abcdef0123456789abcdef01234567",
+    "url": "https://huggingface.co/someone/New-Model-9B",
+    "licence": "apache-2.0",
+    "pipeline_tag": "text-generation",
+    "parameters": 9_000_000_000,
+    "created": "2026-07-01",
+}
 
-    def get_json(self, url, *, headers, timeout):
-        self.asked.append((url, dict(headers)))
-        return HttpResponse(status_code=200, text=json.dumps(self.body), headers={})
 
-    def post_json(self, *arguments, **named):
-        raise AssertionError("a refresh posts nothing and asks no model")
+def _with_facts(price: dict | None = PRICE, card: dict | None = CARD) -> dict:
+    """The shipped catalog as a version 2: the first entry priced and carded, the rest neither."""
+    document = copy.deepcopy(_document())
+    document.update(profile=catalog.PROFILE_WITH_FACTS, catalog_version=2, read_on="2026-10-24")
+    for at, entry in enumerate(document["entries"]):
+        entry.update(price=price if at == 0 else None, card=card if at == 0 else None)
+    return document
 
 
-def test_the_command_reads_the_public_catalog_once_with_no_key_and_writes_the_file(
-    tmp_path, capsys
-):
-    transport = _Scripted(_complete_public(NEW, KEPT))
-    out = tmp_path / "provider-models.json"
-    assert catalog.main(["refresh", "--out", str(out)], transport=transport) == 0
-    [(url, headers)] = transport.asked
-    assert url == load_manifest().providers[PROVIDER].catalog_url
-    assert "authorization" not in {name.lower() for name in headers}
-    models, classes = catalog.read(json.loads(out.read_text(encoding="utf-8")))
-    assert {model.model_id for model in models.values()} == set(load_manifest().models) | {
-        NEW["model_id"],
-        KEPT["model_id"],
-    }
-    assert len(classes) == 26
-    served = [spec for spec in load_manifest().models.values() if spec.provider == PROVIDER]
-    assert (
-        capsys.readouterr().out.strip()
-        == f"{len(served) + 2} models stated; 1 of them not classified"
+def test_the_server_reads_the_newest_version_and_every_older_one_stays_readable(tmp_path):
+    """The catalog the server reads is the newest version beside it; a version 1 states no facts."""
+    assert catalog.catalog_versions()[max(catalog.catalog_versions())] == catalog.CATALOG
+    (tmp_path / "provider-models.v1.json").write_text(json.dumps(_document()))
+    (tmp_path / "provider-models.v2.json").write_text(json.dumps(_with_facts()))
+    (tmp_path / "provider-models.v2.json.tmp").write_text("{}")
+    assert sorted(catalog.catalog_versions(tmp_path)) == [1, 2]
+    assert catalog.read_facts(_document()) == {}
+    assert catalog.read(_with_facts())[0] == catalog.read(_document())[0]
+
+
+def test_a_version_2_entry_states_its_price_and_card_or_none():
+    first = _document()["entries"][0]
+    facts = catalog.read_facts(_with_facts())
+    stated = facts[first["key"]]
+    assert stated.price == catalog.StatedPrice(Decimal("0.06"), Decimal("0.24"), 131072)
+    assert stated.card is not None and stated.card.parameters == 9_000_000_000
+    assert (stated.card.licence, stated.card.created) == ("apache-2.0", "2026-07-01")
+    assert all(
+        (one.price, one.card) == (None, None) for key, one in facts.items() if key != first["key"]
     )
-    # The shipped file is not written by a refresh to another path.
-    assert json.loads(catalog.CATALOG.read_text(encoding="utf-8")) == _document()
+
+
+@pytest.mark.parametrize(
+    ("price", "card"),
+    [
+        ({**PRICE, "input_usd_per_mtok": 0.06}, CARD),
+        ({**PRICE, "context_window_tokens": 0}, CARD),
+        ({**PRICE, "currency": "usd"}, CARD),
+        (PRICE, {**CARD, "revision": "main"}),
+        (PRICE, {**CARD, "url": "https://elsewhere.test/someone/New-Model-9B"}),
+        (PRICE, {**CARD, "parameters": 0}),
+        (PRICE, {**CARD, "licence": "<b>apache</b>"}),
+        (PRICE, {**CARD, "created": "July 2026"}),
+    ],
+)
+def test_a_price_or_card_that_is_not_plain_data_is_refused(price, card):
+    with pytest.raises(ValueError):
+        catalog.read(_with_facts(price, card))
+    missing = _with_facts()
+    del missing["read_on"]
+    with pytest.raises(ValueError, match="the day it was read"):
+        catalog.read(missing)
+    unpriced = _with_facts()
+    del unpriced["entries"][0]["price"]
+    with pytest.raises(ValueError, match="states exactly"):
+        catalog.read(unpriced)
+
+
+def test_a_refresh_of_a_version_2_leaves_its_provider_s_facts_to_be_read_again():
+    """Each rewritten entry states no price and no card, which the operator's script then reads;
+    another provider's entries keep theirs."""
+    before = _with_facts()
+    other = {**before["entries"][0], "key": "another|a/model", "provider": "another"}
+    before["entries"].append({**other, "model_id": "a/model"})
+    after = catalog.refreshed(
+        before,
+        PROVIDER,
+        _complete_public(NEW),
+        source="https://provider.test/models",
+        read_on="2026-10-24",
+    )
+    facts = catalog.read_facts(after)
+    assert facts["another|a/model"].price is not None
+    assert all(
+        (one.price, one.card) == (None, None)
+        for key, one in facts.items()
+        if key.startswith(f"{PROVIDER}|")
+    )
 
 
 # -- prices, from the provider's own API origin --------------------------------------------------
@@ -494,56 +553,6 @@ def test_a_shipped_model_whose_price_moved_proves_nothing_and_blocks_nothing():
     # The unit is the one the other shipped model proves; the moved price is the provider's own.
     assert found["maker/Shipped-One"].input_usd_per_mtok == Decimal("0.07")
     assert found["someone/New-Model-9B"].output_usd_per_mtok == Decimal("1.2")
-
-
-@pytest.mark.parametrize("body", [[], [{}], _public(NEW), [{"flavors": [None]}]])
-def test_empty_partial_or_malformed_refresh_leaves_old_catalog_bytes(tmp_path, body):
-    out = tmp_path / "catalog.json"
-    old = catalog.CATALOG.read_bytes()
-    out.write_bytes(old)
-    with pytest.raises(ValueError):
-        catalog.main(["refresh", "--out", str(out)], transport=_Scripted(body))
-    assert out.read_bytes() == old
-    assert list(tmp_path.iterdir()) == [out]
-
-
-@pytest.mark.parametrize(
-    "field,value",
-    [
-        ("model_id", "bad|identifier"),
-        ("model_id", "x" * 201),
-        ("model_type", "<script>bad</script>"),
-        ("use_cases", "text"),
-        ("use_cases", [True]),
-        ("license", {"name": "x" * 513}),
-        ("license", {"name": "ok", "url": "javascript:alert(1)"}),
-        ("license", {"name": "ok", "url": "https://secret@host.test/a"}),
-        ("license", {"name": "<img src=x>", "url": "https://host.test/a"}),
-    ],
-)
-def test_hostile_refresh_preserves_old_bytes(tmp_path, field, value):
-    flavor = {**NEW, field: value}
-    out = tmp_path / "catalog.json"
-    old = catalog.CATALOG.read_bytes()
-    out.write_bytes(old)
-    with pytest.raises(ValueError):
-        catalog.main(["refresh", "--out", str(out)], transport=_Scripted(_complete_public(flavor)))
-    assert out.read_bytes() == old
-
-
-def test_failed_atomic_replacement_keeps_old_bytes_and_cleans_temporary(tmp_path, monkeypatch):
-    out = tmp_path / "catalog.json"
-    old = catalog.CATALOG.read_bytes()
-    out.write_bytes(old)
-
-    def refused(*args):
-        raise OSError("replacement refused")
-
-    monkeypatch.setattr(catalog.os, "replace", refused)
-    with pytest.raises(OSError, match="replacement refused"):
-        catalog.main(["refresh", "--out", str(out)], transport=_Scripted(_complete_public(NEW)))
-    assert out.read_bytes() == old
-    assert list(tmp_path.iterdir()) == [out]
 
 
 def test_zero_prices_cannot_prove_a_unit_and_boolean_context_is_not_a_window():
