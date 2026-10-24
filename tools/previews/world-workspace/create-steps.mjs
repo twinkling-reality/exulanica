@@ -125,6 +125,19 @@ export function startCards(recipes = [], kinds = [], { blankExists = false } = {
 export const moveChoice = (index, count, by) => Math.max(0, Math.min(count - 1, index + by));
 
 /**
+ * Where Tab takes the focus so it stays within Create (C6): from the page's last stop to its first, and with Shift
+ * from its first (or from the page itself, which holds the focus while a world is made) to its last; null lets the
+ * browser move between the stops in between. `stops` are the page's own Tab stops in document order.
+ */
+export function wrapStop(stops, at, back) {
+  if (stops.length === 0) return null;
+  const index = stops.indexOf(at);
+  if (index < 0) return back ? stops[stops.length - 1] : stops[0];
+  if (back) return index === 0 ? stops[stops.length - 1] : null;
+  return index === stops.length - 1 ? stops[0] : null;
+}
+
+/**
  * What a key does on frames 20 and 21 (spec 9, K2, K7, K8, N5, N6). `state`: { page: 'create' |
  * 'creating', focus: 'field' | 'card' | 'button' | 'page', canCreate }. Fates:
  * - 'create' Enter in the field with words to make; 'start' Enter on a card; 'previous', 'next';

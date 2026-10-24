@@ -286,6 +286,24 @@ describe('Create a world as a page', () => {
     return shown!;
   };
 
+  it('keeps Tab within the page, from its last stop to its first and back, never on to the front door under it (C6)', async () => {
+    serve(offerOf());
+    const behind = document.createElement('button'); behind.textContent = 'Open My world'; document.body.append(behind);
+    await mount();
+    const field = document.querySelector<HTMLTextAreaElement>('textarea.wu-light-field')!;
+    field.focus();
+    // Shift+Tab from the field, the first stop, goes to the last, Your worlds.
+    expect(key(field, 'Tab', { shiftKey: true }).defaultPrevented).toBe(true);
+    expect(document.activeElement?.classList.contains('wu-qcmd')).toBe(true);
+    // Tab from the last stop comes back to the field, not on to the front door's own button.
+    expect(key(document.activeElement!, 'Tab').defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(field);
+    expect(document.activeElement).not.toBe(behind);
+    // Between the first and the last, the browser moves the focus.
+    expect(key(field, 'Tab').defaultPrevented).toBe(false);
+    document.body.replaceChildren();
+  });
+
   it('says under the field how long a host keeps what is made where it states a day, and nothing where it states none (A5)', async () => {
     const kept = 'The worlds you make here and the words you type stay on this server until it is deleted after 15\u00a0December\u00a02026.';
     serve(offerOf());

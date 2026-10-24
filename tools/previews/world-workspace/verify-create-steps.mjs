@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { CREATE_WORDS } from './create-words.mjs';
 import {
-  MADE_HANDOFF_KEY, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, pollDelay, readMade, spentOf,
+  MADE_HANDOFF_KEY, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, pollDelay, readMade, spentOf, wrapStop,
   startCards, writeMade,
 } from './create-steps.mjs';
 
@@ -79,6 +79,17 @@ assert.equal(cards.at(-1).blank, true);
 assert.deepEqual(startCards().map(card => card.name), [CREATE_WORDS.blank]);
 assert.equal(moveChoice(0, 3, -1), 0);
 assert.equal(moveChoice(1, 3, 1), 2);
+// Tab stays within Create (C6): from the last stop to the first, with Shift from the first (or the page) to the last;
+// between them the browser moves the focus.
+const stops = ['field', 'card', 'leave'];
+assert.equal(wrapStop(stops, 'leave', false), 'field');
+assert.equal(wrapStop(stops, 'field', true), 'leave');
+assert.equal(wrapStop(stops, 'field', false), null);
+assert.equal(wrapStop(stops, 'card', true), null);
+assert.equal(wrapStop(stops, 'page', true), 'leave');
+assert.equal(wrapStop(stops, 'page', false), 'field');
+assert.equal(wrapStop(['leave'], 'leave', false), 'leave');
+assert.equal(wrapStop([], 'page', false), null);
 assert.equal(moveChoice(2, 3, 1), 2);
 
 // Keys. In the field only Enter, Shift+Enter and Esc act; Cmd and Ctrl pass to the browser; the old

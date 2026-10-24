@@ -21,7 +21,7 @@ import {
 } from './create-words.mjs';
 import {
   MADE_HANDOFF_KEY, SHORT_CODE, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, pollDelay, spentOf, startCards,
-  writeMade,
+  wrapStop, writeMade,
 } from './create-steps.mjs';
 import { chosenWorldPicture, openMadeWorld } from './front-door.ts';
 import { mountUiScale } from './world-ui.ts';
@@ -59,6 +59,12 @@ let keptWords = '';
 type RawDraft = Readonly<Record<string, unknown>>;
 
 /** A read with the page's own credentials: its bearer on a person's own install, its session's cookie for a guest. */
+/** A page's own Tab stops in document order: focusable, enabled, in the Tab order and inside nothing hidden. */
+function tabStops(root: HTMLElement): HTMLElement[] {
+  return [...root.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')]
+    .filter((one) => one.tabIndex >= 0 && !(one as HTMLButtonElement).disabled && one.closest('[hidden]') === null);
+}
+
 async function readRaw(access: Credentials, path: string, signal: AbortSignal): Promise<RawDraft> {
   const response = await fetch(access.baseUrl + path, { headers: { ...accessHeaders(access), Accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store', signal });
   if (!response.ok) throw Object.assign(new Error('read'), { status: response.status });
@@ -535,6 +541,12 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   // cards, Esc leaves once; nothing else reaches the front door or the shell under this page.
   page.root.addEventListener('keydown', (event) => {
     const active = document.activeElement;
+    // Tab keeps the focus within this page (C6): from its last stop to its first and back, never on to the front door
+    // under it; between them the browser moves it.
+    if (event.code === 'Tab' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      const next = wrapStop(tabStops(page.root), active, event.shiftKey);
+      if (next !== null) { event.preventDefault(); event.stopPropagation(); next.focus(); return; }
+    }
     const focus = field !== null && active === field.field ? 'field'
       : strip !== null && strip.cards.includes(active as HTMLButtonElement) ? 'card'
         : active instanceof HTMLButtonElement ? 'button' : 'page';
