@@ -141,8 +141,8 @@ assert.equal(modelsDecide([teo, ari]), "Teo's and Ari's models decide. Everyone 
 assert.equal(modelsDecide([teo, ari, resident]), "Teo's, Ari's and the resident's models decide. Everyone else carries on as before.");
 assert.equal(modelsDecide([teo, ari, resident, ines]), "Teo's model and 3 more decide. Everyone else carries on as before.");
 assert.equal(modelsDecide([]), null);
-assert.equal(stopsAfter(10), 'It stops after 10 minutes, or when you stop it.');
-assert.equal(stopsAfter(1), 'It stops after 1 minute, or when you stop it.');
+assert.equal(stopsAfter(10), 'It stops after 10 minutes of real time, or when you stop it.');
+assert.equal(stopsAfter(1), 'It stops after 1 minute of real time, or when you stop it.');
 const limits = { wallSeconds: 600, usd: '0.05000000' };
 const asked = questionGroup({ who: teo, askers: [teo], models: ['Nemotron 3 Nano 30B'], limits, anotherModel: true });
 assert.equal(asked.name, 'Teo');
@@ -152,7 +152,7 @@ assert.equal(asked.note, "Teo's model decides. Everyone else carries on as befor
 assert.deepEqual(keys(asked), ['Enter Run', 'M Choose another model']);
 assert.deepEqual(asked.rows.map(row => row.action), ['run', 'model']);
 assert.equal(asked.print, 'Nemotron 3 Nano 30B · at most $0.05');
-assert.equal(asked.after, 'It stops after 10 minutes, or when you stop it.');
+assert.equal(asked.after, 'It stops after 10 minutes of real time, or when you stop it.');
 assert.equal(asked.refused, false);
 assert.deepEqual(keys(questionGroup({ who: teo, models: ['M'], limits })), ['Enter Run'], 'no other model offered, or this page cannot choose: no M');
 assert.equal(questionGroup({ who: teo, models: ['M'], limits, busy: true }).rows[0].disabled, true);

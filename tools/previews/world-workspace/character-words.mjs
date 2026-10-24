@@ -318,8 +318,11 @@ export function modelsNamed(names) {
   return `${named[0]} and ${named.length - 1} other models`;
 }
 
-/** Under the Run question's model and cap (r08): when the run stops, naming no control. */
-export const stopsAfter = minutes => `It stops after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}, or when you stop it.`;
+/**
+ * Under the Run question's model and cap (r08): when the run stops, naming no control, its minutes said as real
+ * time so they are never read as the world's (DESIGN 03:57).
+ */
+export const stopsAfter = minutes => `It stops after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} of real time, or when you stop it.`;
 
 /** The Run question's way to another model (r08), where another is offered and this page may choose. */
 export const ANOTHER_MODEL = 'Choose another model';
