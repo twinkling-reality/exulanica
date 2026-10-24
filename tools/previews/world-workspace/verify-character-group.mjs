@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { GROUP_LAYOUT, MODEL_ROWS, SAID_READ, choosableModels, offersModels, openWhileOffered, deciderOf, freeHere, groupContent, groupPlace, keepLastSaid, lastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, questionGroup, readLastSaid } from './character-group.mjs';
+import { GROUP_LAYOUT, MODEL_ROWS, SAID_READ, choosableModels, offersModels, openWhileOffered, deciderOf, freeHere, groupContent, groupHeld, groupPlace, keepLastSaid, lastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, questionGroup, readLastSaid } from './character-group.mjs';
 import { GROUP_WORDS, called, decidesPrint, modelsDecide, noModelRunning, quoted, saidUnder, stopsAfter } from './character-words.mjs';
 import { dayWord } from './talk-words.mjs';
 
@@ -348,6 +348,17 @@ assert.equal(groupPlace({ head, bounds, size, viewport, prefer: 'left' }).side, 
 assert.equal(groupPlace({ head, bounds, size, viewport, prefer: 'left' }).x, 905 - 100 - 420);
 assert.equal(groupPlace({ head: { x: 200, y: 500 }, bounds: { left: 160, right: 240 }, size, viewport, prefer: 'left' }).side, 'right', 'no room on the left: the right');
 assert.equal(groupPlace({ head: { x: 1700, y: 500 }, bounds: { left: 1660, right: 1740 }, size, viewport, prefer: 'right' }).side, 'left', 'no room on the right: the left');
+// P7: its person walked out of view with the list open. It stays where it stood; the leader runs from the edge they
+// left by to the side of the group facing it, at the name line, as groupPlace draws one.
+const offLeft = groupHeld({ last: right, edge: { x: 0, y: 540 }, size });
+assert.deepEqual([offLeft.x, offLeft.y, offLeft.side], [right.x, right.y, 'right'], 'left by the left edge: held where it stood');
+assert.deepEqual({ ...offLeft.leader.from }, { x: 0, y: 540 });
+assert.deepEqual({ ...offLeft.leader.elbow }, { ...right.leader.elbow }, 'the leader ends where it ended');
+assert.deepEqual({ ...offLeft.leader.to }, { ...right.leader.to });
+const offRight = groupHeld({ last: right, edge: { x: 1920, y: 300 }, size });
+assert.deepEqual([offRight.x, offRight.side], [right.x, 'left'], 'left by the right edge: the leader comes to its right side');
+assert.equal(offRight.leader.elbow.x, right.x + 420 + 56);
+assert.equal(offRight.leader.to.x, right.x + 420 + 36);
 // It keeps inside the screen and clear of the bands where the world screen's pills and keys sit.
 assert.equal(groupPlace({ head: { x: 400, y: 20 }, bounds: { left: 360, right: 440 }, size, viewport }).y, GROUP_LAYOUT.top);
 assert.equal(groupPlace({ head: { x: 400, y: 1070 }, bounds: { left: 360, right: 440 }, size, viewport }).y, 1080 - GROUP_LAYOUT.bottom - 336);

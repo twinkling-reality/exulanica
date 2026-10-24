@@ -5,7 +5,7 @@
 // and places it each frame, so it follows the person and flips side near the screen's edge.
 import './character-group.css';
 import { chip, glyphRows, setChipLive, shade } from './world-ui.ts';
-import { groupPlace } from './character-group.mjs';
+import { groupHeld, groupPlace } from './character-group.mjs';
 import { CHARACTER_WORDS } from './character-words.mjs';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -60,6 +60,11 @@ export interface CharacterGroup {
   set(content: GroupContent | null): void;
   /** Places the group and its leader beside the person; null hides them (the person out of view). */
   place(at: GroupAnchor | null): void;
+  /**
+   * Holds the group where it last stood, its leader from `edge`, the point at the view's edge its person left by (P7);
+   * hidden where it has not stood yet.
+   */
+  hold(edge: { readonly x: number; readonly y: number }): void;
   remove(): void;
 }
 
@@ -87,11 +92,25 @@ export function characterGroup({ scale, onAction }: { readonly scale: () => numb
   group.setAttribute('role', 'group');
   root.append(leader, group);
   let shown: string | null = null, placed = '';
+  // Where it last stood, for holding it there.
+  let last: { readonly x: number; readonly y: number } | null = null;
+  const draw = (at: { readonly x: number; readonly y: number; readonly side: string; readonly leader: { readonly from: { x: number; y: number }; readonly elbow: { x: number; y: number }; readonly to: { x: number; y: number } } }) => {
+    const transform = `translate3d(${at.x.toFixed(1)}px,${at.y.toFixed(1)}px,0)`;
+    const { from, elbow, to } = at.leader;
+    const path = `M${from.x.toFixed(1)} ${from.y.toFixed(1)}L${elbow.x.toFixed(1)} ${elbow.y.toFixed(1)}L${to.x.toFixed(1)} ${to.y.toFixed(1)}`;
+    // Each frame moves it only when it moved: the person walks, the camera turns.
+    if (transform + path === placed) return;
+    placed = transform + path;
+    group.style.transform = transform;
+    line.setAttribute('d', path);
+    dot.setAttribute('cx', from.x.toFixed(1)); dot.setAttribute('cy', from.y.toFixed(1));
+    root.dataset.side = at.side;
+  };
 
   return {
     root,
     set(content) {
-      if (!content) { shown = null; root.hidden = true; group.replaceChildren(); return; }
+      if (!content) { shown = null; last = null; root.hidden = true; group.replaceChildren(); return; }
       const key = JSON.stringify(content);
       if (key === shown) return;
       shown = key;
@@ -125,16 +144,13 @@ export function characterGroup({ scale, onAction }: { readonly scale: () => numb
       root.hidden = false;
       const at2 = groupPlace({ head: at.head, bounds: at.bounds, size: { width: group.offsetWidth, height: group.offsetHeight },
         viewport: { width: innerWidth, height: innerHeight }, scale: scale(), prefer: at.prefer ?? null });
-      const transform = `translate3d(${at2.x.toFixed(1)}px,${at2.y.toFixed(1)}px,0)`;
-      const { from, elbow, to } = at2.leader;
-      const path = `M${from.x.toFixed(1)} ${from.y.toFixed(1)}L${elbow.x.toFixed(1)} ${elbow.y.toFixed(1)}L${to.x.toFixed(1)} ${to.y.toFixed(1)}`;
-      // Each frame moves it only when it moved: the person walks, the camera turns.
-      if (transform + path === placed) return;
-      placed = transform + path;
-      group.style.transform = transform;
-      line.setAttribute('d', path);
-      dot.setAttribute('cx', from.x.toFixed(1)); dot.setAttribute('cy', from.y.toFixed(1));
-      root.dataset.side = at2.side;
+      last = { x: at2.x, y: at2.y };
+      draw(at2);
+    },
+    hold(edge) {
+      if (last === null || shown === null) { root.hidden = true; return; }
+      root.hidden = false;
+      draw(groupHeld({ last, edge, size: { width: group.offsetWidth, height: group.offsetHeight }, scale: scale() }));
     },
     remove() { root.remove(); },
   };

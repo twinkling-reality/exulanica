@@ -182,6 +182,24 @@ export function groupPlace({ head, bounds, size, viewport, scale = 1, layout = G
   return Object.freeze({ x, y, side, leader });
 }
 
+/**
+ * Where a group that holds its model list or Run question stands while its person is out of view (P7): where it last
+ * stood (`last`, a groupPlace answer, with the group's `size`), its leader from `edge`, the point at the view's edge
+ * the person left by, to the side of the group that faces it, at the name line, as groupPlace draws it.
+ */
+export function groupHeld({ last, edge, size, scale = 1, layout = GROUP_LAYOUT }) {
+  const side = edge.x <= last.x + size.width / 2 ? 'right' : 'left';
+  const towards = side === 'right' ? 1 : -1;
+  const facing = side === 'right' ? last.x : last.x + size.width;
+  const nameY = last.y + layout.nameMiddle * scale;
+  const leader = Object.freeze({
+    from: Object.freeze({ x: edge.x, y: edge.y }),
+    elbow: Object.freeze({ x: facing - towards * layout.elbow * scale, y: nameY }),
+    to: Object.freeze({ x: facing - towards * layout.end * scale, y: nameY }),
+  });
+  return Object.freeze({ x: last.x, y: last.y, side, leader });
+}
+
 /** How many model rows show at once, each on its number key (1 to 9); the arrows move past nine (r07). */
 export const MODEL_ROWS = 9;
 

@@ -57,6 +57,8 @@ export interface CharacterPresence {
    * top of a character's head on screen, where the group's leader starts.
    */
   place(at: { readonly bounds: SubjectBounds; readonly prefer?: 'right' | 'left' | null; readonly head?: { readonly x: number; readonly y: number } } | null): void;
+  /** Holds the group where it last stood while its person is out of view, its leader from `edge` (P7); the card hides. */
+  hold(edge: { readonly x: number; readonly y: number }): void;
   /** Hides the tag and cards while a page is up, and brings them back after. */
   setCovered(covered: boolean): void;
   /**
@@ -153,6 +155,11 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
         grouped.place({ head: at.head ?? { x: (at.bounds.left + at.bounds.right) / 2, y: at.bounds.headY ?? at.bounds.top }, bounds: at.bounds, prefer: at.prefer ?? null });
       }
       else if (chosen) { question.hide(); card.place(at.bounds, { prefer: at.prefer ?? null }); }
+      keepTagClear();
+    },
+    hold(edge) {
+      card.hide(); question.hide();
+      if (covered || !grouping) grouped.place(null); else grouped.hold(edge);
       keepTagClear();
     },
     cover: (element) => under.cover(element),

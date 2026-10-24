@@ -1354,7 +1354,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         const half = ring.rx * BODY_HALF_WIDTH;
         presence.place({ bounds: { left: Math.min(heldFrame.left, ring.x - half), right: Math.max(heldFrame.right, ring.x + half), top: heldFrame.top, bottom: heldFrame.bottom,
           headY, waistY: headY + (ring.y - headY) * CARD_WAIST }, prefer: awaySide(shownPops, ring.x), head: { x: heldFrame.headInView ? heldFrame.overhead.x : ring.x, y: headY } });
-      } else presence.place(null);
+      } else if (!scened.showing && (picker.of(held) || asking)) { const head = targetPoint(held, true), at = head && b.camera.camera.worldToScreen(head), right = head && head.clone().sub(b.camera.getPosition()).dot(b.camera.right) >= 0;
+        // P7: a group with its list or Run question open holds where it stood, its leader from where its person left the view.
+        presence.hold(at && at.z > 0 ? { x: Math.max(0, Math.min(innerWidth, at.x)), y: Math.max(0, Math.min(innerHeight, at.y)) } : { x: right ? innerWidth : 0, y: innerHeight / 2 }); } else presence.place(null);
     } else { groundRing.hide(); heldInView = false; }
     // Lines over whoever said one or whose mind chose something (N28 section 4, T1 to T4), none over a record page
     // (F12): within hearing, 24 px over the head and never nearer an edge of the view than the edge inset; two that
