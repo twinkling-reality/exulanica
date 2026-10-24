@@ -249,6 +249,9 @@ span.wu-prompt { cursor: default; }
   animation: wu-note-in var(--t-note-in) var(--ease) both; }
 .wu-note[data-leaving="true"] { animation: wu-note-out var(--t-note-out) var(--ease) both; }
 .wu-note .wu-prompt { text-shadow: none; font-size: max(12px, calc(15 * var(--u))); }
+/* A second line under the note's words: what a thing placed closes to cars (B1). */
+.wu-note-lines { display: flex; flex-direction: column; gap: calc(4 * var(--u)); }
+.wu-note-under { font-size: max(12px, calc(15 * var(--u))); color: var(--ink-2); }
 /* Clear of the hints while walking or flying; above the catalog in build mode; low on a page. */
 .wu-note[data-place="build"] { bottom: calc(236 * var(--u)); }
 .wu-note[data-place="page"] { bottom: calc(46 * var(--u)); }

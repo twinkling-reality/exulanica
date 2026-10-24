@@ -16,6 +16,8 @@ interface BuildMode {
   dispose(): void;
 }
 interface Write { readonly actionId: string; readonly path: string; readonly body: Record<string, unknown> }
+/** A note build mode showed: its words and the second line under them. */
+interface Said { readonly words: string; readonly under?: string }
 const build = async (): Promise<{ mountBuildMode(host: Record<string, unknown>): BuildMode }> =>
   import('../../../../tools/previews/world-workspace/' + 'build-mode.ts') as Promise<{ mountBuildMode(host: Record<string, unknown>): BuildMode }>;
 
@@ -36,9 +38,14 @@ class Point {
 let mounted: BuildMode | null = null;
 afterEach(() => { mounted?.dispose(); mounted = null; document.body.replaceChildren(); });
 
-/** Build mode in a made world with one creature made, the server ready for every spot; its writes kept in order. */
-async function mount(): Promise<{ mode: BuildMode; writes: Write[] }> {
-  const writes: Write[] = [];
+/**
+ * Build mode in a made world with one creature made, the server ready for every spot; its writes kept in order and
+ * its notes as shown. `previewed(n)` is the n-th place preview's answer beyond ready (from 0), and it answers once
+ * `held(n)` lets it (at once by default).
+ */
+async function mount({ previewed = (_: number): Record<string, unknown> => ({}), held = (_: number): Promise<void> => Promise.resolve() } = {}): Promise<{ mode: BuildMode; writes: Write[]; said: Said[] }> {
+  const writes: Write[] = [], said: Said[] = [];
+  let previews = 0;
   const root = document.createElement('div'), canvas = document.createElement('canvas');
   document.body.append(root, canvas);
   const read = async (path: string): Promise<unknown> => {
@@ -48,15 +55,18 @@ async function mount(): Promise<{ mode: BuildMode; writes: Write[] }> {
   };
   const send = async (write: Write): Promise<{ body: unknown }> => {
     writes.push(write);
-    return { body: write.actionId === 'things.place.preview' ? { availability: 'ready', landing: { checked: true } } : {} };
+    if (write.actionId !== 'things.place.preview') return { body: {} };
+    const n = previews++;
+    await held(n);
+    return { body: { availability: 'ready', landing: { checked: true }, ...previewed(n) } };
   };
-  const notes = { show: () => {}, clear: () => {}, place: () => {} };
+  const notes = { show: (words: string, options: { under?: string } = {}) => { said.push({ words, ...(options.under ? { under: options.under } : {}) }); }, clear: () => {}, place: () => {} };
   const corners = { mode: () => {}, keys: () => {}, hints: () => {}, back: () => {}, notes };
   const camera = { getPosition: () => new Point(0, 10, 0), camera: { worldToScreen: (_: unknown, out = new Point()) => out.set(0, 0, -1) } };
   const b = { camera, regionRoots: new Map(), authoredSociety: null, __workspaceThings: () => null, __workspacePick: () => null };
   const { mountBuildMode } = await build();
   mounted = mountBuildMode({ b, root, state: { activeWorldEntry: entry }, entry, read, send, binding: () => saved, canvas, corners, inspecting: () => false });
-  return { mode: mounted, writes };
+  return { mode: mounted, writes, said };
 }
 const press = (mode: BuildMode, code: string): boolean => mode.key(new KeyboardEvent('keydown', { code, bubbles: true }));
 const asked = (writes: readonly Write[]): Write | undefined => writes.find((write) => write.actionId === 'things.place.preview');
@@ -95,6 +105,40 @@ describe('build mode holding a made creature for the page that made it', () => {
     expect(press(mode, 'Escape')).toBe(true);
     expect(await second).toEqual({ outcome: 'put-back' });
     expect(writes.some((write) => write.actionId === 'things.place')).toBe(false);
+  });
+
+  it('says what its spot closes to cars on its line while held, then under the placed note (B1)', async () => {
+    const elm = { rules: 3, read: true, lanes: 1, streets: [], turns: [{ segment: 'segment:2', street: 'Elm Street' }], widest: 'turn' };
+    const { mode, writes, said } = await mount({ previewed: () => ({ closes: elm }) });
+    const held = mode.hold({ source: 'workspace', sha256: PIP }, { xMm: 4000, zMm: -8000 });
+    await vi.waitFor(() => expect(document.querySelector('.wu-held-line')?.textContent).toBe('Placed here, it closes the turn into Elm Street.'));
+    expect(press(mode, 'Enter')).toBe(true);
+    await held;
+    expect(writes.some((write) => write.actionId === 'things.place')).toBe(true);
+    await vi.waitFor(() => expect(said).toHaveLength(1));
+    expect(said.at(-1)).toEqual({ words: expect.stringMatching(/^You placed the /u), under: 'Cars can no longer turn into Elm Street here.' });
+  });
+
+  it('says only what the preview of the spot it is kept at says: one still on its way at Enter is waited for (B1)', async () => {
+    const lane = { rules: 2, read: true, lanes: 1, streets: [], turns: [], widest: 'lane' };
+    let answerTurned = (): void => {};
+    const turned = new Promise<void>((resolve) => { answerTurned = resolve; });
+    // The first spot closes a lane; the roads under the turned one could not be read, which says nothing.
+    const { mode, writes, said } = await mount({ previewed: (n) => ({ closes: n === 0 ? lane : { rules: 2, read: false } }), held: (n) => (n === 0 ? Promise.resolve() : turned) });
+    const held = mode.hold({ source: 'workspace', sha256: PIP }, { xMm: 4000, zMm: -8000 });
+    await vi.waitFor(() => expect(document.querySelector('.wu-held-line')?.textContent).toBe('Placed here, it closes this lane to cars.'));
+    expect(press(mode, 'BracketRight')).toBe(true);
+    await vi.waitFor(() => expect(writes.filter((write) => write.actionId === 'things.place.preview')).toHaveLength(2));
+    expect(document.querySelector('.wu-held-line')).toBeNull();
+    expect(press(mode, 'Enter')).toBe(true);
+    await answered();
+    expect(writes.some((write) => write.actionId === 'things.place')).toBe(false);
+    answerTurned();
+    await held;
+    const placed = writes.find((write) => write.actionId === 'things.place')!;
+    expect(placed.body.pose).toEqual(writes.filter((write) => write.actionId === 'things.place.preview')[1]!.body.pose);
+    await vi.waitFor(() => expect(said).toHaveLength(1));
+    expect(said.at(-1)).toEqual({ words: expect.stringMatching(/^You placed the /u) });
   });
 
   it('holds nothing for a kind that is not a made one', async () => {

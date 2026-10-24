@@ -95,8 +95,8 @@ async function mount(picked: { readonly direction: readonly number[]; readonly d
     if (write.actionId.endsWith('.preview')) return new Promise((resolve) => { waiting.push((body) => resolve({ body })); });
     return Promise.resolve({ body: {} });
   };
-  const shown: Array<{ readonly words: string; readonly prompt: string }> = [];
-  const notes = { show: (words: string, options: { prompt?: Element } = {}) => { shown.push({ words, prompt: options.prompt?.textContent ?? '' }); }, clear: () => {}, place: () => {} };
+  const shown: Array<{ readonly words: string; readonly prompt: string; readonly under?: string }> = [];
+  const notes = { show: (words: string, options: { prompt?: Element; under?: string } = {}) => { shown.push({ words, prompt: options.prompt?.textContent ?? '', ...(options.under ? { under: options.under } : {}) }); }, clear: () => {}, place: () => {} };
   // The clock's pill: whether people live in this world.
   const corners = { mode: () => {}, keys: () => {}, hints: () => {}, back: () => {}, notes, hasClock: () => peopleLive };
   const project = (p: Point, out = new Point()): Point => {
@@ -219,6 +219,22 @@ describe('carrying a chosen thing by the point a press met on it', () => {
     await answer();
     await vi.waitFor(() => expect(writes.some((write) => write.actionId === 'things.move')).toBe(true));
     expect(writes.find((write) => write.actionId === 'things.move')!.body.pose).toMatchObject({ x_mm: 0, z_mm: -1500 });
+  });
+
+  it('says what a dragged thing closes to cars where it is kept, under the note, as its preview there says (B1)', async () => {
+    rays.set('500,300', back.ray);
+    rays.set('500,400', down.ray);
+    const { mode, writes, answer, shown } = await mount({ direction: back.ray.direction, distance: back.distance });
+    expect(press(mode, 'KeyB')).toBe(true);
+    await vi.waitFor(() => expect(mode.click(500, 300)).toBe(true));
+    await settled();
+    expect(mode.pointerDown(new MouseEvent('mousedown', { button: 0, clientX: 500, clientY: 300 }))).toBe(true);
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 500, clientY: 400 }));
+    document.dispatchEvent(new MouseEvent('mouseup', { clientX: 500, clientY: 400 }));
+    await answer({ availability: 'ready', landing: { checked: true }, closes: { rules: 2, read: true, lanes: 2, streets: [{ segment: 'segment:1', street: 'Mill Road' }], turns: [], widest: 'street' } });
+    await vi.waitFor(() => expect(writes.some((write) => write.actionId === 'things.move')).toBe(true));
+    await vi.waitFor(() => expect(shown.at(-1)?.prompt).toContain('Undo'));
+    expect(shown.at(-1)).toMatchObject({ words: 'You moved the bench', under: 'Cars now take other streets.' });
   });
 
   it('keeps the met point under the pointer as it is dragged, not the ground behind the thing', async () => {

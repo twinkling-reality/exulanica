@@ -25,7 +25,7 @@ import { pickSiteSlot } from '../../../web/packages/app/src/composition/sight.ts
 import { currentOpenSite } from '../../../web/packages/app/src/composition/site-world.ts';
 import { kindDocumentLabel } from '../../../web/packages/app/src/composition/visitor-notices.ts';
 import { townThingName } from './town-thing-names.mjs';
-import { BUSY, MADE_WITH_WORLD, REDO_KEY, TRAY, TURN_DEGREES, UNDO_KEY, buildKeys, changeParts, createKindLabels, facingYaw, heldRows, keyAction, namesTogether, nothingInView, nothingPlaceable, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
+import { BUSY, MADE_WITH_WORLD, REDO_KEY, TRAY, TURN_DEGREES, UNDO_KEY, buildKeys, changeParts, closingWords, createKindLabels, facingYaw, heldRows, keyAction, namesTogether, nothingInView, nothingPlaceable, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
 import { youChangeWords } from './history-words.mjs';
 import { keyWord, nameTag, outline, path, scaleOf } from './world-ui.ts';
 import { heldGroup, namesNear, tray, type TrayTab } from './world-ui-build.ts';
@@ -186,12 +186,15 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     canMake: makeCreature !== null && !making && !trayView.root.hidden,
   });
 
-  /** The note above the tray; a change it reports can be taken back from it, and an undo done again (W12.3). */
-  function say(words, { undoable = false, redoable = false } = {}) {
+  /**
+   * The note above the tray; a change it reports can be taken back from it, and an undo done again (W12.3). `under`
+   * is a second line under its words: what a thing placed or moved closes to cars (B1).
+   */
+  function say(words, { undoable = false, redoable = false, under = null } = {}) {
     if (!words) { corners.notes.clear(); return; }
     const prompt = undoable ? keyWord({ ...UNDO_KEY, small: true, onPress: () => { void undo(); } })
       : redoable ? keyWord({ ...REDO_KEY, small: true, onPress: () => { void redo(); } }) : null;
-    corners.notes.show(words, prompt ? { prompt } : {});
+    corners.notes.show(words, { ...(prompt ? { prompt } : {}), ...(under ? { under } : {}) });
   }
   function problem(error) {
     const detail = typeof error?.code === 'string' && typeof error.message === 'string' && error.message.startsWith(error.code + ': ') ? error.message.slice(error.code.length + 2) : '';
@@ -489,7 +492,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
         // Stood at the height the ground says it rests at there, so its copy, its ring and the kept pose agree (W12.6).
         const at = restingAt(answered, to);
         held.to = at;
-        held.verdict = { state: 'ready', words: answered.landing?.checked === false ? 'Where it may stand is not checked in this world.' : '', base: stateBase, to: at };
+        held.verdict = readyVerdict(answered, stateBase, at);
       } else held.verdict = { state: 'refused', words: refusalWords(answered.blocked_reason, answered.blocked_detail) };
     } catch (error) {
       if (request !== asked || placing !== held) return;
@@ -501,6 +504,16 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     if (held.letGo) { held.letGo = false; if (held.verdict.state === 'ready') { void placeNew(); return; } }
     tellPlacing(held);
   }
+  /**
+   * A ready place or move preview's verdict for `to`: the held line's words, what standing there closes to cars and
+   * where the world does not check where a thing may stand, that; its closing, said under the note once it is kept
+   * there (B1). Kept with the verdict, so a drop says only what the preview of the position kept says.
+   */
+  const readyVerdict = (answered, stateBase, to) => {
+    const closing = closingWords(answered.closes);
+    const words = [closing?.held, answered.landing?.checked === false ? 'Where it may stand is not checked in this world.' : ''].filter(Boolean).join(' ');
+    return { state: 'ready', words, base: stateBase, to, closing };
+  };
   /** `to` at the height a ready preview says the thing rests at (`landing.rest_y_mm`), where it says one. */
   const restingAt = (answered, to) => (Number.isFinite(answered.landing?.rest_y_mm) && answered.landing.rest_y_mm !== to.y ? { ...to, y: answered.landing.rest_y_mm } : to);
   const placingBody = (held, to) => ({
@@ -538,7 +551,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       busy = false; dropPlacing({ outcome: 'placed', thingId: held.thingId });
       try { await refreshRecords(); } catch {}
       if (records.has(held.thingId)) selected = held.thingId;
-      render(); say(youDid('add_thing', held.thingId, name), { undoable: true });
+      render(); say(youDid('add_thing', held.thingId, name), { undoable: true, under: verdict.closing?.placed });
       if (held.kind.source === 'workspace') void readCreatures(true);
       return;
     } catch (error) {
@@ -765,7 +778,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
         // A thing stands at the height its ground says it rests at there; a made part keeps its floor.
         const at = isPart(move.placedId) ? to : restingAt(answered, to);
         move.to = at;
-        move.verdict = { state: 'ready', words: answered.landing?.checked === false ? 'Where it may stand is not checked in this world.' : '', base: stateBase, to: at };
+        move.verdict = readyVerdict(answered, stateBase, at);
       } else move.verdict = { state: 'refused', words: refusalWords(answered.blocked_reason, answered.blocked_detail) };
     } catch (error) {
       if (request !== asked || moving !== move) return;
@@ -815,7 +828,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
       const to = verdict.to;
       await post(actionOf(move.placedId, 'move'), routeOf(move.placedId) + '/move',
         { base_state_sha256: verdict.base, pose: poseOf(move.placedId, to), saved_entry: savedEntry() });
-      busy = false; dropMove(); render(); say(youDid(isPart(move.placedId) ? 'transform_element' : 'move_thing', move.placedId, name, { turned_in_place: turnedInPlace(poseOf(move.placedId, move.from), poseOf(move.placedId, to)) }), { undoable: true });
+      busy = false; dropMove(); render(); say(youDid(isPart(move.placedId) ? 'transform_element' : 'move_thing', move.placedId, name, { turned_in_place: turnedInPlace(poseOf(move.placedId, move.from), poseOf(move.placedId, to)) }), { undoable: true, under: verdict.closing?.placed });
     } catch (error) {
       busy = false;
       if (moving === move) move.verdict = { state: 'refused', words: problem(error) };

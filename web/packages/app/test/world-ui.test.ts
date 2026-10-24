@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /** What these tests use of world-ui.ts, a preview module outside this package. */
-interface Notes { show(words: string, options?: { prompt?: HTMLElement; ms?: number }): void; place(where: 'world' | 'build' | 'page'): void; readonly root: HTMLElement }
+interface Notes { show(words: string, options?: { prompt?: HTMLElement; ms?: number; under?: string }): void; place(where: 'world' | 'build' | 'page'): void; readonly root: HTMLElement }
 interface Page { readonly root: HTMLElement; readonly content: HTMLElement; readonly keys: HTMLElement; open(host: HTMLElement): void; close(): void }
 interface WorldUi {
   keyWord(options: { keys: readonly string[] | 'mouse' | 'mouse-click'; word: string; shortcut?: string; onPress?: () => void; small?: boolean; disabled?: boolean }): HTMLElement;
@@ -112,6 +112,19 @@ describe('the other parts', () => {
     vi.advanceTimersByTime(301 + 1);
     expect(shown.root.hidden).toBe(true);
     expect(shown.root.textContent).toBe('');
+  });
+
+  it('a note can carry a second line under its words, beside its prompt (B1)', async () => {
+    const { notes, keyWord } = await parts();
+    const shown = notes(document.body);
+    shown.show('You placed the bench', { prompt: keyWord({ keys: ['⌘Z'], word: 'Undo', onPress: () => {} }), under: 'Cars now keep to the other lane.' });
+    const lines = shown.root.querySelector('.wu-note-lines');
+    expect([...lines!.children].map((line) => [line.className, line.textContent])).toEqual([
+      ['wu-note-words', 'You placed the bench'], ['wu-note-under', 'Cars now keep to the other lane.'],
+    ]);
+    expect(lines!.nextElementSibling?.textContent).toBe('⌘ZUndo');
+    shown.show('Moved the bench.');
+    expect(shown.root.querySelector('.wu-note-lines, .wu-note-under')).toBeNull();
   });
 
   it('a page is a modal dialog with its key row, and closing removes it', async () => {

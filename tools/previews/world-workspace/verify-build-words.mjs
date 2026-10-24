@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { BUSY, HISTORY, MADE_WITH_WORLD, MAX_YAW, TRAY, TURN_DEGREES, buildKeys, createKindLabels, changeParts, changeWords, clockWords, dayWords, facingYaw, heldRows, keyAction, madeBeingName, namesTogether, nothingInView, nothingPlaceable, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
+import { BUSY, HISTORY, MADE_WITH_WORLD, MAX_YAW, TRAY, TURN_DEGREES, buildKeys, createKindLabels, changeParts, changeWords, clockWords, closingWords, dayWords, facingYaw, heldRows, keyAction, madeBeingName, namesTogether, nothingInView, nothingPlaceable, placedLine, previewParts, redoRefusalWords, refusalWords, removeLine, removeTitle, snapped, thingName, titled, turned, turnedInPlace, undoRefusalWords } from './build-words.mjs';
 import { youChangeWords } from './history-words.mjs';
 import { townThingName } from './town-thing-names.mjs';
 import { called } from './character-words.mjs';
@@ -134,6 +134,21 @@ const turnLog = [{ edit_id: 'n1', kind: 'move_thing', thing_id: 'bench:1', turne
 assert.deepEqual(turnLog.map(edit => changeWords(edit, turnLog, () => 'bench')), ['Turned the bench', 'Turned the bench back', 'Turned the bench again']);
 // The card's line for a placed thing, which the chosen card outside build mode reads too.
 assert.equal(placedLine(), 'Placed in this world');
+// What a thing standing there closes to cars, from a ready preview's `closes` (B1): the widest closing alone, a street
+// over a turn over a lane, on the held line and under the placed note; a turn by the street it turns into, "the turn
+// here" where the town names none.
+{
+  const read = (widest, turns = []) => ({ rules: 3, read: true, lanes: 2, streets: widest === 'street' ? [{ segment: 's:1', street: 'Mill Road' }] : [], turns, widest });
+  const elm = [{ segment: 's:2', street: 'Elm Street' }, { segment: 's:3', street: 'Ash Lane' }];
+  assert.deepEqual(closingWords(read('lane')), { held: 'Placed here, it closes this lane to cars.', placed: 'Cars now keep to the other lane.' });
+  assert.deepEqual(closingWords(read('street', elm)), { held: 'Placed here, it closes this street to cars.', placed: 'Cars now take other streets.' });
+  assert.deepEqual(closingWords(read('turn', elm)), { held: 'Placed here, it closes the turn into Elm Street.', placed: 'Cars can no longer turn into Elm Street here.' });
+  for (const turns of [[{ segment: 's:2', street: null }], [{ segment: 's:2', street: '  ' }], []]) {
+    assert.deepEqual(closingWords(read('turn', turns)), { held: 'Placed here, it closes the turn here.', placed: 'Cars can no longer turn here.' });
+  }
+  // Nothing said where the preview states nothing closed: on no lane, roads it could not read, rules 1 (no `closes`).
+  for (const closes of [read(null), { rules: 3, read: false }, { rules: 2, read: false, widest: 'lane' }, undefined, null]) assert.equal(closingWords(closes), null);
+}
 // A change the server could not take up yet says so, in DESIGN's words (W11), whichever wait it is.
 for (const code of ['kind_work_overran', 'kind_work_busy', 'kind_work_unavailable']) assert.equal(refusalWords(code, 'Ask again shortly.'), BUSY);
 assert.equal(BUSY, 'The world is busy with another change. Try again in a moment.');

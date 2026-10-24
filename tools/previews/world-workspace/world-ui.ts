@@ -236,8 +236,11 @@ export function anchor(part: HTMLElement, x: number, y: number, { inset = ANCHOR
 export type NotePlace = 'world' | 'build' | 'page';
 
 export interface Notes {
-  /** Shows one line, replacing any note on screen; it leaves after its time unless `ms` is 0. */
-  show(words: string, options?: { readonly prompt?: HTMLElement; readonly ms?: number }): void;
+  /**
+   * Shows one line, and `under` it a second where given, replacing any note on screen; it leaves after its time unless
+   * `ms` is 0.
+   */
+  show(words: string, options?: { readonly prompt?: HTMLElement; readonly ms?: number; readonly under?: string }): void;
   clear(): void;
   place(where: NotePlace): void;
   readonly root: HTMLElement;
@@ -259,9 +262,14 @@ export function notes(host: HTMLElement, { place = 'world' }: { readonly place?:
     root,
     clear,
     place(where) { root.dataset.place = where; },
-    show(words, { prompt, ms } = {}) {
+    show(words, { prompt, ms, under } = {}) {
       clear();
-      root.append(element('span', 'wu-note-words', words));
+      const said = element('span', 'wu-note-words', words);
+      if (under) {
+        const lines = element('span', 'wu-note-lines');
+        lines.append(said, element('span', 'wu-note-under', under));
+        root.append(lines);
+      } else root.append(said);
       if (prompt) root.append(prompt);
       root.hidden = false;
       const stay = ms ?? noteDuration(Boolean(prompt));

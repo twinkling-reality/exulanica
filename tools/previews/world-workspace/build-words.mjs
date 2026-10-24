@@ -293,6 +293,26 @@ export function placedLine() {
   return 'Placed in this world';
 }
 
+/**
+ * What a thing standing where a ready preview asked closes to cars, from the preview's `closes`: `held`, on the held
+ * thing's line before it is let go, and `placed`, under the note once it stands there (ruling B1, 11:39 on 24 October).
+ * Only the widest closing is said, a street over a turn over a lane; a turn by the street it turns into, "the turn
+ * here" where the town names none. Null where the preview states nothing closed: under the town's rules 1, a thing
+ * on no lane, or roads it could not read (`read: false`), which never guesses.
+ */
+export function closingWords(closes) {
+  if (closes?.read !== true) return null;
+  if (closes.widest === 'street') return { held: 'Placed here, it closes this street to cars.', placed: 'Cars now take other streets.' };
+  if (closes.widest === 'turn') {
+    const street = typeof closes.turns?.[0]?.street === 'string' ? closes.turns[0].street.trim() : '';
+    return street
+      ? { held: `Placed here, it closes the turn into ${street}.`, placed: `Cars can no longer turn into ${street} here.` }
+      : { held: 'Placed here, it closes the turn here.', placed: 'Cars can no longer turn here.' };
+  }
+  if (closes.widest === 'lane') return { held: 'Placed here, it closes this lane to cars.', placed: 'Cars now keep to the other lane.' };
+  return null;
+}
+
 /** Said when Tab finds nothing to choose. */
 export function nothingInView() {
   return 'No placed things in view. Walk closer to one.';
