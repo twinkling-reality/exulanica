@@ -6,7 +6,7 @@ import { mountFrameMeasurement } from './frame-measurement.mjs';
 import { DISCOVERY, clickReach, inspectionReach } from './discovery-policy.mjs';
 import { createReadBackoff } from './read-backoff.mjs';
 import { keepWorldInAddress, returnToFrontDoor } from './front-door.ts';
-import { keepWorldPicture } from '/src/composition/world-pictures.ts';
+import { frameCheckFor, keepWorldPicture } from '/src/composition/world-pictures.ts';
 import { accessHeaders } from '/src/config.ts';
 import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
@@ -133,7 +133,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   const leaveWorld = () => {
     if (leaving) return;
     leaving = true;
-    void keepWorldPicture(b, entry.entryId).catch(() => false).finally(() => returnToFrontDoor(entry.entryId));
+    void keepWorldPicture(b, entry.entryId, frameCheckFor(entry)).catch(() => false).finally(() => returnToFrontDoor(entry.entryId));
   };
   // The corners (world-corners.ts): the way out (or Back while something is chosen), the clock with
   // Play and Pause, the hints for what works here, the reticle and the note.

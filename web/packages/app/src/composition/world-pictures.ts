@@ -129,8 +129,23 @@ export interface PictureSource {
  */
 export const FRAME_CHECK = Object.freeze({ sampleEvery: 97, flatRange: 12, washedLevel: 220, washedSpread: 24, washedShare: 0.5 });
 
+/** A check a frame is held to, by `FRAME_CHECK`'s measures. */
+export type FrameCheck = { readonly [K in keyof typeof FRAME_CHECK]: number };
+
+/**
+ * The check for the workspace's starter world (My world, which Blank opens), whose land is drawn from its first frame:
+ * pale sky over pale endless ground by its own look, so most of its samples are washed whatever stands on it (0.91 of
+ * them on its frame empty, 0.77 with a bench). It is held only to not being one flat colour.
+ */
+export const STARTER_FRAME_CHECK = Object.freeze({ ...FRAME_CHECK, washedShare: Number.POSITIVE_INFINITY });
+
+/** The check a frame of `entry`'s world is held to: the starter world's own, else every other world's. */
+export function frameCheckFor(entry: Pick<SavedWorldEntry, 'authoredScene'>): FrameCheck {
+  return entry.authoredScene?.kind === 'authored-starter' ? STARTER_FRAME_CHECK : FRAME_CHECK;
+}
+
 /** Whether pixels (RGBA) hold a drawn world by `FRAME_CHECK`: not one flat colour and not washed out. */
-export function holdsWorld(data: ArrayLike<number>, check = FRAME_CHECK): boolean {
+export function holdsWorld(data: ArrayLike<number>, check: FrameCheck = FRAME_CHECK): boolean {
   let low = 255;
   let high = 0;
   let samples = 0;
@@ -156,7 +171,7 @@ export interface FrameSize { readonly width: number; readonly height: number }
  * for a frame that holds no drawn world (`check`), or none.
  */
 export function takeFrame(
-  source: PictureSource, size: FrameSize = { width: WIDTH, height: HEIGHT }, check: typeof FRAME_CHECK = FRAME_CHECK,
+  source: PictureSource, size: FrameSize = { width: WIDTH, height: HEIGHT }, check: FrameCheck = FRAME_CHECK,
 ): Promise<HTMLCanvasElement | null> {
   const { width: WIDTH_, height: HEIGHT_ } = size;
   return new Promise((resolve) => {
@@ -204,11 +219,11 @@ function keepHere(frame: HTMLCanvasElement, entryId: string): boolean {
 }
 
 /**
- * Keep a frame of the world `entryId` names in this browser, as the person leaves it. Resolves
- * true when one was kept.
+ * Keep a frame of the world `entryId` names in this browser, as the person leaves it, held to
+ * `check` (that world's, `frameCheckFor`). Resolves true when one was kept.
  */
-export async function keepWorldPicture(source: PictureSource, entryId: string): Promise<boolean> {
-  const frame = await takeFrame(source);
+export async function keepWorldPicture(source: PictureSource, entryId: string, check: FrameCheck = FRAME_CHECK): Promise<boolean> {
+  const frame = await takeFrame(source, undefined, check);
   return frame !== null && keepHere(frame, entryId);
 }
 
@@ -276,14 +291,14 @@ export interface FirstViewWait {
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
-/** The first frame that holds a drawn world, asked for until the wait's bound, or null. */
-async function firstDrawnFrame(source: PictureSource, wait: FirstViewWait): Promise<HTMLCanvasElement | null> {
+/** The first frame that holds a drawn world by `check`, asked for until the wait's bound, or null. */
+async function firstDrawnFrame(source: PictureSource, wait: FirstViewWait, check: FrameCheck): Promise<HTMLCanvasElement | null> {
   const timing = wait.timing ?? FIRST_VIEW_WAIT;
   const sleep = wait.sleep ?? ((ms: number) => new Promise<void>((resolve) => { window.setTimeout(resolve, ms); }));
   for (let waited = 0; waited <= timing.boundMs; waited += timing.retryMs) {
     if (wait.current?.() === false) return null;
     if (wait.ready?.() !== false) {
-      const frame = await takeFrame(source);
+      const frame = await takeFrame(source, undefined, check);
       if (frame !== null) return wait.current?.() === false ? null : frame;
     }
     if (waited + timing.retryMs > timing.boundMs) break;
@@ -295,14 +310,14 @@ async function firstDrawnFrame(source: PictureSource, wait: FirstViewWait): Prom
 /**
  * Keep a frame of `entry`'s first view in this browser, and put it to the server unless the
  * server's picture is current already or the world holds or held a photograph. Only a frame that
- * holds the drawn world is kept or put: until one does (`wait`), nothing is. A refusal (a read-only
- * copy refuses every write) leaves this browser's own picture. Resolves the server's record of the
- * picture it kept, or null.
+ * holds the drawn world by its check (`frameCheckFor`) is kept or put: until one does (`wait`),
+ * nothing is. A refusal (a read-only copy refuses every write) leaves this browser's own picture.
+ * Resolves the server's record of the picture it kept, or null.
  */
 export async function keepFirstViewPicture(
   source: PictureSource, entry: SavedWorldEntry, server: Pick<PictureServer, 'putPicture'>, wait: FirstViewWait = {},
 ): Promise<SavedWorldEntryPicture | null> {
-  const frame = await firstDrawnFrame(source, wait);
+  const frame = await firstDrawnFrame(source, wait, frameCheckFor(entry));
   if (frame === null) return null;
   keepHere(frame, entry.entryId);
   const shows = `${entry.entryId} ${entry.authoredVersionId} ${entry.authoredStateSha256} ${entry.styleVersionId}`;

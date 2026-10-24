@@ -3,7 +3,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildYourWorlds, onlyUntouchedStarter } from '../src/composition/world-entry.js';
 import {
-  FIRST_VIEW_WAIT, frameJpeg, holdsWorld, jpegWithoutMetadata, keepFirstViewPicture, mayPutPicture, readServedPictures, worldPicture, type PictureSource,
+  FIRST_VIEW_WAIT, FRAME_CHECK, frameCheckFor, frameJpeg, holdsWorld, jpegWithoutMetadata, keepFirstViewPicture, keepWorldPicture, mayPutPicture,
+  readServedPictures, worldPicture, type PictureSource,
 } from '../src/composition/world-pictures.js';
 import type { SavedWorldEntry, SavedWorldEntryPicture } from '../src/world-entry-api.js';
 
@@ -412,6 +413,37 @@ describe('the pictures the server keeps', () => {
     expect(await keepFirstViewPicture(renderer(() => 40), flat, quietPut, { sleep: async () => undefined })).toBeNull();
     expect(own(flat)).toBeNull();
     expect(quietPut.putPicture).not.toHaveBeenCalled();
+  });
+
+  // The workspace's starter world (My world, which Blank opens) drawn whole: pale sky over pale endless ground, near
+  // white and colourless by its own look (measured on its frames: 0.91 of the samples washed empty, 0.77 with a bench),
+  // so the washed-out check reads it as a world not drawn yet; it is not one flat colour.
+  const paleLevel = (index: number): number => ((index >> 2) % 1000 < 500 ? 246 : 230) + ((index >> 2) % 5) + (index % 4 === 0 ? 3 : 0);
+  const myWorld = () => world({ title: 'My world', sourceKind: 'authored', authoredScene: { kind: 'authored-starter' } as never, generatedGround: null });
+
+  it('keeps the starter world\'s first view, pale by its own look, here and on the server; a made world\'s pale frame stays refused', async () => {
+    const sleep = vi.fn(async () => undefined);
+    const put = server();
+    const mine = myWorld();
+    expect(await keepFirstViewPicture(renderer(paleLevel), mine, put, { sleep })).not.toBeNull();
+    expect(own(mine)).toBe('data:image/jpeg;base64,BBBB');
+    expect(put.putPicture).toHaveBeenCalledTimes(1);
+    const made = world();
+    const madePut = server();
+    expect(await keepFirstViewPicture(renderer(paleLevel), made, madePut, { sleep })).toBeNull();
+    expect(own(made)).toBeNull();
+    expect(madePut.putPicture).not.toHaveBeenCalled();
+  });
+
+  it('keeps the view the person leaves the starter world at, pale as it is, by the check its entry chooses', async () => {
+    const mine = myWorld();
+    expect(await keepWorldPicture(renderer(paleLevel), mine.entryId, frameCheckFor(mine))).toBe(true);
+    expect(own(mine)).toBe('data:image/jpeg;base64,BBBB');
+    // A made world's check is today's: its pale frame is a world not drawn yet, and nothing is kept.
+    const made = world();
+    expect(frameCheckFor(made)).toBe(FRAME_CHECK);
+    expect(await keepWorldPicture(renderer(paleLevel), made.entryId, frameCheckFor(made))).toBe(false);
+    expect(await keepWorldPicture(renderer(() => 40), mine.entryId, frameCheckFor(mine))).toBe(false);
   });
 });
 
