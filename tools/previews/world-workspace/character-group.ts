@@ -210,6 +210,32 @@ const LOOK_ROW_SIZES = Object.freeze({ glyph: 24, rowGap: 8, colGap: 10, word: 1
 const LOOK_LAYOUT = Object.freeze({ over: 16, inset: 32 });
 
 /**
+ * What keeps the world's marks under the panels drawn over them (V10): the looked-at tag and the aim mark are not drawn
+ * in a frame where their box crosses a panel drawn now (`panels`, each by its element), and come back as soon as it
+ * moves off them or closes.
+ */
+export function panelCover(panels: () => readonly (Element | null | undefined)[]) {
+  const crosses = (box: { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number }): boolean =>
+    box.right > box.left && box.bottom > box.top && panels().some((part) => {
+      // A panel put away has an empty box, which nothing crosses.
+      const panel = part?.getBoundingClientRect();
+      return panel !== undefined && box.left < panel.right && box.right > panel.left && box.top < panel.bottom && box.bottom > panel.top;
+    });
+  return {
+    crosses,
+    /** Leaves the tag out of this frame where it crosses a panel. */
+    clear(label: Pick<LookLabel, 'box' | 'set'>): void {
+      const box = label.box();
+      if (box && crosses({ left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height })) label.set(null, false);
+    },
+    /** Hides `element` by its visibility, so its own box is still measured, in a frame where it crosses a panel. */
+    cover(element: HTMLElement): void {
+      element.style.visibility = !element.hidden && crosses(element.getBoundingClientRect()) ? 'hidden' : '';
+    },
+  };
+}
+
+/**
  * The label over a looked-at character (r04, R-RUN-BUILD-SHEET section 4): the name label grows into one soft label,
  * centred 16 px over the head, on the speech label's shade (.wu-speech, world-ui-talk.css): the name, what they are doing,
  * the model's chip where a model decides for them (DESIGN's aha 19), so the world says who has one before a run and during

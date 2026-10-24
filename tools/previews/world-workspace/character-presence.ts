@@ -4,7 +4,7 @@
 // character-view.mjs decide what it says and contextual-world.ts places it each frame from the projected points. The ring at a chosen character's feet is drawn in the
 // world (atlas-react ground-ring.ts), so walls cover it as they cover the feet.
 import { chip, keyWord, promptColumn, promptRow, rule, scaleOf, sideCard, cardWords, orb, type NameTagWords, type SubjectBounds } from './world-ui.ts';
-import { characterGroup, lookLabel, type GroupContent } from './character-group.ts';
+import { characterGroup, lookLabel, panelCover, type GroupContent } from './character-group.ts';
 import { dayStartMinute } from './character-view.mjs';
 import type { SocietySnapshot } from '/src/society-api.ts';
 import { DEFAULT_SOCIETY_ENGINE, societyEngine } from '/src/society-engines.ts';
@@ -59,6 +59,11 @@ export interface CharacterPresence {
   place(at: { readonly bounds: SubjectBounds; readonly prefer?: 'right' | 'left' | null; readonly head?: { readonly x: number; readonly y: number } } | null): void;
   /** Hides the tag and cards while a page is up, and brings them back after. */
   setCovered(covered: boolean): void;
+  /**
+   * Keeps `element` (the aim mark) under the panels up now, the chosen card, group or question: hidden in a frame where
+   * its box crosses one, shown where it does not (V10). The looked-at tag keeps under them the same way.
+   */
+  cover(element: HTMLElement): void;
   readonly asking: boolean;
   /** The top of the looked-at label (r04) on screen while it shows, or null: a pop sits 12 px over it. */
   tagTop(): number | null;
@@ -77,8 +82,12 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
   const card = sideCard({ scale });
   const question = sideCard({ question: true, scale });
   const grouped = characterGroup({ scale, onAction });
-  for (const part of [card.root, grouped.root, question.root, looked.root]) host.append(part);
+  // The tag first, so the panels draw over it.
+  for (const part of [looked.root, card.root, grouped.root, question.root]) host.append(part);
   let shown: string | null = null, asked: string | null = null, covered = false, chosen = false, grouping = false;
+  // The chosen card, the question and the group, which the tag and the aim mark keep under.
+  const under = panelCover(() => [card.root.querySelector('.wu-card'), question.root.querySelector('.wu-card'), grouped.root.querySelector('.cg-group')]);
+  const keepTagClear = (): void => under.clear(looked);
   const prompt = (item: CardPrompt): HTMLElement => keyWord({ keys: item.keys, word: item.word, shortcut: item.shortcut, onPress: () => onAction(item.action) });
 
   return {
@@ -89,6 +98,7 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
       if (!words || !head || covered) { looked.set(null, false); return; }
       looked.set({ name: words.name, doing: words.doing ?? null, model: words.model ?? null, live: words.live === true }, inspectable);
       looked.place(head);
+      keepTagClear();
     },
     choose(content) {
       chosen = content !== null;
@@ -143,7 +153,9 @@ export function mountCharacterPresence(host: HTMLElement, { onInspect, onAction 
         grouped.place({ head: at.head ?? { x: (at.bounds.left + at.bounds.right) / 2, y: at.bounds.headY ?? at.bounds.top }, bounds: at.bounds, prefer: at.prefer ?? null });
       }
       else if (chosen) { question.hide(); card.place(at.bounds, { prefer: at.prefer ?? null }); }
+      keepTagClear();
     },
+    cover: (element) => under.cover(element),
     setCovered(on) {
       covered = on;
       if (on) { looked.set(null, false); card.hide(); question.hide(); grouped.place(null); }

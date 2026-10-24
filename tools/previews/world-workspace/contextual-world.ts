@@ -1311,7 +1311,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     // The Back corner says Back while something is chosen, the Run question and the model list included (r07, r08):
     // they are the group's own states, and Esc goes back from them.
     if (!build?.active()) corners.back(held ? CORNER_WORDS.back : CORNER_WORDS.yourWorlds); // build mode keeps its own
-    corners.reticle.hidden = pageShown();
+    corners.reticle.hidden = pageShown(); presence.cover(corners.reticle);
     corners.reticle.dataset.state = target ? targetReachable ? 'ready' : 'far' : 'empty';
     root.dataset.reachable = String(targetReachable);
     root.dataset.focusDistance = Number.isFinite(distance) ? distance.toFixed(2) : '';
