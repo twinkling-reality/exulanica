@@ -308,6 +308,9 @@ export interface MountedEnvironmentSelection {
   societyContext(): CompanionSocietyContext | null;
   /** Each simulated person's name and each usable place's label, as the inspector draws them. */
   societyNames(): SocietyNames | null;
+  /** The names a host page gives beings (J20): the Play band and the people listed ask it first; null hands naming back
+   * to the society's own labels. */
+  nameBeings(nameOf: ((id: string) => string | null) | null): void;
   /**
    * Select the person a simulation citation names, and show the cited words beside them, each
    * placeholder drawn as `references`, the answer's own maps, say.
@@ -719,6 +722,8 @@ export function mountEnvironmentSelection(
   let selectedInhabitant: string | null = null;
   /** Play this one, made the first time a person plays a being of this world. */
   let playThisOne: MountedPlayThisOne | null = null;
+  /** The host page's names for beings, asked before the society's own label (nameBeings). */
+  let beingNames: ((id: string) => string | null) | null = null;
   // What the inspector is showing. A society refresh re-renders an inspected inhabitant and
   // re-gates a destination's directed-action control; it never swaps one view for the other.
   let inspectedInhabitant: string | null = null;
@@ -877,6 +882,11 @@ export function mountEnvironmentSelection(
   function inhabitantLabel(inhabitant: OwnedSocietyState['inhabitants'][number]): string {
     const place = deps.state.atlas?.binding.ownedDistrict?.district.name ?? 'this place';
     return inhabitant.display_name ?? (inhabitant.role ? `A ${inhabitant.role}` : `A person in ${place}`);
+  }
+
+  /** A being as the host page names it inside a sentence, else as the society labels it. */
+  function beingName(inhabitant: OwnedSocietyState['inhabitants'][number]): string {
+    return beingNames?.(inhabitant.id) ?? inhabitantLabel(inhabitant);
   }
 
   /**
@@ -2198,7 +2208,7 @@ export function mountEnvironmentSelection(
       versionId: () => savedWorld?.versionId ?? null,
       nameOf: (id) => {
         const person = society?.state.inhabitants.find((one) => one.id === id);
-        return person === undefined ? 'them' : inhabitantLabel(person);
+        return person === undefined ? 'them' : beingName(person);
       },
       refreshModels: async () => { await societyModels?.refresh(society?.currentTick ?? null, societyPeople(), true); },
       // DRAW's ring on the ground where the played being's chosen walk goes.
@@ -2210,7 +2220,7 @@ export function mountEnvironmentSelection(
 
   /** The connected society's people, as People nearby names them. */
   function societyPeople(): readonly { readonly id: string; readonly name: string }[] {
-    return (society?.state.inhabitants ?? []).map((person) => ({ id: person.id, name: inhabitantLabel(person) }));
+    return (society?.state.inhabitants ?? []).map((person) => ({ id: person.id, name: beingName(person) }));
   }
 
   /**
@@ -3182,6 +3192,7 @@ export function mountEnvironmentSelection(
       return { versionId: society.versionId, inhabitantId };
     },
     societyNames,
+    nameBeings: (nameOf) => { beingNames = nameOf; },
     play: async (subjectId) => { await playController()?.play(subjectId); },
     giveBack: async () => { await playThisOne?.giveBack(); },
     rereadMinds: async () => { await societyModels?.refresh(society?.currentTick ?? null, societyPeople(), true); },

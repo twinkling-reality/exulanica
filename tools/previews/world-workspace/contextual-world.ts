@@ -267,6 +267,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   /** A person inside History's sentences and the record pages (J20, T12): in the same words as the plate and tags (whoOf). */
   const calledAs = (id) => whoOf(id);
   const calledWithin = (id) => calledAs(id).within;
+  selection.nameBeings?.(calledWithin); lifetime.signal.addEventListener('abort', () => selection.nameBeings?.(null), { once: true });
   /** A person as the tag and card call them (J20), by society id: a made kind's own name ("Round yellow body 2"), else their offer, else their society name, else "the" and their kind. */
   function whoOf(id) {
     const row = beingRow(id), kind = characterFacts(subjectReads.society, id)?.kind ?? null, offer = row ? offers.get(row.key)?.offer ?? null : null, made = madeName(id);

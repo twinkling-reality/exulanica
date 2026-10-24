@@ -10,6 +10,7 @@ import type { PlacedThingRecord, ThingLayerOptions, ThingPick } from '@exulanica
 import { mountEnvironmentSelection, type SelectedThing } from '../src/composition/environment-selection.js';
 import { parseSociety, type SocietySnapshot } from '../src/society-api.js';
 import { parseSocietyControl } from '../src/society-control-api.js';
+import { parseSocietyModels } from '../src/society-models-api.js';
 import { THING_PICK_EVENT, crowdFacing, type ThingPickDetail } from '../src/composition/things.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
@@ -214,7 +215,7 @@ function mount(withSociety = false, scene: { readonly nothingPlaced?: boolean; r
     thingLooksClient: { read: vi.fn(async () => new Map()) },
   });
   document.body.append(mounted.root);
-  return { mounted, crowd, controls, canvas, shell, regionEntity, binding, showStatus, holdStatus, inspectObject, placed, supportVersions };
+  return { mounted, crowd, controls, canvas, shell, regionEntity, binding, showStatus, holdStatus, inspectObject, placed, supportVersions, modelsClient };
 }
 
 describe('a saved world\'s placed things', () => {
@@ -537,6 +538,37 @@ describe('authored object hits share saved-world targeting', () => {
     } finally {
       animationFrame.mockRestore();
       h.mounted.dispose();
+    }
+  });
+  it('names a played being in the Play band as the host page names it, else as the society does (D2b)', async () => {
+    const h = mount(true, { objectDistance: 2 });
+    await h.mounted.begin();
+    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    try {
+      h.mounted.nameBeings((id) => (id === 'person-0' ? 'the round duck' : null));
+      await h.mounted.play('person-0');
+      expect(document.querySelector('.play-band-title')?.textContent).toBe('You are playing the round duck');
+      // The people the who-decides panel lists, read again, are named the same way.
+      h.modelsClient.read.mockImplementation(async () => parseSocietyModels({
+        profile: 'exulanica.society-models/v1', society_id: 'society', engine: 'exulanica-society/v7', takes_model_choices: true,
+        host_refusal: null, contract: { versions: {}, sha256: 'c'.repeat(64), model_people_maximum: 8 }, models: [], choices: [],
+        latest: [], by_model: [], decisions_read: { counted: 0, maximum: 2000 },
+      }) as never);
+      await h.mounted.rereadMinds();
+      for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+      expect([...document.querySelectorAll('.society-models-person-name')].map((node) => node.textContent)).toContain('the round duck');
+    } finally {
+      h.mounted.dispose();
+    }
+    const plain = mount(true, { objectDistance: 2 });
+    await plain.mounted.begin();
+    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    try {
+      plain.mounted.nameBeings(null);
+      await plain.mounted.play('person-0');
+      expect(document.querySelector('.play-band-title')?.textContent).toBe('You are playing Knight');
+    } finally {
+      plain.mounted.dispose();
     }
   });
   it('opens the nearest object by click and E, retaining modal and typing exclusions', async () => {

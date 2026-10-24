@@ -114,7 +114,7 @@ describe('playing one being from the world', () => {
     expect(text(band, '.play-band-status')).toBe('Taken: it happens at the next minute.');
   });
 
-  it('gives it back on G, and says the being\'s own mind decides again', async () => {
+  it('gives it back on G, and says the being\'s own mind decides again, naming the being', async () => {
     const { play, client, refreshModels, band } = harness([turnBody(3)]);
     await play.play('knight');
     refreshModels.mockClear();
@@ -122,7 +122,7 @@ describe('playing one being from the world', () => {
     await settle();
     expect(client.giveBack).toHaveBeenCalledWith('version', 'knight');
     expect(refreshModels).toHaveBeenCalled();
-    expect(text(band, '.play-band-title')).toBe('You gave Knight back. Its own mind decides again from the next minute.');
+    expect(text(band, '.play-band-title')).toBe('You gave Knight back. From the next minute, Knight\'s own mind decides again.');
     expect(play.playing()).toBeNull();
     // Once not playing, a click opens what it would have opened.
     expect(play.onPick({ subjectId: 'traveller', thingId: null })).toBe(false);
@@ -133,7 +133,7 @@ describe('playing one being from the world', () => {
     await play.play('knight');
     play.minuteMoved();
     await settle();
-    expect(text(band, '.play-band-title')).toBe('You are no longer playing Knight: its own mind decides again.');
+    expect(text(band, '.play-band-title')).toBe('You are no longer playing Knight: Knight\'s own mind decides again.');
     expect(play.playing()).toBeNull();
   });
 

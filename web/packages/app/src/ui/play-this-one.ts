@@ -31,8 +31,8 @@ export const PLAY_WORDS = Object.freeze({
   say: 'Say',
   characters: '{count} of {maximum}',
   cancel: 'Cancel',
-  givenBack: 'You gave {name} back. Its own mind decides again from the next minute.',
-  stopped: 'You are no longer playing {name}: its own mind decides again.',
+  givenBack: 'You gave {name} back. From the next minute, {name}\'s own mind decides again.',
+  stopped: 'You are no longer playing {name}: {name}\'s own mind decides again.',
   starting: 'Starting to play {name}…',
 });
 
