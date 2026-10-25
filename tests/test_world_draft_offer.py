@@ -8,7 +8,9 @@ import pytest
 from exulanica.api.world_draft_offer import (
     WorldDraftOfferRefused,
     calls_at_most,
+    confirm_operation,
     operation_sheet,
+    read_operation_sheet,
     stages,
 )
 from exulanica.models.manifest import load_manifest
@@ -113,3 +115,44 @@ def test_an_unpriced_or_unsafe_operation_is_refused_instead_of_quoted_zero(chang
         prices[key] = replace(prices[key], context_window_tokens=1)
     with pytest.raises(WorldDraftOfferRefused, match="price_unavailable"):
         operation_sheet(manifest, prices, at, wire, now=NOW)
+
+
+class _RatesRead:
+    """A client whose every rate read answers the same prices from a list whose raw text differs,
+    as Nebius's does: each model's "created" moves with the clock, and so does the text's digest."""
+
+    def __init__(self, scale: Decimal = Decimal(1)) -> None:
+        self.manifest = load_manifest()
+        self.scale = scale
+        self.reads = 0
+
+    def maximum_wire_attempts(self, role):
+        return len(self.manifest[role].chain) * 3
+
+    def provider_prices(self, provider):
+        self.reads += 1
+        return {
+            s.model_id: ProviderPrice(
+                s.model_id,
+                s.input_usd_per_mtok * self.scale,
+                s.output_usd_per_mtok,
+                s.context_window_tokens,
+                f"{self.reads:064x}",
+            )
+            for rows in stages().values()
+            for role, _ in rows
+            for s in self.manifest[role].chain
+            if s.provider == provider
+        }
+
+
+def test_a_second_read_of_the_same_rates_confirms_though_the_list_text_moved():
+    client = _RatesRead()
+    offered = read_operation_sheet(client)
+    # Read again at the start: the same prices, a list whose raw text (and digest) differs.
+    assert confirm_operation(client, offered) == offered
+    # A rate that did change is still refused before anything is sent.
+    client.scale = Decimal(2)
+    with pytest.raises(WorldDraftOfferRefused) as refused:
+        confirm_operation(client, offered)
+    assert refused.value.code == "world_draft_operation_changed"

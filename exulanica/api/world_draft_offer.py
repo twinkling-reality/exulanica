@@ -237,6 +237,15 @@ def read_operation_sheet(client: Any) -> dict[str, Any]:
         raise WorldDraftOfferRefused("world_draft_price_unavailable") from failed
 
 
+#: What of a priced model a confirmation compares: everything but when its list was read and the
+#: digest of the list's raw text, which are evidence of the read, not terms of the operation.
+_READ_EVIDENCE = frozenset({"rate_read_at", "rate_response_sha256"})
+
+
+def _rate_terms(rate: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in rate.items() if key not in _READ_EVIDENCE}
+
+
 def confirm_operation(client: Any, offered: Mapping[str, Any] | None) -> dict[str, Any]:
     """Recheck a sheet's exact economic/configuration terms, without moving its expiry."""
     if offered is None:
@@ -268,8 +277,11 @@ def confirm_operation(client: Any, offered: Mapping[str, Any] | None) -> dict[st
 
         if economic(fresh) != economic(offered):
             raise WorldDraftOfferRefused("world_draft_operation_changed")
-        old_rates = [{k: v for k, v in p.items() if k != "rate_read_at"} for p in offered["prices"]]
-        new_rates = [{k: v for k, v in p.items() if k != "rate_read_at"} for p in fresh["prices"]]
+        # The rates and windows themselves, as parsed: never when or how the provider's list was
+        # read. Its raw text carries fields that move with the clock (each model's "created"),
+        # so its digest differs between two reads of the same prices.
+        old_rates = [_rate_terms(p) for p in offered["prices"]]
+        new_rates = [_rate_terms(p) for p in fresh["prices"]]
         if old_rates != new_rates:
             raise WorldDraftOfferRefused("world_draft_operation_changed")
     except (KeyError, TypeError, ValueError, CanonicalisationError) as failed:
