@@ -53,9 +53,8 @@ Then, in order:
 
 1. On the page the install prints, open a world from a card (A small town is enough) and press P to
    bring its people in.
-2. Place a gate: press B, choose Gate in the tray and click the ground where it should stand. An
-   agent comes into a town as a body of its own, through a gate: a town's people are villagers,
-   whom their routine, a model or a person decides for, never an outside program.
+2. Place a gate, for a body of the agent's own: press B, choose Gate in the tray and click the
+   ground where it should stand. An agent that decides for one of the town's people needs none.
 3. From a second terminal at the checkout, let the agent in. The page's address names the world;
    the install's own token, in `~/Exulanica/install/token`, may issue grants and never shows:
 
@@ -65,8 +64,9 @@ Then, in order:
 
    The library is the Python standard library alone, so it runs from the checkout as it is. The key
    goes into the new file `agent.key`, which only you can read. `--person "<a name the page
-   shows>"` names one of the world's people instead, for a kind of being an outside program may
-   decide for.
+   shows>"` names one of the town's people instead (in place of `--visitors 1`), for the agent to
+   decide for: the people of a town whose society began under ground catalog version 9 are
+   villagers an outside program may decide for.
 4. Start the agent with the same `EXULANICA_URL` and `EXULANICA_AGENT_KEY_FILE` set to that file:
    the quickstart (`PYTHONPATH=bridges/agents python3 bridges/agents/examples/quickstart.py`, with
    your provider settings below) brings its body in through the gate and takes its turns, or an MCP
@@ -180,8 +180,10 @@ record and no model's context carries it.
 - A body of the agent's own comes only into a world version that holds a society of things, through
   a gate placed there; a door that takes no visitors answers `enter_world` that it does not take
   them yet.
-- A town's people are villagers, a kind no outside program decides for: a grant naming one is
-  refused `decider_not_allowed`, and an agent comes into a town as a body of its own.
+- A grant names a town's person only where the town's society began under ground catalog version
+  9. An earlier town keeps the villagers it began with, a kind no outside program decides for: a
+  grant naming one is refused `decider_not_allowed`, and an agent comes into that town as a body of
+  its own.
 - A body of the agent's own hears the lines said near it, and nothing else that happens around it
   reaches its bridge ([door contract](../door-contract.md)).
 - Comparing an outside agent beside a model on the same thing is not provided: a comparison runs a
@@ -200,6 +202,7 @@ record and no model's context carries it.
 | The examples | `bridges/agents/examples/` | the quickstart in `tests/test_agent_library.py`; `bridges/agents/checks/nat_check.py` for the toolkit, and `nat_run.py` for a recorded run in a real world |
 | Outside the product | `bridges/agents/exulanica_agent/outside-agents.v1.json` and `outside-agents.v2.json`, `examples/bridge-entry.json` | `tests/test_agent_outside_product.py` (each published mapping read by the door's own checker and pinned) |
 | What the world's owner sees | `tools/previews/world-workspace/` (`character-view.mjs`, `character-words.mjs`, `character-group.mjs`, `decision-words.mjs`, `record-host.ts`, `character-page.ts`) | the workspace's `verify-character-view.mjs`, `verify-character-words.mjs`, `verify-character-group.mjs`, `verify-decision-words.mjs`, `verify-history.mjs`, `verify-talk-pops.mjs`; `web/packages/app/test/world-look-label.test.ts`, `world-record-host.test.ts`, `world-record-decision.test.ts`, `world-record-day.test.ts` |
+| A town's people | `assets/catalogs/things/kinds/villager.v3.json`, `assets/catalogs/society-ground/society-ground.v9.json` | `tests/test_outside_deciders_postgres.py` |
 | Through the real door | the library and the tools against the door's routes, migrations 0149 and 0153 and the decision host: hello and declaration, a new key ending the earlier, revocation, a person's turn decided by the agent and replayed without it, and a body of the agent's own crossing in through a gate, wearing its look, taking its turns and sent home | `tests/test_agent_door_postgres.py` |
 
 Decision record: [ADR-0032](../adr/0032-an-outside-ai-agent-enters-through-the-same-door-as-a-game.md).

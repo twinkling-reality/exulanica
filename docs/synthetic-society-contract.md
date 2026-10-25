@@ -92,7 +92,7 @@ Implementation:
   declared area of each, the dependency its input names its place under, the kinds of the
   world's own records its people's activities may name, the thing kind its population is made
   of and, for a town, the measured cost of a minute in place of a head count:
-  `assets/catalogs/society-ground/society-ground.v8.json` (versions 1 to 7 kept beside it), read by
+  `assets/catalogs/society-ground/society-ground.v9.json` (versions 1 to 8 kept beside it), read by
   `exulanica/world/society_grounds.py`; the reader of the measured points:
   `exulanica/world/society_minute_cost.py`;
 - sending a society's people away and bringing them back:
@@ -611,7 +611,7 @@ about the person's world.
   that is not the built-in authored starter at a supported module version, and a ground kind the
   projection has no rule for are refused with the reason rather than guessed at.
 - Declared by the ground's entry in the society ground catalog
-  (`assets/catalogs/society-ground/society-ground.v8.json`, read by
+  (`assets/catalogs/society-ground/society-ground.v9.json`, read by
   `exulanica/world/society_grounds.py`): the walkable area on a ground that states none, and a
   route lattice at two metre spacing over the area, inset by the navigation clearance. A flat
   rectangle has no paths of its own, so a graph over it is a discretisation the entry fixes, not a
@@ -2208,7 +2208,11 @@ villager a model or the world's owner decides for is offered to say something to
 hear it and to everyone near, and, asked the minute after a line was said to it, may answer. A
 society whose first input recorded the first villager keeps it, and its villagers say nothing. A
 society no model decides for lives the same either way
-(`tests/test_villagers_say_lines.py`).
+(`tests/test_villagers_say_lines.py`). From ground catalog version 9 the population is the
+villager's third version, which an outside program may also decide for, under a grant its owner
+issues naming them ([door contract](door-contract.md)); it lives as the second does while nobody
+outside decides for it. A society whose first input recorded an earlier villager keeps that one,
+which no outside program decides for (`tests/test_outside_deciders_postgres.py`).
 
 **Its people's names.** A society of things made since the identity catalog's second version
 records it in its first input (`identity`: the catalog `society-legacy-identity` at version 2) and

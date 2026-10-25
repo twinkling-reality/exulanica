@@ -34,6 +34,7 @@ from exulanica.world.society_surroundings import (
 )
 
 import test_society_things_town_people as town_people
+import things_society_support as things_support
 from living_town_support import before_floor_area
 
 pytestmark = pytest.mark.usefixtures(before_floor_area.__name__)
@@ -155,7 +156,9 @@ def _as_sealed(monkeypatch) -> None:
     input recording the purposeful planner's third version. A society made since records the
     fourth or later: the fourth's take-in outdoors changes nothing here but the module it names,
     and the fifth starts residents by their own doors, which moves who stands near the villager.
-    Composed so, the request's bytes are the ones a society stored then rebuilds."""
+    Composed so, the request's bytes are the ones a society stored then rebuilds. Its people are
+    the villager's second version, as the eighth ground catalog named them."""
+    things_support.composed_under_ground(monkeypatch, 8)
     current = registry.current_modules
     monkeypatch.setattr(
         registry,

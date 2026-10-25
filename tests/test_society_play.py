@@ -39,6 +39,7 @@ from exulanica.world.society_play import (
 )
 from exulanica.world.society_things import initial_things_society
 
+import things_society_support as things_support
 from things_society_support import SEED, SOCIETY, compose, thing
 
 ACCOUNT = str(uuid.UUID(int=0xA1))
@@ -211,8 +212,11 @@ def sealed_square(monkeypatch):
     """The square composed as the code that sealed the pinned requests composed it: its first input
     recording the purposeful planner's third version. A society made since records the fourth or
     later, whose take-in outdoors changes nothing here but the module it names, so the requests'
-    bytes are the ones a society stored then rebuilds."""
+    bytes are the ones a society stored then rebuilds. Its people are the villager's second
+    version, as the eighth ground catalog named them."""
     from exulanica.abilities import registry
+
+    things_support.composed_under_ground(monkeypatch, 8)
 
     current = registry.current_modules
     monkeypatch.setattr(

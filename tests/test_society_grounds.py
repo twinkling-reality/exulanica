@@ -273,11 +273,16 @@ def test_an_activity_may_name_only_the_records_its_own_ground_states():
 
 
 def test_each_ground_names_the_shipped_being_its_population_is_made_of():
-    # From the eighth version, the villager's second version, which may say a line; the seventh
-    # named the first, which a society made under it records and keeps.
-    villager = dict(shipped_thing_kinds()[("villager", 2)].reference())
+    # From the ninth version, the villager's third version, which an outside program may also
+    # decide for; the eighth named the second, which may say a line, and the seventh the first.
+    # A society made under any of them records the one it named and keeps it.
+    villager = dict(shipped_thing_kinds()[("villager", 3)].reference())
     grounds = load_society_grounds()
     assert [ground.population_kind for ground in grounds] == [villager] * len(grounds)
+    second = dict(shipped_thing_kinds()[("villager", 2)].reference())
+    assert [ground.population_kind for ground in load_society_grounds(version=8)] == [second] * len(
+        grounds
+    )
     first = dict(shipped_thing_kinds()[("villager", 1)].reference())
     assert [ground.population_kind for ground in load_society_grounds(version=7)] == [first] * len(
         grounds

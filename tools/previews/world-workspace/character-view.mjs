@@ -123,6 +123,10 @@ export function outsideDecider(read, subjectId) {
   return entry ? (entry.ai ? 'agent' : 'external') : null;
 }
 
+/** Whether the page may choose a model for a being (AG1c): never while an outside program decides for it, a choice the
+ * server refuses (decided_from_outside: end its grant, or send it away, instead). */
+export const modelChoosableFor = (read, subjectId) => outsideOf(read, subjectId) === null;
+
 /** The ring's radius on the ground under a person, in metres: rx 104 px at 4 m in the frame. */
 export const PERSON_RING_METRES = 0.44;
 

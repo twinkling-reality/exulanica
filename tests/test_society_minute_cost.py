@@ -236,7 +236,7 @@ def test_a_town_refuses_nobody_and_no_head_count():
 
 
 def test_every_published_version_of_the_ground_catalog_still_reads():
-    assert CATALOG_VERSION == 8
+    assert CATALOG_VERSION == 9
     by_version = {
         version: {ground.key: ground for ground in load_society_grounds(version=version)}
         for version in range(1, CATALOG_VERSION + 1)
@@ -268,6 +268,13 @@ def test_every_published_version_of_the_ground_catalog_still_reads():
     for key, ground in by_version[8].items():
         earlier = by_version[7][key]
         assert (earlier.population_kind["version"], ground.population_kind["version"]) == (1, 2)
+        assert replace(ground, population_kind=earlier.population_kind) == earlier
+    # The ninth version's grounds are the eighth's, but that their people are the villager's third
+    # version, which an outside program may also decide for: its answers ask no model and cost
+    # nothing, so a minute costs what it did.
+    for key, ground in by_version[9].items():
+        earlier = by_version[8][key]
+        assert (earlier.population_kind["version"], ground.population_kind["version"]) == (2, 3)
         assert replace(ground, population_kind=earlier.population_kind) == earlier
 
 

@@ -786,7 +786,8 @@ def test_a_name_the_world_cannot_tell_apart_is_refused_before_any_grant(
 def test_a_person_an_agent_may_not_decide_for_points_to_a_body_of_its_own(
     door, monkeypatch, tmp_path, capsys
 ):
-    # A town's people are villagers, whose kind takes no outside decider; a visitor still can.
+    # A town begun before the ninth ground catalog keeps villagers whose kind takes no outside
+    # decider: the world's refusal reaches the owner in its words; a visitor still can.
     monkeypatch.setenv("EXULANICA_TOKEN", OWNER_TOKEN)
     _from_the_page(door, PEOPLE)
     door.refuse("/door/grants", 409, "decider_not_allowed")

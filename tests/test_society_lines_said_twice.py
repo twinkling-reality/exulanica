@@ -27,6 +27,7 @@ from exulanica.world.society_play import PLAY_CATALOG_VERSION, play_contract
 from exulanica.world.society_things import LINES_CONTRACT, THINGS_PROFILE
 
 import test_society_lines as lines
+import things_society_support as things_support
 from things_society_support import SEED
 
 PROMPT_V10 = "society-person-choice/v10"
@@ -237,7 +238,9 @@ def _as_sealed(monkeypatch) -> None:
     """The town composed as the code that sealed the stored twelfth request composed it: its first
     input recording the purposeful planner's third version. A society made since records a later
     one, which changes nothing here but the module it names, so the request's bytes are the ones a
-    society stored then rebuilds."""
+    society stored then rebuilds. Its people are the villager's second version, as the eighth
+    ground catalog named them."""
+    things_support.composed_under_ground(monkeypatch, 8)
     current = registry.current_modules
     monkeypatch.setattr(
         registry,

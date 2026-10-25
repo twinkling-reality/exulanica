@@ -497,7 +497,7 @@ def test_only_the_deciders_a_kind_allows_may_decide_for_its_beings():
         for name, person in (("villager", villager), ("knight", knight), ("visitor", visitor))
     }
     assert allowed == {
-        "villager": {"routine", "model", "person"},
+        "villager": {"routine", "model", "person", "external"},
         "knight": {"routine", "model", "person", "external"},
         "visitor": {"external"},
     }

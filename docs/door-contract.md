@@ -151,7 +151,10 @@ grant_id}`) in the grant's own transaction, so no thing is ever decided for unde
 not exist. When the version has no society, or the choice record refuses the binding, the whole
 grant is refused with the answer the choices route gives (404 `unknown_reference` for a version with
 no society; 409 for `engine_takes_no_model_choice`, `choice_key_reused` and `decided_from_outside`;
-422 for the rest, such as `person_not_in_this_world`), and nothing is issued. Revoking hands every
+422 for the rest, such as `person_not_in_this_world`), and nothing is issued. A town's people may be
+named in a society begun under ground catalog version 9, whose people are the villager's third
+version; one begun earlier keeps the villager it recorded, which takes no outside decider, so a
+grant naming one of its people is refused 422 `decider_not_allowed`. Revoking hands every
 thing the grant still decides for back to its routine in the revocation's transaction
 (`release_external_choice`); a thing its owner gave another decider meanwhile keeps that decider. A
 grant that runs out hands its things back the same way the first time the decision host meets one

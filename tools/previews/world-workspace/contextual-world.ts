@@ -13,7 +13,7 @@ import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
 import { SAID_READ, choosableModels, deciderOf, freeHere, groupContent, keepLastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, offersModels, openWhileOffered, overBudget, overRows, questionGroup } from './character-group.mjs';
 import { compareFirst, compareStep } from './compare-words.mjs';
-import { PAGE_FRAMING, PERSON_RING_METRES, askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, outsideDecider, outsideOf, ownPeople, unlistedOutside, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
+import { PAGE_FRAMING, PERSON_RING_METRES, askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, modelChoosableFor, outsideDecider, outsideOf, ownPeople, unlistedOutside, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
 import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, outOfViewNote, overLine, pageSub, runSectionLine } from './character-words.mjs';
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
@@ -677,7 +677,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       ? [...choosableModels(subjectReads.models).map(item => ({ model: item, current: Boolean(model && item.provider === model.provider && item.modelId === model.modelId) })), { model: null, current: !model }]
       : null;
     const offer = offers.get(pageView.row.key)?.offer;
-    const assignable = !readOnly && Boolean(inventory && offers.has(pageView.row.key) && offersModels(subjectReads.models) && assignmentSubject(inventory, pageView.row, offer ?? null));
+    const assignable = !readOnly && modelChoosableFor(subjectReads.models, pageView.row.scene.id) && Boolean(inventory && offers.has(pageView.row.key) && offersModels(subjectReads.models) && assignmentSubject(inventory, pageView.row, offer ?? null));
     return {
       who: view.who, sub: pageSub(view.who.named ? view.facts?.kind ?? null : null, entry.title), assignable,
       model: subjectReads.models ? (model ? { name: model.name, price: served?.price ?? null, local: served?.local === true } : null) : undefined,

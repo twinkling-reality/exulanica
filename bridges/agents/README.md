@@ -161,7 +161,8 @@ prints the key. A token of only `world.read` and `world.write` is refused `403 n
 world and the version its things are in or its bodies arrive in; `--world <id> --version <id>`
 name them directly. `--person "<name>"` names one of the world's people by the name the page shows
 and `--thing <id>` any of its things, for the agent to decide for; a person whose kind no outside
-program decides for, such as a town's villager, is refused `decider_not_allowed`. `--visitors`
+program decides for, such as a villager of a town whose society began before ground catalog
+version 9, is refused `decider_not_allowed`. `--visitors`
 says how many bodies of its own it may bring, and `--gate` the gate they come through, by the id it
 was placed with (else one of the version's gates).
 

@@ -214,7 +214,7 @@ def test_a_things_input_records_the_kind_its_ground_s_population_is_made_of():
     document = compose((WELL,))
     ground = society_ground_for_navigation(document["navigation"]["profile"])
     assert document["population_kind"] == ground.population_kind
-    assert document["population_kind"] == dict(shipped_thing_kinds()[("villager", 2)].reference())
+    assert document["population_kind"] == dict(shipped_thing_kinds()[("villager", 3)].reference())
     validate_input_things(document)  # the positive control
     broken = copy.deepcopy(document)
     broken["population_kind"] = {"kind": "villager", "version": 2}

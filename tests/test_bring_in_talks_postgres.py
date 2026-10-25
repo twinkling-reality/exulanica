@@ -6,7 +6,7 @@ town, neither holding a placed thing:
 
 *   on a host that offers societies of things, the saved entry and the version's capability read
     state the engine of things, and the society the entry's engine makes is one: its people are
-    the villager's second version, which may say a line, and it replays as it was made;
+    the villager's third version, which may say a line, and it replays as it was made;
 *   a host that does not offer them states, and makes, the ground's own engine.
 """
 
@@ -67,7 +67,7 @@ def test_people_brought_into_a_world_holding_nothing_placed_may_speak(made, worl
     assert _capability_engine(api, entry) == THINGS
     society = _bring_in(api, entry, read["society_engine"])
     assert society["profile"] == THINGS
-    villager = shipped_thing_kinds()[("villager", 2)]
+    villager = shipped_thing_kinds()[("villager", 3)]
     assert "say" in {ability["key"] for ability in villager.document["abilities"]}
     people = [p for p in society["state"]["inhabitants"] if p["came_by"] == "populated"]
     assert people and all(p["kind"] == dict(villager.reference()) for p in people)

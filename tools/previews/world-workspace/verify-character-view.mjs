@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { called } from './character-words.mjs';
-import { askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, outsideDecider, outsideOf, ownPeople, unlistedOutside, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords, timeRange } from './character-view.mjs';
+import { askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, modelChoosableFor, outsideDecider, outsideOf, ownPeople, unlistedOutside, pageFraming, pairFraming, promptPlace, ringRadii, runQuestion, subjectWho, tagWords, timeRange } from './character-view.mjs';
 import { defaultRunLimits } from './run-words.mjs';
 
 // Names: a being named only by its body is called by its kind; a thing by its own name or look.
@@ -108,6 +108,9 @@ assert.deepEqual(untaken.map(row => [row.what, row.chose, row.unanswered, row.re
 const read = { outside: [{ subjectId: 'v1', ai: true, connected: true, declared: { name: 'Scout', maker: 'Harbour Lab', mind: null } }, { subjectId: 'v2', ai: false, connected: true, declared: null }] };
 assert.deepEqual([outsideDecider(read, 'v1'), outsideDecider(read, 'v2'), outsideDecider(read, 't'), outsideDecider(null, 'v1')], ['agent', 'external', null, null]);
 assert.equal(outsideOf(read, 'v1').declared.name, 'Scout');
+// The page offers no model choice for a being an outside program decides for (AG1c): the server refuses it
+// decided_from_outside, so the day page offers no M while an AI agent or a visitor's own program decides.
+assert.deepEqual([modelChoosableFor(read, 'v1'), modelChoosableFor(read, 'v2'), modelChoosableFor(read, 't'), modelChoosableFor(null, 'v1')], [false, false, true, true]);
 assert.equal(unlistedOutside(read, [{ scene: { id: 'v1' } }]), true, 'v2 has no row yet');
 assert.equal(unlistedOutside(read, [{ scene: { id: 'v1' } }, { scene: { id: 'v2' } }]), false);
 assert.equal(unlistedOutside({ outside: [] }, []), false);

@@ -25,7 +25,10 @@ replay through the replay route. What is shown:
     (``saved_name_withheld``);
 *   in a society of things, a visitor is decided for by its own program from its arrival, and a
     grant names only beings whose kind allows an outside program (``decider_not_allowed``); a
-    visitor whose program a saved name keeps unasked goes home after its kind's quiet minutes.
+    visitor whose program a saved name keeps unasked goes home after its kind's quiet minutes;
+*   a town's people from the ninth ground catalog, the villager's third version, are decided for
+    by an outside program a grant names them to, at no cost, and handed back when it ends, while a
+    town begun under the eighth keeps the second version, which no outside program decides for.
 """
 
 from __future__ import annotations
@@ -45,6 +48,7 @@ from exulanica.api.decision_host import DecisionHost, world_hour
 from exulanica.canonical import canonical_json
 from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.identity import IdentityRepository, rename_entity
+from exulanica.world import society_grounds, society_walking_surfaces
 from exulanica.world.crossings import register_crossing_stream
 from exulanica.world.society_controls import LEASE_SECONDS
 from exulanica.world.society_decision_contract import (
@@ -680,17 +684,87 @@ def test_a_visitor_whose_program_a_saved_name_keeps_unasked_goes_home_after_its_
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_an_outside_program_decides_only_for_a_being_whose_kind_allows_it(app):
+def test_an_outside_program_decides_for_a_new_town_s_villager_and_hands_them_back(app):
     world, client = app
     _offering_societies_of_things(client)
     services = _services(client)
     things_api._place(client, world, "well", "well", 2, -4_000, 2_000)
+    snapshot = things_api._make_society(client, world)
+    villager = next(p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "populated")
+    assert (villager["kind"]["kind"], villager["kind"]["version"]) == ("villager", 3)
+    choice = _grant(services, world, [villager["id"]])
+    assert choice["people"] == [villager["id"]]
+    assert choice["decider"] == {"kind": "external", "bridge": BRIDGE, "grant_id": str(GRANT)}
+    door = _Door()
+    host = _doorkeeping_host(world, services, door)
+    snapshot = _asked_until_decided(world, client, services, host, snapshot)
+    receipts = _decisions(services, world, snapshot)
+    assert {receipt["subject_id"] for receipt in receipts} == {villager["id"]}
+    assert receipts[0]["provider"]["kind"] == "external"
+    assert "cost_usd" not in receipts[0]["provider"]
+    assert [entry[2:] for entry in door.configured] == [(villager["id"], choice["decider"])]
+    stays._step(world, client, snapshot)
+    applied = [
+        event
+        for event in _events(client, world, "decision_applied")
+        if event["subject_id"] == villager["id"]
+    ]
+    assert applied and applied[-1]["document"]["origin"] == "external"
+    # An outside answer is no model decision: nothing of the world's hour is asked or spent.
+    with services.database.session(world["workspace"]) as connection:
+        hour = world_hour(connection, world["workspace"], world["binding"].world_id, person_role())
+    assert hour == (0, 0)
+    scope, _, society = routes(world)
+    heard = len(door.asked)
+    replayed = client.get(society + "/replay", headers=OWNER, params=scope)
+    assert replayed.status_code == 200, replayed.text
+    assert replayed.json()["replay_verified"] is True
+    assert len(door.asked) == heard
+    # Ending the grant hands the villager back to their routine.
+    with services.database.session(world["workspace"]) as connection:
+        released = _repository(connection, world).release_external_choice(
+            world["binding"].version_id,
+            person_role(),
+            request_id=uuid.uuid4(),
+            grant_id=GRANT,
+            chosen_by=world["session"].actor,
+            contract=decision_contract(),
+        )
+    assert released is not None and released["people"] == [villager["id"]]
+    assert released["decider"] == {"kind": "routine"}
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_an_outside_program_decides_only_for_a_being_whose_kind_allows_it(app, monkeypatch):
+    world, client = app
+    _offering_societies_of_things(client)
+    services = _services(client)
+    # A town begun under the eighth ground catalog, then lived on and replayed under the ninth,
+    # keeps the villager's second version.
+    current = (
+        society_grounds.society_ground_for_navigation,
+        society_walking_surfaces.society_ground_for_navigation,
+    )
+    things_support.composed_under_ground(monkeypatch, 8)
+    things_api._place(client, world, "well", "well", 2, -4_000, 2_000)
     things_api._place(client, world, "knight", "knight", 1, 3_000, 3_000)
     snapshot = things_api._make_society(client, world)
+    monkeypatch.setattr(society_grounds, "society_ground_for_navigation", current[0])
+    monkeypatch.setattr(society_walking_surfaces, "society_ground_for_navigation", current[1])
+    assert society_grounds.load_society_grounds()[0].population_kind["version"] == 3
+    for _ in range(3):
+        snapshot = stays._step(world, client, snapshot)
     people = snapshot["state"]["inhabitants"]
-    villager = next(person["id"] for person in people if person["came_by"] == "populated")
+    populated = [person for person in people if person["came_by"] == "populated"]
+    assert populated
+    assert {(p["kind"]["kind"], p["kind"]["version"]) for p in populated} == {("villager", 2)}
+    scope, _, society = routes(world)
+    replayed = client.get(society + "/replay", headers=OWNER, params=scope)
+    assert replayed.status_code == 200, replayed.text
+    assert replayed.json()["replay_verified"] is True
+    villager = populated[0]["id"]
     [knight] = [person["id"] for person in people if person["came_by"] == "placed"]
-    # A villager's kind allows the routine, a model and a person, never an outside program.
+    # Its kind allows the routine, a model and a person, never an outside program.
     with pytest.raises(ModelChoiceRefused) as caught:
         _grant(services, world, [villager])
     assert caught.value.code == "decider_not_allowed"

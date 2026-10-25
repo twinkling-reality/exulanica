@@ -92,7 +92,7 @@ __all__ = [
 ]
 
 CATALOG_ID: Final = "society-ground"
-CATALOG_VERSION: Final = 8
+CATALOG_VERSION: Final = 9
 CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[2].joinpath("assets", "catalogs", CATALOG_ID)
 )
@@ -436,6 +436,9 @@ _SCHEMAS: Final = MappingProxyType(
         # Version 8 states version 7's fields; every ground's people are the villager's second
         # version, which may say a line.
         8: CatalogSchema(CATALOG_ID, 8, _FIELDS_V6, entry_check=_entry_check_v6),
+        # Version 9 states version 8's fields; every ground's people are the villager's third
+        # version, which an outside program its owner grants them to may also decide for.
+        9: CatalogSchema(CATALOG_ID, 9, _FIELDS_V6, entry_check=_entry_check_v6),
     }
 )
 

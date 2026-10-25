@@ -16,6 +16,7 @@ from typing import Any
 
 from exulanica.environment.district_geometry import segment_blocked
 from exulanica.things.kinds import shipped_thing_kinds
+from exulanica.world import society_grounds, society_walking_surfaces
 from exulanica.world.arrival_selection import ArrivalDescriptor
 from exulanica.world.authored_delta import delta_sha256
 from exulanica.world.crossings import (
@@ -62,6 +63,16 @@ def thing(
         ObjectOrigin("authored", "fictional"),
         removed,
     )
+
+
+def composed_under_ground(monkeypatch, version: int) -> None:
+    """Societies composed from here on as the ground catalog ``version`` peopled them: a stored
+    request or record made under it rebuilds from a town of the villager it named."""
+    grounds = {
+        g.navigation_profile: g for g in society_grounds.load_society_grounds(version=version)
+    }
+    for module in (society_grounds, society_walking_surfaces):
+        monkeypatch.setattr(module, "society_ground_for_navigation", grounds.__getitem__)
 
 
 def compose(

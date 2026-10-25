@@ -572,7 +572,7 @@ kind suggesting a look the library does not hold at the kind's digest each stop 
 | `traveller` | being | humanoid, 1,550 to 1,800 mm | as the knight; version 2 also leave after 5 quiet minutes, offered only once it crossed in | as the knight | as the knight | `blocky-traveller` |
 | `lantern_spirit` | being | bodiless, radius 200 mm | wait, follow, say, pick_up, put_down, give, take | talk_to, hear, receive, be_followed | as the knight; its authored preference to follow a lantern's holder is not executed by the routine | `spirit-light` |
 | `visitor` | being | humanoid, 1,500 to 2,000 mm | wait, stand, talk, say, pick_up, put_down, give, take, follow, leave after 5 quiet minutes | talk_to, hear, receive, be_followed | an outside program only | none: its crossing brings one |
-| `villager` | being | humanoid, 1,500 to 1,950 mm | wait, stand, talk, rest, visit; version 2 also say | talk_to, hear | the routine; a model or the owner | `people-catalog` |
+| `villager` | being | humanoid, 1,500 to 1,950 mm | wait, stand, talk, rest, visit; versions 2 and 3 also say | talk_to, hear | the routine; a model or the owner; version 3 also an outside program | `people-catalog` |
 | `sword` | object | versions 2 and 3: 240 x 80 x 1,000 mm, as wide and deep as a sword's guard and pommel; version 1: 120 x 40 x 1,000 mm | | holdable, one hand, 150 mm up its length | | version 3: `kaykit-sword`, then `primitive-sword`; versions 1 and 2: `primitive-sword` |
 | `lantern` | object | 180 x 180 x 300 mm | | holdable, one hand | | `primitive-lantern` |
 | `well` | object | 1,600 x 1,600 x 2,200 mm, blocks walking | | visit, from two sides | | `primitive-well` |

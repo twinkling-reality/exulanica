@@ -60,7 +60,7 @@ def _lines(state, document, being) -> set[tuple[str, str | None]]:
 
 def test_a_villager_beside_the_knight_is_offered_a_line_to_it_and_to_everyone_near():
     state, document, knight, villager = _square()
-    assert document["population_kind"] == _villager_reference(2)
+    assert document["population_kind"] == _villager_reference(3)
     assert {("say_to", knight["id"]), ("say_all", None)} <= _lines(state, document, villager)
 
 
@@ -95,7 +95,7 @@ def test_a_society_that_recorded_the_first_villager_offers_its_people_no_line(mo
 
 def test_a_society_no_model_decides_for_lives_the_same_with_either_villager(monkeypatch):
     """Saying is offered only to a being a model or the world's owner decides for, so the routine
-    walks the same people the same way, minute by minute, under either catalog's villager."""
+    walks the same people the same way, minute by minute, under each catalog's villager."""
 
     def lives(version: int) -> list:
         read = {
@@ -103,7 +103,7 @@ def test_a_society_no_model_decides_for_lives_the_same_with_either_villager(monk
         }
         monkeypatch.setattr(society_grounds, "society_ground_for_navigation", read.__getitem__)
         document = compose((GATE, KNIGHT))
-        assert document["population_kind"] == _villager_reference({7: 1, 8: 2}[version])
+        assert document["population_kind"] == _villager_reference(version - 6)
         state = copy.deepcopy(initial_things_society(SOCIETY, SEED, document, population=12))
         seen = []
         for _ in range(20):
@@ -118,4 +118,4 @@ def test_a_society_no_model_decides_for_lives_the_same_with_either_villager(monk
             )
         return seen
 
-    assert lives(7) == lives(8)
+    assert lives(7) == lives(8) == lives(9)
