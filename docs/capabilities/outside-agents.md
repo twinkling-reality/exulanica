@@ -133,6 +133,20 @@ named by digest), version 0.2.0 `outside-agents.v2.json` (profile `exulanica.bri
 looks named by the thing library's key, version and digest; [door contract](../door-contract.md),
 Mapping files).
 
+## What the world's owner sees
+
+In the world workspace, a being an outside AI agent decides for is shown as one, from the models
+read's entry for it (`ai` true). Looked at, its label's chip reads "An outside AI agent", with a live
+dot while the agent is connected. Chosen, its card says "An outside AI agent decides for <name>."
+and gives the words the agent declared as text, never on the body: "In its own words: <name>, made
+by <maker>, thinking with <mind>.", each part only where declared. Its lines, History and the rows of
+its day page read "By an outside AI agent"; its day page says the agent costs the world nothing and
+offers no model and no run, because the page cannot end a grant. Each of its decisions shows what
+the agent was told and which offered action it chose, with how long it took and no cost. A turn it
+did not answer reads "Asked the outside AI agent · no answer · the routine acted", with why (it did
+not answer in time, or it was not connected), and one whose answer could not be used reads "no
+usable answer" in its place. A game's program keeps "An outside program" in these places.
+
 ## What an agent is shown and may answer
 
 Each turn is one ask of the door: the request the decision host reserved for the thing, with the
@@ -168,9 +182,6 @@ record and no model's context carries it.
   them yet.
 - A town's people are villagers, a kind no outside program decides for: a grant naming one is
   refused `decider_not_allowed`, and an agent comes into a town as a body of its own.
-- The world workspace does not yet show that an outside agent decides: a body of the agent's own is
-  drawn in the look it wore, without a name, a mark or a card, and choosing it chooses nothing. The
-  society's events (`decision_applied`) and the models read (`GET .../society/models`) say so.
 - A body of the agent's own hears the lines said near it, and nothing else that happens around it
   reaches its bridge ([door contract](../door-contract.md)).
 - Comparing an outside agent beside a model on the same thing is not provided: a comparison runs a
@@ -188,6 +199,7 @@ record and no model's context carries it.
 | The MCP facade | `bridges/agents/exulanica_agent/facade.py`, `mcp_server.py` | `tests/test_agent_facade.py`; `bridges/agents/checks/mcp_stdio.py` and `mcp_http.py` with the MCP SDK installed |
 | The examples | `bridges/agents/examples/` | the quickstart in `tests/test_agent_library.py`; `bridges/agents/checks/nat_check.py` for the toolkit, and `nat_run.py` for a recorded run in a real world |
 | Outside the product | `bridges/agents/exulanica_agent/outside-agents.v1.json` and `outside-agents.v2.json`, `examples/bridge-entry.json` | `tests/test_agent_outside_product.py` (each published mapping read by the door's own checker and pinned) |
+| What the world's owner sees | `tools/previews/world-workspace/` (`character-view.mjs`, `character-words.mjs`, `character-group.mjs`, `decision-words.mjs`, `record-host.ts`, `character-page.ts`) | the workspace's `verify-character-view.mjs`, `verify-character-words.mjs`, `verify-character-group.mjs`, `verify-decision-words.mjs`, `verify-history.mjs`, `verify-talk-pops.mjs`; `web/packages/app/test/world-look-label.test.ts`, `world-record-host.test.ts`, `world-record-decision.test.ts`, `world-record-day.test.ts` |
 | Through the real door | the library and the tools against the door's routes, migrations 0149 and 0153 and the decision host: hello and declaration, a new key ending the earlier, revocation, a person's turn decided by the agent and replayed without it, and a body of the agent's own crossing in through a gate, wearing its look, taking its turns and sent home | `tests/test_agent_door_postgres.py` |
 
 Decision record: [ADR-0032](../adr/0032-an-outside-ai-agent-enters-through-the-same-door-as-a-game.md).
