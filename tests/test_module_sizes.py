@@ -39,10 +39,11 @@ LIMITS: dict[str, tuple[int, str]] = {
         "buildings' storeys among them",
     ),
     "web/packages/app/src/composition/environment-selection.ts": (
-        3_360,
+        3_361,
         "the people, picking and society views of a mounted world, in one closure, with the "
         "world's clock and population, the seats its placed things give and the people spacing, "
-        "walkers' included, and a host page's names for its beings",
+        "walkers' included, a host page's names for its beings, and a pick that stops at the one "
+        "chosen",
     ),
     "web/packages/atlas-react/src/playcanvas/atlas-binding.ts": (
         3_282,
@@ -86,11 +87,12 @@ LIMITS: dict[str, tuple[int, str]] = {
         "where the being lives",
     ),
     "web/packages/atlas-react/src/playcanvas/society/crowd.ts": (
-        1_607,
+        1_622,
         "a society's people as drawn near and far: where each stands, faces and sits (two who "
         "spoke facing each other, a placed being walking in from where it was put down, no two "
         "standing or walking inside each other), whether one is drawn in full yet, and which one "
-        "a ray picks (the one it passes through the middle of over one it grazes)",
+        "a ray picks (the one it passes through the middle of over one it grazes, stopping at "
+        "the one chosen)",
     ),
     "exulanica/selection/kind_brief.py": (1_529, "a kind of world as a model drafts it"),
     "tools/previews/world-workspace/contextual-world.ts": (
