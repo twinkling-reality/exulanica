@@ -500,3 +500,39 @@ def test_a_zone_across_the_far_edge_too_shallow_for_its_areas_is_given_more_of_t
         "width_mm" in step for step in compiled.sizing[: compiled.sizing.index(raised[0])]
     )
     assert _passes(compiled.document)["verdict"] == "passed"
+
+
+def test_the_brief_s_patterns_hold_no_anchor_inside_a_group() -> None:
+    """A provider compiles the form's JSON schema into a grammar before it answers: Nebius refused
+    the whole kind drafter with HTTP 400 ("EBNF parser error ... Expect element, but got |") for
+    a look pattern written ``^($|...)$``, an anchor inside a group. Every pattern of every form the
+    drafter asks with says empty with an optional group instead, and still means what it said."""
+    from exulanica.selection.kind_drafting import kind_drafting_prompt, load_kind_catalogs
+    from exulanica.world.society_living import town_routine
+
+    prompt = kind_drafting_prompt()
+    catalogs = load_kind_catalogs(bounds_version=2 if prompt.version >= 7 else 1)
+    patterns: list[str] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "pattern" and isinstance(value, str):
+                    patterns.append(value)
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    for contract in (False, True):
+        form = brief_form(
+            catalogs, town_routine(), fixture_vocabulary=True, requirement_contract=contract
+        )
+        walk(form.model_json_schema())
+    assert patterns
+    for pattern in patterns:
+        assert not re.search(r"\((\?:)?[$^]|[$^]\)|\(\||\|\)|\|\|", pattern), pattern
+    # The requirement's look still takes an empty look or a look role, and nothing else.
+    look = next(p for p in patterns if p.startswith("^((") and p.endswith(")?$"))
+    assert re.fullmatch(look, "") and re.fullmatch(look, "structure.cottage")
+    assert not re.fullmatch(look, "cottage") and not re.fullmatch(look, "structure.")

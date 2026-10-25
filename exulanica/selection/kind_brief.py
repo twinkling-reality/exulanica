@@ -434,8 +434,11 @@ def _build(
                 "status": (Literal["fulfilled", "omitted"], ...),
                 "omission": (Literal[("", *OMISSION_CODES)], ...),
                 "form": (Literal[("", *FORM_LOOKS)], ...),
+                # Empty, or a look role: written as an optional group, never with an anchor inside
+                # one, which a provider's grammar compiler reads as an empty alternative and refuses
+                # the whole schema (Nebius: "EBNF parser error ... Expect element, but got |").
                 "look": (
-                    Annotated[str, Field(pattern=rf"^($|({'|'.join(LOOK_FAMILIES)})\.{_KEY})$")],
+                    Annotated[str, Field(pattern=rf"^(({'|'.join(LOOK_FAMILIES)})\.{_KEY})?$")],
                     ...,
                 ),
                 "shape_class": (Literal[("", *load_shape_classes().entries)], ...),

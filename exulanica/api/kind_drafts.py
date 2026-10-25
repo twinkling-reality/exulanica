@@ -762,7 +762,14 @@ def drafted_kind(
             )
         else:
             # A provider's error status, a connection that failed, or a call refused before it
-            # was sent: not a model's silence, so not said as one.
+            # was sent: not a model's silence, so not said as one. Logged by its class and the
+            # status line alone (never the provider's body, which may quote what was sent), so
+            # a drafter every call refuses is seen in the log.
+            _LOG.warning(
+                "the kind drafter's call failed: %s: %s",
+                type(failed).__qualname__,
+                str(failed).split(":", 1)[0],
+            )
             refused(
                 {
                     "code": "kind_draft_model_failed",
