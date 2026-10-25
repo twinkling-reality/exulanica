@@ -432,12 +432,14 @@ export class AuthoredRegionSociety {
    * than that many world metres along it (something else the ray meets first stands in front).
    * One the ray passes through the middle of (seen from above, within half their box's reach of
    * where they stand) wins over a nearer one whose box it only grazes: the person under the
-   * pointer, not a passer-by beside the line (P1).
+   * pointer, not a passer-by beside the line (P1). The one `chosen` names stops the ray where it
+   * meets them: nobody behind the person chosen is picked through them.
    */
   pickInhabitant(
     origin: readonly [number, number, number],
     direction: readonly [number, number, number],
     limit = Number.POSITIVE_INFINITY,
+    chosen: string | null = null,
   ): string | null {
     // The crowd reports boxes in this root's frame, so the ray is carried into it: its origin as a
     // point of the visitor's world, its direction by the root's inverse turn.
@@ -464,7 +466,7 @@ export class AuthoredRegionSociety {
       // How far beside the ray their middle stands, seen from above; a ray straight down, from its foot.
       const beside = across > 1e-9 ? Math.abs(dx * (z - oz) - dz * (x - ox)) / across : Math.hypot(x - ox, z - oz);
       return beside <= reach;
-    });
+    }, chosen);
   }
 
   /**

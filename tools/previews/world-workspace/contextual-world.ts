@@ -306,7 +306,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   function picked(x, y) {
     if (!current() || !inventory || !b.__workspacePick) return null;
     const ray = pointerRay(b, x, y); if (!ray) return null;
-    const hit = b.__workspacePick(ray.origin, ray.direction);
+    const hit = b.__workspacePick(ray.origin, ray.direction, held?.scene.type === 'being' ? held.scene.id : null); // The one chosen stops the look.
     const being = hit?.inhabitantId || hit?.thing?.pick?.subjectId;
     return being ? rowForSceneSelection(rows, { type: 'being', id: being })
       : hit?.authored?.objectId ? rowForSceneSelection(rows, { type: 'object', id: hit.authored.objectId }) : null;

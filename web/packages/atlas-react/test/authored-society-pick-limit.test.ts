@@ -47,18 +47,20 @@ describe('picking a person behind something nearer', () => {
   });
 });
 
+// A ray along +Z from 1 m up: a nearer person 3 m out and a farther one 6 m out, each offset sideways as stated, and
+// the one chosen, if any.
+const pick = (nearSide: number, farSide: number | null, chosen: string | null = null) => {
+  const society = setup(1);
+  const person = (id: string, side: number, along: number): OwnedSocietyState['inhabitants'][number] =>
+    ({ id, synthetic: true, position_mm: [side, along], motion_path_mm: [[side, along]] });
+  const inhabitants = [person('near', nearSide, 3000), ...(farSide === null ? [] : [person('far', farSide, 6000)])];
+  society.setSociety({ ...state, inhabitants }, [0, 0]);
+  const picked = society.pickInhabitant([0, 1, 0], [0, 0, 1], Number.POSITIVE_INFINITY, chosen);
+  society.destroy();
+  return picked;
+};
+
 describe('picking the person under the pointer, not a passer-by beside the line (P1)', () => {
-  // A ray along +Z from 1 m up: a nearer person 3 m out and a farther one 6 m out, each offset sideways as stated.
-  const pick = (nearSide: number, farSide: number | null) => {
-    const society = setup(1);
-    const person = (id: string, side: number, along: number): OwnedSocietyState['inhabitants'][number] =>
-      ({ id, synthetic: true, position_mm: [side, along], motion_path_mm: [[side, along]] });
-    const inhabitants = [person('near', nearSide, 3000), ...(farSide === null ? [] : [person('far', farSide, 6000)])];
-    society.setSociety({ ...state, inhabitants }, [0, 0]);
-    const picked = society.pickInhabitant([0, 1, 0], [0, 0, 1]);
-    society.destroy();
-    return picked;
-  };
 
   it('chooses the farther one the ray passes through the middle of over a nearer one it only grazes', () => {
     // 0.25 m beside the ray: inside the nearer one's 0.34 m box, outside half of it.
@@ -70,5 +72,23 @@ describe('picking the person under the pointer, not a passer-by beside the line 
     expect(pick(250, null)).toBe('near');
     // Nobody grazed or met: 0.5 m beside the ray is outside the box.
     expect(pick(500, null)).toBeNull();
+  });
+});
+
+describe('the look stopping at the one chosen, never labelling someone behind them', () => {
+  // P1's layout, the nearer person chosen: the ray meets them 0.25 m beside their middle, and passes through the middle
+  // of someone 3 m behind them.
+  it('stops at the chosen one when it meets them, however squarely it would meet someone behind', () => {
+    expect(pick(250, 0, 'near')).toBe('near');
+  });
+
+  it('keeps P1 up to the chosen one and leaves a ray that misses them as it was', () => {
+    // The farther one chosen: the nearer one the ray passes through the middle of still stands in front.
+    expect(pick(50, 0, 'far')).toBe('near');
+    // The farther one chosen and squarely met, the nearer one only grazed: the middle still wins.
+    expect(pick(250, 0, 'far')).toBe('far');
+    // The chosen one beside the ray, unmet: the pick is the one without anyone chosen.
+    expect(pick(500, 0, 'near')).toBe('far');
+    expect(pick(250, 0, null)).toBe('far');
   });
 });

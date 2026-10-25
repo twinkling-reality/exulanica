@@ -2817,8 +2817,9 @@ export function mountEnvironmentSelection(
     attachedControls = atlas.controls;
     priorInteract = atlas.controls.onInteract;
     // The nearest along a ray wins: a placed thing, or one of the world's people in front of it.
-    // Aiming and pressing E and a click on the world before looking around pick the same way.
-    const pickedAlong = (origin: readonly [number, number, number], direction: readonly [number, number, number]) => {
+    // Aiming and pressing E and a click on the world before looking around pick the same way. The
+    // person `chosen` names stops the ray: nobody behind them is picked through them.
+    const pickedAlong = (origin: readonly [number, number, number], direction: readonly [number, number, number], chosen: string | null = null) => {
       // Nothing is picked through what hides it: the ray reaches a placed thing or a person only
       // short of the first thing of the world's plan that stands in it, and a person only short of
       // a placed thing in front.
@@ -2826,7 +2827,7 @@ export function mountEnvironmentSelection(
       const met = things?.pick(origin, direction) ?? null;
       const authored = atlas.objects?.pick(origin, direction, open) ?? null;
       const thing = met !== null && met.distance <= Math.min(open, authored?.distance ?? Number.POSITIVE_INFINITY) ? met : null;
-      const inhabitantId = atlas.authoredSociety?.pickInhabitant(origin, direction, Math.min(open, thing?.distance ?? Number.POSITIVE_INFINITY, authored?.distance ?? Number.POSITIVE_INFINITY)) ?? null;
+      const inhabitantId = atlas.authoredSociety?.pickInhabitant(origin, direction, Math.min(open, thing?.distance ?? Number.POSITIVE_INFINITY, authored?.distance ?? Number.POSITIVE_INFINITY), chosen) ?? null;
       const pick: PlayPick | null = inhabitantId !== null ? { subjectId: inhabitantId, thingId: null }
         : thing !== null ? { subjectId: thing.pick.subjectId, thingId: thing.pick.thingId } : null;
       return { thing, authored, inhabitantId, pick };

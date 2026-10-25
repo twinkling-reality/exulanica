@@ -1126,14 +1126,24 @@ export class SocietyCrowd {
 
   /**
    * The nearest drawn inhabitant whose box `hit` meets before `limit`, near or far; with `central`, one the ray passes
-   * through the middle of wins over one it only grazes (P1: a click chooses the person under the pointer).
+   * through the middle of wins over one it only grazes (P1: a click chooses the person under the pointer). The one
+   * `stopAt` names (the person chosen) stops the ray where it meets them: nobody behind them is picked through them,
+   * however squarely, so the look never labels someone behind the one chosen.
    */
   pick(
     limit: number,
     hit: (min: readonly [number, number, number], max: readonly [number, number, number]) => number | null,
     central?: (min: readonly [number, number, number], max: readonly [number, number, number]) => boolean,
+    stopAt: string | null = null,
   ): string | null {
-    let nearest = limit, nearestCentral = limit;
+    let reach = limit;
+    if (stopAt !== null && this.drawnIds.includes(stopAt) && this.pickable(stopAt)) {
+      const walker = this.walkers.get(stopAt);
+      const met = walker ? hit(...this.boxOf(stopAt, walker)) : null;
+      // Just past where the chosen one is met, so they are among those up to it.
+      if (met !== null && met < reach) reach = met + 1e-6;
+    }
+    let nearest = reach, nearestCentral = reach;
     let selected: string | null = null, selectedCentral: string | null = null;
     // A selected inhabitant wins a tie with anyone standing on the same point.
     const chosen = this.selectedId;
@@ -1141,8 +1151,7 @@ export class SocietyCrowd {
       ? [chosen, ...this.drawnIds.filter((id) => id !== chosen)]
       : this.drawnIds;
     for (const id of order) {
-      const renderable = this.near.get(id);
-      if (renderable && (!renderable.root.enabled || renderable.root.tags.has('native-character-hidden'))) continue;
+      if (!this.pickable(id)) continue;
       const walker = this.walkers.get(id);
       if (!walker) continue;
       const [min, max] = this.boxOf(id, walker);
@@ -1157,6 +1166,12 @@ export class SocietyCrowd {
       }
     }
     return selectedCentral ?? selected;
+  }
+
+  /** Whether an inhabitant can be picked: drawn, and not hidden behind a native character. */
+  private pickable(id: string): boolean {
+    const renderable = this.near.get(id);
+    return !renderable || (renderable.root.enabled && !renderable.root.tags.has('native-character-hidden'));
   }
 
   /**
