@@ -45,6 +45,11 @@
 .wu-record-day .wu-day-item .wu-hr-pic { border-radius: 12px; box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 10px 28px rgba(18,40,44,.14); }
 .wu-record-day .wu-day-item[aria-current="true"] .wu-hr-pic { transform: translateY(-3px); box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 16px 40px rgba(18,40,44,.22); }
 .wu-record-day .wu-day-item[aria-current="true"] .wu-hr-pic::after { opacity: 1; }
+/* A slot whose picture has not drawn yet (D6): only the tile's faint wash where it will fade in, no edge, shadow or lift;
+   they come in with the picture. */
+.wu-record-day .wu-day-item .wu-hr-pic[data-waiting="true"] { transform: none; box-shadow: none; }
+.wu-record-day .wu-day-item .wu-hr-pic[data-waiting="true"]::after { opacity: 0; }
+.wu-record-day .wu-day-item .wu-hr-pic::after { transition: opacity 200ms; }
 .wu-record-day .wu-day-words { min-width: 0; }
 .wu-record-day .wu-day-title { margin-top: 8px; font: 400 21px/1.3 var(--font-sans); color: var(--hr-ink); text-wrap: pretty; }
 .wu-record-day .wu-day-said { margin-top: 6px; }

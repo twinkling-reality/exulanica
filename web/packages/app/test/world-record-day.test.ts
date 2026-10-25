@@ -174,6 +174,20 @@ describe("Teo's day", () => {
     expect(loaded()).toEqual(['true', null]);
   });
 
+  it('marks a picture slot waiting until its picture draws, a wash with no box (D6), and one shown before starts drawn', async () => {
+    const { root, page } = await open();
+    const state = () => teoState({ did: rows().map((row) => (row.picture ? { ...row, picture: `${row.picture}?wash` } : row)) });
+    const waiting = () => [...root.querySelectorAll('.wu-day-item .wu-hr-pic')].map((box) => (box as HTMLElement).dataset['waiting'] ?? null);
+    page.draw(state());
+    // Two pictures on their way and two moments with none yet: every slot waits.
+    expect(waiting()).toEqual(['true', 'true', 'true', 'true']);
+    root.querySelector('.wu-day-item .wu-hr-pic img')!.dispatchEvent(new Event('load'));
+    expect(waiting()).toEqual([null, 'true', 'true', 'true']);
+    // Drawn again, as each second during a run, the picture already shown starts drawn.
+    page.draw(state());
+    expect(waiting()).toEqual([null, 'true', 'true', 'true']);
+  });
+
   it('draws What Teo did newest first on the path at x 880, the chosen card filled and offering its decision', async () => {
     const { root, act, page } = await open();
     page.draw(teoState());

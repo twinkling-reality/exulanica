@@ -52,17 +52,19 @@ const shownPictures = new Set<string>();
 
 /**
  * A picture, or the quiet tile while it does not exist (no spinner, no words); it fades in once, when it first arrives,
- * and a redraw of a picture already shown (a page drawn again each second during a run) starts shown.
+ * and a redraw of a picture already shown (a page drawn again each second during a run) starts shown. Until its picture
+ * has drawn the slot is marked waiting, which a page may draw as a wash with no box (the day page, D6).
  */
 export function pictureBox(url: string | null, width: number, height: number): HTMLDivElement {
   const box = element('div', 'wu-hr-pic');
   box.style.width = `${width}px`;
   box.style.height = `${height}px`;
+  if (!url || !shownPictures.has(url)) box.dataset['waiting'] = 'true';
   if (url) {
     const image = element('img');
     image.alt = '';
     if (shownPictures.has(url)) image.setAttribute('data-loaded', 'true');
-    else image.addEventListener('load', () => { shownPictures.add(url); image.setAttribute('data-loaded', 'true'); });
+    else image.addEventListener('load', () => { shownPictures.add(url); image.setAttribute('data-loaded', 'true'); delete box.dataset['waiting']; });
     image.src = url;
     box.append(image);
   }
