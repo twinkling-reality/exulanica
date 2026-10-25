@@ -359,8 +359,9 @@ class Project:
         self._write(checkpoint, {}, self._merge(self.working_sessions(), evidence))
 
     def _commit(self, paths: list[str], message: str, when: float | None = None) -> str:
-        self.git("add", "--", *paths)
+        # Checked before anything is staged, so a refused message leaves the folder as it was.
         text = check_message(message)
+        self.git("add", "--", *paths)
         self.git("commit", "--quiet", "--no-verify", "-m", text, "--", *paths, when=when)
         head = self.head()
         if head is None:
@@ -443,8 +444,18 @@ class Project:
         if path.is_file() and path.read_bytes() == data:
             return {"committed": False, "reason": "unchanged", "link": read_link(self.folder)}
         path.write_bytes(data)
-        text = f"Link project to {repository} (base {base}, branch {branch})" + (
-            ", published automatically" if publish == "automatic" else ""
+        # The first wording that keeps the commit message rule: a long login and repository name say
+        # less, and the committed project-link.json holds the base, branch and publish setting.
+        automatic = ", published automatically" if publish == "automatic" else ""
+        text = next(
+            words
+            for words in (
+                f"Link project to {repository} (base {base}, branch {branch}){automatic}",
+                f"Link project to {repository}{automatic}",
+                f"Link project to {repository}",
+                "Link project to its repository",
+            )
+            if len(words) <= 120
         )
         return {
             "committed": True,

@@ -190,6 +190,27 @@ def test_two_runs_a_new_private_repository_a_link_and_one_rolling_pull_request(
     assert "run-1" not in pull["body"].split("<!--")[0]
 
 
+def test_a_long_login_and_name_link_in_a_commit_within_the_message_rule(
+    world,  # noqa: F811
+    tmp_path,
+    capsys,
+):
+    # GitHub's longest login (39) and repository name (100): the full link line would pass 120
+    # characters, so its commit says less and the committed project-link.json holds the rest.
+    folder = tmp_path / "long-project"
+    code, first = record_run(
+        world, tmp_path, folder, "session:run-1", capsys, "--project-id", "project:knight"
+    )
+    assert code == 0 and first["committed"]
+    repository = "o" * 39 + "/" + "n" * 100
+    project = Project(folder)
+    linked = project.link(repository, "main", "exulanica/world", "automatic")
+    assert linked["committed"] and len(linked["message"]) <= 120
+    assert linked["message"] == "Link project to its repository"
+    assert project.git("status", "--porcelain") == ""
+    assert project.timeline()["link"]["repository"] == repository
+
+
 def test_the_link_is_closed_and_holds_no_credentials(tmp_path):
     from exulanica.world_package.projects.link import link_document, make_link, resolve
 
