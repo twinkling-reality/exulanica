@@ -2,8 +2,13 @@
 // that frames them, from the recipe file. Run: node verify-moment-framing.mjs
 import assert from 'node:assert/strict';
 import { MOMENT_FRAMING, faceAngle, foregroundShare, frameRays, framedWhole, framingInSight, framingPose, lensOf, momentSociety, overviewDistance, reframe, standsInBand } from './moment-framing.mjs';
+import v5 from './moment-framing.v5.json' with { type: 'json' };
 
-assert.equal(MOMENT_FRAMING.recipe, 'moment-framing/v5');
+assert.equal(MOMENT_FRAMING.recipe, 'moment-framing/v6');
+// v6 is v5 with the near cover compared first, and nothing else changed.
+assert.deepEqual({ ...MOMENT_FRAMING, recipe: v5.recipe, sight: { ...MOMENT_FRAMING.sight, foreground: { ...MOMENT_FRAMING.sight.foreground, first: undefined } } },
+  { ...v5, sight: { ...v5.sight, foreground: { ...v5.sight.foreground, first: undefined } } });
+assert.equal(MOMENT_FRAMING.sight.foreground.first, true);
 // R23's band: from its foot to its top.
 assert.ok(MOMENT_FRAMING.tallest_least > 0 && MOMENT_FRAMING.tallest_least < MOMENT_FRAMING.tallest_share);
 // A near subject is waited for until drawn in full (its far form has no face), within the draw's bound.
@@ -133,6 +138,24 @@ assert.ok(framingInSight(pair, (camera, point) => point.y > 1 || (camera.z < 0 &
 
 // Faces: a camera stands where every face shows, the most frontal it can.
 const face = (pose, people) => Math.max(...people.map((one) => faceAngle(one, pose)));
+
+// A street tree's crown over the camera (DESIGN's first-minute finding 2, a day row's picture two thirds black): the
+// sight lines to the faces stay clear under it, so only the near cover tells it. One facing south (+z), the other
+// south-west, with a crown over every framing more than 1 m south of them: only those show both faces. v5 takes the
+// framing under the crown for its two faces; v6 takes a clear framing, which shows one.
+const crowned = [{ x: 0, y: 0, z: 0, heading: Math.PI }, { x: 2, y: 0, z: 0, heading: Math.PI - 0.8 }];
+const crownSouth = (pose) => (pose.z > 1 ? 0.6 : 0);
+const shownFrom = (pose) => crowned.filter((one) => faceAngle(one, pose) <= MOMENT_FRAMING.sight.face_limit_deg).length;
+const underCrown = framingInSight(crowned, () => true, v5, crownSouth);
+assert.ok(crownSouth(underCrown) > 0 && shownFrom(underCrown) === 2, 'v5, the control: two faces under the crown');
+const clearOfCrown = framingInSight(crowned, () => true, MOMENT_FRAMING, crownSouth);
+assert.equal(crownSouth(clearOfCrown), 0, 'v6: a framing clear of the crown');
+assert.equal(shownFrom(clearOfCrown), 1, 'v6: with a face still shown');
+// Covered everywhere, the least covered wins under v6; v5 takes its first side, the most covered here.
+const crownEverywhere = (pose) => (pose.z > 0 ? 0.6 : 0.3);
+const faceToFace = [{ x: 0, y: 0, z: 0, heading: -Math.PI / 2 }, { x: 2, y: 0, z: 0, heading: Math.PI / 2 }];
+assert.ok(framingInSight(faceToFace, () => true, MOMENT_FRAMING, crownEverywhere).z < 0, 'v6: the least covered');
+assert.ok(framingInSight(faceToFace, () => true, v5, crownEverywhere).z > 0, 'v5, the control: its first side');
 // Facing each other: square on, both turned toward the camera no further than a profile.
 const talking = [{ x: 0, y: 0, z: 0, heading: -Math.PI / 2 }, { x: 2, y: 0, z: 0, heading: Math.PI / 2 }];
 const profile = framingInSight(talking, () => true);

@@ -5,8 +5,10 @@
 // moment-framing.v1.json to v4.json stay beside it: the recipes the pictures kept under their names were
 // drawn by (v3 frames as v2 does and waits for the near subjects to be drawn in full, `wait_ms.near`; v4 draws
 // as v3 does with the moment's read made whole: steps in whole millimetres, everyone else indoors on every engine;
-// v5 keeps the one who acted or spoke the most prominent: no bystander larger, the camera stepping back for them).
-import framing from './moment-framing.v5.json' with { type: 'json' };
+// v5 keeps the one who acted or spoke the most prominent: no bystander larger, the camera stepping back for them;
+// v6 frames as v5 does with a near thing's cover compared first (`sight.foreground.first`): a framing with something
+// near the camera over more than the frame's share, a street tree's crown above it, loses to any clear one).
+import framing from './moment-framing.v6.json' with { type: 'json' };
 
 /** The framing recipe; each figure a world could want different is a field of the file. */
 export const MOMENT_FRAMING = Object.freeze(framing);
@@ -335,7 +337,8 @@ const comesBefore = (a, b) => {
 };
 
 /**
- * The best framing of the subjects over the recipe's heights, sides and `thirds`, from those `allowed`: the most
+ * The best framing of the subjects over the recipe's heights, sides and `thirds`, from those `allowed`: where the
+ * recipe compares the foreground first (`sight.foreground.first`), the least near cover past its share; then the most
  * faces shown; then the fewest bystanders out of the band (`outOfBand`), and by the least; then sight; then faces
  * turned least; then the nearest. With bystanders out of the band the camera may step back by `back_step_m` at a
  * time, within the most distance, while the one who acted or spoke stays at least `tallest_least` of the frame.
@@ -360,13 +363,17 @@ function chooseSide(drawn, seen, recipe, covered, thirds, allowed, outOfBand = (
     if (shown === 0) return false;
     const worst = turned.length > 0 ? Math.max(...turned) : 0;
     const points = [...subjects, ...ahead(pose)];
-    // Something near the camera over more than the recipe's share of the frame counts as one more unseen point.
-    const clear = covered(pose, drawn) <= recipe.sight.foreground.share;
+    // Something near the camera over more than the recipe's share of the frame counts as one more unseen point;
+    // where the recipe compares it first, how far past the share it covers decides before the faces, so a camera
+    // under a tree's crown, whose sight lines to the faces are clear, never beats a clear framing.
+    const share = covered(pose, drawn);
+    const clear = share <= recipe.sight.foreground.share;
+    const cover = recipe.sight.foreground.first ? Math.max(0, share - recipe.sight.foreground.share) : 0;
     const passed = points.filter((point) => seen(pose, point)).length + (clear ? 1 : 0);
     const band = outOfBand(pose);
-    // The most faces shown; then the fewest bystanders out of the band, and by the least; then sight; then faces
-    // turned least; then the nearest.
-    const order = [-shown, band.count, band.excess, -passed, worst, back];
+    // The least near cover past the share (where first); the most faces shown; then the fewest bystanders out of
+    // the band, and by the least; then sight; then faces turned least; then the nearest.
+    const order = [cover, -shown, band.count, band.excess, -passed, worst, back];
     if (best === null || comesBefore(order, best.order)) best = { pose, order, side, raise, third, back };
     return band.count > 0;
   };
