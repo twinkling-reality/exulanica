@@ -1,0 +1,61 @@
+/* The Integrations page over the front door (integrations.ts; DESIGN's frames r30-integrations-a and -b and their
+   sheet, BUILD-SHEETS-1024.md): the light page with the chosen world faded behind, what this is at the left, the
+   rows at the right in the model gallery's rhythm, the focused one opened to its three lines. Built on the light
+   plane's tokens (world-ui-create.css) and world-ui.css's --u; sizes are CSS pixels at 1920 by 1080 times
+   --ui-scale, text under 16 px keeping a 12 px floor and a key cap's glyph 9 px (L5). */
+
+.wu-integrations-host { position: fixed; inset: 0; z-index: 55; }
+
+/* The front door's button beside Create a world, in the same glass: tops aligned, the arrows' 4 px between. */
+body.ux-review #shell .ux-world-entry .ux-entry-integrations { vertical-align: top; margin-left: 4px; }
+
+/* The world faded behind, under the page's own wash, as the frames draw it. */
+.wu-light[data-form="integrations"] { background: #eef1f0; }
+.wu-light[data-form="integrations"] .wu-light-world { background-color: #eef1f0; background-position: right 30% center; opacity: .22; }
+.wu-light[data-form="integrations"] .wu-light-veil {
+  background: linear-gradient(90deg, #eef1f0 0%, rgba(238, 241, 240, .94) 40%, rgba(238, 241, 240, .62) 72%, rgba(238, 241, 240, .36) 100%),
+    linear-gradient(0deg, #eef1f0 0%, rgba(238, 241, 240, 0) 45%); }
+.wu-light[data-form="integrations"] .wu-light-surface { display: none; }
+.wu-light[data-form="integrations"] .wu-light-wordmark { top: calc(40 * var(--u)); font-size: calc(26 * var(--u)); letter-spacing: -.01em; }
+
+/* Left: the over-label, the title and what the page is. */
+.wu-light[data-form="integrations"] .wu-light-head { left: calc(120 * var(--u)); top: calc(150 * var(--u)); width: calc(600 * var(--u)); }
+.wu-int-over { margin: 0; font: 400 max(12px, calc(14 * var(--u)))/1 var(--font-mono); letter-spacing: .02em; color: var(--l-muted); }
+.wu-light[data-form="integrations"] .wu-light-title { margin-top: calc(16 * var(--u)); font-size: calc(64 * var(--u)); line-height: 1.05; text-wrap: balance; }
+.wu-int-sub { margin: calc(22 * var(--u)) 0 0; font: 400 calc(19 * var(--u))/1.45 var(--font-sans); color: var(--l-sub); text-wrap: pretty; }
+.wu-int-small { margin: calc(18 * var(--u)) 0 0; font: 400 max(12px, calc(14 * var(--u)))/1.5 var(--font-sans); color: var(--l-muted); text-wrap: pretty; }
+
+/* Right: the groups and their rows. */
+.wu-light[data-form="integrations"] .wu-light-lower { left: calc(860 * var(--u)); top: calc(150 * var(--u)); bottom: auto; right: auto; width: calc(900 * var(--u)); }
+.wu-int-group { margin-bottom: calc(30 * var(--u)); }
+.wu-int-label { margin: 0 0 calc(10 * var(--u)) calc(18 * var(--u)); font: 400 max(12px, calc(13 * var(--u)))/1 var(--font-mono); letter-spacing: .02em; color: var(--l-muted); }
+.wu-int-row { position: relative; display: grid; grid-template-columns: calc(34 * var(--u)) 1fr auto; column-gap: calc(16 * var(--u)); align-items: start;
+  padding: calc(16 * var(--u)) calc(18 * var(--u)); border: 1.5px solid transparent; border-bottom: 1px solid rgba(18, 23, 21, .10); cursor: pointer; }
+.wu-int-row:last-child { border-bottom-color: transparent; }
+.wu-int-row[data-focus="true"] { border: 1.5px solid #6496a6; border-radius: calc(12 * var(--u)); background: rgba(255, 255, 255, .72);
+  box-shadow: 0 calc(10 * var(--u)) calc(28 * var(--u)) rgba(18, 40, 44, .10); margin: 2px 0; }
+.wu-int-row:focus-visible { outline: none; }
+.wu-int-mark { width: calc(34 * var(--u)); height: calc(34 * var(--u)); border-radius: calc(9 * var(--u)); display: grid; place-items: center;
+  background: linear-gradient(180deg, #f7faf9, #e3ebea); box-shadow: inset 0 0 0 1px rgba(100, 150, 166, .45); }
+.wu-int-mark svg { width: calc(20 * var(--u)); height: calc(20 * var(--u)); stroke: #3f6f80; stroke-width: 1.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.wu-int-name { margin: 0; font: 400 calc(19 * var(--u))/1.25 var(--font-sans); color: var(--l-ink); }
+.wu-int-line { margin: calc(5 * var(--u)) 0 0; font: 400 max(12px, calc(14 * var(--u)))/1.45 var(--font-sans); color: var(--l-muted); text-wrap: pretty; }
+.wu-int-state { margin: 0; padding-top: calc(3 * var(--u)); font: 400 max(12px, calc(14 * var(--u)))/1.25 var(--font-sans); color: var(--l-muted); text-align: right; white-space: nowrap; }
+.wu-int-state[data-on="true"] { color: var(--l-ink); }
+.wu-int-dot { display: inline-block; width: calc(7 * var(--u)); height: calc(7 * var(--u)); border-radius: 50%; background: #6496a6; margin-right: calc(8 * var(--u)); vertical-align: 1px; }
+
+/* The focused row opened to its three lines, and the faint line where several grants stand. */
+.wu-int-open { grid-column: 2 / 4; margin: calc(14 * var(--u)) 0 0; display: grid; grid-template-columns: calc(96 * var(--u)) 1fr; row-gap: calc(9 * var(--u)); column-gap: calc(14 * var(--u)); }
+.wu-int-open dt { font: 400 max(12px, calc(12 * var(--u)))/1.6 var(--font-mono); letter-spacing: .02em; color: var(--l-muted); }
+.wu-int-open dd { margin: 0; font: 400 max(12px, calc(15 * var(--u)))/1.5 var(--font-sans); color: var(--l-ink); text-wrap: pretty; }
+.wu-int-faint { grid-column: 2 / 4; margin: calc(12 * var(--u)) 0 0; font: 400 max(12px, calc(14 * var(--u)))/1.45 var(--font-sans); color: var(--l-faint); }
+
+/* The key row at the bottom right, Esc among its keys; Enter's key is the link to the focused row's guide. */
+.wu-light[data-form="integrations"] .wu-light-keys { bottom: calc(40 * var(--u)); gap: calc(30 * var(--u)); }
+.wu-int-guide { color: inherit; text-decoration: none; }
+
+@media (forced-colors: active) {
+  .wu-int-row[data-focus="true"] { border-color: Highlight; }
+  .wu-int-mark svg { stroke: CanvasText; }
+  .wu-int-dot { background: CanvasText; }
+}

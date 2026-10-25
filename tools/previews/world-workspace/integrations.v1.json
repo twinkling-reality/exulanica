@@ -1,0 +1,90 @@
+{
+  "profile": "exulanica.integrations/v1",
+  "note": "What a person's worlds connect to, as the Integrations page lists it (integrations.ts; DESIGN's build sheet of 24 October and WORDS.md). One catalog over the model providers and the door: each row names where its state is read from, the words for each state, its Connects, Reads and Goes to lines, its guide (a document under docs/ and one of its headings, opened at guides) and its mark, a plain line drawing in a 24 by 24 box. A row whose state this install cannot give is left out. verify-integration-words.mjs holds every guide to a heading that exists.",
+  "guides": "https://github.com/twinkling-reality/exulanica/blob/main/",
+  "groups": [
+    {
+      "key": "models",
+      "label": "Where models run",
+      "rows": [
+        {
+          "key": "nebius",
+          "name": "Nebius Token Factory",
+          "line": "Open models from their makers answer for your people, with your own key, usually for a fraction of a cent a decision.",
+          "from": { "provider": "nebius_token_factory", "off_when": "provider_credential_absent" },
+          "states": { "on": "Your key is set", "off": "No key yet" },
+          "connects": "The open models offered with your Nebius key, each from its maker, priced per million tokens.",
+          "reads": "What a person's model is told at a decision, word for word as that decision's page shows it.",
+          "goes_to": "Nebius Token Factory, with your key. The key stays on this computer and is sent only to them.",
+          "guide": { "document": "docs/development-setup.md", "heading": "Running your own install" },
+          "mark": [
+            { "rect": { "x": 4, "y": 4, "width": 16, "height": 7, "rx": 2 } },
+            { "rect": { "x": 4, "y": 13, "width": 16, "height": 7, "rx": 2 } },
+            { "path": { "d": "M8 7.5h.01M8 16.5h.01" } }
+          ]
+        },
+        {
+          "key": "this-computer",
+          "name": "A model on this computer",
+          "line": "A local model runner answers here, free, and nothing it is told leaves this computer.",
+          "from": { "provider": "ollama_local", "off_when": "provider_not_running" },
+          "states": { "on": "Running · {model}", "off": "Not running" },
+          "connects": "The models your runner holds that this install offers, each checked here before a person may choose it.",
+          "reads": "What a person's model is told at a decision, word for word as that decision's page shows it.",
+          "goes_to": "Nowhere else: your runner answers on this computer.",
+          "guide": { "document": "docs/development-setup.md", "heading": "Running your own install" },
+          "mark": [
+            { "rect": { "x": 5, "y": 5, "width": 14, "height": 10, "rx": 1.5 } },
+            { "path": { "d": "M3 19h18" } }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "door",
+      "label": "Outside programs, through a world's door",
+      "rows": [
+        {
+          "key": "game",
+          "name": "A game",
+          "line": "A game plays someone in your world, or brings its own character in, under a grant you give and can end.",
+          "from": { "door": "bridges", "ai": false },
+          "states": { "none": "None admitted on this install", "some": "{n} admitted" },
+          "connects": "A game you admit on this install, for one of your people or a character of its own that comes in through the gate.",
+          "reads": "What the world's own models are shown for that person, and the world's rules in words.",
+          "goes_to": "The game, under the grant you give it.",
+          "guide": { "document": "docs/door-contract.md", "heading": "Bridges" },
+          "mark": [
+            { "path": { "d": "M7 9h10a4 4 0 0 1 4 4v1a3 3 0 0 1-5 2l-1-1H9l-1 1a3 3 0 0 1-5-2v-1a4 4 0 0 1 4-4z" } },
+            { "path": { "d": "M8 11.5v3M6.5 13h3M15.5 12.5h.01M17.5 14h.01" } }
+          ]
+        },
+        {
+          "key": "agent",
+          "name": "An AI agent you build",
+          "line": "Any framework, through MCP or NVIDIA NeMo Agent Toolkit, decides for someone you grant it.",
+          "from": { "door": "grants", "ai": true },
+          "states": { "none": "No grant yet", "deciding": "Deciding for {names}", "nobody": "Deciding for nobody yet", "some": "{n} grants" },
+          "several": "Each grant ends by itself at most a day after it was given.",
+          "connects": "An agent you run, with a key you hand it, for one of your people or a body of its own that comes in through the gate.",
+          "reads": "What the world's own models are shown for that person, and the world's rules in words. Every line it says is shown as an AI's.",
+          "goes_to": "The agent you run. You can end the grant at any moment, and the person's own routine decides again.",
+          "ends": {
+            "ended": "Ended.",
+            "one": "{name}'s own routine decides again.",
+            "several": "Their own routines decide again: {names}.",
+            "refused": "It could not be ended just then; it still stands."
+          },
+          "guide": { "document": "docs/capabilities/outside-agents.md", "heading": "On your own install" },
+          "mark": [
+            { "circle": { "cx": 12, "cy": 12, "r": 3 } },
+            { "circle": { "cx": 5, "cy": 6, "r": 1.8 } },
+            { "circle": { "cx": 19, "cy": 6, "r": 1.8 } },
+            { "circle": { "cx": 12, "cy": 20, "r": 1.8 } },
+            { "path": { "d": "M9.6 10.2 6.4 7.4M14.4 10.2l3.2-2.8M12 15v3.2" } }
+          ]
+        }
+      ]
+    }
+  ]
+}

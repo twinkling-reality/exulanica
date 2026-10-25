@@ -18,7 +18,8 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', 
 let serial = 0;
 const nextId = (stem: string): string => `${stem}-${++serial}`;
 
-export type LightForm = 'create' | 'creating';
+/** Frame 20 (Create), frame 21 (Creating), and the Integrations page over the front door (integrations.ts). */
+export type LightForm = 'create' | 'creating' | 'integrations';
 
 export interface LightPage {
   readonly root: HTMLElement;
@@ -268,7 +269,7 @@ export function quietCommand({ key = 'Esc', word = CREATE_WORDS.yourWorlds, shor
 export interface CreateKeys { readonly create: boolean; readonly start: boolean }
 
 /** A key the row says: a cap and a word, not a button (the orb and the cards are the buttons). */
-function lightHint(key: string, word: string, shortcut: string): HTMLSpanElement {
+export function lightHint(key: string, word: string, shortcut: string): HTMLSpanElement {
   const hint = element('span', 'wu-qcmd wu-light-hint');
   const cap = element('span', 'wu-qcmd-key', key);
   cap.setAttribute('aria-hidden', 'true');

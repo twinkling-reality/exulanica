@@ -60,7 +60,7 @@ type RawDraft = Readonly<Record<string, unknown>>;
 
 /** A read with the page's own credentials: its bearer on a person's own install, its session's cookie for a guest. */
 /** A page's own Tab stops in document order: focusable, enabled, in the Tab order and inside nothing hidden. */
-function tabStops(root: HTMLElement): HTMLElement[] {
+export function tabStops(root: HTMLElement): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')]
     .filter((one) => one.tabIndex >= 0 && !(one as HTMLButtonElement).disabled && one.closest('[hidden]') === null);
 }
@@ -584,14 +584,15 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
 
 /**
  * The "Being made…" card on the front door (N12): where this person's draft still runs, a card
- * first in the strip that opens Create a world, which follows it on frame 21. Read once, quietly.
+ * first in the strip that opens Create a world, which follows it on frame 21. Read once, quietly;
+ * answers the offer it read, for the front door's other readers of it, or null where it read none.
  */
-export async function showBeingMade(root: HTMLElement, credentials: Credentials, signal?: AbortSignal): Promise<void> {
+export async function showBeingMade(root: HTMLElement, credentials: Credentials, signal?: AbortSignal): Promise<RawDraft | null> {
   let raw: RawDraft;
-  try { raw = await readRaw(credentials, '/worlds/drafts', signal ?? new AbortController().signal); } catch { return; }
-  if (offerState(raw).page !== 'following' || !root.isConnected) return;
+  try { raw = await readRaw(credentials, '/worlds/drafts', signal ?? new AbortController().signal); } catch { return null; }
+  if (offerState(raw).page !== 'following' || !root.isConnected) return raw;
   const list = root.querySelector<HTMLElement>('.your-worlds-strip .world-entry-item')?.parentElement;
-  if (!list || list.querySelector('.ux-being-made')) return;
+  if (!list || list.querySelector('.ux-being-made')) return raw;
   // Drawn as Your worlds draws a card (composition/world-entry.ts): a quiet tile, then its words.
   const card = document.createElement('button');
   card.type = 'button';
@@ -606,4 +607,5 @@ export async function showBeingMade(root: HTMLElement, credentials: Credentials,
   item.className = 'world-entry-item';
   item.append(card);
   list.prepend(item);
+  return raw;
 }

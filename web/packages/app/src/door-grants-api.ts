@@ -4,6 +4,10 @@
  * hello (`{name, maker, mind?}`), or null where it gave none. An outside agent's mark names it by
  * that name (`composition/thing-marks.ts`); the words are the program's own, so they are set as
  * text only, and a grant that says nothing leaves its visitor's pill saying `agent`.
+ *
+ * Each grant also keeps whether it still stands (`ended`: null, else `revoked` or `expired`),
+ * whether its program is an AI's, and the version and people it was given for, which the
+ * Integrations page reads; the owner ends one with `POST /door/grants/{grant_id}/revoke`.
  */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
@@ -20,8 +24,17 @@ export interface DeclaredSelf {
 
 export interface DoorGrant {
   readonly grantId: string;
+  readonly worldId: string;
   readonly bridge: string;
   readonly declared: DeclaredSelf | null;
+  /** Null while the grant stands; `revoked` or `expired` once it does not. */
+  readonly ended: string | null;
+  /** Whether the deployment declares its program an AI's (the bridge's `ai`). */
+  readonly ai: boolean;
+  /** The world version its people are named in and its visitors arrive in, or null. */
+  readonly versionId: string | null;
+  /** The people it decides for, by their ids in that version. */
+  readonly things: readonly string[];
 }
 
 const record = (value: unknown): Readonly<Record<string, unknown>> =>
@@ -43,18 +56,28 @@ function declaredOf(value: unknown): DeclaredSelf | null {
   });
 }
 
-/** Read the world's grants, refusing a row that does not name its grant and bridge. */
+/** One grant as the door's grant view serves it, refusing one that does not name its grant, world and bridge. */
+export function parseDoorGrant(value: unknown): DoorGrant {
+  const entry = record(value);
+  const scope = record(entry['scope']);
+  const things = scope['things'];
+  return Object.freeze({
+    grantId: words(entry['grant_id'], 'its id'),
+    worldId: words(entry['world_id'], 'its world'),
+    bridge: words(entry['bridge'], 'its bridge'),
+    declared: declaredOf(entry['declared']),
+    ended: typeof entry['ended'] === 'string' ? entry['ended'] : null,
+    ai: entry['ai'] === true,
+    versionId: typeof scope['version_id'] === 'string' ? scope['version_id'] : null,
+    things: Object.freeze(Array.isArray(things) ? things.filter((thing): thing is string => typeof thing === 'string') : []),
+  });
+}
+
+/** Read the world's grants, refusing a row that does not name its grant, world and bridge. */
 export function parseDoorGrants(value: unknown): readonly DoorGrant[] {
   const rows = record(value)['grants'];
   if (!Array.isArray(rows)) throw new TypeError('The world\'s grants are not a list');
-  return Object.freeze(rows.map((row: unknown) => {
-    const entry = record(row);
-    return Object.freeze({
-      grantId: words(entry['grant_id'], 'its id'),
-      bridge: words(entry['bridge'], 'its bridge'),
-      declared: declaredOf(entry['declared']),
-    });
-  }));
+  return Object.freeze(rows.map(parseDoorGrant));
 }
 
 export interface DoorGrantsClientOptions extends TransportOptions {
@@ -76,5 +99,11 @@ export class DoorGrantsClient {
     const path = openWorldPath(DOOR_GRANTS_PATH, this.#worldId, 'the programs let into this world');
     const grants = parseDoorGrants(await this.#transport.getJson<unknown>(path));
     return new Map(grants.map((grant) => [grant.grantId, grant]));
+  }
+
+  /** End a grant now, as its owner (`world.write` and `door.grant`): the grant as it then stands. Ending it twice changes nothing. */
+  async revoke(grantId: string): Promise<DoorGrant> {
+    const answer = await this.#transport.postJson<unknown>(`${DOOR_GRANTS_PATH}/${encodeURIComponent(grantId)}/revoke`, {});
+    return parseDoorGrant(record(answer)['grant']);
   }
 }

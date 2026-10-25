@@ -5,6 +5,7 @@ import { showWorldDetails } from './front-door-details.ts';
 import { offerOpenAndDetailsOnly } from './front-door-card.ts';
 import { endOpening, handOverOpening } from './world-opening.ts';
 import { showBeingMade } from './create-world.ts';
+import { offerIntegrations } from './integrations.ts';
 import { capturedPicture, frontDoorAddress, leadsWithCreate, openWorldAddress, worldAddress } from './front-door-routes.mjs';
 import { worldPicture } from '/src/composition/world-pictures.ts';
 import { icon, type IconName } from '/src/ui/system/icon.ts';
@@ -176,6 +177,9 @@ export function mountFrontDoor({ root, entries, credentials }: { root: HTMLEleme
   reflect();
   // A first run with only the untouched starter lands on Create a world, as its own button opens it (aha item 3).
   if (leadsWithCreate(entries, { remembered, pictured: (entry: SavedWorldEntry) => (frontDoorPicture(entry) ?? worldPicture(entry)) !== null })) root.querySelector<HTMLElement>('.your-worlds-create')?.click();
-  // A world this person is having made still runs: its card waits here (N12).
-  if (credentials) void showBeingMade(root, credentials);
+  // A world this person is having made still runs: its card waits here (N12). The offer it reads also says whether
+  // this page is the install owner's own, which alone offers Integrations beside Create a world.
+  if (credentials) {
+    void showBeingMade(root, credentials).then(offer => offerIntegrations(createRow as HTMLElement, offer, { credentials, entries, picture: chosenWorldPicture }));
+  }
 }

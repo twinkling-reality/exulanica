@@ -147,6 +147,17 @@ did not answer reads "Asked the outside AI agent · no answer · the routine act
 not answer in time, or it was not connected), and one whose answer could not be used reads "no
 usable answer" in its place. A game's program keeps "An outside program" in these places.
 
+On the owner's own install, the Integrations page, opened from Your worlds beside Create a world,
+holds a row for an AI agent. It reads each saved world's grants (`GET /door/grants`) and says what
+stands now: "No grant yet", "Deciding for <name>" for one grant, by the names the world gives the
+people it decides for (a body that came in through the gate is "Visitor"), "Deciding for nobody
+yet", or the count of several. While exactly one AI grant stands, Del ends it through the door's own
+`POST /door/grants/{grant_id}/revoke`, and the row then says "Ended.", naming under it whose own
+routine decides again where the version's model history records that hand-back. An end the server
+refuses or does not answer leaves the grant standing, and the row says so. Several grants are not
+ended from the page: each ends by itself when its minutes run out, or through the same route.
+The page sets nothing up, and Enter opens this guide at "On your own install".
+
 ## What an agent is shown and may answer
 
 Each turn is one ask of the door: the request the decision host reserved for the thing, with the
