@@ -94,7 +94,11 @@ LIMITS: dict[str, tuple[int, str]] = {
         "a ray picks (the one it passes through the middle of over one it grazes, stopping at "
         "the one chosen)",
     ),
-    "exulanica/selection/kind_brief.py": (1_529, "a kind of world as a model drafts it"),
+    "exulanica/selection/kind_brief.py": (
+        1_532,
+        "a kind of world as a model drafts it, its look pattern written so a provider's grammar "
+        "compiler accepts it",
+    ),
     "tools/previews/world-workspace/contextual-world.ts": (
         1_526,
         "the world view's host: its corners, people, speech, building (which lets go of a chosen "
