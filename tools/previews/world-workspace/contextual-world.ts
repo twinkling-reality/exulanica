@@ -556,7 +556,6 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   const quietChoices = quietWords(Object.values(import.meta.glob('../../../assets/catalogs/society/society-decision-action.v*.json', { eager: true, import: 'default' })));
   const speechParts = new Map(), nameParts = new Map(), togetherParts = new Map();
   const insetNow = edgeInset(beside);
-  let lastChosen = null;
   // Talking while following a conversation (talk-scene.mjs, ruling T9): the scene's lines, and who speaks.
   const scene = createScene();
   let sceneSpeaker = null;
@@ -1402,19 +1401,18 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     // hints; one that would rise above it sits at its edge (L21).
     for (const item of placedPops) item.part.place(item.x, Math.max(safeTop, Math.min(safeBottom - item.height, tops.get(item.serial) ?? item.y)));
     for (const [subjectId, part] of speechParts) if (!shownPops.some(item => item.subjectId === subjectId)) { part.remove(); speechParts.delete(subjectId); }
-    // Names over people farther off (N28 section 5): the people of a line said beyond hearing and the
-    // person chosen last, seen; never one whose line shows, who carries the looked-at tag or is chosen
-    // now; the person chosen last first, then the nearest, three at most.
-    if (held?.scene.type === 'being') lastChosen = held.scene.id;
+    // Names over people farther off (N28 section 5): the people of a line said beyond hearing, seen; never
+    // one whose line shows, who carries the looked-at tag or is chosen now; the nearest first, three at most.
+    // Someone let go keeps nothing over their head but what anyone has (DESIGN's ruling (3)).
     const showing = new Set(placedPops.map(item => item.id));
     if (looking) showing.add(target.scene.id);
     if (held) showing.add(held.scene.id);
     for (const id of inScene) showing.add(id);
     const candidates = [];
     if (!pageShown()) {
-      for (const id of new Set([...beyond, ...(lastChosen ? [lastChosen] : [])])) {
+      for (const id of new Set(beyond)) {
         const row = beingRow(id), frameOf = row && screenFrame(row);
-        if (frameOf?.headInView && seen(row, frameOf) && frameOf.bottom - frameOf.top >= NAMED_LEAST_PX * s) candidates.push({ id, metres: reachDistance(row), last: id === lastChosen });
+        if (frameOf?.headInView && seen(row, frameOf) && frameOf.bottom - frameOf.top >= NAMED_LEAST_PX * s) candidates.push({ id, metres: reachDistance(row) });
       }
     }
     const named = namedPeople(candidates, showing);

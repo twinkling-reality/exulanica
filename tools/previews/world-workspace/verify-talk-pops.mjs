@@ -129,17 +129,18 @@ assert.deepEqual(edgePlace({ ...box, right: false, overY: 400 }), { x: 32, y: 40
 assert.deepEqual(edgePlace({ ...box, right: false, overY: 20 }), { x: 32, y: 120 }, 'never above the safe area');
 assert.deepEqual(edgePlace({ ...box, right: false, overY: 2000 }), { x: 32, y: 920 - 60 }, 'never below it');
 assert.deepEqual(edgePlace({ ...box, right: true, overY: null }), { x: 1588, y: 120 + (800 - 60) / 2 }, 'behind the camera');
-// N28 section 5: who is named. The person chosen last first, then the nearest, at most three; never
-// one with a line showing, the looked-at tag, or chosen now; one counted once, at its nearest.
+// N28 section 5: who is named. The nearest first, at most three; never one with a line showing, the
+// looked-at tag, or chosen now; one counted once, at its nearest. A mark that someone was chosen last puts
+// nobody first: someone let go keeps nothing over their head but what anyone has (DESIGN's ruling (3)).
 assert.equal(NAMES_MOST, 3);
 assert.equal(NAMED_LEAST_PX, 24);
 const far = [
   { id: 'marco', metres: 40 }, { id: 'lia', metres: 25 }, { id: 'ana', metres: 60 }, { id: 'bo', metres: 30 },
   { id: 'lia', metres: 22 }, { id: 'teo', metres: 90, last: true }, { id: 'ines', metres: 21 }, { id: 'kai', metres: Infinity },
 ];
-assert.deepEqual(namedPeople(far, new Set(['ines'])), ['teo', 'lia', 'bo']);
+assert.deepEqual(namedPeople(far, new Set(['ines'])), ['lia', 'bo', 'marco']);
 assert.deepEqual(namedPeople(far, new Set(['teo', 'ines'])), ['lia', 'bo', 'marco']);
-assert.deepEqual(namedPeople(far, new Set(), 1), ['teo']);
+assert.deepEqual(namedPeople(far, new Set(), 1), ['ines']);
 assert.deepEqual(namedPeople([], new Set()), []);
 // T10: names that would overlap become one label over them, left to right; a name apart stays alone, and a
 // chain of overlaps is one label.

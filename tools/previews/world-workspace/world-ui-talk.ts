@@ -90,7 +90,7 @@ export function speech(): Speech {
   };
 }
 
-/** A name over someone farther off: in a conversation out of hearing, or the person chosen last (N28 section 5). */
+/** A name over someone farther off: in a conversation out of hearing (N28 section 5). */
 export function nameOver(): NameOver {
   const root = shade({ small: true });
   root.classList.add('wu-anchored', 'wu-name-over');

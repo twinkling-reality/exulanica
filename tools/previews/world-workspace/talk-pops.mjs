@@ -257,17 +257,17 @@ export function nameGroups(boxes, gap = 4) {
 }
 
 /**
- * Who is named over their head (N28 section 5). `candidates` are `{ id, metres, last }`, each seen on
- * screen: the speaker and listener of a line beyond hearing, and the person chosen last (`last`).
- * `skip` holds whoever has a line showing, carries the looked-at tag, or is chosen now. Answers at most
- * `most` ids: the person chosen last first, then the nearest.
+ * Who is named over their head (N28 section 5). `candidates` are `{ id, metres }`, each seen on screen:
+ * the speaker and listener of a line beyond hearing. `skip` holds whoever has a line showing, carries the
+ * looked-at tag, or is chosen now. Answers at most `most` ids, the nearest first. Someone let go is not
+ * among them: they keep nothing over their head but what anyone has (DESIGN's ruling (3)).
  */
 export function namedPeople(candidates, skip, most = NAMES_MOST) {
   const people = new Map();
   for (const one of candidates) {
     if (skip.has(one.id) || !Number.isFinite(one.metres)) continue;
     const known = people.get(one.id);
-    people.set(one.id, { id: one.id, metres: Math.min(one.metres, known?.metres ?? Infinity), last: Boolean(one.last || known?.last) });
+    people.set(one.id, { id: one.id, metres: Math.min(one.metres, known?.metres ?? Infinity) });
   }
-  return [...people.values()].sort((a, b) => Number(b.last) - Number(a.last) || a.metres - b.metres).slice(0, most).map(one => one.id);
+  return [...people.values()].sort((a, b) => a.metres - b.metres).slice(0, most).map(one => one.id);
 }
