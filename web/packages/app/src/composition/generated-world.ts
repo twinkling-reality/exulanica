@@ -49,6 +49,7 @@ import { furnitureOnLand, loadTownLand, rememberTownLand, townGround, withTownLa
 import { toApiError } from '@exulanica/graph-client';
 import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
 import { accessHeaders, type Credentials } from '../config.js';
+import { readWithinShare } from './share-reads.js';
 import { fill, say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
 import type { GeneratedGround, SavedWorldEntry } from '../world-entry-api.js';
@@ -242,7 +243,7 @@ async function worldTileBytes(
   const query = new URLSearchParams({ world_id: entry.worldId });
   const url = `${access.baseUrl}/world/versions/${encodeURIComponent(entry.authoredVersionId)}`
     + `/tiles/${encodeURIComponent(bakedTileId)}/bytes?${query.toString()}`;
-  const response = await fetch(url, {
+  const response = await readWithinShare(url, {
     headers: { ...accessHeaders(access), Accept: CONTAINER_MEDIA_TYPE },
     credentials: 'same-origin',
   });

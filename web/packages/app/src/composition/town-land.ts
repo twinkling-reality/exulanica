@@ -9,7 +9,8 @@
  * through the same version and holds each to the digest the section names (`readLandSection`), as
  * a site on land's are. While the kind worker is still making the land, the route answers 503 with
  * a `Retry-After`, and the page asks again after the seconds it states, for at most `LAND_WAIT_MS`
- * in all. Land that cannot be read is not stood in for: the world does not open, as it does not
+ * in all; the reads go a few at a time and a 429 for the workspace's share waits the same way
+ * (`./share-reads.ts`). Land that cannot be read is not stood in for: the world does not open, as it does not
  * with a tile that is not the one its entry names. A town whose tiles still bake asks for its land
  * once beforehand (`askForTownLand`), so the server makes it beside the bakes and keeps it.
  *
@@ -31,6 +32,7 @@ import { entityTagDigest } from '@exulanica/atlas-core';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import type { DrawnSiteLand, SiteLand } from '@exulanica/atlas-react/generated-site';
 import { accessHeaders, type Credentials } from '../config.js';
+import { readWithinShare } from './share-reads.js';
 import type { GeneratedTile, SavedWorldEntry } from '../world-entry-api.js';
 
 /** The profile of a town on its land's land section. */
@@ -99,10 +101,10 @@ export async function loadTownLand(access: Credentials, entry: SavedWorldEntry, 
   const read = async (path: string, sha256: string | null): Promise<unknown> => {
     let response: Response;
     for (;;) {
-      response = await fetch(landAddress(access, entry, path), {
+      response = await readWithinShare(landAddress(access, entry, path), {
         headers: { ...accessHeaders(access), Accept: 'application/json' },
         credentials: 'same-origin',
-      });
+      }, until);
       // Still being made: asked again after the seconds stated, a second at least, until the wait is spent.
       const stated = response.status === 503 ? Number(response.headers.get('Retry-After') ?? Number.NaN) : Number.NaN;
       const ms = Math.max(1, stated) * 1000;

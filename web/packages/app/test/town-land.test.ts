@@ -134,6 +134,22 @@ function making(refusals: number, retry: string | null = '2') {
   return { fetched, asks };
 }
 
+/** A host whose chunk (0, 0) answers 429 for the workspace's share, Retry-After 1, to its first `refusals` asks; when each was asked. */
+function crowded(refusals: number) {
+  const served = host();
+  const asks: number[] = [];
+  const fetched = vi.fn(async (input: string): Promise<Response> => {
+    if (input.includes('/land/chunks/0/0?')) {
+      asks.push(Date.now());
+      if (asks.length <= refusals) {
+        return new Response('{"code":"workspace_capacity_exhausted"}', { status: 429, headers: { 'Retry-After': '1' } });
+      }
+    }
+    return served.fetched(input);
+  });
+  return { fetched, asks };
+}
+
 // The page loads what reads and draws land only when a town on land opens; loading it the first
 // time takes seconds, so it is loaded once here, apart from what any test holds to its time.
 beforeAll(async () => {
@@ -177,6 +193,22 @@ describe("a town on its land's land, read", () => {
     await vi.advanceTimersByTimeAsync(LAND_WAIT_MS);
     expect((await town).land.groundMm(4000, 8000)).toBe(6320);
     expect(asks.map((at) => at - start)).toEqual([0, 2000, 4000]);
+  });
+
+  it('reads a chunk the workspace\'s share turned away, asking again after the seconds its 429 states, and refuses one past the wait by name', async () => {
+    vi.useFakeTimers();
+    const once = crowded(1);
+    vi.stubGlobal('fetch', once.fetched);
+    const start = Date.now();
+    const town = loadTownLand(access, entry, LAND_SHA256);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect((await town).land.groundMm(4000, 8000)).toBe(6320);
+    expect(once.asks.map((at) => at - start)).toEqual([0, 1000]);
+    const always = crowded(Number.POSITIVE_INFINITY);
+    vi.stubGlobal('fetch', always.fetched);
+    const refused = expect(loadTownLand(access, entry, LAND_SHA256)).rejects.toThrow('HTTP 429');
+    await vi.advanceTimersByTimeAsync(LAND_WAIT_MS);
+    await refused;
   });
 
   it('refuses land still being made once the wait is spent, having asked until then', async () => {

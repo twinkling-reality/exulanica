@@ -53,6 +53,7 @@ import { entityTagDigest, type TerrainOccupancyProof } from '@exulanica/atlas-co
 
 import type { GeneratedSiteMount, SiteDrawing, SiteLand, SiteVolumes, StructuredSiteDrawing, TerrainSiteDrawing } from '@exulanica/atlas-react/generated-site';
 import { accessHeaders, type Credentials } from '../config.js';
+import { readWithinShare } from './share-reads.js';
 import { say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
 import type { WorldLookChoice } from '../world-look.js';
@@ -134,7 +135,7 @@ export async function loadSiteWorld(
     + `/site?${query.toString()}`;
   let response: Response;
   for (let ask = 1; ; ask += 1) {
-    response = await fetch(url, {
+    response = await readWithinShare(url, {
       headers: { ...accessHeaders(access), Accept: 'application/json' },
       credentials: 'same-origin',
     });
@@ -190,7 +191,7 @@ async function loadSiteLandscape(
   const ask = async (path: string): Promise<Response> => {
     let response: Response;
     for (let asked = 1; ; asked += 1) {
-      response = await fetch(`${version}/${path}`, {
+      response = await readWithinShare(`${version}/${path}`, {
         headers: { ...accessHeaders(access), Accept: 'application/json' },
         credentials: 'same-origin',
       });
@@ -263,7 +264,7 @@ async function loadSiteLand(access: Credentials, entry: SavedWorldEntry, drawing
   const version = `${access.baseUrl}/world/versions/${encodeURIComponent(entry.authoredVersionId)}`;
   let bytes = 0;
   const read = async (path: string, sha256: string): Promise<unknown> => {
-    const response = await fetch(`${version}/${path}?${query.toString()}`, {
+    const response = await readWithinShare(`${version}/${path}?${query.toString()}`, {
       headers: { ...accessHeaders(access), Accept: 'application/json' },
       credentials: 'same-origin',
     });
