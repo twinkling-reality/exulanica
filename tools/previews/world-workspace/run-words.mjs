@@ -109,16 +109,34 @@ export function decidingWords(whos) {
 /**
  * The pill's run line (r09): who decides, the time left and the spending, "Teo's model is deciding · 9:13 left · $0.0011 of
  * $0.05"; with no money figure where every model the run asks is on this computer (`free`, A2) or the page has not read
- * them yet (`free` null).
+ * them yet (`free` null). `spent` is what the people's cards add up to (runSpent), where the page has read it.
  */
-export function pillRunLine(run, now, whos, free = false) {
-  return [decidingWords(whos), runningLine(run, now, free)].join(' · ');
+export function pillRunLine(run, now, whos, free = false, spent = null) {
+  return [decidingWords(whos), runningLine(run, now, free, spent)].join(' · ');
 }
 
-/** The page's line while a run is on: "9:13 left · $0.0011 of $0.05" (the strip and the orb say it runs; DESIGN's J9); "9:13 left" where it is free or not known yet. */
-export function runningLine(run, now, free = false) {
+/**
+ * What a run has spent as the people's cards say it (D9, DESIGN's fold-in): their models' known receipts in it summed
+ * (`entries`, the models read's run spending), "at least" while one of their costs is not known yet; null where nothing
+ * is read yet or no cost is known, when the run's own figure stands.
+ */
+export function runSpent(entries) {
+  if (!entries) return null;
+  const usd = entries.reduce((sum, entry) => sum + Number(entry.knownCostUsd), 0);
+  if (!(usd > 0)) return null;
+  return Object.freeze({ usd: usd.toFixed(8), unknown: entries.some(entry => entry.costsUnknown > 0) });
+}
+
+/**
+ * The page's line while a run is on: "9:13 left · $0.0011 of $0.05" (the strip and the orb say it runs; DESIGN's J9); "9:13
+ * left" where it is free or not known yet. With `spent` (runSpent's), the figure the cards add up to, "at least" as they
+ * say it; without, what the run's bounds hold.
+ */
+export function runningLine(run, now, free = false, spent = null) {
   const left = `${timeLeft(run.endsBy, now)} ${RUN_WORDS.left}`;
-  return free === false ? [left, `${amount(run.used.usd)} of ${amount(run.limits.usd)}`].join(' · ') : left;
+  if (free !== false) return left;
+  const used = spent ? `${spent.unknown ? 'at least ' : ''}${amount(spent.usd)}` : amount(run.used.usd);
+  return [left, `${used} of ${amount(run.limits.usd)}`].join(' · ');
 }
 
 /** What a closed run spent, with what is not settled yet. */

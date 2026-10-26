@@ -44,6 +44,7 @@ from exulanica.api.dependencies import (
 )
 from exulanica.api.runner_models import runner_model_name, runner_rows
 from exulanica.api.services import Services
+from exulanica.api.session_spending import bound_key
 from exulanica.api.world_scope import WorldId
 from exulanica.door.outside import outside_deciders
 from exulanica.models.budget import BudgetGuard
@@ -61,6 +62,7 @@ from exulanica.world.decision_roles import (
     decision_roles,
 )
 from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.society_control_repository import open_session_receipt
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_model_choice_repository import (
@@ -97,6 +99,16 @@ CHOICE_CONFLICTS: Final = frozenset(
 SUBJECT: Final = "person"
 #: What an outside entry says of its subject's latest decision by the program its grant opens to.
 OUTSIDE_LATEST: Final = ("decision_seq", "base_tick", "consumed_tick", "status", "reason")
+#: The decision requests an open run's own bounds admitted an attempt for: each attempt of a
+#: person's decision is admitted under the run's bound of its provider as ``decision:<request>#n``
+#: (``exulanica.api.session_spending``), so a receipt belongs to this run by its request alone.
+_RUN_REQUESTS: Final = """
+select distinct split_part(substr(x.request_key, 10), '#', 1) as request_id
+  from spending_reservation x
+  join spending_grant g on g.workspace_id = x.workspace_id and g.grant_id = x.bound_id
+ where x.workspace_id = %(workspace)s and starts_with(g.bound_key, %(bound)s)
+   and starts_with(x.request_key, 'decision:')
+"""
 
 
 _LOG = logging.getLogger(__name__)
@@ -192,6 +204,41 @@ def _middle_cost(asked: list[dict[str, Any]]) -> dict[str, Any]:
         "cost_median_usd": usd_string(median_low(costs)) if costs else None,
         "costs_counted": len(costs),
     }
+
+
+def _run_spending(
+    connection: ScopedConnection,
+    workspace_id: uuid.UUID,
+    society_id: uuid.UUID,
+    decisions: list[dict[str, Any]],
+) -> list[dict[str, Any]] | None:
+    """What each person's model has spent in the society's open run (D9): among ``decisions``,
+    the stored receipts whose request the run's own bounds admitted an attempt for, by person,
+    with their known costs summed and how many costs are not known yet; None while no run is open.
+    A person with no such receipt has no entry, and nothing is estimated."""
+    opened = open_session_receipt(connection, workspace_id, society_id)
+    if opened is None:
+        return None
+    rows = connection.execute(
+        _RUN_REQUESTS,
+        {"workspace": workspace_id, "bound": bound_key(opened["session_id"], "")},
+    ).fetchall()
+    requests = {str(row["request_id"]) for row in rows}
+    held: dict[str, list[dict[str, Any]]] = {}
+    for decision in decisions:
+        if str(decision["request_id"]) in requests:
+            held.setdefault(decision["subject_id"], []).append(decision)
+    return [
+        {
+            "subject_id": subject_id,
+            "decisions": len(receipts),
+            "known_cost_usd": usd_string(
+                sum((Decimal(row["cost_usd"]) for row in receipts if row["cost_known"]), Decimal(0))
+            ),
+            "costs_unknown": sum(1 for row in receipts if not row["cost_known"]),
+        }
+        for subject_id, receipts in sorted(held.items())
+    ]
 
 
 def _by_model(decisions: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -496,6 +543,7 @@ def society_models_view(
         latest[decision["subject_id"]] = decision
     spending = _spending(services, connection, session.workspace_id)
     here = spend_here_usd(spending, holds_as_guest(request))
+    run = _run_spending(connection, session.workspace_id, snapshot["society_id"], asked_models)
     return {
         "profile": PROFILE,
         "society_id": str(snapshot["society_id"]),
@@ -581,6 +629,9 @@ def society_models_view(
         "by_being": [
             {**entry, "name": name_of(entry["model_id"])} for entry in by_being(asked_models)
         ],
+        # What each person's model has spent in the open run, from its stored receipts, an
+        # optional field absent while no run is open (D9): a page says it beside the run's time.
+        **({} if run is None else {"run_spending": run}),
         "decisions_read": {"counted": len(decisions), "maximum": DECISIONS_READ},
         # Every subject an outside program decides for now under a grant that stands, the world's
         # own people a grant names (came "run") and the visitors that crossed in ("crossed"), with

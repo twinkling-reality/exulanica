@@ -44,7 +44,7 @@ export interface RunWatch {
   dispose(): void;
 }
 
-export function mountRunWatch({ pill, askers, free = () => false, entry, credentials, isCurrent, readOnly, onChange }: {
+export function mountRunWatch({ pill, askers, free = () => false, spent, entry, credentials, isCurrent, readOnly, onChange }: {
   readonly pill: RunPill;
   /** The characters whose choice is a model, as the page calls them now, for the pill's "who decides". */
   readonly askers: () => readonly CalledAs[];
@@ -53,6 +53,8 @@ export function mountRunWatch({ pill, askers, free = () => false, entry, credent
    * says no money figure (A2).
    */
   readonly free?: () => boolean | null;
+  /** What the people's cards add up to in the run (run-words.mjs runSpent), or null where the run's own figure stands. */
+  readonly spent?: () => { readonly usd: string; readonly unknown: boolean } | null;
   readonly entry: { readonly worldId: string; readonly authoredVersionId: string };
   readonly credentials: Record<string, unknown>;
   readonly isCurrent: () => boolean;
@@ -117,7 +119,7 @@ export function mountRunWatch({ pill, askers, free = () => false, entry, credent
     const run = openRun(control);
     if (!run) { if (shown) pill.run(null); shown = false; return; }
     shown = true;
-    pill.run({ line: pillRunLine(run, Date.now(), askers(), free()), onStop: () => { void watch.stop(); } });
+    pill.run({ line: pillRunLine(run, Date.now(), askers(), free(), spent?.() ?? null), onStop: () => { void watch.stop(); } });
   }
   async function read() {
     const before = openRun(control);

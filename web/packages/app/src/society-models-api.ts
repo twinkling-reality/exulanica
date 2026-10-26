@@ -303,6 +303,17 @@ export interface OutsideReceipt {
   readonly reason: string;
 }
 
+/** What one person's model has spent in the open run (D9). */
+export interface RunSpending {
+  readonly subjectId: string;
+  /** Their stored receipts in this run. */
+  readonly decisions: number;
+  /** Their known costs summed, US dollars as a decimal string. */
+  readonly knownCostUsd: string;
+  /** How many of their costs are not known yet. */
+  readonly costsUnknown: number;
+}
+
 export interface SocietyModels {
   readonly societyId: string;
   /** Only a purposeful society's people are run by chosen models. */
@@ -327,6 +338,11 @@ export interface SocietyModels {
   readonly travellers?: readonly TravellerChoice[];
   /** Each being's measures under each model; absent from a server that predates them. */
   readonly byBeing?: readonly BeingDecisionMeasures[];
+  /**
+   * While a run is open, what each person's model has spent in it, from its stored receipts (D9): only people with one,
+   * their known costs summed and how many are not known yet; absent while no run is open and from an older server.
+   */
+  readonly runSpending?: readonly RunSpending[];
   /** Every model a person's own runner serves beside the manifest's, with its check's state; absent from an older server. */
   readonly runnerModels?: readonly RunnerModel[];
   /**
@@ -596,6 +612,13 @@ export function parseSocietyModels(value: unknown): SocietyModels {
       byBeing: list(row['by_being']).map((entry): BeingDecisionMeasures => {
         const held = object(entry);
         return { ...modelRef(held), subjectId: text(held['subject_id']), measures: decisionMeasures(held['measures']) };
+      }),
+    }),
+    // Added to the profile as an optional field: absent while no run is open, and from an older server.
+    ...(row['run_spending'] === undefined ? {} : {
+      runSpending: list(row['run_spending']).map((entry): RunSpending => {
+        const held = object(entry);
+        return { subjectId: text(held['subject_id']), decisions: count(held['decisions']), knownCostUsd: amount(held['known_cost_usd']), costsUnknown: count(held['costs_unknown']) };
       }),
     }),
     // Added to the profile as an optional field: absent from an older server.

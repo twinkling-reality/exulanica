@@ -49,6 +49,8 @@ export interface RecordHost {
   label(kind: unknown): string | null;
   /** The run on now, or null. */
   run(): Json | null;
+  /** What a person's model has spent in the run on now (D9: runSpentWords's), or null. */
+  runSpent(subjectId: string): string | null;
   /** Whether this page may choose the character's model. */
   assignable(): boolean;
 }
@@ -281,7 +283,7 @@ export function recordStates(host: RecordHost) {
         decider: view.decider ?? null,
         // A routine keeps the Run section's line, which says how a model could decide.
         ...(modelsRead && deciding !== 'routine' ? { decides: decidesPrint(who, { decider: deciding, model: view.model ?? null }) } : {}),
-        running: run && view.model ? decidesPrint(who, { decider: 'model', model: view.model, left: timeLeft(run.endsBy, Date.now()) }) : null,
+        running: run && view.model ? decidesPrint(who, { decider: 'model', model: view.model, left: timeLeft(run.endsBy, Date.now()), spent: host.runSpent(showing.row.scene.id) }) : null,
         // An outside AI agent's own words, from its door entry (AG1d 6).
         declared: deciding === 'agent' ? declaredParts(view.outside?.declared ?? null) : null,
       };

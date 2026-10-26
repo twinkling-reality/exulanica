@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { GROUP_LAYOUT, SAID_READ, choosableModels, offersModels, deciderOf, freeHere, groupContent, groupHeld, groupPlace, keepLastSaid, lastSaid, noModelLine, noneRunningHere, overRows, questionGroup, readLastSaid } from './character-group.mjs';
-import { CHARACTER_WORDS, GROUP_WORDS, called, decidesPrint, modelsDecide, noModelRunning, quoted, saidUnder, stopsAfter } from './character-words.mjs';
+import { CHARACTER_WORDS, GROUP_WORDS, called, decidesPrint, modelsDecide, noModelRunning, quoted, runSpentWords, saidUnder, stopsAfter } from './character-words.mjs';
 import { dayWord } from './talk-words.mjs';
 
 // A chosen character's group (DESIGN's J30, the r05 picture): what it says and where it stands.
@@ -17,6 +17,13 @@ assert.equal(dayWord(resident), "The resident's day");
 assert.equal(GROUP_WORDS.follow(resident), 'Follow the resident');
 assert.equal(decidesPrint(teo, { decider: 'model', model: 'Nemotron 3 Nano 30B' }), 'Nemotron 3 Nano 30B decides for Teo');
 assert.equal(decidesPrint(teo, { decider: 'model', model: 'Nemotron 3 Nano 30B', left: '1:52' }), "Teo's model is deciding · 1:52 left");
+// What their model has spent in the run (D9): from its known receipts, "at least" while a cost is not known, nothing before.
+assert.equal(decidesPrint(teo, { decider: 'model', model: 'Nemotron 3 Nano 30B', left: '1:52', spent: '$0.0003 spent' }), "Teo's model is deciding · 1:52 left · $0.0003 spent");
+assert.equal(runSpentWords({ knownCostUsd: '0.00030000', costsUnknown: 0 }), '$0.0003 spent');
+assert.equal(runSpentWords({ knownCostUsd: '0.00030000', costsUnknown: 1 }), 'at least $0.0003 spent');
+assert.equal(runSpentWords({ knownCostUsd: '0.00002000', costsUnknown: 0 }), 'less than $0.0001 spent');
+assert.equal(runSpentWords({ knownCostUsd: '0.00000000', costsUnknown: 1 }), null, 'no estimate before a cost is known');
+assert.equal(runSpentWords(null), null);
 assert.equal(decidesPrint(teo, { decider: 'routine' }), 'Teo follows a routine');
 assert.equal(decidesPrint(resident, { decider: 'routine' }), 'The resident follows a routine');
 assert.equal(decidesPrint(teo, { decider: 'person' }), 'A person is playing Teo');
@@ -115,6 +122,8 @@ assert.equal(picture.print, 'Nemotron 3 Nano 30B decides for Teo');
 const running = groupContent({ who: teo, decider: 'model', model: 'Nemotron 3 Nano 30B', running: true, left: '1:52' });
 assert.deepEqual(keys(running), ["Enter Teo's day", "R Stop Teo's model", 'V Follow Teo']);
 assert.equal(running.print, "Teo's model is deciding · 1:52 left");
+assert.equal(groupContent({ who: teo, decider: 'model', model: 'N', running: true, left: '1:52', spent: '$0.0003 spent' }).print, "Teo's model is deciding · 1:52 left · $0.0003 spent");
+assert.equal(groupContent({ who: teo, decider: 'model', model: 'N', spent: '$0.0003 spent' }).print, 'N decides for Teo', 'no run, no spending');
 assert.deepEqual(keys(groupContent({ who: teo, decider: 'model', model: 'M', connected: false })), ["Enter Teo's day", 'V Follow Teo'], 'a model that cannot be asked here: no R');
 assert.deepEqual(keys(groupContent({ who: teo, decider: 'routine', assignable: true })), ["Enter Teo's day", "M Choose Teo's AI model", 'V Follow Teo']);
 assert.deepEqual(keys(groupContent({ who: teo, decider: 'routine', assignable: false })), ["Enter Teo's day", 'V Follow Teo'], 'no M where this page cannot choose');
@@ -148,13 +157,19 @@ assert.equal(groupContent({ who: visitor, decider: 'agent', declared: { name: ' 
 assert.equal(groupContent({ who: visitor, decider: 'external', declared }).declared, null);
 assert.equal(deciderOf({ decider: 'agent', model: 'M' }), 'agent');
 
-// The Run question (r08): the same group asking in place; J28's words for whose models decide.
+// The Run question (r08): the same group asking in place; J28's counts, each person with their own model (F9).
 const ari = called({ name: 'Ari' }), ines = called({ name: 'Ines' });
-assert.equal(modelsDecide([teo]), "Teo's model decides. Everyone else carries on as before.");
-assert.equal(modelsDecide([teo], { others: false }), "Teo's model decides.");
-assert.equal(modelsDecide([teo, ari]), "Teo's and Ari's models decide. Everyone else carries on as before.");
-assert.equal(modelsDecide([teo, ari, resident]), "Teo's, Ari's and the resident's models decide. Everyone else carries on as before.");
-assert.equal(modelsDecide([teo, ari, resident, ines]), "Teo's model and 3 more decide. Everyone else carries on as before.");
+const [nano, qwen, sup] = ['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct', 'Nemotron 3 Super 120B'];
+// A model's name stays whole on one line in the note (DESIGN's fold-in): its spaces are no-break spaces.
+const whole = text => text.replace(/Nemotron 3 Nano 30B|Qwen3 235B Instruct|Nemotron 3 Super 120B|\bM\b(?= decides)/gu, name => name.replaceAll(' ', '\u00a0'));
+assert.equal(modelsDecide([teo], { models: [nano] }), whole("Teo's Nemotron 3 Nano 30B decides. Everyone else carries on as before."));
+assert.equal(modelsDecide([teo], { others: false, models: [nano] }), whole("Teo's Nemotron 3 Nano 30B decides."));
+assert.equal(modelsDecide([teo, ari], { models: [nano, qwen] }), whole("Teo's Nemotron 3 Nano 30B and Ari's Qwen3 235B Instruct decide. Everyone else carries on as before."));
+assert.equal(modelsDecide([teo, ari, resident], { models: [nano, qwen, sup] }),
+  whole("Teo's Nemotron 3 Nano 30B, Ari's Qwen3 235B Instruct and the resident's Nemotron 3 Super 120B decide. Everyone else carries on as before."));
+assert.ok(!/Nemotron 3/u.test(modelsDecide([teo], { models: [sup] })), 'no break inside a model name');
+assert.equal(modelsDecide([teo, ari, resident, ines], { models: [nano, qwen, sup, nano] }), whole("Teo's Nemotron 3 Nano 30B and 3 more people's models decide. Everyone else carries on as before."));
+assert.equal(modelsDecide([teo, ari], { models: [nano] }), whole("Teo's Nemotron 3 Nano 30B and Ari's model decide. Everyone else carries on as before."), 'a model not read yet');
 assert.equal(modelsDecide([]), null);
 assert.equal(stopsAfter(10), 'It stops after 10 minutes of real time, or when you stop it.');
 assert.equal(stopsAfter(1), 'It stops after 1 minute of real time, or when you stop it.');
@@ -163,10 +178,10 @@ const asked = questionGroup({ who: teo, askers: [teo], models: ['Nemotron 3 Nano
 assert.equal(asked.name, 'Teo');
 assert.equal(asked.doing, 'Run for 10 minutes');
 assert.equal(asked.said, null);
-assert.equal(asked.note, "Teo's model decides. Everyone else carries on as before.");
+assert.equal(asked.note, whole("Teo's Nemotron 3 Nano 30B decides. Everyone else carries on as before."));
 assert.deepEqual(keys(asked), ['Enter Run', 'M Choose another model']);
 assert.deepEqual(asked.rows.map(row => row.action), ['run', 'model']);
-assert.equal(asked.print, 'Nemotron 3 Nano 30B · at most $0.05');
+assert.equal(asked.print, 'At most $0.05');
 assert.equal(asked.after, 'It stops after 10 minutes of real time, or when you stop it.');
 assert.equal(asked.refused, false);
 assert.deepEqual(keys(questionGroup({ who: teo, models: ['M'], limits })), ['Enter Run'], 'no other model offered, or this page cannot choose: no M');
@@ -178,13 +193,13 @@ assert.equal(refusedRun.after, null);
 assert.equal(refusedRun.refused, true);
 assert.equal(refusedRun.rows[0].disabled, false);
 assert.equal(questionGroup({ who: teo, models: ['M'], limits, refusal: 'unheard_of' }).print, 'The run did not start. Nothing was spent.');
-assert.equal(questionGroup({ who: teo, askers: [], models: ['M'], limits }).note, "Teo's model decides. Everyone else carries on as before.", 'the chosen one at least');
+assert.equal(questionGroup({ who: teo, askers: [], models: ['M'], limits }).note, whole("Teo's M decides. Everyone else carries on as before."), 'the chosen one at least');
 assert.equal(questionGroup({ who: teo, models: ['M'], limits: { wallSeconds: 300, usd: '0.02000000' } }).doing, 'Run for 5 minutes');
-// The models a run asks, as they are (DESIGN's aha 20): three people, three models, named by the chosen one's.
-const three = questionGroup({ who: teo, askers: [teo, ari, resident], models: ['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct', 'Nemotron 3 Super 120B'], limits });
-assert.equal(three.print, 'Nemotron 3 Nano 30B and 2 other models · at most $0.05');
-assert.equal(questionGroup({ who: teo, askers: [teo, ari], models: ['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct'], limits }).print, 'Nemotron 3 Nano 30B and Qwen3 235B Instruct · at most $0.05');
-assert.equal(questionGroup({ who: teo, askers: [teo, ari], models: ['Nemotron 3 Nano 30B', 'Nemotron 3 Nano 30B'], limits }).print, 'Nemotron 3 Nano 30B · at most $0.05', 'one model two people use is named once');
+// Whose model is whose (F9): the note pairs each person with theirs, and the small print is the cap alone.
+const three = questionGroup({ who: teo, askers: [teo, ari, resident], models: [nano, qwen, sup], limits });
+assert.equal(three.note, whole("Teo's Nemotron 3 Nano 30B, Ari's Qwen3 235B Instruct and the resident's Nemotron 3 Super 120B decide. Everyone else carries on as before."));
+assert.equal(three.print, 'At most $0.05');
+assert.equal(questionGroup({ who: teo, askers: [teo, ari], models: [nano, nano], limits }).note, whole("Teo's Nemotron 3 Nano 30B and Ari's Nemotron 3 Nano 30B decide. Everyone else carries on as before."));
 
 // Choose a model (r07; a gallery that teaches, A3): what this computer runs first, then the key group by price, Routine
 // last; each group under its label, a model's maker and size under its name, Current on theirs, the chosen row marked
@@ -295,8 +310,8 @@ assert.equal(groupContent({ who: lone, assignable: true, noModel: runOne }).afte
 assert.equal(groupContent({ who: lone }).after, null);
 // A run whose every model is on this computer says it is free in place of its cap.
 const free = questionGroup({ who: lone, models: ['Qwen3 4B Instruct'], limits: { wallSeconds: 600, usd: '0.05000000' }, free: true });
-assert.equal(free.print, 'Qwen3 4B Instruct \u00b7 Free, on this computer');
-assert.match(questionGroup({ who: lone, models: ['Qwen3 4B Instruct'], limits: { wallSeconds: 600, usd: '0.05000000' } }).print, /at most/);
+assert.equal(free.print, 'Free, on this computer');
+assert.equal(questionGroup({ who: lone, models: ['Qwen3 4B Instruct'], limits: { wallSeconds: 600, usd: '0.05000000' } }).print, 'At most $0.05');
 const read = { models: [{ provider: 'ollama_local', modelId: 'm', local: true }, { provider: 'nebius', modelId: 'n', local: false }] };
 assert.equal(freeHere(read, [{ provider: 'ollama_local', modelId: 'm' }]), true);
 assert.equal(freeHere(read, [{ provider: 'ollama_local', modelId: 'm' }, { provider: 'nebius', modelId: 'n' }]), false, 'one hosted model costs');

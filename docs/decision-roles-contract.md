@@ -292,6 +292,13 @@ among those decisions (`latest`: `{decision_seq, base_tick, consumed_tick, statu
 program left without a usable answer reads as its receipt does, such as `unavailable` with
 `no_answer_in_time`: the turn the routine decided. Neither route asks a model.
 
+While the society has an open run, the read also carries `run_spending`, an optional field absent
+while none is open: for each person whose model has a stored receipt in that run,
+`{subject_id, decisions, known_cost_usd, costs_unknown}`. A receipt is the run's when its request
+reserved an attempt under the run's own bound of its provider (as `decision:<request_id>#n`,
+`exulanica/api/session_spending.py`); its known costs are summed, and how many are not known yet
+is counted. Nothing is estimated, and the page says it beside the run's time left.
+
 Each per-model summary also carries `measures`, and the read carries `by_being`: the same measures
 for each being under each model (`{subject_id, provider, model_id, name, measures}`). Both are
 optional fields of `exulanica.society-models/v1`, computed by

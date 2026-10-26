@@ -165,6 +165,13 @@ describe('reading who decides', () => {
     expect(() => parseSocietyModels(read({ by_model: [{ ...summary, cost_median_usd: 'about a cent', costs_counted: 1 }] }))).toThrow();
   });
 
+  it("reads what each person's model has spent in the open run, and nothing while none is open (D9)", () => {
+    const spent = parseSocietyModels(read({ run_spending: [{ subject_id: 'teo', decisions: 3, known_cost_usd: '0.00030000', costs_unknown: 1 }] }));
+    expect(spent.runSpending).toEqual([{ subjectId: 'teo', decisions: 3, knownCostUsd: '0.00030000', costsUnknown: 1 }]);
+    expect(parseSocietyModels(read()).runSpending).toBeUndefined();
+    expect(() => parseSocietyModels(read({ run_spending: [{ subject_id: 'teo', decisions: 1, known_cost_usd: 'a little', costs_unknown: 0 }] }))).toThrow();
+  });
+
   it('reads which models run on this computer, and none from a server that does not say', () => {
     const laptop = { ...read().models[0]!, provider: 'ollama', model_id: 'qwen3:4b', name: 'Qwen3 4B Instruct', usd_per_mtok: { input: '0', output: '0' }, on_this_computer: true };
     const view = parseSocietyModels(read({ models: [{ ...read().models[0]!, on_this_computer: false }, laptop] }));

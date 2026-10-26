@@ -16,6 +16,7 @@ Shown against the database with the real playback worker, in this order:
 from __future__ import annotations
 
 import datetime as dt
+import json
 import time
 import uuid
 from decimal import Decimal
@@ -28,6 +29,7 @@ from exulanica.epistemics.hosted_requests import no_place_released
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import TransportError
+from exulanica.models.transport import HttpResponse
 from exulanica.spending.ledger import DurableSpending, holder_label
 from exulanica.spending.operator import SpendingOperator
 from exulanica.spending.status import read_spending_refusals
@@ -36,7 +38,7 @@ from exulanica.spending.witness import FileSpendingWitness
 import test_society_controls_postgres as control
 import test_society_person_decisions_postgres as person_decisions
 import test_society_stay_requests_api as stays
-from model_fakes import FakeTransport
+from model_fakes import FakeTransport, chat_body
 from test_guest_model_minds_postgres import admin_rows
 from test_living_session_models_postgres import LIMITS as SAVED_LIMITS
 from test_living_session_models_postgres import _session
@@ -374,3 +376,91 @@ def test_the_reaper_closes_the_bound_of_a_session_a_person_stopped(app, spine_sc
         )
         == []
     )
+
+
+class _TimesOutWhenTold(person_decisions._Chooser):
+    """The scripted chooser, answering every ask (where no walk is offered, by waiting), whose next
+    call times out with nothing back once told to: that call's cost alone is not known."""
+
+    fail_next = False
+
+    def post_json(self, url, *, headers, payload, timeout):
+        if self.fail_next:
+            self.fail_next = False
+            raise TransportError("timed out", timed_out=True, reached_provider=None)
+        try:
+            return super().post_json(url, headers=headers, payload=payload, timeout=timeout)
+        except StopIteration:
+            enum = payload["tools"][0]["function"]["parameters"]["properties"]["action"]["enum"]
+            label = next((a for a in enum if a.lower().startswith("wait")), enum[-1])
+            body = chat_body("", model=payload["model"], finish_reason="tool_calls")
+            body["choices"][0]["message"]["content"] = None
+            body["choices"][0]["message"]["tool_calls"] = [
+                {
+                    "id": "c",
+                    "type": "function",
+                    "function": {"name": "act", "arguments": json.dumps({"action": label})},
+                }
+            ]
+            return HttpResponse(200, json.dumps(body))
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_each_person_s_spending_in_a_run_counts_that_run_s_receipts_alone(
+    app, spine_schema, tmp_path
+):
+    world, client = app
+    services = person_decisions._services(client)
+    manifest, model_id = person_decisions._offered()
+    provider = manifest.spec(model_id).provider
+    _admin, durable = _durable(services, world, spine_schema, tmp_path, provider)
+    snapshot = stays._inhabited(world, client)
+    people = [person["id"] for person in snapshot["state"]["inhabitants"]]
+    model = {"provider": provider, "model_id": model_id}
+    person_decisions._choose(services, world, people, model, manifest=manifest, open_session=False)
+    transport = _TimesOutWhenTold()
+    model_client = ModelClient(
+        api_key="test-key-not-real",
+        manifest=manifest,
+        transport=transport,
+        budget=BudgetGuard(ceiling_usd=Decimal("100"), max_calls=1000),
+        spending=durable,
+    )
+    host = _host(
+        services,
+        world,
+        manifest,
+        model_client,
+        spending=durable,
+        spending_refusals=lambda connection, workspace: read_spending_refusals(
+            connection, workspace, witness_configured=True
+        ),
+    )
+    worker = _played(services, world, host, spending=durable)
+    params, version, society = person_decisions.routes(world)
+
+    def read(path: str) -> dict:
+        return client.get(path, headers=person_decisions.OWNER, params=params).json()
+
+    # No run is open: the read says nothing of one.
+    assert "run_spending" not in read(society + "/models")
+    first = _session(client, world, limits={**SAVED_LIMITS, "calls": 100, "minutes": 2})
+    assert _play_until_closed(services, world, worker)["reason"] == "session_minutes"
+    assert "run_spending" not in read(society + "/models")
+    used_first = read(version + f"/society/control/sessions/{first['session_id']}")["used"]
+    assert used_first["decisions"] > 0
+    # A second run, whose first call's cost is not known: each person's entry counts this run's
+    # receipts alone, as the run's own spending read counts its decisions and what it committed.
+    second = _session(client, world, limits={**SAVED_LIMITS, "calls": 100, "minutes": 5})
+    transport.fail_next = True
+    for _ in range(3):
+        _due(services, world)
+        worker.run_once(world["workspace"])
+    spending = read(society + "/models")["run_spending"]
+    used = read(version + f"/society/control/sessions/{second['session_id']}")["used"]
+    assert spending and {entry["subject_id"] for entry in spending} <= set(people)
+    assert all(entry["decisions"] >= 1 for entry in spending)
+    assert sum(entry["decisions"] for entry in spending) == used["decisions"]
+    assert sum(entry["costs_unknown"] for entry in spending) == used["unresolved"]["count"] == 1
+    known = sum(Decimal(entry["known_cost_usd"]) for entry in spending)
+    assert known == Decimal(used["usd"]) - Decimal(used["unresolved"]["usd"]) > 0

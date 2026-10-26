@@ -97,7 +97,8 @@ export function deciderOf({ decider = null, model = null }) {
  * - `said` (lastSaid's answer, or null), `toWho` (called()'s for its listener, or null), `startMinute` (the
  *   society clock's first minute, null where it keeps none);
  * - `decider` (deciderOf's: 'person', 'external', 'agent', 'model' or 'routine'), `model` (the model's served name, or null), `connected` (a model can be asked
- *   here), `assignable` (this page may choose their model), `running` (a run is on), `left` (its time left);
+ *   here), `assignable` (this page may choose their model), `running` (a run is on), `left` (its time left), `spent` (what
+ *   their model has spent in it, runSpentWords's, or null);
  * - `following` (V follows them now); `reading` while their record is still read, when the group holds their
  *   name and that it is reading, and no keys yet;
  * - `declared` (an outside AI agent's own words about itself, its door entry's), drawn under the print (AG1d 2).
@@ -105,7 +106,7 @@ export function deciderOf({ decider = null, model = null }) {
  * is on, Stop; without a model, Choose only where this page may choose one.
  */
 export function groupContent({ who, doing = null, said = null, toWho = null, startMinute = null, decider = 'routine', model = null,
-  connected = true, assignable = false, running = false, left = null, following = false, reading = false, noModel = null, declared = null }) {
+  connected = true, assignable = false, running = false, left = null, spent = null, following = false, reading = false, noModel = null, declared = null }) {
   if (reading) return Object.freeze({ name: who.title, doing: readingRecord(who), said: null, note: null, rows: Object.freeze([]), print: null, after: null, refused: false, declared: null });
   const hhmm = said && said.tick !== null && Number.isSafeInteger(startMinute) ? worldTime(said.tick, startMinute)?.hhmm ?? null : null;
   const spoken = said ? Object.freeze({ line: quoted(said.line), under: saidUnder({ to: said.to ? toWho : null, hhmm }) }) : null;
@@ -121,7 +122,7 @@ export function groupContent({ who, doing = null, said = null, toWho = null, sta
     said: spoken,
     note: null,
     rows: Object.freeze(rows.map(row => Object.freeze(row))),
-    print: decidesPrint(who, { decider, model, left: running && decided ? left : null }),
+    print: decidesPrint(who, { decider, model, left: running && decided ? left : null, spent: running && decided ? spent : null }),
     // Where [M] is not offered because no model is running on this computer, how to have one, under the small print (A2).
     after: decider === 'routine' && !assignable && noModel ? noModel : null,
     refused: false,
@@ -131,10 +132,10 @@ export function groupContent({ who, doing = null, said = null, toWho = null, sta
 
 /**
  * The Run question (r08, R-RUN-BUILD-SHEET section 1): R turns the same group, in place, into the question. Top to
- * bottom: the name, "Run for 10 minutes", whose models the run asks (J28: `askers`, called()'s with the chosen
- * character first; `others` whether anybody else lives here), the rows "[Enter] Run" and, where another model is
- * offered and this page may choose one, "[M] Choose another model", then the models it asks (`models`, their names with
- * the chosen character's first) and the cap as small print with when it stops under it. A refusal (`refusal`, the server's code) takes the small print's place in its own
+ * bottom: the name, "Run for 10 minutes", whose models the run asks, each person with their own (J28, F9: `askers`,
+ * called()'s with the chosen character first, `models` their models' names in the same order; `others` whether anybody
+ * else lives here), the rows "[Enter] Run" and, where another model is offered and this page may choose one, "[M] Choose
+ * another model", then the cap as small print with when it stops under it. A refusal (`refusal`, the server's code) takes the small print's place in its own
  * sentence and dims Run, which still answers its key; `busy` while the start is asked, when Run does nothing.
  */
 export function questionGroup({ who, askers = [who], others = true, models = [], limits, refusal = null, busy = false, anotherModel = false, free = false }) {
@@ -144,10 +145,10 @@ export function questionGroup({ who, askers = [who], others = true, models = [],
     name: who.title,
     doing: runFor(limits),
     said: null,
-    note: modelsDecide(askers.length ? askers : [who], { others }),
+    note: modelsDecide(askers.length ? askers : [who], { others, models }),
     rows: Object.freeze(rows.map(row => Object.freeze(row))),
     // A run whose every model is on this computer costs nothing: it says so in place of its cap (A2).
-    print: refusal ? runRefusalWords(refusal, modelsNamed(models)) : `${modelsNamed(models) ?? ''} \u00b7 ${free ? CHARACTER_WORDS.freeHere : atMost(limits)}`.replace(/^ \u00b7 /u, ''),
+    print: refusal ? runRefusalWords(refusal, modelsNamed(models)) : free ? CHARACTER_WORDS.freeHere : atMost(limits, true),
     after: refusal ? null : stopsAfter(Math.round(limits.wallSeconds / 60)),
     refused: Boolean(refusal),
   });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_RUN, MODEL_MINDS_REFUSALS, NOT_CONNECTED, RUN_REFUSALS, RUN_WORDS, atMost, defaultRunLimits, endedNote, OWN_ENDS, runFor, runStopWords, runLength, runRefusalWords, runningLine, spentWords, stripWords, timeLeft, whoDecides, decidingWords, pillRunLine } from './run-words.mjs';
+import { DEFAULT_RUN, MODEL_MINDS_REFUSALS, NOT_CONNECTED, RUN_REFUSALS, RUN_WORDS, atMost, defaultRunLimits, endedNote, OWN_ENDS, runFor, runSpent, runStopWords, runLength, runRefusalWords, runningLine, spentWords, stripWords, timeLeft, whoDecides, decidingWords, pillRunLine } from './run-words.mjs';
 import { called } from './character-words.mjs';
 
 const python = path => readFileSync(new URL('../../../' + path, import.meta.url), 'utf8');
@@ -81,6 +81,16 @@ const teo = called({ name: 'Teo' }), ines = called({ name: 'Ines' }), someone = 
 assert.equal(pillRunLine(open, now, [teo]), "Teo's model is deciding · 9:13 left · $0.0011 of $0.05");
 assert.equal(pillRunLine(open, now, [teo], true), "Teo's model is deciding · 9:13 left");
 assert.equal(pillRunLine(open, now, [], null), 'Running · 9:13 left');
+// What the people's cards add up to (D9, DESIGN's fold-in): the pill says the same receipts at the cards' precision,
+// "at least" as the cards do; with nothing known yet, what the run's bounds hold.
+const cards = [{ subjectId: 'teo', decisions: 2, knownCostUsd: '0.00030000', costsUnknown: 0 }, { subjectId: 'ari', decisions: 3, knownCostUsd: '0.00050000', costsUnknown: 0 }];
+assert.deepEqual(runSpent(cards), { usd: '0.00080000', unknown: false });
+assert.equal(pillRunLine(open, now, [teo], false, runSpent(cards)), "Teo's model is deciding · 9:13 left · $0.0008 of $0.05");
+assert.equal(runningLine(open, now, false, runSpent([{ ...cards[0], costsUnknown: 1 }])), '9:13 left · at least $0.0003 of $0.05');
+assert.equal(runningLine(open, now, true, runSpent(cards)), '9:13 left', 'a free run says no money');
+assert.equal(runSpent(null), null);
+assert.equal(runSpent([{ ...cards[0], knownCostUsd: '0.00000000', costsUnknown: 1 }]), null, 'nothing known yet: the run figure stands');
+assert.equal(runningLine(open, now, false, null), '9:13 left · $0.0011 of $0.05');
 assert.equal(decidingWords([teo, ines]), "Teo's and Ines's models are deciding");
 assert.equal(decidingWords([teo, ines, someone]), "Teo's, Ines's and the resident's models are deciding");
 assert.equal(decidingWords([someone]), "The resident's model is deciding");

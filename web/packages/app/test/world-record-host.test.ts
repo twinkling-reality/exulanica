@@ -91,7 +91,7 @@ function host(extra: Json = {}) {
       modelName: () => 'Nemotron 3 Nano 30B',
       latest: () => null,
       compareModels: () => [], modelKey: () => '', comparedDecisions: () => [], boundOf: () => 0,
-      label: () => null, run: () => null, assignable: () => true,
+      label: () => null, run: () => null, runSpent: () => null, assignable: () => true,
       ...extra,
     },
   };

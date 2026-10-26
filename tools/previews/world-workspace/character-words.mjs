@@ -352,14 +352,26 @@ export const GROUP_WORDS = Object.freeze({
 /**
  * The group's small print: who decides for the character now (J30). `decider` is 'external' (an outside
  * program, T7), 'person', 'model' or 'routine'; `model` the model's served name; `left` the time left of a run its model is in
- * ("1:52"), or null when no run is on.
+ * ("1:52"), or null when no run is on; `spent` what their model has spent in it (runSpentWords), or null.
  */
-export function decidesPrint(who, { decider, model = null, left = null }) {
+export function decidesPrint(who, { decider, model = null, left = null, spent = null }) {
   if (decider === 'external') return `${who.start} comes from an outside program`;
   if (decider === 'agent') return `${CHARACTER_WORDS.outsideAgent} decides for ${who.within}.`;
   if (decider === 'person') return `A person is playing ${who.within}`;
-  if (decider === 'model' && plain(model)) return left ? `${possessive(who.start)} model is deciding · ${left} left` : `${plain(model)} decides for ${who.within}`;
+  if (decider === 'model' && plain(model)) {
+    return left ? [`${possessive(who.start)} model is deciding`, `${left} left`, ...(spent ? [spent] : [])].join(' · ') : `${plain(model)} decides for ${who.within}`;
+  }
   return `${who.start} follows a routine`;
+}
+
+/**
+ * What a person's model has spent in the open run (D9), from the models read's entry for them: "$0.0003 spent", or "at
+ * least $0.0003 spent" while one of its costs is not known yet; null before a cost is known, and where the caller knows
+ * the run is free.
+ */
+export function runSpentWords(entry) {
+  if (!entry || !(Number(entry.knownCostUsd) > 0)) return null;
+  return `${entry.costsUnknown > 0 ? 'at least ' : ''}${amount(entry.knownCostUsd)} spent`;
 }
 
 /** A line as it was said, in curly quotes. */
@@ -376,18 +388,20 @@ export function saidUnder({ to = null, hhmm = null }) {
 }
 
 /**
- * Whose models a run asks (J28), the chosen character first, then the others in the order served: "Teo's model
- * decides.", "Teo's and Ari's models decide.", "Teo's, Ari's and the resident's models decide.", "Teo's model and
- * 3 more decide.", then "Everyone else carries on as before." unless nobody else lives in the world (`others`
- * false). `whos` are called()'s for each character the run will ask; null when there is none.
+ * Whose models a run asks (J28), each person with their own model (F9), the chosen character first, then the others in
+ * the order served: "Teo's Nemotron 3 Nano 30B decides.", "Teo's Nemotron 3 Nano 30B and Ari's Qwen3 4B Instruct
+ * decide.", three the same way, "Teo's Nemotron 3 Nano 30B and 3 more people's models decide.", then "Everyone else
+ * carries on as before." unless nobody else lives in the world (`others` false). `whos` are called()'s for each character
+ * the run will ask, null when there is none; `models` their models' names in the same order, "model" where one is not
+ * read yet. A model's name is kept whole on one line (no-break spaces), never "Nemotron" apart from "3 Super 120B".
  */
-export function modelsDecide(whos, { others = true } = {}) {
+export function modelsDecide(whos, { others = true, models = [] } = {}) {
   const [first, ...rest] = whos ?? [];
   if (!first) return null;
-  const owners = rest.length === 0 ? `${possessive(first.start)} model decides.`
-    : rest.length === 1 ? `${possessive(first.start)} and ${possessive(rest[0].within)} models decide.`
-      : rest.length === 2 ? `${possessive(first.start)}, ${possessive(rest[0].within)} and ${possessive(rest[1].within)} models decide.`
-        : `${possessive(first.start)} model and ${rest.length} more decide.`;
+  const own = (who, at) => `${possessive(at === 0 ? who.start : who.within)} ${plain(models[at])?.replace(/ /gu, '\u00a0') ?? 'model'}`;
+  const owners = rest.length === 0 ? `${own(first, 0)} decides.`
+    : rest.length <= 2 ? `${[first, ...rest].map(own).slice(0, -1).join(', ')} and ${own(rest.at(-1), rest.length)} decide.`
+      : `${own(first, 0)} and ${rest.length} more people's models decide.`;
   return others ? `${owners} Everyone else carries on as before.` : owners;
 }
 
