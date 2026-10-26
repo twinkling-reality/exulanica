@@ -1,0 +1,44 @@
+/* The light pages' frame (DESIGN's GALLERY-FIX-1026 and SHORT-WINDOW-1026): a page fills the window at any size as one
+   grid of three rows, its head, its body taking the height left and its key row, nothing laid over another part. A
+   page gives its grid .wu-frame and places its own columns in .wu-frame-body, `var(--frame-gap)` apart; a part that may
+   be taller than its column scrolls as .wu-frame-scroll in a .wu-frame-col (world-page-frame.ts), fading its last (or
+   first) 48 px while more lies beyond, with a 3 px track. Sides 120 px from 1700 wide, 64 from 1280, 32 below; the head
+   steps down at 1700 wide, 900 tall and 700 tall. A page's own rules set no size the frame sets. */
+.wu-frame { --frame-gap: 100px; position: absolute; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) 56px; padding: 0 120px; box-sizing: border-box; }
+.wu-frame-head { max-width: 1100px; padding-top: 84px; margin-bottom: 40px; }
+.wu-frame-face { flex: none; width: 40px; height: 40px; }
+.wu-frame-title { font-size: 52px; }
+.wu-frame-role { font-size: 19px; }
+.wu-frame-body { min-height: 0; }
+.wu-frame-keys { display: flex; justify-content: flex-end; align-items: center; gap: 28px; }
+
+.wu-frame-col { position: relative; display: flex; flex-direction: column; min-height: 0; }
+.wu-frame-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; padding-right: 12px; box-sizing: border-box; }
+.wu-frame-scroll::-webkit-scrollbar { display: none; }
+.wu-frame-scroll[data-below="true"] { mask-image: linear-gradient(180deg, #000 calc(100% - 48px), transparent); }
+.wu-frame-scroll[data-above="true"] { mask-image: linear-gradient(0deg, #000 calc(100% - 48px), transparent); }
+.wu-frame-scroll[data-above="true"][data-below="true"] { mask-image: linear-gradient(180deg, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
+.wu-frame-track { position: absolute; top: 0; right: 0; bottom: 0; width: 3px; border-radius: 2px; background: color-mix(in srgb, var(--hr-quiet) 35%, transparent); }
+.wu-frame-thumb { position: absolute; left: 0; width: 3px; border-radius: 2px; background: color-mix(in srgb, var(--hr-quiet) 70%, transparent); }
+
+/* Narrower than 1700: sides 64, columns 36 apart. Narrower than 1280: sides 32. */
+@media (max-width: 1699px) {
+  .wu-frame { --frame-gap: 36px; padding: 0 64px; }
+}
+@media (max-width: 1279px) {
+  .wu-frame { padding: 0 32px; }
+}
+/* The head below 1700 wide or 900 tall. */
+@media (max-width: 1699px), (max-height: 899px) {
+  .wu-frame-head { padding-top: 56px; }
+  .wu-frame-title { font-size: 42px; }
+  .wu-frame-role { font-size: 17px; }
+}
+/* Under 700 tall: the head closer, smaller and nearer the body; the key row 44 tall. */
+@media (max-height: 699px) {
+  .wu-frame { grid-template-rows: auto minmax(0, 1fr) 44px; }
+  .wu-frame-head { padding-top: 28px; margin-bottom: 24px; }
+  .wu-frame-face { width: 32px; height: 32px; }
+  .wu-frame-title { font-size: 34px; }
+  .wu-frame-role { font-size: 15px; }
+}

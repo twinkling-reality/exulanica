@@ -1,8 +1,11 @@
 // The model gallery's page (G2): M on a chosen person, and the day page's Model, open it as a light page over the world
 // faded behind, as History and the decision page are. The rows and every word are model-gallery.mjs's; this draws them,
-// moves the focus, and chooses through the host's own write (recordEntityModel), the one the in-world list used.
+// moves the focus, and chooses through the host's own write (recordEntityModel), the one the in-world list used. At any
+// window on the light pages' frame (world-page-frame.ts): the list and the card's words scroll in their own columns, the
+// row in focus kept in view.
+import { keepInView, scrollingColumn } from './world-page-frame.ts';
 import './model-gallery.css';
-import { element, keyButton } from './world-ui-record.ts';
+import { element, ground, keyButton, orb } from './world-ui-record.ts';
 import { GALLERY_WORDS, firstFocus, galleryDetail, galleryPage, moveFocus, rowForKey } from './model-gallery.mjs';
 import { CHARACTER_WORDS } from './character-words.mjs';
 import { page, type Page } from './world-ui.ts';
@@ -17,6 +20,8 @@ export interface GalleryHooks {
   read(): SocietyModels | null;
   /** The still of the world behind, or null for the plain ground. */
   still(): string | null;
+  /** The row's person's round portrait, as the day page shows it, or null for the first letter of their name. */
+  portrait(row: Json): string | null;
   /** Whether the page is a guest's, whose models a host pays for. */
   fromServer(): boolean;
   /** Who it is for, what they are doing and their model now (null: their routine). */
@@ -53,6 +58,8 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
   let made: Page | null = null;
   let row: Json | null = null;
   let focus = 0, busy = false, refusal: string | null = null, key = crypto.randomUUID();
+  /** The row in focus when last drawn, -1 before the first draw; and what reads the scrolling parts again as they resize. */
+  let drawnFocus = -1, sizes: ResizeObserver | null = null;
 
   function view() {
     const read = hooks.read(), about = hooks.about(row as Json), fromServer = hooks.fromServer();
@@ -60,17 +67,26 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
     return { read, about, fromServer, shown };
   }
 
-  function draw() {
+  /** Draws the page; with `reveal` (a key or a press moved the focus, even onto the row it was on) the row in focus is brought into view. */
+  function draw(reveal = false) {
     if (!made || !row) return;
     const { read, about, fromServer, shown } = view();
     focus = Math.min(focus, shown.rows.length - 1);
     const content = made.content;
+    // What was scrolled stays scrolled across a draw: the list always, the card's words while it shows the same model.
+    const was = { list: content.querySelector('.wu-g2-list')?.scrollTop ?? 0, words: content.querySelector('.wu-g2-scroll')?.scrollTop ?? 0 };
+    const moved = focus !== drawnFocus;
+    drawnFocus = focus;
+    sizes?.disconnect();
     content.replaceChildren();
-    const world = element('div', 'wu-g2-world');
-    const still = hooks.still();
-    if (still) world.style.backgroundImage = `url("${still}")`;
-    const head = element('div', 'wu-g2-head');
-    head.append(element('div', 'wu-g2-over', shown.over), element('h1', 'wu-g2-title', shown.title), element('div', 'wu-g2-role', shown.role));
+    const head = element('div', 'wu-g2-head wu-frame-head');
+    const over = element('div', 'wu-g2-over');
+    // The person's round portrait at the start of the over line, sized by the stylesheet's steps.
+    const face = orb(String(row.scene?.id ?? ''), 0, hooks.portrait(row), String(about.who?.title ?? ''));
+    face.style.width = face.style.height = '';
+    face.classList.add('wu-frame-face');
+    over.append(face, element('span', '', shown.over));
+    head.append(over, element('h1', 'wu-g2-title wu-frame-title', shown.title), element('div', 'wu-g2-role wu-frame-role', shown.role));
     head.querySelector('h1')!.tabIndex = -1;
     const list = element('div', 'wu-g2-list');
     for (const group of shown.groups) {
@@ -87,7 +103,7 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
         words.append(name);
         if (one.sub) words.append(subLine(one.sub));
         button.append(element('span', 'wu-g2-num', one.key), element('span', `wu-g2-mark${one.model ? '' : ' routine'}`, one.mark), words, element('span', 'wu-g2-cost', one.cost));
-        button.addEventListener('click', () => { focus = index; refusal = null; draw(); });
+        button.addEventListener('click', () => { focus = index; refusal = null; draw(true); });
         block.append(button);
       }
       for (const faint of group.faint) {
@@ -111,7 +127,8 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
     }
     const chosenRow = shown.rows[focus];
     const detail = galleryDetail({ read, row: chosenRow, who: about.who, fromServer });
-    const card = element('div', 'wu-g2-detail');
+    // The card's words scroll; its action row and a refusal stay at its bottom.
+    const card = element('div', 'wu-g2-detail'), words = element('div', 'wu-g2-scroll');
     const top = element('div', 'wu-g2-top');
     const named = element('div', 'wu-g2-named');
     named.append(element('div', 'wu-g2-dname', detail.name));
@@ -125,33 +142,34 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
       named.append(by);
     }
     top.append(element('span', `wu-g2-mark big${chosenRow?.model ? '' : ' routine'}`, detail.mark), named);
-    card.append(top);
-    if (detail.line) card.append(element('p', 'wu-g2-line', detail.line));
+    words.append(top);
+    if (detail.line) words.append(element('p', 'wu-g2-line', detail.line));
     if (detail.why.length) {
-      card.append(element('div', 'wu-g2-k', GALLERY_WORDS.why));
+      words.append(element('div', 'wu-g2-k', GALLERY_WORDS.why));
       const why = element('ul', 'wu-g2-why');
-      why.append(...detail.why.map((words: string) => element('li', '', words)));
-      card.append(why);
+      why.append(...detail.why.map((said: string) => element('li', '', said)));
+      words.append(why);
     }
     if (detail.words) {
-      card.append(element('div', 'wu-g2-k', GALLERY_WORDS.inWords));
+      words.append(element('div', 'wu-g2-k', GALLERY_WORDS.inWords));
       const quote = element('div', 'wu-g2-quote', detail.words.said);
       if (detail.words.from) quote.append(element('span', 'wu-g2-from', detail.words.from));
-      card.append(quote);
+      words.append(quote);
     }
     if (detail.facts.length) {
-      card.append(element('div', 'wu-g2-k', GALLERY_WORDS.fromCard));
+      words.append(element('div', 'wu-g2-k', GALLERY_WORDS.fromCard));
       const facts = element('div', 'wu-g2-facts');
       for (const fact of detail.facts) facts.append(element('div', 'wu-g2-fk', fact.key), element('div', 'wu-g2-fv', fact.value));
-      card.append(facts);
+      words.append(facts);
     }
+    const listPart = scrollingColumn(list), wordsPart = scrollingColumn(words);
     const act = element('div', 'wu-g2-act');
     act.append(keyButton(['Enter'], detail.act, () => void use(focus)));
     if (detail.then) act.append(element('span', 'wu-g2-then', detail.then));
-    card.append(act);
+    card.append(wordsPart.column, act);
     if (refusal) card.append(element('p', 'wu-g2-refused', refusal));
     if (busy) card.setAttribute('aria-busy', 'true');
-    const keys = element('div', 'wu-g2-keys');
+    const keys = element('div', 'wu-g2-keys wu-frame-keys');
     for (const one of shown.keys) {
       const item = element('span', 'wu-g2-key');
       one.caps.forEach((cap: string, at: number) => {
@@ -161,7 +179,25 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
       item.append(element('span', '', one.word));
       keys.append(item);
     }
-    content.append(world, element('div', 'wu-g2-wash'), head, list, card, keys);
+    // One grid filling the window: the head, the body with the list and the card, and the key row under them.
+    const body = element('div', 'wu-g2-body wu-frame-body'), grid = element('div', 'wu-frame');
+    body.append(listPart.column, card);
+    grid.append(head, body, keys);
+    content.append(...ground(hooks.still()), grid);
+    list.scrollTop = was.list;
+    if (!moved) words.scrollTop = was.words;
+    const focused = list.querySelector<HTMLElement>('[aria-current="true"]');
+    if (moved || reveal) keepInView(list, focused);
+    listPart.update(); wordsPart.update();
+    if (typeof ResizeObserver === 'function') {
+      // A window that grows or shrinks keeps the row in focus in view too.
+      let height = list.clientHeight;
+      sizes = new ResizeObserver(() => {
+        if (list.clientHeight !== height) { height = list.clientHeight; keepInView(list, focused); }
+        listPart.update(); wordsPart.update();
+      });
+      sizes.observe(list); sizes.observe(words);
+    }
   }
 
   async function use(index: number) {
@@ -186,6 +222,7 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
 
   function close() {
     if (!made) return;
+    sizes?.disconnect(); sizes = null;
     made.close();
     made = null; row = null;
     hooks.closed();
@@ -195,7 +232,7 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
     get isOpen() { return made !== null; },
     open(opened) {
       if (made) return;
-      row = opened; refusal = null; busy = false; key = crypto.randomUUID();
+      row = opened; refusal = null; busy = false; key = crypto.randomUUID(); drawnFocus = -1;
       made = page({ form: 'full' });
       made.root.classList.add('wu-record', 'wu-g2');
       made.root.setAttribute('aria-label', CHARACTER_WORDS.chooseModel);
@@ -214,7 +251,7 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
       const digit = /^Digit([1-9])$/u.exec(event.code);
       if (event.code === 'Escape' && !busy) close();
       else if (event.code === 'ArrowUp' || event.code === 'ArrowDown') {
-        focus = moveFocus(shown, focus, event.code === 'ArrowUp' ? -1 : 1); refusal = null; draw();
+        focus = moveFocus(shown, focus, event.code === 'ArrowUp' ? -1 : 1); refusal = null; draw(true);
       } else if (event.code === 'Enter') void use(focus);
       else if (digit) {
         const found = rowForKey(shown, digit[1]);

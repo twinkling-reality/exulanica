@@ -537,6 +537,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   // question, or the day page's run, then asks again. Esc goes back to where M was pressed, the person still chosen.
   let galleryOver = null;
   const gallery = mountModelGallery({ root, read: () => subjectReads.models, still: () => pictures.still(), fromServer: () => !state.credentials.token,
+    portrait: (row) => pictures.portraitNow(row.scene.id),
     about: (row) => ({ who: subjectView(row).who, doing: subjectView(row).doing ?? null, current: modelOf(row).model ?? null }),
     write: async (row, selected, key) => (await recordEntityModel({ entry, subjectId: row.scene.id, selected, key, refresh: () => refreshSubject(row),
       client: modelsClient, current: () => gallery.isOpen && current() })).verified,

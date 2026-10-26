@@ -28,7 +28,7 @@ async function mounted(write = vi.fn(async () => read)) {
   const root = document.createElement('div');
   document.body.append(root);
   const hooks = {
-    root, read: () => read, still: () => null, fromServer: () => false,
+    root, read: () => read, still: () => null, portrait: () => null, fromServer: () => false,
     about: () => ({ who: { title: 'Teo', start: 'Teo', within: 'Teo', named: true }, doing: 'Resting at the bench', current: null }),
     write, refusal: () => 'This model cannot decide for Teo here.', chosen: vi.fn(), closed: vi.fn(),
   };
@@ -82,5 +82,17 @@ describe('the model gallery page (G2)', () => {
     expect(refused).toHaveBeenCalledWith(row, null, expect.any(String));
     expect(gallery.isOpen).toBe(true);
     expect(hooks.closed).not.toHaveBeenCalled();
+    // A refusal stays at the card's bottom with its action row, never scrolled away with the card's words.
+    expect(root.querySelector('.wu-g2-refused')!.closest('.wu-g2-scroll')).toBeNull();
+  });
+
+  it('scrolls the list and the card\'s words in their own columns, its action row and keys outside them (DESIGN 1026)', async () => {
+    const { root } = await mounted();
+    const words = root.querySelector('.wu-g2-detail .wu-g2-scroll')!;
+    expect(all(words, '.wu-g2-fk')).toContain('Licence');
+    for (const fixed of ['.wu-g2-act', '.wu-g2-keys']) expect(root.querySelector(fixed)!.closest('.wu-g2-scroll, .wu-g2-list')).toBeNull();
+    expect(root.querySelector('.wu-g2-keys')!.closest('.wu-g2-body')).toBeNull();
+    // The person at the head: their portrait, or the first letter of their name until one exists.
+    expect(root.querySelector('.wu-g2-head .wu-hr-orb')?.textContent).toBe('T');
   });
 });
