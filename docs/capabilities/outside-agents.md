@@ -164,9 +164,12 @@ Each turn is one ask of the door: the request the decision host reserved for the
 role's messages rendered for a model, the forced function `act` with the labels offered, and the
 minute. The agent answers once, with one label exactly as offered and, when the option says
 something, one line. The door stores the answer; the decision host checks it as it checks a
-model's, records the receipt, and the engine checks the action again in its minute. A late or
-missing answer is recorded as such and the world's routine decides that minute; a world minute
-passes whether or not the agent answers.
+model's, records the receipt, and the engine checks the action again in its minute. A model's line
+is also held to two rules of its prompt, ending with no listener's name and saying no line again
+that it was told it said or heard lately, because a model that breaks one is asked once more; an
+outside agent is not asked again, so its line is said as it gives it, held to the line rule and
+the saved names. A late or missing answer is recorded as such and the world's routine decides that
+minute; a world minute passes whether or not the agent answers.
 
 At hello the agent declares its name, its maker and, if it says, the mind it thinks with. The door
 keeps the declaration by digest and records on every answer which declaration gave it; no society
