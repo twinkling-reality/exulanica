@@ -206,10 +206,10 @@ TITLE_JOINING_WORDS_PATH: Final = (
     / "assets"
     / "catalogs"
     / "world-titles"
-    / "title-joining-word.v1.json"
+    / "title-joining-word.v2.json"
 )
 _TITLE_JOINING_WORD: Final = CatalogSchema(
-    "title-joining-word", 1, (("class", text_field), ("reason", text_field))
+    "title-joining-word", 2, (("class", text_field), ("reason", text_field))
 )
 
 

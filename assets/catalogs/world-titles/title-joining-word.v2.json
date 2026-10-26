@@ -1,0 +1,787 @@
+{
+  "schema_version": 1,
+  "catalog_id": "title-joining-word",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "a",
+      "class": "article",
+      "reason": "An article: it introduces a noun, so a title ending on it stops before the thing it names.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "above",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "across",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "against",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "along",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "although",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins what comes before it to what follows, so a title ending on it joins nothing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "amid",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "among",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "an",
+      "class": "article",
+      "reason": "An article: it introduces a noun, so a title ending on it stops before the thing it names.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "and",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins what comes before it to what follows, so a title ending on it joins nothing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "around",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "as",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins what comes before it to what follows, so a title ending on it joins nothing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "at",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "atop",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "because",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins what comes before it to what follows, so a title ending on it joins nothing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "behind",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "below",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "beneath",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "beside",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "between",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "beyond",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "but",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins what comes before it to what follows, so a title ending on it joins nothing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "by",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "each",
+      "class": "determiner",
+      "reason": "A determiner: it introduces a noun, so a title ending on it stops before the thing it picks out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "every",
+      "class": "determiner",
+      "reason": "A determiner: it introduces a noun, so a title ending on it stops before the thing it picks out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "for",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "from",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "if",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins what comes before it to what follows, so a title ending on it joins nothing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "in",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "inside",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "into",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "its",
+      "class": "possessive determiner",
+      "reason": "A possessive determiner: it introduces whose a noun is, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "like",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "my",
+      "class": "possessive determiner",
+      "reason": "A possessive determiner: it introduces whose a noun is, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "near",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "no",
+      "class": "determiner",
+      "reason": "A determiner: it introduces a noun, so a title ending on it stops before the thing it picks out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "nor",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins what comes before it to what follows, so a title ending on it joins nothing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "of",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "on",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "onto",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "or",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins what comes before it to what follows, so a title ending on it joins nothing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "our",
+      "class": "possessive determiner",
+      "reason": "A possessive determiner: it introduces whose a noun is, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "outside",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "over",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "past",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "than",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins what comes before it to what follows, so a title ending on it joins nothing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "that",
+      "class": "relative word",
+      "reason": "A relative word: it opens a clause about what comes before it, so a title ending on it opens a clause it never says.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "the",
+      "class": "article",
+      "reason": "An article: it introduces a noun, so a title ending on it stops before the thing it names.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "their",
+      "class": "possessive determiner",
+      "reason": "A possessive determiner: it introduces whose a noun is, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "through",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "to",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "toward",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "towards",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "under",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "upon",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "when",
+      "class": "relative word",
+      "reason": "A relative word: it opens a clause about what comes before it, so a title ending on it opens a clause it never says.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "where",
+      "class": "relative word",
+      "reason": "A relative word: it opens a clause about what comes before it, so a title ending on it opens a clause it never says.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "which",
+      "class": "relative word",
+      "reason": "A relative word: it opens a clause about what comes before it, so a title ending on it opens a clause it never says.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "who",
+      "class": "relative word",
+      "reason": "A relative word: it opens a clause about what comes before it, so a title ending on it opens a clause it never says.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "whom",
+      "class": "relative word",
+      "reason": "A relative word: it opens a clause about what comes before it, so a title ending on it opens a clause it never says.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "whose",
+      "class": "relative word",
+      "reason": "A relative word: it opens a clause about what comes before it, so a title ending on it opens a clause it never says.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "with",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "within",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "without",
+      "class": "preposition",
+      "reason": "A preposition: it joins a noun to what comes before it, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    },
+    {
+      "key": "your",
+      "class": "possessive determiner",
+      "reason": "A possessive determiner: it introduces whose a noun is, so a title ending on it leaves that noun out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world titles; see the entry reasons"
+      }
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 its first 48 characters ending on a whole word, with a capital first letter and no full stop; never
 a saved name it holds; cut short, never ending on a joining word the catalog lists; the preset's
 label where fewer than two words are left (``exulanica/api/world_making.py`` ``title_from_words``
-and ``assets/catalogs/world-titles/title-joining-word.v1.json``)."""
+and ``assets/catalogs/world-titles/title-joining-word.v2.json``)."""
 
 from __future__ import annotations
 
@@ -81,6 +81,11 @@ def test_a_cut_at_48_characters_drops_the_joining_words_it_ends_on():
         (
             "a snowy mountain village at night with glowing windows",
             "A snowy mountain village at night",
+        ),
+        # DESIGN (26 October): a phrase of place ("beneath", "among", ...) goes whole too.
+        (
+            "a quiet mountain village beneath tall snowy peaks and pine forests",
+            "A quiet mountain village",
         ),
     ],
 )
