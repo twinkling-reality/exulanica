@@ -786,4 +786,6 @@ export type {
 } from './landscape.js';
 
 export { SITE_TOP_PROFILE, SiteTopError, readSiteTop, siteTopCellHeld, siteTopHeightMm } from './site-top.js';
+
+export { entityTagDigest } from './entity-tag.js';
 export type { SiteTop, SiteTopRun } from './site-top.js';

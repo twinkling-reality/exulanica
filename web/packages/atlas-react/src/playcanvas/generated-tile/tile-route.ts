@@ -27,7 +27,7 @@
  * and never dresses a 404 up as "not permitted" or "no such tile".
  */
 
-import type { TextureSetDigest } from '@exulanica/atlas-core';
+import { entityTagDigest, type TextureSetDigest } from '@exulanica/atlas-core';
 
 /** What the route serves a container as. Anything else is refused. */
 export const BAKED_TILE_MEDIA_TYPE = 'application/vnd.exulanica.owd';
@@ -202,11 +202,10 @@ export function tileAt(
   return tiles.find((tile) => tile.tileX === at.tileX && tile.tileY === at.tileY && tile.lod === at.lod) ?? null;
 }
 
+/** The digest the route names the container by, as an edge may have tagged it (`entityTagDigest`); null for none. */
 function etagDigest(response: Response): string | null {
-  const etag = response.headers.get('ETag');
-  if (etag === null) return null;
-  const bare = etag.replace(/^W\//, '').replace(/^"/, '').replace(/"$/, '');
-  return HEX_64.test(bare) ? bare : null;
+  const bare = entityTagDigest(response.headers.get('ETag'));
+  return bare !== null && HEX_64.test(bare) ? bare : null;
 }
 
 /**

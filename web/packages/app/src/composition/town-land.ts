@@ -27,6 +27,7 @@
  * and everything that draws it is loaded with it.
  */
 
+import { entityTagDigest } from '@exulanica/atlas-core';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import type { DrawnSiteLand, SiteLand } from '@exulanica/atlas-react/generated-site';
 import { accessHeaders, type Credentials } from '../config.js';
@@ -110,8 +111,8 @@ export async function loadTownLand(access: Credentials, entry: SavedWorldEntry, 
     }
     if (!response.ok) throw new Error(`This town's land could not be read: HTTP ${response.status}.`);
     const body = new Uint8Array(await response.arrayBuffer());
-    const tag = response.headers.get('ETag')?.replaceAll('"', '');
-    if (tag === undefined || tag !== (sha256 ?? sha256Hex(body))) throw new Error("This town's land arrived as a document its section does not name.");
+    const tag = entityTagDigest(response.headers.get('ETag'));
+    if (tag === null || tag !== (sha256 ?? sha256Hex(body))) throw new Error("This town's land arrived as a document its section does not name.");
     bytes += body.byteLength;
     return JSON.parse(new TextDecoder().decode(body));
   };

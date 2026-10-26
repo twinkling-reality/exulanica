@@ -1,5 +1,5 @@
 import { holdTerrainOccupancy, type TerrainOccupancyLease } from './terrain-occupancy.js';
-import type { TerrainOccupancyProof } from '@exulanica/atlas-core';
+import { entityTagDigest, type TerrainOccupancyProof } from '@exulanica/atlas-core';
 /**
  * A saved world made from a world kind, drawn from its site's served drawing.
  *
@@ -147,7 +147,7 @@ export async function loadSiteWorld(
     import('@exulanica/atlas-react/playcanvas'),
   ]);
   const body: unknown = JSON.parse(text);
-  const stated = response.headers.get('ETag')?.replaceAll('"', '') ?? null;
+  const stated = entityTagDigest(response.headers.get('ETag'));
   const actual = sha256Hex(new TextEncoder().encode(canonicalJson(body)));
   if (stated === null || stated !== actual) {
     throw new Error("This world's drawing arrived as a document that is not the one its route named.");
@@ -211,7 +211,7 @@ async function loadSiteLandscape(
     ]);
     const text = await response.text();
     let bytes = new TextEncoder().encode(text).byteLength;
-    const stated = response.headers.get('ETag')?.replaceAll('"', '') ?? undefined;
+    const stated = entityTagDigest(response.headers.get('ETag')) ?? undefined;
     if (stated === undefined) throw new Error("This world's landscape arrived with no digest.");
     const landscape = readLandscapeDrawing(JSON.parse(text), sha256Hex, stated);
     const top = drawing.top;
@@ -227,7 +227,7 @@ async function loadSiteLandscape(
       const response = await ask(`landscape/${route}?${new URLSearchParams({ sha256, world_id: entry.worldId }).toString()}`);
       const what = route === 'chunk' ? 'landscape chunk' : 'land below its top';
       if (!response.ok) throw new Error(`This world's ${what} could not be read: HTTP ${response.status}.`);
-      if (response.headers.get('ETag')?.replaceAll('"', '') !== sha256) throw new Error(`This world's ${what} arrived as a document its landscape does not name.`);
+      if (entityTagDigest(response.headers.get('ETag')) !== sha256) throw new Error(`This world's ${what} arrived as a document its landscape does not name.`);
       const body = await response.text();
       bytes += new TextEncoder().encode(body).byteLength;
       return JSON.parse(body) as unknown;
@@ -266,7 +266,7 @@ async function loadSiteLand(access: Credentials, entry: SavedWorldEntry, drawing
       credentials: 'same-origin',
     });
     if (!response.ok) throw new Error(`This world's land could not be read: HTTP ${response.status}.`);
-    if (response.headers.get('ETag')?.replaceAll('"', '') !== sha256) throw new Error("This world's land arrived as a document its drawing does not name.");
+    if (entityTagDigest(response.headers.get('ETag')) !== sha256) throw new Error("This world's land arrived as a document its drawing does not name.");
     const text = await response.text();
     bytes += new TextEncoder().encode(text).byteLength;
     return JSON.parse(text);

@@ -41,6 +41,7 @@
  * pack's light, and swapped on the same host, so the person stays where they stand.
  */
 
+import { entityTagDigest } from '@exulanica/atlas-core';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import type { StreetFurniture } from '@exulanica/atlas-react/playcanvas';
 import { rememberTownFurniture } from './town-furniture.js';
@@ -252,7 +253,7 @@ async function worldTileBytes(
     });
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
-  const stated = response.headers.get('ETag')?.replaceAll('"', '') ?? null;
+  const stated = entityTagDigest(response.headers.get('ETag'));
   const actual = hex(await crypto.subtle.digest('SHA-256', bytes));
   if (stated === null || stated !== actual) {
     throw new Error(`Tile ${bakedTileId} arrived as bytes that are not the ones the route named.`);

@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GeneratedTileHost } from '@exulanica/atlas-react/generated-tile';
 import type { GeneratedSiteMount, SiteVolumes } from '@exulanica/atlas-react/generated-site';
+import { entityTagDigest } from '@exulanica/atlas-core';
 import { DRAWING_ASKS, currentOpenSite, loadSiteWorld, openSiteWorld, switchableSite, type SiteWorld } from '../src/composition/site-world.js';
 import { redrawWorldLook } from '../src/composition/world-look-redraw.js';
 import { siteSightRings } from '../src/composition/sight.js';
@@ -169,15 +170,18 @@ function committedLibrary(): { list: unknown; content: Map<string, Uint8Array<Ar
   return { list: { profile: STYLE_PACK_LIST_PROFILE, packs }, content };
 }
 
-/** A host serving a drawing (the yard's unless another is given) and, unless `listStatus` says otherwise, the committed packs. */
-function host(listStatus = 200, served: string = DRAWING) {
+/**
+ * A host serving a drawing (the yard's unless another is given) under the entity tag `tag` makes of its digest and,
+ * unless `listStatus` says otherwise, the committed packs.
+ */
+function host(listStatus = 200, served: string = DRAWING, tag = (digest: string): string => `"${digest}"`) {
   const library = committedLibrary();
   const asked: string[] = [];
   const fetched = vi.fn(async (input: string): Promise<Response> => {
     const path = input.slice(access.baseUrl.length);
     asked.push(path);
     if (path.startsWith('/world/versions/')) {
-      return new Response(served, { status: 200, headers: { ETag: `"${sha256(new TextEncoder().encode(served))}"` } });
+      return new Response(served, { status: 200, headers: { ETag: tag(sha256(new TextEncoder().encode(served))) } });
     }
     if (path === '/world/style-packs') return new Response(JSON.stringify(library.list), { status: listStatus });
     const digest = /^\/world\/style-packs\/([0-9a-f]{64})$/.exec(path)?.[1];
@@ -186,6 +190,33 @@ function host(listStatus = 200, served: string = DRAWING) {
   });
   return { fetched, asked };
 }
+
+describe('a drawing an edge compressed on its way (the judges\' server, Caddy\'s encode zstd)', () => {
+  // The tag as that edge served it: the strong tag of the document before compression, its coding appended inside the
+  // quotes (Content-Encoding zstd, Via 1.1 Caddy). The browser hands the page the document itself.
+  const seen = (digest: string): string => `"${digest}-zstd"`;
+
+  it('names the digest by the tag without its quotes, its weakness or the coding an edge added', () => {
+    const digest = 'a'.repeat(64);
+    expect(entityTagDigest(seen(digest))).toBe(digest);
+    expect(entityTagDigest(`"${digest}"`)).toBe(digest);
+    for (const coding of ['zstd', 'gzip', 'br', 'deflate']) expect(entityTagDigest(`W/"${digest}-${coding}"`)).toBe(digest);
+    expect(entityTagDigest(`W/"${digest}"`)).toBe(digest);
+    // A suffix that is no content coding stays, so it is compared as stated and refused.
+    expect(entityTagDigest(`"${digest}-lz4"`)).toBe(`${digest}-lz4`);
+    expect(entityTagDigest(null)).toBeNull();
+    expect(entityTagDigest('')).toBeNull();
+  });
+
+  it('opens a drawing the edge tagged so, and still refuses one whose tag names another document', async () => {
+    vi.stubGlobal('fetch', host(200, DRAWING, seen).fetched);
+    const world = await loadSiteWorld(access, entry, () => {}, async () => {}, '', null);
+    expect(world).not.toBeNull();
+    vi.stubGlobal('fetch', host(200, DRAWING, () => seen('b'.repeat(64))).fetched);
+    await expect(loadSiteWorld(access, entry, () => {}, async () => {}, '', null))
+      .rejects.toThrow("This world's drawing arrived as a document that is not the one its route named.");
+  });
+});
 
 describe('the look a site world is drawn in', () => {
   // A 30 s bound: loading the default pack and its dresser takes 4 to 5 s on a busy machine, against the 5 s default.
