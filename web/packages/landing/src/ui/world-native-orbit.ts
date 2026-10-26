@@ -1,4 +1,4 @@
-import { orbitPose } from './world-orbit-geometry.js';
+import { orbitDrawn, orbitPose } from './world-orbit-geometry.js';
 
 /** The native fallback uses the same track and projection as the canvas. */
 export function mountNativeWorldOrbit(root: HTMLElement) {
@@ -14,7 +14,10 @@ export function mountNativeWorldOrbit(root: HTMLElement) {
     previous = now;
     const { width, height } = root.getBoundingClientRect();
     forms.forEach(form => {
-      const p = orbitPose(Number(form.dataset.orbitIndex), elapsed, width, height);
+      const index = Number(form.dataset.orbitIndex);
+      // Neither seen, tapped nor tabbed to where the stage does not draw it.
+      form.style.display = orbitDrawn(index, width, height) ? '' : 'none';
+      const p = orbitPose(index, elapsed, width, height);
       const rx = Math.hypot(p.ax, p.bx), ry = Math.hypot(p.ay, p.by);
       form.style.left = `${p.x - rx}px`; form.style.top = `${p.y - ry}px`;
       form.style.width = `${2 * rx}px`; form.style.height = `${2 * ry}px`;

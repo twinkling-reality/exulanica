@@ -1,6 +1,6 @@
 import { mountNativeWorldOrbit } from './world-native-orbit.js';
 import { ORBIT_PALETTES } from './world-materials.js';
-import { ORBIT_COUNT, ORBIT_OUTER_COUNT, ORBIT_PERIOD, orbitPose } from './world-orbit-geometry.js';
+import { ORBIT_COUNT, ORBIT_OUTER_COUNT, ORBIT_PERIOD, ORBIT_TOUCH_RADIUS, orbitDrawn, orbitPose } from './world-orbit-geometry.js';
 import type { OrbitPose } from './world-orbit-geometry.js';
 import { lensMotions, LiquidMotionState } from './liquid-motion.js';
 
@@ -173,6 +173,12 @@ export function mountWorldOptics(root: HTMLElement, images: readonly string[]): 
   const originalStyles = forms.map(form => form.style.cssText);
   const active = () => visible && !document.hidden && (!document.documentElement.dataset.surface || document.documentElement.dataset.surface === 'title');
   const paused = () => reduced.matches || hovered !== undefined || focused || root.dataset.selected !== undefined;
+  // An orb this stage does not draw stands still far beyond it: the surface passes it by and it never moves.
+  const posed = (index: number, time: number) => {
+    const pose = orbitPose(index, time, width, height);
+    if (!orbitDrawn(index, width, height)) { pose.x = -1e5; pose.y = -1e5; }
+    return pose;
+  };
   const draw = (now: number) => {
     frame = 0;
     if (disposed || !width || !height || !active()) { previous = 0; return; }
@@ -193,18 +199,20 @@ export function mountWorldOptics(root: HTMLElement, images: readonly string[]): 
       tiltX[index] = reduced.matches ? 0 : tiltX[index]! + (tx - tiltX[index]!) * .15;
       tiltY[index] = reduced.matches ? 0 : tiltY[index]! + (ty - tiltY[index]!) * .15;
       if (highlights[index] !== target || Math.abs(tx - tiltX[index]!) > .002 || Math.abs(ty - tiltY[index]!) > .002) settling = true;
-      const pose = orbitPose(index, elapsed, width, height);
+      const pose = posed(index, elapsed);
       const textureIndex = choices.findIndex(choice => Number(choice.dataset.orbitIndex) === index);
       if (textureIndex >= 0) pose.material = 6 + textureIndex;
       const scale = 1 + highlights[index]! * .12;
       pose.ax *= scale; pose.ay = pose.ay * scale + tiltY[index]! * 3;
       pose.bx = pose.bx * scale + tiltX[index]! * 3; pose.by *= scale;
-      projected.push(orbitPose(index,elapsed,width,height));
+      projected.push(posed(index,elapsed));
       poses.set([pose.x, pose.y, pose.material, index / (ORBIT_COUNT - 1)], index * 4);
       bases.set([pose.ax, pose.ay, pose.bx, pose.by], index * 4);
       const button = forms[index];
       if (button && root.classList.contains('has-optics')) {
-        const minimum = textureIndex >= 0 ? 22 : 0;
+        // Neither seen, tapped nor tabbed to where the stage does not draw it.
+        button.style.display = orbitDrawn(index, width, height) ? '' : 'none';
+        const minimum = textureIndex >= 0 ? ORBIT_TOUCH_RADIUS : 0;
         const rx = Math.max(minimum, Math.hypot(pose.ax, pose.bx)), ry = Math.max(minimum, Math.hypot(pose.ay, pose.by));
         button.style.left = `${pose.x-rx}px`; button.style.top = `${pose.y-ry}px`;
         button.style.width = `${rx*2}px`; button.style.height = `${ry*2}px`;
@@ -212,7 +220,7 @@ export function mountWorldOptics(root: HTMLElement, images: readonly string[]): 
         button.style.setProperty('--world-ring-projection', `matrix(${pose.ax/32},${pose.ay/32},${pose.bx/32},${pose.by/32},0,0)`);
       }
     }
-    const future=projected.map((_,index)=>orbitPose(index,elapsed+1/60,width,height));
+    const future=projected.map((_,index)=>posed(index,elapsed+1/60));
     settling=liquid.update(lensMotions(projected,future,1/60),delta,paused()) || settling;
     const first=liquid.active[0]!, second=liquid.active[1]!;
     motionA.set([first.index,first.strength,first.x,first.y]); motionB.set([second.index,second.strength,second.x,second.y]);
