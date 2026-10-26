@@ -4,7 +4,7 @@
 // the caller's, and which key does what is create-steps.mjs's createKey. Their look lives in
 // world-ui-create.css, from world-ui.css's tokens and front-door.css's materials.
 import { orb, stepList, type Step } from './world-ui.ts';
-import { CREATE_WORDS, countWords } from './create-words.mjs';
+import { CREATE_WORDS, NOTES_WORDS, aspectLabel, countWords } from './create-words.mjs';
 import './front-door.css';
 import './world-ui-create.css';
 
@@ -352,6 +352,59 @@ export function madeNote(columns: readonly MadeNoteColumn[]): MadeNote {
       root.dataset.leaving = 'true';
       const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
       leaving = window.setTimeout(() => root.remove(), reduced ? 120 : 300);
+    },
+  };
+}
+
+/**
+ * Asking for web notes on frame 20 (WORDS.md "Web notes in Create, the words", item 2): one check box under the price
+ * line, off until the person ticks it, its label in the price line's ink and under it, faint, `line` (where the
+ * searches go and what they add). A real check box, so a click, or Tab and Space, ticks it; Enter still makes the world.
+ */
+export function notesAsk({ checked, line, onChange }: { readonly checked: boolean; readonly line: string; readonly onChange: (checked: boolean) => void }): HTMLLabelElement {
+  const row = element('label', 'wu-notes-ask');
+  const box = element('input', 'wu-notes-box');
+  box.type = 'checkbox';
+  box.checked = checked;
+  const said = element('span', 'wu-notes-line', line);
+  said.id = nextId('wu-notes-line');
+  box.setAttribute('aria-describedby', said.id);
+  box.addEventListener('change', () => onChange(box.checked));
+  row.append(box, element('span', 'wu-notes-words', NOTES_WORDS.ask), said);
+  return row;
+}
+
+export interface NotesPanel {
+  readonly root: HTMLElement;
+  /** The notes the request kept, each by its aspect's label, and the line under them. */
+  notes(notes: readonly { readonly aspect: string; readonly text: string }[], foot: string): void;
+  /** Where no notes come, the line that says why in their place (item 4). */
+  instead(line: string): void;
+}
+
+/** The notes at the page's right on frame 21 (item 3), under "From the web", each on a line, its aspect first. */
+export function notesPanel(): NotesPanel {
+  const root = element('section', 'wu-notes-panel');
+  const label = lightLabel(CREATE_WORDS.fromTheWeb);
+  label.id = nextId('wu-notes-label');
+  root.setAttribute('aria-labelledby', label.id);
+  root.hidden = true;
+  root.append(label);
+  return {
+    root,
+    notes(notes, foot) {
+      const list = element('ul', 'wu-notes-list');
+      for (const note of notes) {
+        const item = element('li');
+        item.append(element('span', 'wu-notes-aspect', `${aspectLabel(note.aspect)} · `), note.text);
+        list.append(item);
+      }
+      root.replaceChildren(label, list, element('p', 'wu-notes-foot', foot));
+      root.hidden = false;
+    },
+    instead(line) {
+      root.replaceChildren(label, element('p', 'wu-notes-instead', line));
+      root.hidden = false;
     },
   };
 }

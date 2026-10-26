@@ -10,8 +10,9 @@ repair: a refused or cut answer leaves its step missed and the bundle partial, n
 * :func:`read_notes` reads the leads a search returned (a source's excerpts and picture
   descriptions, held in memory only) and writes notes in its own words, each about one aspect.
 
-The words they are asked with are data: ``reference-prompts.v1.json`` beside this module, named by
-its sha256.
+The words they are asked with are data: the ``reference-prompts.v*.json`` files beside this
+module, each named by its sha256; a new request takes its purpose's newest words, and a request
+keeps the words it pinned.
 """
 
 from __future__ import annotations
@@ -41,6 +42,7 @@ __all__ = [
     "PROMPT_PATH",
     "THINGS_PROMPT_PATH",
     "WITHOUT_PICTURE_DESCRIPTIONS",
+    "WORLD_PROMPT_PATH",
     "Drafted",
     "ReferencePrompts",
     "catalogs_for_prompts",
@@ -54,6 +56,9 @@ DRAFTING_ROLE: Final = Role.REFERENCE_DRAFTING
 PROMPT_PATH: Final = Path(__file__).with_name("reference-prompts.v1.json")
 THINGS_PROMPT_PATH: Final = Path(__file__).with_name("reference-prompts.v3.json")
 THINGS_PICTURE_PROMPT_PATH: Final = Path(__file__).with_name("reference-prompts.v4.json")
+#: New requests of every purpose but things: v1's words, the reader keeping each note to what its
+#: search asks about and giving sizes in metres.
+WORLD_PROMPT_PATH: Final = Path(__file__).with_name("reference-prompts.v5.json")
 _PROFILE: Final = "exulanica.reference-prompts/v1"
 #: Answer ceilings. 640 is the structured_extraction chain's floor: its models reason before
 #: they answer (the manifest's min_max_tokens), and three short subjects fit well within it.
@@ -131,11 +136,12 @@ def prompts_for_request(
     Selected things pictures use their own words; historical digests resolve unchanged.
     """
     legacy = reference_prompts()
+    world = reference_prompts(WORLD_PROMPT_PATH)
     things = reference_prompts(THINGS_PROMPT_PATH)
     picture_words = reference_prompts(THINGS_PICTURE_PROMPT_PATH)
     if sha256 is None:
-        return (picture_words if pictures else things) if purpose == "things" else legacy
-    for candidate in (legacy, things, picture_words) if purpose == "things" else (legacy,):
+        return (picture_words if pictures else things) if purpose == "things" else world
+    for candidate in (legacy, things, picture_words) if purpose == "things" else (world, legacy):
         if candidate.sha256 == sha256:
             return candidate
     raise ValueError("reference_prompts_unavailable")

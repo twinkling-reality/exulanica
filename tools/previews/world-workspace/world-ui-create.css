@@ -190,3 +190,21 @@
   .wu-light-surface { background: Canvas; mask: none; -webkit-mask: none; border: 1px solid CanvasText; }
   .wu-qcmd { border: 1px solid ButtonText; }
 }
+
+/* Web notes (create-world.ts; WORDS.md "Web notes in Create, the words", DESIGN's frames/web-notes/): the check box
+   under the price line on frame 20, and the notes at the page's right on frame 21. */
+.wu-notes-ask { display: grid; grid-template-columns: auto 1fr; column-gap: calc(12 * var(--u)); row-gap: calc(4 * var(--u));
+  align-items: start; margin-top: calc(16 * var(--u)); max-width: calc(700 * var(--u)); cursor: pointer; }
+.wu-notes-box { appearance: none; box-sizing: border-box; width: calc(18 * var(--u)); height: calc(18 * var(--u)); margin: calc(2 * var(--u)) 0 0;
+  border-radius: calc(5 * var(--u)); border: 1.5px solid var(--l-focus); background: transparent; cursor: pointer; }
+.wu-notes-box:checked { background: var(--l-focus) center / 70% no-repeat
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E"); }
+.wu-notes-words { font: 400 max(12px, calc(15 * var(--u)))/1.5 var(--font-sans); color: var(--l-muted); }
+.wu-notes-line { grid-column: 2; font: 400 max(12px, calc(13 * var(--u)))/1.45 var(--font-sans); color: var(--l-faint); text-wrap: pretty; }
+.wu-notes-panel { position: absolute; left: calc(1220 * var(--u)); top: calc(512 * var(--u)); width: calc(600 * var(--u)); }
+.wu-notes-panel[hidden] { display: none; }
+.wu-notes-list { list-style: none; margin: calc(14 * var(--u)) 0 0; padding: 0; display: grid; row-gap: calc(10 * var(--u)); }
+.wu-notes-list li { font: 400 max(12px, calc(15 * var(--u)))/1.45 var(--font-sans); color: var(--l-ink); text-wrap: pretty; }
+.wu-notes-aspect { color: var(--l-faint); }
+.wu-notes-foot { margin: calc(16 * var(--u)) 0 0; font: 400 max(12px, calc(13 * var(--u)))/1.45 var(--font-sans); color: var(--l-faint); text-wrap: pretty; }
+.wu-notes-instead { margin: calc(14 * var(--u)) 0 0; font: 400 max(12px, calc(15 * var(--u)))/1.5 var(--font-sans); color: var(--l-muted); text-wrap: pretty; }

@@ -4,7 +4,7 @@
 // made handoff. Pure, so verify-create-steps.mjs checks it in Node; the page draws what it returns.
 import { OFFLINE_AFTER_FAILED_READS } from './world-ui-layout.mjs';
 import { READ_BACKOFF } from './read-backoff.mjs';
-import { CREATE_WORDS, STEP_WORDS, cardSub, stepTime } from './create-words.mjs';
+import { CREATE_WORDS, NOTES_WORDS, STEP_WORDS, cardSub, stepTime } from './create-words.mjs';
 
 /** The draft states that are steps, in the server's order; `ready` and `refused` end a draft. */
 export const DRAFT_STEPS = Object.freeze(['queued', 'choosing', 'drafting', 'making']);
@@ -140,12 +140,12 @@ export function wrapStop(stops, at, back) {
 
 /**
  * What a key does on frames 20 and 21 (spec 9, K2, K7, K8, N5, N6). `state`: { page: 'create' |
- * 'creating', focus: 'field' | 'card' | 'button' | 'page', canCreate }. Fates:
- * - 'create' Enter in the field with words to make; 'start' Enter on a card; 'previous', 'next';
+ * 'creating', focus: 'field' | 'box' | 'card' | 'button' | 'page', canCreate }. Fates:
+ * - 'create' Enter in the field with words to make, or on the web notes box; 'start' Enter on a card; 'previous', 'next';
  * - 'leave' Esc, once, for Your worlds, the words kept (N6); on 21 the making carries on;
  * - 'type' the field takes the key as text (Shift+Enter a new line), and the page does nothing;
  * - 'quiet' a combination with Cmd or Ctrl: the browser keeps it (the field's undo), the page does nothing;
- * - 'pass' Tab, and Enter or Space on a focused button, as anywhere;
+ * - 'pass' Tab, Enter or Space on a focused button, and Space on the web notes box, as anywhere;
  * - 'silence' anything else: the old shell's N H K I M O R G P Backspace ? among them.
  */
 export function createKey(event, state) {
@@ -158,6 +158,11 @@ export function createKey(event, state) {
   if (focus === 'field') {
     if ((event.code === 'Enter' || event.code === 'NumpadEnter') && !event.shiftKey && !event.altKey) return ready && !event.repeat ? 'create' : 'silence';
     return 'type';
+  }
+  if (focus === 'box') {
+    // The web notes box: Space ticks it, and Enter creates as from the field, as a form's box does.
+    if (event.code === 'Space') return 'pass';
+    if ((event.code === 'Enter' || event.code === 'NumpadEnter') && !event.shiftKey && !event.altKey) return ready && !event.repeat ? 'create' : 'silence';
   }
   if (focus === 'card') {
     // Space starts as Enter does: a card is a native button (N23); Space is not drawn.
@@ -172,12 +177,13 @@ export function createKey(event, state) {
 export const MADE_HANDOFF_KEY = 'exulanica.made.v1';
 
 /**
- * The made note's columns in order (N13), each { label, value }; an empty one is left out.
- * @param {{ inIt?: string | null, set?: string | null, notInItYet?: string | null, spent?: string | null }} values
+ * The made note's columns in order (N13), each { label, value }; an empty one is left out. `web`, where web notes
+ * were used, stands after Set (WORDS.md "Web notes in Create, the words", item 5).
+ * @param {{ inIt?: string | null, set?: string | null, web?: string | null, notInItYet?: string | null, spent?: string | null }} values
  * @returns {{ label: string, value: string }[]}
  */
-export function madeColumns({ inIt = null, set = null, notInItYet = null, spent = null }) {
-  return [[CREATE_WORDS.inIt, inIt], [CREATE_WORDS.set, set], [CREATE_WORDS.notInItYet, notInItYet], [CREATE_WORDS.spent, spent]]
+export function madeColumns({ inIt = null, set = null, web = null, notInItYet = null, spent = null }) {
+  return [[CREATE_WORDS.inIt, inIt], [CREATE_WORDS.set, set], [CREATE_WORDS.fromTheWeb, web], [CREATE_WORDS.notInItYet, notInItYet], [CREATE_WORDS.spent, spent]]
     .filter(([, value]) => typeof value === 'string' && value.trim())
     .map(([label, value]) => ({ label, value }));
 }
@@ -193,11 +199,62 @@ export function readMade(text, entryId) {
   try {
     const value = JSON.parse(text ?? 'null');
     if (!value || value.entryId !== entryId || !Array.isArray(value.columns)) return null;
-    const labels = new Set([CREATE_WORDS.inIt, CREATE_WORDS.set, CREATE_WORDS.notInItYet, CREATE_WORDS.spent]);
+    const labels = new Set([CREATE_WORDS.inIt, CREATE_WORDS.set, CREATE_WORDS.fromTheWeb, CREATE_WORDS.notInItYet, CREATE_WORDS.spent]);
     const columns = value.columns.filter(one => one && labels.has(one.label) && typeof one.value === 'string' && one.value.trim())
       .map(one => ({ label: one.label, value: one.value }));
     return { entryId, columns, build: value.build === true };
   } catch {
     return null;
   }
+}
+
+/** The notes request's steps the page shows, in their order: the searches' plan, the searches and the reading. */
+export const NOTES_STEPS = Object.freeze(['plan', 'search', 'read']);
+
+/**
+ * The notes' steps on frame 21 (WORDS.md "Web notes in Create, the words", item 3), from the request's served steps:
+ * a running step is the one now, a done one done, a missed one drawn as not done with its time (item 4), and one
+ * still waiting or skipped is not shown. `seconds` holds each step's time as the page saw it, by step: the request
+ * states no times, so they are the page's own reads'.
+ * @returns {{ key: string, words: string, state: 'done' | 'now' | 'next', time: string }[]}
+ */
+export function notesSteps(steps, seconds = {}) {
+  const shown = [];
+  for (const key of NOTES_STEPS) {
+    const step = (steps ?? []).find((one) => one?.step === key);
+    const state = step?.state === 'done' ? 'done' : step?.state === 'running' ? 'now' : step?.state === 'missed' ? 'next' : null;
+    if (state === null) continue;
+    shown.push({ key, words: NOTES_WORDS.steps[key], state, time: stepTime(Number(seconds[key] ?? 0)) });
+  }
+  return shown;
+}
+
+/**
+ * What came of a finished notes request: `notes` where it kept notes to draft with, `nothing` where its searches
+ * kept none, `notMade` where it failed, expired or was stopped; null while it runs.
+ */
+export function notesOutcome(request) {
+  const status = request?.status;
+  if (status === 'complete' || status === 'partial') return (request.notes?.length ?? 0) > 0 ? 'notes' : 'nothing';
+  if (status === 'failed' || status === 'cancelled' || status === 'withdrawn' || status === 'expired') return 'notMade';
+  return null;
+}
+
+/** Where notes do not come, the line in their place (item 4): from the request's outcome or the draft's own reason. */
+export function notesNotUsedLine(outcome, code = null) {
+  if (code === 'reference_not_for_this_tool') return NOTES_WORDS.notReached;
+  if (outcome === 'nothing' || code === 'reference_has_no_notes') return NOTES_WORDS.nothingFound;
+  return NOTES_WORDS.notMade;
+}
+
+/**
+ * What a draft with web notes spent and may spend (items 3 and 5): the draft's own, with what the notes' model calls
+ * spent as the draft read states it; where it states none (a request that kept no bundle), the notes' most is
+ * counted as not known yet, so the line never reads as complete.
+ */
+export function withNotesSpent(spent, notesSpentUsd, notesMostUsd) {
+  if (spent === null) return null;
+  const known = notesSpentUsd !== null && notesSpentUsd !== undefined;
+  const add = (a, b) => Math.round((Number(a) + Number(b ?? 0)) * 1e8) / 1e8;
+  return { spentUsd: add(spent.spentUsd, known ? notesSpentUsd : 0), unknownUsd: add(spent.unknownUsd, known ? 0 : notesMostUsd) };
 }

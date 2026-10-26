@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import {
+  NOTES_WORDS, aspectLabel, notesAskLine, notesFoot, sumUsd, webColumn,
   CREATE_WORDS, PROVIDER_NAMES, REFUSAL_BY_CODE, REFUSAL_WORDS, STEP_WORDS, budgetShort, cardSub, ceilingAmount, countWords, keyName, leftAmount, madeSpent, hostKeepsLine, priceLine,
   priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine, stepTime, stoppedLine,
 } from './create-words.mjs';
@@ -14,7 +15,7 @@ assert.equal(CREATE_WORDS.orStartFrom, 'Or start from');
 assert.equal(CREATE_WORDS.noModelFree, 'No AI model · Free');
 assert.equal(CREATE_WORDS.blank, 'Blank');
 assert.equal(CREATE_WORDS.buildItYourself, 'Build it yourself · Free');
-assert.equal(CREATE_WORDS.opensMyWorldAgain, 'Opens My world again');
+assert.equal(CREATE_WORDS.opensMyWorldAgain, 'Opens My world again · Free');
 assert.equal(CREATE_WORDS.yourWorlds, 'Your worlds');
 assert.equal(CREATE_WORDS.loading, 'Reading what you can make here…');
 assert.equal(CREATE_WORDS.noModel, 'Making a world from your words needs an AI model, and none is connected here. You can still start from these:');
@@ -135,6 +136,10 @@ const sentences = {
   spending_suspended: 'Spending on AI models is paused here, so nothing was made.',
   world_draft_unanswered: 'The AI model took too long, so nothing was made. Try again.',
   world_draft_interrupted: 'Making stopped part way, so nothing was kept. Try again.',
+  // A kind's draft the model could not make from the words, as a world's (REHEARSAL run 3, beat 1's village).
+  kind_not_drafted: 'No world could be made from these words. Try again, or say it another way.',
+  // A kind's draft whose reply ran on until the call's token ceiling cut it (DESIGN 11:35 on 26 October).
+  kind_draft_ran_on: 'The AI model’s answer ran on too long to use, so nothing was made. Try again, or say it another way.',
 };
 for (const [code, sentence] of Object.entries(sentences)) assert.equal(refusalWords(code), sentence, code);
 for (const unknown of ['no_such_code', null, undefined, 42]) {
@@ -203,3 +208,18 @@ if (words && existsSync(words)) {
 }
 
 export default true;
+
+// Web notes in Create, DESIGN's words of 11:55 on 25 October (WORDS.md "Web notes in Create, the words").
+assert.equal(NOTES_WORDS.ask, 'Read the web first for what such a place looks like');
+assert.equal(notesAskLine(3, '0.0153'), 'Up to 3 web searches go to Tavily, made from your words with the names and details this install holds as yours left out, and Tavily keeps them. Adds at most $0.02.');
+assert.deepEqual(NOTES_WORDS.steps, { plan: 'Choosing what to look up', search: 'Searching the web', read: 'Writing notes from what it found' });
+assert.equal(notesFoot(3), 'A model wrote these from 3 web searches. They help plan the place and are never facts about it.');
+assert.equal(NOTES_WORDS.notMade, 'The web notes could not be made, so it is made from your words alone.');
+assert.equal(NOTES_WORDS.nothingFound, 'The searches found nothing to use, so it is made from your words alone.');
+assert.equal(NOTES_WORDS.notReached, 'This kind of place is made from your words alone, so the notes were not used.');
+assert.equal(CREATE_WORDS.fromTheWeb, 'From the web');
+assert.equal(webColumn(7, 3), '7 notes from 3 searches');
+assert.equal(webColumn(1, 1), '1 note from 1 search');
+// Each note's aspect by the aspect catalog's label, never a key the page names.
+assert.equal(aspectLabel('landscape_and_plants'), 'Landscape and plants');
+assert.equal(sumUsd('0.20766720', '0.0153'), '0.22296720');

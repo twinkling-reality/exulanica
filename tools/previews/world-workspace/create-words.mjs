@@ -3,6 +3,7 @@
 // code, `meaning` or `detail` is never shown; a code maps to one of these sentences.
 import { amount } from './character-words.mjs';
 import { NOTE_WORDS } from './world-words.mjs';
+import aspects from '../../../assets/catalogs/reference-sources/reference-aspect.v2.json' with { type: 'json' };
 
 export const CREATE_WORDS = Object.freeze({
   wordmark: 'exulanica',
@@ -18,7 +19,7 @@ export const CREATE_WORDS = Object.freeze({
   blank: 'Blank',
   buildItYourself: 'Build it yourself · Free',
   /** Blank's sub-line where the workspace's blank world already exists: Blank reopens it (N27). */
-  opensMyWorldAgain: 'Opens My world again',
+  opensMyWorldAgain: 'Opens My world again · Free',
   yourWorlds: 'Your worlds',
   start: 'Start',
   loading: 'Reading what you can make here…',
@@ -29,6 +30,8 @@ export const CREATE_WORDS = Object.freeze({
   inIt: 'In it',
   set: 'Set',
   notInItYet: 'Not in it yet',
+  /** The made note's column after Set where web notes were used (WORDS.md "Web notes in Create, the words", item 5). */
+  fromTheWeb: 'From the web',
   spent: 'Spent',
   /** No AI model to make a world (N7): no key, or models not run here. */
   noModel: 'Making a world from your words needs an AI model, and none is connected here. You can still start from these:',
@@ -71,6 +74,8 @@ export const REFUSAL_WORDS = Object.freeze({
   priceUnavailable: 'The price can’t be read right now. Trying again.',
   tileBudget: 'You’ve reached today’s limit for new worlds. Try again tomorrow.',
   notDrafted: 'No world could be made from these words. Try again, or say it another way.',
+  /** A kind's draft whose reply ran on until the call's token ceiling cut it: said as what happened to the answer. */
+  ranOn: 'The AI model’s answer ran on too long to use, so nothing was made. Try again, or say it another way.',
 });
 
 /** Which sentence each served code says; any other code says `failed` (N8, "anything else"). */
@@ -98,6 +103,8 @@ export const REFUSAL_BY_CODE = Object.freeze({
   world_draft_price_unavailable: 'priceUnavailable',
   tile_budget_reached: 'tileBudget',
   world_not_drafted: 'notDrafted',
+  kind_not_drafted: 'notDrafted',
+  kind_draft_ran_on: 'ranOn',
 });
 
 /**
@@ -273,3 +280,48 @@ export function setValue(land, setting = null) {
   if (land.chosen_by === 'words' && Array.isArray(land.words) && land.words.length > 0) return `${capital(land.title)}, for your words ${quoted(land.words)}`;
   return capital(land.title);
 }
+
+/**
+ * Web notes in Create (DESIGN's words of 11:55 on 25 October, WORDS.md "Web notes in Create, the words"): the check
+ * box on frame 20 and its line, the notes' steps on frame 21 before the drafting's, the notes at the page's right
+ * under "From the web", what the page says where none came, and the made note's column. The source is named where
+ * a person's words go, as Nebius is.
+ */
+export const NOTES_WORDS = Object.freeze({
+  ask: 'Read the web first for what such a place looks like',
+  steps: Object.freeze({
+    plan: 'Choosing what to look up',
+    search: 'Searching the web',
+    read: 'Writing notes from what it found',
+  }),
+  /** The request failed, expired or was stopped: the drafting goes on from the words alone. */
+  notMade: 'The web notes could not be made, so it is made from your words alone.',
+  /** The searches kept no notes. */
+  nothingFound: 'The searches found nothing to use, so it is made from your words alone.',
+  /** The making chose a kind of place its notes do not reach. */
+  notReached: 'This kind of place is made from your words alone, so the notes were not used.',
+});
+
+/** The web source a request's searches go to, as the words name it. */
+export const NOTES_SOURCE = 'Tavily';
+
+const counted = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+/** Under the check box (item 2): the planner's limit and the most the notes' two model calls add, from the offer. */
+export const notesAskLine = (searches, mostUsd) =>
+  `Up to ${counted(searches, 'web search', 'web searches')} go to ${NOTES_SOURCE}, made from your words with the names and details this install holds as yours left out, and ${NOTES_SOURCE} keeps them. Adds at most ${ceilingAmount(mostUsd)}.`;
+
+/** Under the notes at the page's right (item 3): the searches the request sent. */
+export const notesFoot = (searches) =>
+  `A model wrote these from ${counted(searches, 'web search', 'web searches')}. They help plan the place and are never facts about it.`;
+
+/** The made note's column (item 5): the counts the draft read states. */
+export const webColumn = (notes, searches) => `${counted(notes, 'note', 'notes')} from ${counted(searches, 'search', 'searches')}`;
+
+const ASPECT_LABELS = new Map(aspects.entries.map((entry) => [entry.key, entry.label]));
+
+/** A note's aspect by the aspect catalog's label ("Buildings"), its key where the catalog names none. */
+export const aspectLabel = (key) => ASPECT_LABELS.get(key) ?? key;
+
+/** Two USD figures summed to eight places, as the server writes them, so float error never shows as a cent. */
+export const sumUsd = (a, b) => (Math.round((Number(a ?? 0) + Number(b ?? 0)) * 1e8) / 1e8).toFixed(8);

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { CREATE_WORDS } from './create-words.mjs';
 import {
   MADE_HANDOFF_KEY, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, pollDelay, readMade, spentOf, wrapStop,
-  startCards, writeMade,
+  startCards, writeMade, notesNotUsedLine, notesOutcome, notesSteps, withNotesSpent,
 } from './create-steps.mjs';
 
 // The offer to the page's state (N7, N9, N12).
@@ -75,7 +75,7 @@ const cards = startCards([{ key: 'r1', name: 'Small town', picture: 'data:image/
 assert.deepEqual(cards.map(card => [card.name, card.sub]), [['Small town', 'No AI model · Free'], ['Wall city', 'At most $0.40'], ['Blank', 'Build it yourself · Free']]);
 // N27, C4b: once the workspace's blank world holds something its person placed, Blank says it opens it again; empty,
 // as a personal install makes it, it still reads "Build it yourself · Free".
-assert.equal(startCards([], [], { blankHolds: true }).at(-1).sub, 'Opens My world again');
+assert.equal(startCards([], [], { blankHolds: true }).at(-1).sub, 'Opens My world again · Free');
 assert.equal(startCards([], [], { blankHolds: false }).at(-1).sub, 'Build it yourself · Free');
 assert.equal(cards.at(-1).blank, true);
 assert.deepEqual(startCards().map(card => card.name), [CREATE_WORDS.blank]);
@@ -112,6 +112,12 @@ for (const code of ['KeyN', 'KeyH', 'KeyK', 'KeyI', 'KeyM', 'KeyO', 'KeyR', 'Key
   assert.equal(createKey(key(code), { page: 'create', focus: 'page' }), 'silence', code);
   assert.equal(createKey(key(code), { page: 'create', focus: 'card' }), 'silence', code);
 }
+// On the web notes box Space ticks it as anywhere, and Enter creates as from the field, as a form's box does.
+const box = { page: 'create', focus: 'box', canCreate: true };
+assert.equal(createKey(key('Space'), box), 'pass');
+assert.equal(createKey(key('Enter'), box), 'create');
+assert.equal(createKey(key('Enter'), { ...box, canCreate: false }), 'silence');
+assert.equal(createKey(key('Enter', { shiftKey: true }), box), 'silence');
 // On a card: arrows move the choice, Enter starts from it (K2, K7).
 const card = { page: 'create', focus: 'card' };
 assert.equal(createKey(key('ArrowLeft'), card), 'previous');
@@ -139,3 +145,21 @@ assert.equal(readMade(null, 'w-1'), null);
 assert.deepEqual(readMade(JSON.stringify({ entryId: 'w-1', columns: [{ label: 'Code', value: 'x' }, { label: 'Spent', value: '$0' }] }), 'w-1').columns, [{ label: 'Spent', value: '$0' }]);
 
 export default true;
+
+// Web notes: their steps from the request's own (a missed one drawn as not done, one waiting or skipped not shown), what
+// came of the request, the line in their place, and the spend counting them, never complete where it is not known.
+assert.deepEqual(notesSteps([{ step: 'plan', state: 'done' }, { step: 'search', state: 'missed' }, { step: 'read', state: 'skipped' }, { step: 'bundle', state: 'done' }], { plan: 2, search: 20 }),
+  [{ key: 'plan', words: 'Choosing what to look up', state: 'done', time: '2 s' }, { key: 'search', words: 'Searching the web', state: 'next', time: '20 s' }]);
+assert.deepEqual(notesSteps([{ step: 'plan', state: 'running' }, { step: 'search', state: 'waiting' }]).map((step) => step.state), ['now']);
+assert.equal(notesOutcome({ status: 'partial', notes: [{}] }), 'notes');
+assert.equal(notesOutcome({ status: 'complete', notes: [] }), 'nothing');
+assert.equal(notesOutcome({ status: 'failed', notes: [] }), 'notMade');
+assert.equal(notesOutcome({ status: 'running', notes: [] }), null);
+assert.equal(notesNotUsedLine('nothing'), 'The searches found nothing to use, so it is made from your words alone.');
+assert.equal(notesNotUsedLine('notMade'), 'The web notes could not be made, so it is made from your words alone.');
+assert.equal(notesNotUsedLine(null, 'reference_not_for_this_tool'), 'This kind of place is made from your words alone, so the notes were not used.');
+assert.deepEqual(withNotesSpent({ spentUsd: 0.0009, unknownUsd: 0 }, '0.0002', '0.0153'), { spentUsd: 0.0011, unknownUsd: 0 });
+assert.deepEqual(withNotesSpent({ spentUsd: 0.0009, unknownUsd: 0 }, null, '0.0153'), { spentUsd: 0.0009, unknownUsd: 0.0153 });
+assert.equal(withNotesSpent(null, '0.0002', '0.0153'), null);
+// The made note's column for the notes stands after Set, and the handoff keeps it.
+assert.deepEqual(madeColumns({ inIt: 'a', set: 'b', web: '7 notes from 3 searches', spent: 'c' }).map((one) => one.label), ['In it', 'Set', 'From the web', 'Spent']);

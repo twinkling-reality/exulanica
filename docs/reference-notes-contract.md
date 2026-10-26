@@ -115,8 +115,11 @@ withdrawn; the database holds each of these.
 | bundle | The kept notes become a reference bundle (v1 for existing/world requests, v2 for web-only things, v3 for selected things pictures), complete or partial with the steps it missed |
 
 A request that did not ask for web notes skips plan, search and read; one that names no picture
-has no picture step. Planner and reader words are versioned data. Existing requests and world
-purposes use `exulanica/references/reference-prompts.v1.json` (content version 2); new `things`
+has no picture step. Planner and reader words are versioned data. New requests for every purpose
+but `things` use `exulanica/references/reference-prompts.v5.json` (content version 5): the planner
+is asked as in version 2, and the reader keeps each note to what its search asks about, leaving out
+what the material says of other places or things, and gives any size or distance in metres.
+Requests pinned to `reference-prompts.v1.json` (content version 2) keep its words; new `things`
 requests without selected pictures use `reference-prompts.v3.json` (content version 3); things
 requests with selected uploaded captures use `reference-prompts.v4.json` (content version 4).
 Each request pins its file's digest.

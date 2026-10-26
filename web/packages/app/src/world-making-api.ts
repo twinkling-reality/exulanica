@@ -93,6 +93,19 @@ export interface WorldMakingStart {
   readonly idempotencyKey: string;
   readonly operation: WorldDraftOperation;
   readonly maximumUsd: string;
+  /** Web notes to draft with: a finished reference request of this person's own, made for a world draft. */
+  readonly referenceId?: string;
+}
+
+/**
+ * Web notes a draft may be made with here (the offer's `notes`): whether this person may ask for them and why not, the
+ * most searches one request sends, and the most its two model calls may add at current rates.
+ */
+export interface WorldDraftNotesOffer {
+  readonly offered: boolean;
+  readonly code: string | null;
+  readonly searchesAtMost: number;
+  readonly maximumUsd: string | null;
 }
 
 /** Page-session state only. Private words survive solely while exact POST recovery needs them. */
@@ -125,6 +138,8 @@ export interface WorldDraftOffer {
   readonly leftUsd: string | null;
   /** Whether a draft here runs on this person's own key (a person's own install); false where a server's budget pays. */
   readonly ownKey: boolean;
+  /** Web notes a draft may be made with here; null where no draft is offered. */
+  readonly notes: WorldDraftNotesOffer | null;
 }
 
 type Json = Readonly<Record<string, unknown>>;
@@ -229,6 +244,22 @@ export function parseWorldDraftOffer(raw: unknown): WorldDraftOffer {
     refusals: codes(held['refusals']),
     leftUsd: held['left_usd'] === null || held['left_usd'] === undefined ? null : usd(held['left_usd'], 'draft offer', true),
     ownKey: held['own_key'] === true,
+    notes: notesOffer(held['notes']),
+  });
+}
+
+/** The offer's web notes, as served; null where the offer states none. */
+function notesOffer(value: unknown): WorldDraftNotesOffer | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) fail('draft offer notes');
+  const held = value as Json;
+  const searches = held['searches_at_most'];
+  if (typeof held['offered'] !== 'boolean' || typeof searches !== 'number' || !Number.isSafeInteger(searches) || searches < 0) fail('draft offer notes');
+  return Object.freeze({
+    offered: held['offered'] as boolean,
+    code: typeof held['code'] === 'string' ? held['code'] : null,
+    searchesAtMost: searches,
+    maximumUsd: held['maximum_usd'] === null || held['maximum_usd'] === undefined ? null : usd(held['maximum_usd'], 'draft offer notes', true),
   });
 }
 
@@ -332,6 +363,7 @@ export class WorldMakingClient {
     const body = submission === undefined ? { description } : {
       description, idempotency_key: submission.idempotencyKey,
       operation: submission.operation.document, maximum_usd: submission.maximumUsd,
+      ...(submission.referenceId === undefined ? {} : { reference_id: submission.referenceId }),
     };
     const answer = parseWorldMakingDraft(await this.#transport.postJson<unknown>('/worlds/drafts', body));
     if (submission !== undefined && answer.requestId !== submission.idempotencyKey) fail('world draft request identity');

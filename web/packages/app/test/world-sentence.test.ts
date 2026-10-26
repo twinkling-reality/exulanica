@@ -170,6 +170,9 @@ describe('what the server\u2019s draft routes answer', () => {
 
   it('has the members the hand-built scenarios of this file have, and no others', () => {
     expect(members(offerWire())).toEqual(members(SERVED.offer));
+    expect(members(offerWire()['notes'])).toEqual(members(SERVED.offer['notes']));
+    // The offer's notes as the client reads them (web notes in Create).
+    expect(parseWorldDraftOffer(SERVED.offer).notes).toEqual({ offered: false, code: 'references_operator_only', searchesAtMost: 3, maximumUsd: null });
     expect(members(offerWire().starts)).toEqual(members(SERVED.offer['starts']));
     for (const answer of [SERVED.started, SERVED.ready_place, SERVED.ready_town, SERVED.refused]) {
       expect(members(wire('choosing'))).toEqual(members(answer));

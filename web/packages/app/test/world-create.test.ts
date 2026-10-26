@@ -4,6 +4,7 @@
 // start; the field stops at its limit and counts from the first letter; the cards name themselves,
 // Blank last, one Tab stop; Esc is drawn once, as the quiet command, never in the key row; the
 // steps are a polite live region; the made note is announced once and leaves when dismissed.
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 interface Step { words: string; state: 'done' | 'now' | 'next'; sub?: string; time?: string }
@@ -222,7 +223,7 @@ describe('the made note', () => {
 // Create a world as a page (create-world.ts, frames 20 and 21) over stand-in answers: the offer and
 // the draft reads come through the workspace's own read path, a start through the app's client.
 const opened: string[] = [];
-const starts: { words: string; key: string; most: string }[] = [];
+const starts: { words: string; key: string; most: string; reference?: string | null }[] = [];
 let startAnswer: () => Promise<unknown> = async () => ({ draftId: 'd-1', state: 'queued', refusal: null });
 vi.mock('../../../../tools/previews/world-workspace/front-door.ts', () => ({
   chosenWorldPicture: () => null,
@@ -239,7 +240,10 @@ vi.mock('../src/world-making-api.ts', async (original) => {
   return {
     ...real,
     WorldMakingClient: class {
-      async start(words: string, submission: { idempotencyKey: string; maximumUsd: string }) { starts.push({ words, key: submission.idempotencyKey, most: submission.maximumUsd }); return startAnswer(); }
+      async start(words: string, submission: { idempotencyKey: string; maximumUsd: string; referenceId?: string }) {
+        starts.push({ words, key: submission.idempotencyKey, most: submission.maximumUsd, reference: submission.referenceId ?? null });
+        return startAnswer();
+      }
     },
   };
 });
@@ -626,7 +630,7 @@ describe('Create a world as a page', () => {
     document.body.replaceChildren();
     saved = [{ entryId: 'other', authoredScene: null, currentAuthoredEditSeq: 0 }, { entryId: 'starter', authoredScene: { kind: 'authored-starter' }, currentAuthoredEditSeq: 1 }];
     await mount();
-    expect(sub()).toBe('Opens My world again');
+    expect(sub()).toBe('Opens My world again · Free');
   });
 
   it('opens Blank through its opening, marked for build mode', async () => {
@@ -725,5 +729,102 @@ describe('Create a world as a page', () => {
       expect(document.body.textContent).not.toContain('The price changed before it started.');
       expect(starts).toHaveLength(1);
     });
+  });
+});
+
+// Web notes in Create (WORDS.md "Web notes in Create, the words"): asked for with a check box under the price line, the
+// notes' steps and the notes on frame 21, the draft started with them, or from the words alone where none came.
+describe('Create a world with web notes', () => {
+  const READY = (JSON.parse(readFileSync('../tests/snapshots/world-drafts.served.json', 'utf8')) as Record<string, Record<string, unknown>>)['ready_place']!;
+  const NOTES_OFFER = { offered: true, code: null, searches_at_most: 3, maximum_usd: '0.0153' };
+  const request = (status: string, extra: Record<string, unknown> = {}) => ({
+    reference_id: 'r-1', purpose: 'world_draft', web: true, status, missed: [], failure: null, bundle_sha256: null, cancel_requested: false,
+    created_at: '2026-10-26T10:00:00Z', finished_at: null, notes: [], searches: [],
+    steps: [{ step: 'plan', state: 'done' }, { step: 'search', state: 'running' }, { step: 'read', state: 'waiting' }, { step: 'bundle', state: 'waiting' }],
+    ...extra,
+  });
+  const search = { source: 'tavily', outcome: 'sent', result_count: 5, credits: 1, sent_at: '2026-10-26T10:00:01Z' };
+  const KEPT = request('complete', {
+    steps: ['plan', 'search', 'read', 'bundle'].map((step) => ({ step, state: 'done' })),
+    notes: [{ aspect: 'buildings', text: 'Narrow terraced houses in soft pastel colours', basis: 'web_description' },
+      { aspect: 'vehicles_and_boats', text: 'Small wooden fishing boats moored in a row', basis: 'web_description' }],
+    searches: [search, search, search],
+  });
+  const asked: { method: string; path: string; body: unknown }[] = [];
+  afterEach(() => { vi.unstubAllGlobals(); starts.length = 0; asked.length = 0; opened.length = 0; sessionStorage.clear(); });
+
+  /** The offer with notes, the notes request's answers in turn (or a refusal), then the draft's reads. */
+  function serveNotes(answers: unknown[] | 'refused', reads: Record<string, unknown>[]): void {
+    vi.stubGlobal('fetch', vi.fn(async (address: string, init?: RequestInit) => {
+      const path = new URL(address).pathname, method = init?.method ?? 'GET';
+      asked.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : null });
+      const answer = (status: number, body: unknown) => ({ ok: status < 300, status, statusText: '', headers: new Headers(), json: async () => body });
+      if (path === '/worlds/references') {
+        return answers === 'refused' ? answer(409, { code: 'references_not_run_here', detail: 'no' }) : answer(202, answers.shift());
+      }
+      if (path.startsWith('/worlds/references/')) return answer(200, (answers as unknown[]).shift());
+      if (path === '/worlds/drafts') return answer(200, offerOf({ own_key: true, notes: NOTES_OFFER }));
+      return answer(200, reads.shift() ?? { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 });
+    }));
+  }
+  const mountNotes = async () => {
+    const root = document.createElement('div'); document.body.append(root);
+    (await page()).mountCreateWorld({ root, credentials: { baseUrl: 'https://host.test', token: 'install' }, entries: { ensureStarter: async () => ({ entryId: 'starter' }), entries: async () => [] }, onClose: () => {} });
+    await settle();
+  };
+  const priceText = () => [...document.querySelectorAll('.wu-light-line')].map((line) => line.textContent ?? '').find((line) => line.startsWith('An open model')) ?? '';
+
+  it('asks for notes only when ticked, prices them, drafts with them and says what they gave', async () => {
+    serveNotes([request('running'), KEPT], [{ ...READY, references: { state: 'used', reference_id: 'r-1', code: null, detail: null, notes: 2, bundle_sha256: 'a'.repeat(64), basis: ['web_description'], searches: 3, spent_usd: '0.00200000' } }]);
+    await mountNotes();
+    const box = document.querySelector<HTMLInputElement>('.wu-notes-box')!;
+    expect(box.checked).toBe(false);
+    expect(document.querySelector('.wu-notes-ask')!.textContent).toContain('Read the web first for what such a place looks like');
+    expect(document.querySelector('.wu-notes-line')!.textContent).toBe('Up to 3 web searches go to Tavily, made from your words with the names and details this install holds as yours left out, and Tavily keeps them. Adds at most $0.02.');
+    expect(priceText()).toContain('at most $1.43');
+    box.click();
+    expect(priceText()).toContain('at most $1.44');
+    type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'a cozy little town by the sea at dusk');
+    key(document.querySelector('.wu-light-field')!, 'Enter');
+    await settle();
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    await settle(); await settle();
+    const posted = asked.find((one) => one.method === 'POST' && one.path === '/worlds/references')!;
+    expect(posted.body).toMatchObject({ purpose: 'world_draft', description: 'a cozy little town by the sea at dusk', web: true });
+    expect(starts.map((one) => one.reference)).toEqual(['r-1']);
+    const panel = document.querySelector('.wu-notes-panel')!;
+    expect(panel.textContent).toContain('From the web');
+    expect(panel.textContent).toContain('Buildings · Narrow terraced houses in soft pastel colours');
+    expect(panel.textContent).toContain('A model wrote these from 3 web searches. They help plan the place and are never facts about it.');
+    const steps = [...document.querySelectorAll('.wu-step-words')].map((one) => one.textContent);
+    expect(steps.slice(0, 4)).toEqual(['Waiting to start', 'Choosing what to look up', 'Searching the web', 'Writing notes from what it found']);
+    expect(steps.filter((one) => one === 'Waiting to start')).toHaveLength(1);
+    await settle(); await settle();
+    const handed = JSON.parse(sessionStorage.getItem('exulanica.made.v1') ?? 'null') as { columns: { label: string; value: string }[] } | null;
+    expect(handed?.columns.find((column) => column.label === 'From the web')?.value).toBe('2 notes from 3 searches');
+  });
+
+  it('drafts from the words alone where no notes came, and says why where they would stand', async () => {
+    serveNotes('refused', []);
+    await mountNotes();
+    type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'a cozy little town by the sea at dusk');
+    // Ticked by a press, the box holds the focus: Space is left to it, and Enter creates as from the field.
+    const box = document.querySelector<HTMLInputElement>('.wu-notes-box')!;
+    box.click(); box.focus();
+    expect(key(box, 'Space').defaultPrevented).toBe(false);
+    key(box, 'Enter');
+    await settle(); await settle();
+    expect(starts.map((one) => one.reference)).toEqual([null]);
+    expect(document.querySelector('.wu-notes-panel')!.textContent).toContain('The web notes could not be made, so it is made from your words alone.');
+  });
+
+  it('asks the web for nothing where the box is not ticked: a control', async () => {
+    serveNotes([request('running')], []);
+    await mountNotes();
+    type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'a cozy little town by the sea at dusk');
+    key(document.querySelector('.wu-light-field')!, 'Enter');
+    await settle();
+    expect(asked.some((one) => one.path.startsWith('/worlds/references'))).toBe(false);
+    expect(starts.map((one) => one.reference)).toEqual([null]);
   });
 });

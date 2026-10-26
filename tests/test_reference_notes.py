@@ -19,6 +19,7 @@ from exulanica.references.bundle import (
     read_bundle,
 )
 from exulanica.references.catalogs import load_reference_catalogs
+from exulanica.references.drafting import prompts_for_request, reference_prompts
 from exulanica.references.notes import DraftedNote, keep_notes
 from exulanica.references.render import (
     MAX_BLOCK_BYTES,
@@ -301,3 +302,21 @@ def test_a_block_holds_only_the_notes_of_the_bases_it_is_given() -> None:
     assert (both.used, both.photographs) == (2, frozenset({PICTURE}))
     with pytest.raises(ValueError, match="no note has the basis"):
         render_reference_notes(bundle, bases=("rumour",))
+
+
+@pytest.mark.parametrize("purpose", ["world_draft", "kind", "look", "pieces"])
+def test_a_new_request_reads_notes_kept_to_its_searches_in_metres_and_an_old_one_its_own(
+    purpose: str,
+) -> None:
+    new = prompts_for_request(purpose)
+    old = reference_prompts()
+    assert new.version == 5
+    assert "Keep each note to what its search asks about" in new.reading
+    assert "Give any size or distance in metres." in new.reading
+    assert "Write no note that only says the material shows nothing of an aspect" in new.reading
+    # The planner is asked as before; only the reader's words change.
+    assert (new.planning, new.subjects_maximum) == (old.planning, old.subjects_maximum)
+    assert prompts_for_request(purpose, old.sha256) == old
+    assert prompts_for_request(purpose, new.sha256) == new
+    with pytest.raises(ValueError, match="reference_prompts_unavailable"):
+        prompts_for_request(purpose, "a" * 64)

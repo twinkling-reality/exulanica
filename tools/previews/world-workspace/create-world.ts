@@ -5,23 +5,28 @@
 // opening (world-opening.ts), and its arrival shows frame 22 (contextual-world.ts reads the made
 // handoff). The parts draw (world-ui-create.ts); words and key fates are create-words.mjs's and
 // create-steps.mjs's. Esc leaves once, the words kept; a draft carries on and waits in Your worlds.
+// Where web notes are offered and the person asks for them (WORDS.md "Web notes in Create, the words"), Create first
+// asks for notes (POST /worlds/references), shows their steps and the notes, then starts the draft with them, or from
+// the words alone where none came, saying why; the price and spend count the notes' two model calls.
 import { WorldMakingClient, parseWorldDraftOffer, parseWorldMakingDraft, type WorldDraftOffer, type WorldMakingStart } from '../../../web/packages/app/src/world-making-api.ts';
 import { WorldKindsClient, type WorldKind } from '../../../web/packages/app/src/world-kinds-api.ts';
 import { WorldSpecificationClient, type SpecificationPreset } from '../../../web/packages/app/src/world-specification.ts';
 import { cardPicture, readCardPictures } from '../../../web/packages/app/src/ui/card-pictures.ts';
 import { accessHeaders, type Credentials } from '../../../web/packages/app/src/config.ts';
 import type { SavedWorldEntry, WorldEntryClient } from '../../../web/packages/app/src/world-entry-api.ts';
+import { ReferencesClient, referenceFinished, referenceHasNotes, type ReferenceRequest } from '../../../web/packages/app/src/references-api.ts';
 import {
-  createKeyRow, createOrb, filmStrip, lightLabel, lightLine, lightPage, lightSteps, quietCommand, sentenceField, sentenceRow, setOrbReady,
-  type FilmStrip, type LightPage, type SentenceField,
+  createKeyRow, createOrb, filmStrip, lightLabel, lightLine, lightPage, lightSteps, notesAsk, notesPanel, quietCommand, sentenceField, sentenceRow,
+  setOrbReady, type FilmStrip, type LightPage, type LightSteps, type NotesPanel, type SentenceField,
 } from './world-ui-create.ts';
+import type { Step } from './world-ui.ts';
 import {
-  CREATE_WORDS, STEP_WORDS, budgetShort, ceilingAmount, hostKeepsLine, keyName, madeSpent, priceLine, priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine,
-  stepTime, stoppedLine,
+  CREATE_WORDS, STEP_WORDS, budgetShort, ceilingAmount, hostKeepsLine, keyName, madeSpent, notesAskLine, notesFoot, priceLine, priceUp, refusalSpent,
+  refusalWords, setValue, spendLine, startsLeftLine, stepTime, stoppedLine, sumUsd, webColumn,
 } from './create-words.mjs';
 import {
-  MADE_HANDOFF_KEY, SHORT_CODE, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, pollDelay, spentOf, startCards,
-  wrapStop, writeMade,
+  MADE_HANDOFF_KEY, SHORT_CODE, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, notesNotUsedLine, notesOutcome, notesSteps,
+  offerState, pollDelay, spentOf, startCards, withNotesSpent, wrapStop, writeMade,
 } from './create-steps.mjs';
 import { chosenWorldPicture, openMadeWorld } from './front-door.ts';
 import { mountUiScale } from './world-ui.ts';
@@ -138,6 +143,17 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   let offerFailures = 0, offerOffline = false;
   // The sentence that names the cards where no field is drawn (N24), else null.
   let sentenceId: string | null = null;
+  // Web notes for the next draft (WORDS.md "Web notes in Create, the words"): off until the person ticks the box, each
+  // draft its own choice.
+  let notesWanted = false;
+  // Made when notes are first asked for, so a page that never asks them builds no client for them.
+  let referencesClient: ReferencesClient | null = null;
+  const references = (): ReferencesClient => (referencesClient ??= new ReferencesClient(credentials));
+  /** The notes this offer prices, where they are offered here: the planner's limit and the most they add. */
+  const notesOffered = (): { readonly searches: number; readonly mostUsd: string } | null => {
+    const notes = offer?.notes ?? null;
+    return notes !== null && notes.offered && notes.maximumUsd !== null ? { searches: notes.searchesAtMost, mostUsd: notes.maximumUsd } : null;
+  };
 
   const title = (): HTMLElement => {
     const heading = document.createElement('h1');
@@ -204,7 +220,17 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
           head.push(lightLine(refusal.words ?? refusalWords(refusal.code), refusal.code === PRICE_UNAVAILABLE ? { live: true } : { tone: 'refused', live: true }));
           if (refusal.spent) head.push(lightLine(refusal.spent, { tone: 'refused' }));
         }
-        if (offer?.operation && !refusal?.stopped) head.push(lightLine(priceLine(offer.operation.maximumUsd, offer.leftUsd, keyName(offer.ownKey, offer.operation.document))));
+        if (offer?.operation && !refusal?.stopped) {
+          // Ticked, the price line's figure is the whole most with the notes (item 2).
+          const operation = offer.operation, notes = notesOffered();
+          const price = (): string => priceLine(notes !== null && notesWanted ? sumUsd(operation.maximumUsd, notes.mostUsd) : operation.maximumUsd,
+            offer?.leftUsd ?? null, keyName(offer?.ownKey ?? false, operation.document));
+          const line = lightLine(price());
+          head.push(line);
+          if (notes !== null) {
+            head.push(notesAsk({ checked: notesWanted, line: notesAskLine(notes.searches, notes.mostUsd), onChange: (on) => { notesWanted = on; line.textContent = price(); } }));
+          }
+        }
         const left = startsLeftLine(offer?.starts.left ?? Number.NaN);
         if (left) head.push(lightLine(left));
       }
@@ -332,6 +358,8 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   const create = async (requoted = false): Promise<void> => {
     const words = field?.field.value.trim() ?? '';
     if (!ready() || offer?.operation == null) return;
+    const notes = notesOffered();
+    if (notes !== null && notesWanted && !requoted) { void lookUp(words, notes.mostUsd); return; }
     busy = true;
     if (orb) setOrbReady(orb, false);
     if (submission === null || submission.words !== words) {
@@ -408,8 +436,9 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     field?.field.focus({ preventScroll: true });
   };
 
-  /** Frame 21: follows draft `draftId` by its served reads until it is ready or refused. */
-  const follow = async (draftId: string, words: string): Promise<void> => {
+  /** Frame 21's parts: the quote, the steps, the spend line and the offline line, drawn once for a making. */
+  interface CreatingFrame { readonly quote: HTMLElement; readonly steps: LightSteps; readonly spend: HTMLElement; readonly offline: HTMLElement }
+  const creatingFrame = (words: string): CreatingFrame => {
     form = 'creating';
     page.form('creating');
     const quote = document.createElement('p');
@@ -425,6 +454,87 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     sizeQuote(quote);
     keys();
     page.root.focus({ preventScroll: true });
+    return { quote, steps, spend, offline };
+  };
+
+  /** What the notes phase hands the draft it starts: its steps, its panel and the most the notes may add. */
+  interface NotesMade { readonly frame: CreatingFrame; readonly steps: readonly Step[]; readonly panel: NotesPanel; readonly mostUsd: string }
+
+  /**
+   * Web notes first (items 3 and 4): the request asked for the words, its steps drawn as they happen with their times
+   * (the request states none, so they are this page's reads'), its notes at the page's right once kept; then the
+   * draft started with them, or from the words alone where none came, the line in their place saying why.
+   */
+  const lookUp = async (words: string, mostUsd: string): Promise<void> => {
+    busy = true;
+    const frame = creatingFrame(words);
+    const panel = notesPanel();
+    page.root.append(panel.root);
+    signal.addEventListener('abort', () => panel.root.remove());
+    const pressed = performance.now();
+    const started: Record<string, number> = {}, seconds: Record<string, number> = {};
+    let waited: number | null = null;
+    const drawn = (request: ReferenceRequest | null): Step[] => {
+      const now = performance.now();
+      for (const step of request?.steps ?? []) {
+        if (step.state === 'running' || step.state === 'done' || step.state === 'missed') {
+          started[step.step] ??= now;
+          if (step.state === 'running' || seconds[step.step] === undefined) seconds[step.step] = (now - started[step.step]!) / 1000;
+        }
+      }
+      const shown = notesSteps(request?.steps ?? [], seconds);
+      if (shown.length > 0 && waited === null) waited = (now - pressed) / 1000;
+      const waiting: Step = { words: STEP_WORDS.queued, state: shown.length > 0 ? 'done' : 'now', time: stepTime(waited ?? (now - pressed) / 1000) };
+      return [waiting, ...shown];
+    };
+    frame.steps.set(drawn(null));
+    let request: ReferenceRequest | null = null;
+    try {
+      request = await references().request({ purpose: 'world_draft', description: words, idempotencyKey: crypto.randomUUID() });
+      while (!signal.aborted && !referenceFinished(request)) {
+        frame.steps.set(drawn(request));
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        if (signal.aborted) return;
+        request = await references().read(request.referenceId);
+      }
+    } catch {
+      // A request refused or a read that failed: the drafting goes on from the words alone, saying so.
+      request = request !== null && referenceFinished(request) ? request : null;
+    }
+    if (signal.aborted) return;
+    const steps = drawn(request);
+    frame.steps.set(steps);
+    const outcome = request === null ? 'notMade' : notesOutcome(request);
+    if (request !== null && referenceHasNotes(request)) panel.notes(request.notes, notesFoot(request.searches.length));
+    else panel.instead(notesNotUsedLine(outcome));
+    busy = false;
+    notesWanted = false;
+    void startDrafting(words, request !== null && referenceHasNotes(request) ? request.referenceId : null, { frame, steps, panel, mostUsd });
+  };
+
+  /** The draft started after the notes phase, on its frame: with the notes where they came, else from the words alone. */
+  const startDrafting = async (words: string, referenceId: string | null, notes: NotesMade): Promise<void> => {
+    if (offer?.operation == null) return;
+    busy = true;
+    const operation = offer.operation;
+    const sent: WorldMakingStart = { idempotencyKey: crypto.randomUUID(), operation, maximumUsd: operation.maximumUsd, ...(referenceId === null ? {} : { referenceId }) };
+    try {
+      const draft = await making.start(words, sent);
+      busy = false;
+      if (signal.aborted) return;
+      if (draft.state === 'refused') { notes.panel.root.remove(); refused(draft.refusal?.code ?? 'world_draft_failed', null); return; }
+      void follow(draft.draftId, words, notes);
+    } catch (error) {
+      busy = false;
+      if (signal.aborted) return;
+      notes.panel.root.remove();
+      refused(codeOf(error) ?? 'world_draft_failed', null);
+    }
+  };
+
+  /** Frame 21: follows draft `draftId` by its served reads until it is ready or refused; after notes, on their frame. */
+  const follow = async (draftId: string, words: string, notes: NotesMade | null = null): Promise<void> => {
+    const { quote, steps, spend, offline } = notes?.frame ?? creatingFrame(words);
     const reads: RawDraft[] = [];
     const maximum = offer?.operation?.maximumUsd ?? null;
     let failed = 0;
@@ -445,18 +555,30 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       failed = 0; offline.hidden = true;
       reads.push(raw);
       if (!quote.textContent && typeof raw['description'] === 'string' && raw['description']) { quote.textContent = `“${raw['description']}”`; sizeQuote(quote); }
-      steps.set(draftSteps(reads));
-      const spent = spentOf(raw['accounting']);
+      // After notes, their steps first and "Waiting to start" once (item 3).
+      steps.set(notes === null ? draftSteps(reads) : [...notes.steps, ...draftSteps(reads).filter((step: { readonly key: string }) => step.key !== 'queued')]);
+      const noted = raw['references'] as { state?: unknown; code?: unknown; notes?: unknown; searches?: unknown; spent_usd?: unknown } | null | undefined;
+      // A kind of place the notes do not reach says so in their place (item 4).
+      if (notes !== null && noted?.state === 'not_used' && noted.code === 'reference_not_for_this_tool') notes.panel.instead(notesNotUsedLine(null, 'reference_not_for_this_tool'));
+      const own = spentOf(raw['accounting']);
+      // The spend counts the notes' model calls; where the read states none, their most is not known yet (O1).
+      const spent = notes === null ? own : withNotesSpent(own, typeof noted?.spent_usd === 'string' ? noted.spent_usd : null, notes.mostUsd);
       const quoted = typeof (raw['operation'] as { maximum_usd?: unknown } | null)?.maximum_usd === 'string'
         ? (raw['operation'] as { maximum_usd: string }).maximum_usd : maximum;
       // The most this draft may spend: what it was funded with where that is less than the whole (A1b).
       const funded = typeof raw['funded_usd'] === 'string' ? raw['funded_usd'] : null;
-      const most = funded !== null && (quoted === null || Number(funded) < Number(quoted)) ? funded : quoted;
+      const draftMost = funded !== null && (quoted === null || Number(funded) < Number(quoted)) ? funded : quoted;
+      const most = notes === null || draftMost === null ? draftMost : sumUsd(draftMost, notes.mostUsd);
       if (spent !== null && most !== null) { spend.textContent = spendLine(spent, most); spend.hidden = false; }
-      if (raw['state'] === 'ready') { await made(raw, spent, most); return; }
+      if (raw['state'] === 'ready') {
+        const used = noted?.state === 'used' && typeof noted.notes === 'number' && typeof noted.searches === 'number';
+        await made(raw, spent, most, used ? webColumn(noted.notes as number, noted.searches as number) : null);
+        return;
+      }
       if (raw['state'] === 'refused') {
         const code = typeof (raw['refusal'] as { code?: unknown } | null)?.code === 'string' ? (raw['refusal'] as { code: string }).code : 'world_draft_failed';
         keptWords = words || keptWords;
+        notes?.panel.root.remove();
         // Stopped part way where its next step could cost more than was left (A1b): said with its figures.
         const stopped = spent === null ? null : stoppedLine((raw['refusal'] as { spending?: unknown } | null)?.spending ?? null, spent);
         if (stopped !== null) stoppedPartWay(code, stopped);
@@ -481,12 +603,13 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   };
 
   /** Ready: the made note's columns handed to the world's arrival, then the world opens (frame 22). */
-  const made = async (raw: RawDraft, spent: ReturnType<typeof spentOf>, most: string | null): Promise<void> => {
+  const made = async (raw: RawDraft, spent: ReturnType<typeof spentOf>, most: string | null, web: string | null = null): Promise<void> => {
     const draft = parseWorldMakingDraft(raw);
     if (draft.entry === null) { refused('world_draft_failed', null); return; }
     const columns = madeColumns({
       inIt: draft.made.map((part) => part.label).join(', ') || null,
       set: setValue(raw['land'] as Parameters<typeof setValue>[0], raw['setting'] as Parameters<typeof setValue>[1]),
+      web,
       notInItYet: draft.leftOut.join(', ') || null,
       spent: spent !== null && most !== null ? madeSpent(spent, most) : null,
     });
@@ -557,7 +680,8 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     }
     const focus = field !== null && active === field.field ? 'field'
       : strip !== null && strip.cards.includes(active as HTMLButtonElement) ? 'card'
-        : active instanceof HTMLButtonElement ? 'button' : 'page';
+        : active instanceof HTMLInputElement && active.classList.contains('wu-notes-box') ? 'box'
+          : active instanceof HTMLButtonElement ? 'button' : 'page';
     const fate = createKey(event, { page: form, focus, canCreate: ready() });
     if (fate === 'pass' || fate === 'type' || fate === 'quiet') { event.stopPropagation(); return; }
     event.preventDefault();
