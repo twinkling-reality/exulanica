@@ -1495,6 +1495,15 @@ refusal is named as the step `society`. A copy that already lives on another eng
 the host did not offer the scene's, then dressed once it does) keeps that society: nothing of the
 scene is placed and the step is `scene` with `society_already_living`.
 
+**Showcase worlds.** Worlds made from a sentence on real models are served as data beside the
+arrival worlds (`assets/catalogs/showcase-worlds/`, each document locked at its digest), and a
+visitor opens their own copy of one from a link, `/?world=<key>` (`POST /worlds/showcase/{showcase}`,
+[world API](capabilities/world-api.md#showcase-worlds)). `prepare-towns` makes each served one once
+in the operator's workspace after the arrival worlds, so its tiles are baked before a visitor's copy,
+and compares each made world's receipt with its document's digest: it exits 1 when the host's code
+no longer makes the world a document names. A showcase world on land needs a host that makes worlds
+on land.
+
 **Built and not built.**
 - Built: the composition, `deploy/public/public.sh`, the tile worker and the arrival worlds, and the
   host's health and preflight timers.

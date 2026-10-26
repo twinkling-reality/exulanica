@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Writable } from 'node:stream';
-import { capturedPicture, frontDoorAddress, isScenePreview, leadsWithCreate, openWorldAddress, scenePreviewAddress, worldAddress } from './front-door-routes.mjs';
+import { capturedPicture, frontDoorAddress, isScenePreview, leadsWithCreate, openWorldAddress, scenePreviewAddress, showcaseKey, worldAddress } from './front-door-routes.mjs';
 import { CAPTURE_CATALOG_PROFILE, capturePictures, capturesModule, checkedCaptureCatalog, scenePreviewWriteGuard } from './front-door-server.mjs';
 
 const origin = 'http://127.0.0.1:19974';
@@ -21,6 +21,12 @@ assert.equal(leadsWithCreate([{ ...starter, sourceAttachments: [{}] }]), false, 
 assert.equal(leadsWithCreate([{ ...starter, previousSourceAttachments: [{}] }]), false, 'a photograph removed');
 assert.equal(leadsWithCreate([{ ...starter, sourceKind: 'generated' }]), false, 'a made world');
 assert.equal(leadsWithCreate([starter, { ...starter, entryId: 'second' }]), false, 'two worlds');
+
+// A showcase link names a world by its key alone; an address naming a saved world opens that world instead.
+assert.equal(showcaseKey(origin + '/?world=fishing-village'), 'fishing-village');
+assert.equal(showcaseKey(origin + '/?world=fishing-village&entry=x'), null);
+assert.equal(showcaseKey(origin + '/?world=Fishing%20Village'), null);
+assert.equal(showcaseKey(origin + '/'), null);
 
 // Open goes to this workspace's own world view; the live background is the same world, read only.
 assert.equal(worldAddress('01a1-shore', origin), origin + '/?entry=01a1-shore');

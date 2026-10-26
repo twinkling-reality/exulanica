@@ -118,6 +118,7 @@ from exulanica.api.routes import (
     selection,
     selection_actions,
     selection_environment,
+    showcase_worlds,
     signal_comparisons,
     society,
     society_actions,
@@ -654,6 +655,7 @@ def create_app(
     app.include_router(generated_worlds.tiles_router)
     app.include_router(world_kinds.router)
     app.include_router(world_kinds.site_router)
+    app.include_router(showcase_worlds.router)
     app.include_router(world_making.router)
     app.include_router(world_draft_actions.router)
     app.include_router(references.router)

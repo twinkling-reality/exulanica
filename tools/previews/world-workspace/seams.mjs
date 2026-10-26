@@ -94,9 +94,16 @@ import { mountFrontDoor, frontDoorPicture, openFromFrontDoor } from '/@fs/${here
 import { mountScenePreview, scenePreviewPage } from '/@fs/${here}/front-door-preview.ts';
 import { mountCreateWorld } from '/@fs/${here}/create-world.ts';
 import { creatureMakerFor } from '/@fs/${here}/world-creature.ts';
+import { openShowcaseWorld } from '/@fs/${here}/showcase-world.ts';
 import { bakeReach, bakeShare } from '/@fs/${here}/opening-steps.mjs';
 ` + code
-    .replace(seam('start() deep link'), `    const reviewEntryId = new URLSearchParams(location.search).get('entry');
+    .replace(seam('start() deep link'), `    // A showcase world's link opens the caller's own copy of it, at the copy's own address.
+    if (new URLSearchParams(location.search).has('world') && state.credentials) {
+      const showcase = await openShowcaseWorld(state.credentials, location.href);
+      if (showcase) { location.replace(showcase); return; }
+      pendingEntryProblem = 'This world could not be opened here. Choose a world here.';
+    }
+    const reviewEntryId = new URLSearchParams(location.search).get('entry');
     if (reviewEntryId) {
       let reviewEntry = state.savedWorldEntries.find(entry => entry.entryId === reviewEntryId);
       if (reviewEntry && reviewEntry.generatedGround?.tiles.some((tile) => tile.state === 'failed')) {

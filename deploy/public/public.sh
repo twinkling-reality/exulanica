@@ -500,10 +500,13 @@ print(" ".join(name for name in ("api", "client") if services.get(name, {}).get(
     # operator's own workspace, as the runtime role, inside the API's container, and each dressed
     # with the scene the list names for it, as every guest's copy is. The tile worker drains that
     # workspace and bakes them; run again to read each tile's state. Exits 1 when a dressing is
-    # incomplete, naming the step's code.
+    # incomplete, naming the step's code. Then the showcase worlds (assets/catalogs/showcase-worlds in
+    # the image), each made once there from its document with no model call, so a visitor's copy
+    # opens on tiles already baked; exits 1 when one no longer makes the world its document names.
     need_env_file
     workspace="$(python3 -c 'import json,sys; print(next(iter(json.load(open(sys.argv[1])).values()))["workspace_id"])' "$token_dir/operator.json")"
     compose exec -T api python -m exulanica.api.arrival_dressing prepare --workspace "$workspace"
+    compose exec -T api python -m exulanica.api.showcase_dressing prepare --workspace "$workspace"
     ;;
 
   issue-authority)

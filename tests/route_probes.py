@@ -897,6 +897,8 @@ _NON_IDENTIFIER_PARAMETERS: Final[Mapping[str, str]] = {
     # The place of a picture among those a picture search found: a small whole number.
     "n": "0",
     "role_key": decision_roles().deciding_for("person").key,
+    # A showcase world is named by the installation's catalog key, the same for every caller.
+    "showcase": "mountain-town",
     "subject_kind": "avatar",
 }
 _PLACEHOLDER: Final = re.compile(r"\{([^}]+)\}")

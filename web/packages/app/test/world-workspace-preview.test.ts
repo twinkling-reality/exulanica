@@ -57,7 +57,7 @@ function diagnostics(file: string, text: string): string[] {
  * seam imports where it is needed (a baking town's land, asked for while it bakes).
  */
 const EXPECTED = [
-  /^TS(2307|2792): Cannot find module '\/@fs\/.*\/(contextual-world|front-door|front-door-preview|world-opening|create-world|world-creature)\.ts'/u,
+  /^TS(2307|2792): Cannot find module '\/@fs\/.*\/(contextual-world|front-door|front-door-preview|world-opening|create-world|world-creature|showcase-world)\.ts'/u,
   /^TS(2307|2792): Cannot find module '\.\/composition\/town-land\.js'/u,
   /^TS(2307|2792): Cannot find module '\/@fs\/.*\/opening-steps\.mjs'/u,
 ];

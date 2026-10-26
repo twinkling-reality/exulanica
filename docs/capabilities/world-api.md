@@ -53,6 +53,7 @@ and world generation are routes of their own contracts, listed with every other 
 | `GET /world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
 | `GET /world/behaviours` | The reviewed behaviours an object may be given, with each parameter's bounds |
 | `GET /world-entries` | The workspace's saved worlds, each naming the version and state it reopens at |
+| `POST /worlds/showcase/{showcase}` | The caller's own copy of a showcase world, made again from what its sentence's draft decided with no model call and brought to life as it lived; or the copy already held ([showcase worlds](#showcase-worlds)) |
 | `GET /world/source-media` | Protected topology source slots, including their region ids |
 
 The personal-source pair takes no `world_id`: the server chooses the photographs and the world,
@@ -71,6 +72,25 @@ The `/world-read` routes need `library.read`. World Write records provenance; it
 generated assets or execute behavior. The `/world/versions` routes are the object-editing surface,
 and their full contract, including every problem code, is
 [world-objects-contract.md](../world-objects-contract.md) sections 5 to 7.
+
+### Showcase worlds
+
+An installation serves showcase worlds: worlds made from a person's sentence on real models, kept as
+data in `assets/catalogs/showcase-worlds/` (one document per world, served by the lock at its
+digest). A document holds what the draft decided (the town's preset and values, or the place's
+kind document and values), the land, the look and setting, the made world's identity and receipt
+digest, the society's engine, and the cast: the people given an open model, by their place in the
+society. `POST /worlds/showcase/{showcase}` makes that world in the caller's own workspace under its
+identity, so a copy is the same streets, buildings, land and look, then makes its society on the
+document's engine and records each cast member's model as the owner's choice. It answers 201 with
+`{"entry", "made": true, "incomplete"}`, where `incomplete` names any step of that dressing that
+did not happen, or 200 with the copy the workspace already holds, as its owner left it. A key the
+installation does not serve answers 404 `unknown_showcase_world` to everyone. The copy is held to
+the caller's own budgets and the cast's minds are paid from the caller's own allowance, so the
+route needs `world.write` and `model.invoke`. A copy's people are its own: a society's people are
+drawn from its world and its workspace, so the cast gives the same models to the people at the
+same places, and a copy keeps no history but its own. The workspace page opens one from the address
+`/?world=<key>`, which the public site's showcase links use.
 
 ### People and models
 

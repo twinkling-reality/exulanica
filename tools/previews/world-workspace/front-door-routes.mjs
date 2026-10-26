@@ -24,6 +24,16 @@ export function leadsWithCreate(entries, { remembered = null, pictured = () => f
     && (only.sourceAttachments ?? []).length === 0 && (only.previousSourceAttachments ?? []).length === 0 && !pictured(only);
 }
 
+/**
+ * The showcase world a link names (`/?world=<key>`, the public site's links), or null: a key is lowercase words joined
+ * by hyphens, and an address that also names a saved world (`entry`) opens that world instead.
+ */
+export function showcaseKey(url) {
+  const target = url instanceof URL ? url : new URL(url, 'http://127.0.0.1/');
+  const key = target.searchParams.get('world');
+  return key !== null && !target.searchParams.has('entry') && /^[a-z][a-z0-9-]{0,63}$/.test(key) ? key : null;
+}
+
 /** The front door itself, on `origin`. */
 export function frontDoorAddress(origin) {
   return new URL('/', origin).href;

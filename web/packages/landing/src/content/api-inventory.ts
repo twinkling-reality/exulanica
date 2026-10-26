@@ -27275,6 +27275,77 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/worlds/showcase/{showcase}",
+    "method": "post",
+    "id": "open_showcase_world_worlds_showcase__showcase__post",
+    "title": "Make your own copy of a showcase world, or open the one you hold.",
+    "description": "Make the caller's copy of the showcase world ``showcase`` and bring it to life, or answer the\ncopy the caller's workspace already holds.",
+    "group": "worlds",
+    "permission": {
+      "requires": [
+        "model.invoke",
+        "world.write"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "showcase",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "title": "Showcase"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "The copy the workspace already holds."
+      },
+      "201": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "404": {
+        "description": "No showcase world of that key is served here."
+      },
+      "409": {
+        "description": "Refused by name; nothing was written."
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/worlds/drafts",
     "method": "post",
     "id": "start_world_draft_worlds_drafts_post",

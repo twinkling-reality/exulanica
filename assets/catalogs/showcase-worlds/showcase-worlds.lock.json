@@ -1,0 +1,31 @@
+{
+ "profile": "exulanica.showcase-world-lock/v1",
+ "reason": "The one version of each showcase world this installation serves, by the digest of its document: a served document never changes, a changed one is a new version, and a file this lock does not name at its digest is refused.",
+ "worlds": [
+  {
+   "key": "fishing-village",
+   "version": 1,
+   "sha256": "b148a457000e944eee264447c13b0572527b6a9f3711001071040dbca01d9208"
+  },
+  {
+   "key": "lighthouse-island",
+   "version": 1,
+   "sha256": "364fd033baf98caabf5c60eb9895b4773c623047cdb92ca7ddaef88cda891f6e"
+  },
+  {
+   "key": "mountain-town",
+   "version": 1,
+   "sha256": "8a21e261cf1997d14885f7f5c28ffeb23ab9dc5c13cf6cd07f17aecba692a644"
+  },
+  {
+   "key": "night-market",
+   "version": 1,
+   "sha256": "a325944cbc0c667b84514df5fa5ab0b301d603cfde6d26d1151c141d2f3c3642"
+  },
+  {
+   "key": "windmill-village",
+   "version": 1,
+   "sha256": "5d7b066bba0208bb15e3b76b56d05ab8be3b1941a1af8bf7ed2a77d759c435b3"
+  }
+ ]
+}

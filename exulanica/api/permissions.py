@@ -554,6 +554,7 @@ _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     "POST /world/versions/{version_id}/traffic/comparisons/{comparison_id}/cancel",
     "POST /worlds/drafts",
     "POST /worlds/kinds/drafts",
+    "POST /worlds/showcase/{showcase}",
 )
 
 #: Asking for reference notes, and stopping a request. A request spends the operator's web source
