@@ -31,6 +31,8 @@ from exulanica.models.provider_catalog import ProviderPrice
 from exulanica.models.request_envelopes import PROFILE, read, request_bytes_at_most
 from exulanica.models.spending import SpendingTicket, spending_request_key
 from exulanica.models.usage import USD_QUANTUM
+from exulanica.references import boundary, drafting
+from exulanica.references.adapters.base import Leads
 from exulanica.references.render import MAX_BLOCK_BYTES
 from exulanica.selection import (
     creature_drafting,
@@ -129,6 +131,34 @@ def test_every_stage_s_largest_request_fits_its_role_s_envelope():
         )
         assert len(sent) == creature_drafting.DRAFT_ATTEMPTS
         assert max(sent) <= request_bytes_at_most(creature_drafting.DRAFTER_ROLE), sent
+
+
+@pytest.mark.parametrize("purpose", ["world_draft", "things"])
+def test_the_web_notes_two_calls_fit_the_notes_role_s_envelope_at_their_longest(purpose):
+    # The planner with the longest words a person may send; the reader with what the searches
+    # found filling its material in letters that escape longest, in excerpts that fill the cap.
+    words = drafting.prompts_for_request(purpose)
+    catalogs = drafting.catalogs_for_prompts(words)
+    planned = _sent(
+        lambda c: drafting.plan_subjects(
+            c, LONGEST * WORLD_WORDS, purpose=purpose, prompts=words, catalogs=catalogs
+        )
+    )
+    query = boundary.AdmittedQuery(
+        "tavily_search", "stone houses by the sea", next(iter(catalogs.aspects)), boundary._SEAL
+    )
+    # More than the reader's material may hold, however large its cap: the cap is measured.
+    found = tuple(LONGEST * 200 for _ in range(words.material_characters_maximum // 200 + 1))
+    leads = [Leads(query, found, found, len(found), 1, None) for _ in range(words.subjects_maximum)]
+    read = _sent(
+        lambda c: drafting.read_notes(
+            c, leads, prompts=words, catalogs=catalogs, pictures=purpose != "world_draft"
+        )
+    )
+    envelope = request_bytes_at_most(Role.REFERENCE_DRAFTING)
+    assert envelope is not None
+    assert planned and read
+    assert max(planned + read) <= envelope, (planned, read, envelope)
 
 
 @pytest.mark.parametrize(

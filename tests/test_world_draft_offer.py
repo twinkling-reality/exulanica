@@ -16,6 +16,7 @@ from exulanica.api.world_draft_offer import (
 )
 from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.provider_catalog import ProviderPrice
+from exulanica.models.request_envelopes import request_bytes_at_most
 
 NOW = dt.datetime(2026, 10, 11, tzinfo=dt.UTC)
 
@@ -87,6 +88,9 @@ def test_web_notes_are_priced_as_two_calls_of_the_notes_role_with_every_wire_att
     (path,) = sheet["paths"]
     (stage,) = path["stages"]
     assert (path["tool"], stage["role"]) == ("notes", "reference_drafting")
+    # Priced at the notes role's request envelope, not its models' whole context window.
+    envelope = request_bytes_at_most(Role.REFERENCE_DRAFTING)
+    assert envelope is not None and stage["request_bytes_at_most"] == envelope
     assert stage["dispatches_at_most"] == 2 * wire(Role.REFERENCE_DRAFTING)
     dearest = max(Decimal(model["reservation_usd"]) for model in stage["models"])
     assert Decimal(sheet["maximum_usd"]) == dearest * stage["dispatches_at_most"] > 0

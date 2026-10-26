@@ -71,7 +71,10 @@ admission:
 
 Web notes asked for with a draft are their own request, admitted call by call under the
 workspace's grants; the draft offer prices their two model calls at fresh rates (`notes`) so a
-page can say the whole most before anything is sent.
+page can say the whole most before anything is sent. Each call is priced at the
+`reference_drafting` role's request envelope (49,152 bytes), not at its models' whole context
+windows; `tests/test_request_envelopes.py` measures the planner and the reader at their longest
+and holds both under it.
 
 A whole-world draft (`GET /worlds/drafts`) quotes fresh provider rates separately from its
 operation ceiling. The ceiling covers full admitted input contexts, actual output limits,
