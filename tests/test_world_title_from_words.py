@@ -69,6 +69,25 @@ def test_a_cut_at_48_characters_drops_the_joining_words_it_ends_on():
     assert title_from_words(_typed(words)) == "A long quiet market town of red brick houses"
 
 
+@pytest.mark.parametrize(
+    ("words", "title"),
+    [
+        # DESIGN's finding (26 October): the cut fell inside "on a misty morning" and "with glowing
+        # windows", leaving the adjective without its noun.
+        (
+            "a bright toy town among wheat fields on a misty morning",
+            "A bright toy town among wheat fields",
+        ),
+        (
+            "a snowy mountain village at night with glowing windows",
+            "A snowy mountain village at night",
+        ),
+    ],
+)
+def test_a_cut_for_length_inside_a_phrase_drops_the_whole_phrase(words, title):
+    assert title_from_words(_typed(words)) == title
+
+
 def test_a_whole_sentence_keeps_its_last_word():
     """Nothing was cut, so the person's own last word stands."""
     assert title_from_words(_typed("a little town to grow old in")) == (

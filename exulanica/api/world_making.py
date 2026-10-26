@@ -221,14 +221,21 @@ def title_joining_words(path: Path = TITLE_JOINING_WORDS_PATH) -> frozenset[str]
     return frozenset(entry.key for entry in load_catalog(path, _TITLE_JOINING_WORD).entries)
 
 
+def _word(word: str) -> str:
+    """A word of a title as the joining words are listed: no trailing punctuation, any case."""
+    return word.rstrip(".,;:").casefold()
+
+
 def title_from_words(sent: SentDescription) -> str | None:
     """The title of a town made from a person's words, taken from them: their sentence as typed
-    up to its first comma, or its first 48 characters ending on a whole word where it runs longer,
-    with a capital first letter and no full stop. It claims nothing the person did not write and
-    carries no saved name: where one stands inside it (a span the drafting replaced, as typed), it
-    ends before that name. Cut short in any of these ways, it never ends on a joining word
-    (:func:`title_joining_words`). None where fewer than two words are left, and the town keeps
-    its preset's label."""
+    up to its first comma, or its first 48 characters ending on a whole phrase where it runs
+    longer, with a capital first letter and no full stop. It claims nothing the person did not
+    write and carries no saved name: where one stands inside it (a span the drafting replaced, as
+    typed), it ends before that name. Cut short in any of these ways, it never ends on a joining
+    word (:func:`title_joining_words`), and a cut for length that falls inside a phrase (the first
+    word it leaves out is not a joining word) goes back to before that phrase's joining word, so
+    "on a misty" or "with glowing" is never left without its noun. None where fewer than two words
+    are left, and the town keeps its preset's label."""
     typed = sent.typed
     start = len(typed) - len(typed.lstrip())
     comma = typed.find(",", start)
@@ -239,12 +246,22 @@ def title_from_words(sent: SentDescription) -> str | None:
             end, cut = typed_start, True
             break
     clause = " ".join(typed[start:end].split())
+    inside_a_phrase = False
     if len(clause) > TITLE_FROM_WORDS_CHARACTERS:
         within = clause[: TITLE_FROM_WORDS_CHARACTERS + 1]
-        clause, cut = (within[: within.rfind(" ")] if " " in within else ""), True
+        kept = within[: within.rfind(" ")] if " " in within else ""
+        left_out = clause[len(kept) :].split()
+        inside_a_phrase = bool(left_out) and _word(left_out[0]) not in title_joining_words()
+        clause, cut = kept, True
     words = clause.rstrip(" .,;:").split()
     joining = title_joining_words() if cut else frozenset()
-    while words and words[-1].rstrip(".,;:").casefold() in joining:
+    if inside_a_phrase:
+        # The phrase the cut fell in starts at its last joining word: it goes whole, where a
+        # joining word after the first two words leaves a title to keep.
+        starts = [at for at, word in enumerate(words) if at >= 2 and _word(word) in joining]
+        if starts:
+            words = words[: starts[-1]]
+    while words and _word(words[-1]) in joining:
         words.pop()
     title = " ".join(words).rstrip(" .,;:")
     if len(title.split()) < 2:
