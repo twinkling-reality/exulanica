@@ -41,6 +41,10 @@
     "meaning": "The model's provider failed or refused the call, or could not be reached."
    },
    {
+    "code": "kind_draft_ran_on",
+    "meaning": "The model's answer ran on past what a kind of place can hold."
+   },
+   {
     "code": "kind_draft_unanswered",
     "meaning": "The model did not answer in time."
    },
@@ -685,6 +689,10 @@
     "meaning": "The model's provider failed or refused the call, or could not be reached."
    },
    {
+    "code": "kind_draft_ran_on",
+    "meaning": "The model's answer ran on past what a kind of place can hold."
+   },
+   {
     "code": "kind_draft_unanswered",
     "meaning": "The model did not answer in time."
    },
@@ -847,6 +855,10 @@
    {
     "code": "kind_draft_model_failed",
     "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "kind_draft_ran_on",
+    "meaning": "The model's answer ran on past what a kind of place can hold."
    },
    {
     "code": "kind_draft_unanswered",
@@ -1513,6 +1525,10 @@
     "meaning": "The model's provider failed or refused the call, or could not be reached."
    },
    {
+    "code": "kind_draft_ran_on",
+    "meaning": "The model's answer ran on past what a kind of place can hold."
+   },
+   {
     "code": "kind_draft_unanswered",
     "meaning": "The model did not answer in time."
    },
@@ -2126,6 +2142,10 @@
     "meaning": "The model's provider failed or refused the call, or could not be reached."
    },
    {
+    "code": "kind_draft_ran_on",
+    "meaning": "The model's answer ran on past what a kind of place can hold."
+   },
+   {
     "code": "kind_draft_unanswered",
     "meaning": "The model did not answer in time."
    },
@@ -2587,6 +2607,10 @@
    {
     "code": "kind_draft_model_failed",
     "meaning": "The model's provider failed or refused the call, or could not be reached."
+   },
+   {
+    "code": "kind_draft_ran_on",
+    "meaning": "The model's answer ran on past what a kind of place can hold."
    },
    {
     "code": "kind_draft_unanswered",

@@ -226,34 +226,32 @@ def test_three_refusals_are_refused_by_name_with_the_last_check():
     assert "houses" in outcome.refusal.sentence
 
 
-def test_a_brief_outside_the_schema_or_cut_short_is_repaired():
+def test_a_brief_outside_the_schema_is_repaired():
     farm = _farm()
     missing = {key: value for key, value in farm.items() if key != "zones"}
     client, _transport = _client(_reply(missing), _reply(farm))
     outcome = draft_kind(client, DESCRIPTION, role=ROLE, check=_checked)
     assert outcome.attempts == ("form_refused", "passed")
-    client, transport = _client(_reply(farm, finish_reason="length"), _reply(farm))
-    outcome = draft_kind(client, DESCRIPTION, role=ROLE, check=_checked)
-    assert outcome.attempts == ("truncated", "passed")
-    repair = transport.requests[1]["payload"]["messages"][-1]["content"]
-    assert repair == kind_drafting_prompt().repair_truncated
 
 
 @pytest.mark.parametrize(
-    ("tail", "outcome", "words"),
+    ("tail", "outcome"),
     [
-        (" \n" * 200, "truncated:whitespace", "repair_whitespace"),
-        (',"a lot"' * 12, "truncated:repetition", "repair_repetition"),
+        ("", "truncated"),
+        (" \n" * 200, "truncated:whitespace"),
+        (',"a lot"' * 12, "truncated:repetition"),
     ],
 )
-def test_a_brief_cut_off_running_on_is_told_how_it_ran_on(tail, outcome, words):
+def test_a_reply_the_ceiling_cut_off_ends_the_draft_at_once_as_ran_on(tail, outcome):
+    """Asked again at the same ceiling, a reply that ran on runs on again into the call's timeout:
+    the draft ends after the one call, named for what happened, with how it ran on."""
     farm = _farm()
     cut = json.dumps(chat_body(json.dumps(farm)[:600] + tail, finish_reason="length", model=MODEL))
     client, transport = _client(HttpResponse(status_code=200, text=cut), _reply(farm))
     drafted = draft_kind(client, DESCRIPTION, role=ROLE, check=_checked)
-    assert drafted.attempts == (outcome, "passed")
-    repair = transport.requests[1]["payload"]["messages"][-1]["content"]
-    assert repair == getattr(kind_drafting_prompt(), words)
+    assert transport.call_count == 1
+    assert drafted.document is None and drafted.attempts == (outcome,)
+    assert drafted.refusal.code == KindDraftRefusalCode.RAN_ON
 
 
 def test_the_instructions_are_the_prompt_file_s_words_and_the_catalogs_vocabulary():

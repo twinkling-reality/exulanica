@@ -135,6 +135,7 @@ KIND_DRAFT_CODES: Final = (
     ("unknown_reference", "This credential may not read drafts here: reading needs world.read."),
     ("kind_not_drafted", "No kind of place people can live, walk and work in was drafted."),
     ("kind_draft_unanswered", "The model did not answer in time."),
+    ("kind_draft_ran_on", "The model's answer ran on past what a kind of place can hold."),
     (
         "kind_draft_model_failed",
         "The model's provider failed or refused the call, or could not be reached.",

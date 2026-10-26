@@ -138,9 +138,11 @@ _STATED_BOUNDS: Final = (
 
 
 class KindDraftRefusalCode(StrEnum):
-    """Why no kind was drafted: every brief was refused or the checks refused each kind."""
+    """Why no kind was drafted: every brief was refused or the checks refused each kind; or a
+    reply ran on until the token ceiling cut it, which is not asked for again at that ceiling."""
 
     NOT_DRAFTED = "kind_not_drafted"
+    RAN_ON = "kind_draft_ran_on"
 
 
 @dataclass(frozen=True, slots=True)
@@ -401,10 +403,13 @@ def draft_kind(
 
     ``description`` is the text as it is sent, every saved name already replaced, and
     ``placeholders`` the record of those replacements, handed to the boundary with the request.
-    A brief the client refuses (outside the schema, or cut off, named by how it ran on when it
-    plainly did) and a kind the checks refuse are each told why, by the check's code, place and
-    sentence and never the reply's own words; a third refusal is
-    :attr:`KindDraftRefusalCode.NOT_DRAFTED`.
+    A brief the client refuses (outside the schema) and a kind the checks refuse are each told why,
+    by the check's code, place and sentence and never the reply's own words; a third refusal is
+    :attr:`KindDraftRefusalCode.NOT_DRAFTED`. A reply the token ceiling cut off ends the draft at
+    once as :attr:`KindDraftRefusalCode.RAN_ON`, with how it ran on when it plainly did: asked
+    again at the same ceiling it ran on again into the call's timeout (26 October, on real models:
+    95 s to the ceiling, then the repair's 150 s), so the person waited minutes to be told the
+    model was slow.
 
     ``trail``, when given, is the caller's own list each attempt is recorded in as it goes, so a
     measurement keeps the attempts made before a call that raises (a provider's timeout).
@@ -553,7 +558,20 @@ def draft_kind(
             outcome = "truncated" if cut.runaway is None else f"truncated:{cut.runaway}"
             attempts.append(outcome)
             trail.append({"outcome": outcome})
-            repair = prompt.repair_cut(cut.runaway)
+            return KindDraftOutcome(
+                document=None,
+                kind=None,
+                report=None,
+                refusal=KindDraftRefusal(
+                    KindDraftRefusalCode.RAN_ON,
+                    "The model's answer ran on past what a kind of place can hold, so it was not "
+                    "asked again at that length.",
+                ),
+                model_id=None,
+                calls=log.calls,
+                attempts=tuple(attempts),
+                trail=tuple(trail),
+            )
         except StructuredOutputError:
             attempts.append("form_refused")
             trail.append({"outcome": "form_refused"})
