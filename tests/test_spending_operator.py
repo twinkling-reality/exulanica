@@ -18,6 +18,8 @@ import pytest
 from exulanica.models.errors import TransportError
 from exulanica.models.spending import SpendingRefused, SpendingRequest, next_request_key
 from exulanica.models.usage import CallUsage, CostBasis
+from exulanica.references.boundary import SEARCH_ROLE
+from exulanica.references.catalogs import web_source
 from exulanica.spending import witness as witness_module
 from exulanica.spending.__main__ import main
 from exulanica.spending.operator import SpendingOperationRefused
@@ -104,7 +106,7 @@ def test_the_operator_command_issues_grants_reports_revokes_and_verifies(bench, 
     assert code == 0
     code, status = _command(bench, capsys, "status", "--workspace", workspace)
     assert code == 0
-    (entry,) = status["providers"]
+    (entry,) = [entry for entry in status["providers"] if entry["provider"] == PROVIDER]
     assert entry["grant"]["grant_id"] == granted["grant_id"]
     assert entry["available_usd"] == "0.10000000" and entry["available_calls"] == 10
     code, revoked = _command(
@@ -125,6 +127,63 @@ def test_the_operator_command_issues_grants_reports_revokes_and_verifies(bench, 
     assert (code, revoked) == (0, {"outcome": "revoked"})
     code, verified = _command(bench, capsys, "verify", "--authority", authority)
     assert (code, verified) == (0, {"verified": 3, "first_bad_sequence": None})
+
+
+def test_the_status_counts_a_workspace_s_web_searches_beside_its_model_spending(bench, capsys):
+    source = web_source()
+    assert source is not None
+    until = dt.datetime.now(dt.UTC) + dt.timedelta(days=7)
+    authority = bench.operator.issue(
+        provider=source.key,
+        ceiling_usd=Decimal("0.01"),
+        max_calls=50,
+        valid_until=until,
+        dispatch_seconds=60,
+        witnessed=True,
+        operator="ops",
+        reason="the installation's web searches",
+    )
+    workspace = uuid.uuid4()
+    bench.operator.grant(
+        authority,
+        workspace,
+        ceiling_usd=Decimal("0.01"),
+        max_calls=50,
+        valid_until=until - dt.timedelta(days=1),
+        operator="ops",
+        reason="a workspace that may search",
+    )
+    # One search admitted, sent and settled as the reference worker does: one call, at no cost.
+    gate = bench.durable().for_workspace(workspace)
+    ticket = gate.admit(
+        SpendingRequest(
+            provider=source.key,
+            model_id=source.key,
+            role=SEARCH_ROLE,
+            usd=Decimal(0),
+            key="reference:job:search:0",
+        )
+    )
+    gate.dispatch(ticket)
+    gate.settle(
+        ticket,
+        CallUsage(
+            role=SEARCH_ROLE,
+            model_id=source.key,
+            provider=source.key,
+            prompt_tokens=0,
+            completion_tokens=0,
+            reasoning_tokens=0,
+            cached_prompt_tokens=0,
+            usd=Decimal(0),
+        ),
+    )
+    code, status = _command(bench, capsys, "status", "--workspace", str(workspace))
+    assert code == 0
+    entries = {entry["provider"]: entry for entry in status["providers"]}
+    searched = entries[source.key]
+    assert (searched["committed_calls"], searched["available_calls"]) == (1, 49)
+    assert entries[PROVIDER]["grant"] == {"state": "none"}
 
 
 @pytest.mark.parametrize("label", ["someone@example.com", "Operator", "two words", ""])

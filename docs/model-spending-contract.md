@@ -374,6 +374,10 @@ asked again with `--authority-id`, which never issues a second authority. A step
 whose witness record could not then be confirmed answers done, with `"witness_confirmed": false`:
 the record stays unconfirmed at the ledger's own sequence, which the next step reads as having
 taken effect, so asking again would repeat the step.
+`status --workspace` states one entry for each provider that bills and for each provider an
+authority was issued for, such as the web source of the reference source catalog: its searches are
+admitted under the workspace's grant for its key and counted as calls (`committed_calls`), each at
+no cost.
 
 ## 11. What a client sees
 

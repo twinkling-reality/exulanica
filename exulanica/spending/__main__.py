@@ -31,6 +31,7 @@ from typing import Any
 
 from exulanica.db.session import Database
 from exulanica.env import env_get
+from exulanica.models.manifest import load_manifest
 from exulanica.spending.operator import SpendingOperationRefused, SpendingOperator
 from exulanica.spending.status import authority_states, workspace_status
 from exulanica.spending.witness import FileSpendingWitness, WitnessUnavailable
@@ -296,7 +297,15 @@ def _decided(
                 "authorities": authority_states(database),
                 "guest_policies": operator.guest_policies(),
             }
-        return workspace_status(database, arguments.workspace)
+        # Every provider an authority was issued for is named beside the providers that bill: a web
+        # source's searches are admitted under the workspace's grant for the source's key, as a
+        # model's attempts are under its provider's.
+        issued = (authority["provider"] for authority in authority_states(database))
+        return workspace_status(
+            database,
+            arguments.workspace,
+            providers={*load_manifest().billing_providers(), *issued},
+        )
     raise AssertionError(command)
 
 
