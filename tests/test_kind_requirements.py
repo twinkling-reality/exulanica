@@ -111,6 +111,22 @@ def test_partial_placeholder_and_missing_or_ambiguous_target_are_named_refusals(
         assert error.value.code == code
 
 
+def test_a_target_label_matches_whatever_its_case_and_a_refusal_names_the_label_and_its_fault():
+    """A real fishing village (26 October) was refused three times at requirements[0].part_labels
+    by one sentence for two faults, so no repair could say what to change."""
+    loose = farm(claim(labels=("  FarmHouse ",)))
+    assert compile_(loose, DESCRIPTION).document["requirements"][0]["parts"]
+    with pytest.raises(KindRefused) as error:
+        compile_(farm(claim(labels=("lighthouse",))), DESCRIPTION)
+    assert '"lighthouse" names no part' in error.value.detail
+    assert '"farmhouse"' in error.value.detail
+    ambiguous = farm()
+    structure(ambiguous)["rooms"][0]["label"] = "farmhouse"
+    with pytest.raises(KindRefused) as error:
+        compile_(ambiguous, DESCRIPTION)
+    assert '"farmhouse" names 2 parts' in error.value.detail
+
+
 @pytest.mark.parametrize(
     "constraint",
     [

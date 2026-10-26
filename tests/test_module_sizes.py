@@ -95,9 +95,10 @@ LIMITS: dict[str, tuple[int, str]] = {
         "the one chosen)",
     ),
     "exulanica/selection/kind_brief.py": (
-        1_532,
+        1_552,
         "a kind of world as a model drafts it, its look pattern written so a provider's grammar "
-        "compiler accepts it",
+        "compiler accepts it, and a requirement's target label matched whatever its case and "
+        "refused naming the label and its fault",
     ),
     "tools/previews/world-workspace/contextual-world.ts": (
         1_526,

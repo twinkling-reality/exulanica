@@ -529,18 +529,30 @@ def _span(raw: Mapping[str, int], module: int = 1) -> Any:
     return low if low == high else {"from": low, "to": high}
 
 
+#: The most part labels a refusal of a target label lists, so its sentence stays a line.
+LABELS_LISTED: Final = 12
+
+
+def _folded(label: str) -> str:
+    """A part label as a requirement's target names it: case and spacing folded."""
+    return " ".join(str(label).split()).casefold()
+
+
 def compile_requirements(
     requirements: Sequence[Mapping[str, Any]],
     parts: Sequence[Mapping[str, Any]],
     description: str,
 ) -> tuple[list[dict[str, Any]], tuple[tuple[int, int], ...]]:
-    """Resolve exact, unique part labels to identities and retain only source offsets."""
+    """Resolve unique part labels to identities and retain only source offsets. A label names a
+    part whatever its case and spacing; one that names no part, or several, is refused with the
+    label and which it is, so a repair can say what to change."""
     from exulanica.selection.world_drafting import verbatim_bounds
     from exulanica.world.kinds.document import KindRefused
 
     by_label: dict[str, list[str]] = defaultdict(list)
     for part in parts:
-        by_label[part["label"]].append(part["key"])
+        by_label[_folded(part["label"])].append(part["key"])
+    named = sorted({str(part["label"]) for part in parts})
     compiled, omitted = [], []
     for index, raw in enumerate(requirements):
         where = f"requirements[{index}]"
@@ -553,11 +565,19 @@ def compile_requirements(
             )
         targets = []
         for label in raw["part_labels"]:
-            found = by_label.get(label, [])
-            if len(found) != 1:
+            found = by_label.get(_folded(label), [])
+            if not found:
+                listed = ", ".join(f'"{one}"' for one in named[:LABELS_LISTED])
                 raise KindRefused(
                     "kind_requirement_unmet",
-                    "target label is missing or ambiguous",
+                    f'target label "{label}" names no part; the parts are labelled {listed}',
+                    f"{where}.part_labels",
+                )
+            if len(found) > 1:
+                raise KindRefused(
+                    "kind_requirement_unmet",
+                    f'target label "{label}" names {len(found)} parts; '
+                    "give each part its own label",
                     f"{where}.part_labels",
                 )
             targets.append(found[0])
