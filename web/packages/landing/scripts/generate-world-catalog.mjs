@@ -15,7 +15,9 @@ const worlds = manifest.worlds.filter(world => world.featured === true).map(worl
   if (world.showcase === true) {
     if (!/^[a-z][a-z0-9-]{0,63}$/.test(world.world ?? '') || !world.title || !world.sentence) throw new Error(`Missing showcase identity: ${world.id}`);
     if (!world.made?.main || !Array.isArray(world.made.people) || world.made.spend_usd === undefined) throw new Error(`Missing showcase provenance: ${world.id}`);
-    return Object.fromEntries(SHOWCASE_FIELDS.map(key => [key, world[key]]));
+    // The people's models stay in sources.json: product code names a model only through the models manifest.
+    const { people: _people, ...made } = world.made;
+    return Object.fromEntries(SHOWCASE_FIELDS.map(key => [key, key === 'made' ? made : world[key]]));
   }
   if (!world.style_pack || !world.saved_world_title || !world.style_title) throw new Error(`Missing capture metadata: ${world.id}`);
   return Object.fromEntries(CAPTURE_FIELDS.map(key => [key, world[key]]));

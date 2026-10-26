@@ -27,10 +27,6 @@ export const WORLD_CAPTURES: readonly (ShowcaseCapture | ConfigurationCapture)[]
       "main": "4a878448e",
       "draft_id": "7faa20c2-4813-51ef-ad07-c4834d634b0e",
       "tool": "town",
-      "people": [
-        "Qwen/Qwen3-235B-A22B-Instruct-2507",
-        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
-      ],
       "decisions": 25,
       "creature": "White horned grazer",
       "spend_usd": {
@@ -51,10 +47,6 @@ export const WORLD_CAPTURES: readonly (ShowcaseCapture | ConfigurationCapture)[]
       "main": "4a878448e",
       "draft_id": "d16b2a23-c4a0-5d37-b368-e178e48ec7eb",
       "tool": "place",
-      "people": [
-        "Qwen/Qwen3-235B-A22B-Instruct-2507",
-        "nvidia/nemotron-3-super-120b-a12b"
-      ],
       "decisions": 35,
       "creature": "Harbour napper",
       "spend_usd": {
@@ -75,10 +67,6 @@ export const WORLD_CAPTURES: readonly (ShowcaseCapture | ConfigurationCapture)[]
       "main": "4a878448e",
       "draft_id": "089859e9-f12f-5761-ac2b-a317e9ddc175",
       "tool": "place",
-      "people": [
-        "Qwen/Qwen3-235B-A22B-Instruct-2507",
-        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
-      ],
       "decisions": 30,
       "creature": "Sleepy stall wanderer",
       "spend_usd": {
@@ -99,10 +87,6 @@ export const WORLD_CAPTURES: readonly (ShowcaseCapture | ConfigurationCapture)[]
       "main": "4a878448e",
       "draft_id": "bf6a6d68-67b7-5b5d-8f07-23449f246b4a",
       "tool": "place",
-      "people": [
-        "Qwen/Qwen3-235B-A22B-Instruct-2507",
-        "nvidia/nemotron-3-super-120b-a12b"
-      ],
       "decisions": 38,
       "creature": "Shaggy herd guardian",
       "spend_usd": {
@@ -123,9 +107,6 @@ export const WORLD_CAPTURES: readonly (ShowcaseCapture | ConfigurationCapture)[]
       "main": "4a878448e",
       "draft_id": "6fa10c0e-95ce-5f95-8651-08b4878c71a4",
       "tool": "place",
-      "people": [
-        "nvidia/nemotron-3-super-120b-a12b"
-      ],
       "decisions": 30,
       "creature": "Crimson beaked seabird",
       "spend_usd": {
