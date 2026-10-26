@@ -883,7 +883,14 @@ bytes as tokens and its whole answer, so a report never passes what the attempt 
 never spent past its ceiling. Where the catalog names no envelope for the drafter, the basis is
 `full_context_ceiling`, each dispatch priced at a whole context window, and an attempt is reserved
 at an estimate that counts prompt characters at a fixed rate, which is no bound and which the price
-does not use. With no model client the price is null. `GET /things/creatures/drafts` lists the requester's own drafts, newest
+does not use. With no model client the price is null. Where a draft is offered, the offer's `notes`
+says whether this person may ask for web notes with it (`offered`, and `code`: a code of the
+references read, `references_not_permitted` without `references.request`, which a guest never holds,
+or `references_price_unavailable` where no current rate prices their model calls), the most searches
+one notes request sends (`searches_at_most`, the planner's limit for things) and the most its two
+model calls may add at current rates (`maximum_usd`, null where not offered), so a page says the
+whole most before anything is sent; where no draft is offered, `notes` is null.
+`GET /things/creatures/drafts` lists the requester's own drafts, newest
 first, so a reload finds one still running; a draft states when it was asked, when a worker first
 took it and when it ended.
 
@@ -904,7 +911,11 @@ exact notes-conditioned request returned a model response or matched a cached re
 means a dispatch may have reached the provider without a response, including a worker interrupted
 before recording its result. `not_used` means no eligible notes or known non-delivery. Used and
 unknown records name the bundle digest, note count and the consumed bases (`web_description`,
-`own_picture` or both), never note text. Picture-derived requests bypass response caching.
+`own_picture` or both), never note text. Every state also carries `searches` and `spent_usd`: how
+many searches the requester's own notes request sent and what its model calls spent, as its bundle
+records them, so a page counts the notes in the whole spend; both are null for a request that kept
+no bundle (one that failed, was stopped or is not finished) or that is not the requester's own.
+Picture-derived requests bypass response caching.
 The draft queue preserves this record across reclaim without changing the job's spending key.
 The body's and kind's existing origin ingredient lists bind the consumed bundle digest; the user
 words' digest remains separate, and no generation receipt is invented.

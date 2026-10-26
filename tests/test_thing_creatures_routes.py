@@ -23,7 +23,11 @@ worker played by the test, so each step is seen. What is shown:
     its own code;
 *   a made look of a kept creature is asked once, answered 202 and queued, and read by any member
     of the workspace; a kind the workspace does not keep, asked anywhere, is absent, and so is the
-    route to a caller without world.write and model.invoke.
+    route to a caller without world.write and model.invoke;
+*   the offer says whether web notes may be asked for with a draft, by the references read's code
+    or that this person may not, with the planner's limit and the most they add where offered; a
+    draft asked with notes says what its own requester's notes request searched and spent, and
+    nothing of another person's.
 """
 
 from __future__ import annotations
@@ -60,6 +64,7 @@ _OWNER = "creature-owner-token-long-enough-to-be-accepted"
 _OTHER = "creature-other-token-long-enough-to-be-accepted"
 _ELSEWHERE = "creature-elsewhere-token-long-enough-to-be-accepted"
 _READER = "creature-reader-token-long-enough-to-be-accepted"
+_NOTES = "creature-notes-token-long-enough-to-be-accepted"
 
 
 @pytest.fixture
@@ -76,6 +81,8 @@ def served(repository, spine_schema, tmp_path, monkeypatch):
         _OTHER: (workspace_id, every),
         _ELSEWHERE: (uuid.uuid4(), every),
         _READER: (workspace_id, ["world.read"]),
+        # One who may also ask for web notes.
+        _NOTES: (workspace_id, [*every, "references.request"]),
     }
     database = scratch_role_database(scratch, RUNTIME_ROLE)
     stores = local_content_stores(tmp_path / "data")
@@ -182,7 +189,13 @@ def test_reference_identity_is_opt_in_and_only_the_requester_reads_its_use(serve
         headers={"Authorization": f"Bearer {_OWNER}"},
     )
     assert asked.status_code == 202
-    assert asked.json()["references"] == {"reference_id": str(reference_id), "state": "pending"}
+    # The request's own figures for the page's spend: its one search and its model call's dollars.
+    assert asked.json()["references"] == {
+        "reference_id": str(reference_id),
+        "state": "pending",
+        "searches": 1,
+        "spent_usd": "0.00020000",
+    }
     path = f"/things/creatures/drafts/{asked.json()['draft_id']}"
     assert _get(client, path, _OTHER).status_code == 404
     assert _get(client, path, _ELSEWHERE).status_code == 404
@@ -462,3 +475,59 @@ def test_a_kept_creature_s_look_is_asked_once_and_read_by_any_member(served):
     assert refused.status_code == 404
     with database.session(workspace_id) as connection:
         assert connection.execute("select count(*) as n from creature_look").fetchone()["n"] == 1
+
+
+def test_the_offer_says_whether_web_notes_may_be_asked_for_and_what_they_add(served, monkeypatch):
+    from exulanica.api.routes import references
+
+    client, *_ = served
+    # The owner may draft but not ask for web notes: said by name, with the planner's limit.
+    assert _get(client, "/things/creatures/offered").json()["notes"] == {
+        "offered": False,
+        "code": "references_not_permitted",
+        "searches_at_most": 3,
+        "maximum_usd": None,
+    }
+    # One who may is told why not here by the references read's own code, and no figure.
+    notes = _get(client, "/things/creatures/offered", _NOTES).json()["notes"]
+    capability = _get(client, "/worlds/references", _NOTES).json()["capabilities"][0]
+    assert (notes["offered"], notes["code"], notes["maximum_usd"]) == (
+        False,
+        capability["code"],
+        None,
+    )
+    # Offered: the most their model calls add, as a dollar string the page reads.
+    monkeypatch.setattr(references, "unavailable_because", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(references, "notes_maximum_usd", lambda _client: "0.0213456")
+    notes = _get(client, "/things/creatures/offered", _NOTES).json()["notes"]
+    assert notes == {
+        "offered": True,
+        "code": None,
+        "searches_at_most": 3,
+        "maximum_usd": "0.02134560",
+    }
+    # No current rate prices them: not offered, by name.
+    monkeypatch.setattr(references, "notes_maximum_usd", lambda _client: None)
+    notes = _get(client, "/things/creatures/offered", _NOTES).json()["notes"]
+    assert (notes["offered"], notes["code"]) == (False, "references_price_unavailable")
+    # Where no draft is offered, nothing of notes either.
+    assert _get(client, "/things/creatures/offered", _ELSEWHERE).json()["notes"] is None
+
+
+def test_a_draft_says_nothing_of_another_person_s_notes_request(served):
+    from reference_fixtures import finished_reference
+
+    client, database, workspace_id, _stores = served
+    other = client.app.state.services.tokens.session_for(_OTHER).actor
+    with database.session(workspace_id) as connection:
+        reference_id = finished_reference(connection, workspace_id, actor=other, purpose="things")
+    asked = client.post(
+        "/things/creatures",
+        json={"words": "a gentle horse", "reference_id": str(reference_id)},
+        headers={"Authorization": f"Bearer {_OWNER}"},
+    )
+    assert asked.status_code == 202
+    assert (asked.json()["references"]["searches"], asked.json()["references"]["spent_usd"]) == (
+        None,
+        None,
+    )

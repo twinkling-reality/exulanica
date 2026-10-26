@@ -18,7 +18,12 @@ where no durable authority admits this process's calls and nothing is recorded t
 ``GET /things/creatures/offered`` says whether the workspace may ask, the model a draft asks first,
 the most one draft may be charged and to which account (``price``, from the route's bounds and the
 manifest's prices: :func:`exulanica.selection.creature_drafts.price_at_most`), how long a draft
-usually takes and every code a draft may end with.
+usually takes, every code a draft may end with and, where a draft is offered, the web notes it may
+be asked with (``notes``: whether this person may ask for them here, the most searches they send and
+the most their two model calls add, :func:`exulanica.api.routes.references.notes_offer`). A draft
+asked with notes says in ``references`` whether its drafter was handed them and, from its own
+requester's notes request, how many searches it sent and what its model calls spent, so a page
+counts them in the whole spend.
 
 The words are sent with every saved name replaced (:func:`exulanica.selection.world_drafting.
 sendable`) and are kept only in the draft's job until it ends; the draft keeps nothing of them.
@@ -44,16 +49,18 @@ import logging
 import uuid
 from typing import TYPE_CHECKING, Annotated, Any, Final
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
 from exulanica.api.dependencies import (
     CurrentSession,
+    HeldPermissions,
     ReadOnlyConnection,
     ScopedConnection,
     get_services,
 )
+from exulanica.api.routes.references import notes_figures, notes_offer
 from exulanica.api.services import Services
 from exulanica.models.manifest import Role, load_manifest
 from exulanica.selection import creature_drafts as drafts
@@ -172,6 +179,10 @@ def _view(
         if asked is not None:
             view["look_job"] = _look_view(asked)
     if draft.reference_id is not None:
+        # The notes request's own searches and spend, the requester's own only: the page's spend.
+        searches, spent = notes_figures(
+            connection, workspace_id, draft.owner_actor_id, draft.reference_id, purpose="things"
+        )
         view["references"] = {
             "reference_id": str(draft.reference_id),
             **(
@@ -179,14 +190,18 @@ def _view(
                 if draft.reference_usage is not None
                 else {"state": "not_attempted" if draft.finished else "pending"}
             ),
+            "searches": searches,
+            "spent_usd": spent,
         }
     return view
 
 
 @router.get("/creatures/offered")
 def creature_offer(
+    request: Request,
     connection: ReadOnlyConnection,
     session: CurrentSession,
+    held: HeldPermissions,
     services: Annotated[Services, Depends(get_services)],
 ) -> JSONResponse:
     """Whether this workspace may ask for a creature here, why not by code, how long a draft
@@ -231,6 +246,10 @@ def creature_offer(
                 "failed": list(drafts.FAILURE_CODES),
                 "cancelled": list(drafts.CANCELLATION_CODES),
             },
+            # Web notes a draft may be asked with here; none where no draft is offered.
+            "notes": None
+            if not offered
+            else notes_offer(request, services, session.workspace_id, held, purpose="things"),
         },
         headers=_HEADERS,
     )

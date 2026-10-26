@@ -330,6 +330,9 @@ never names two sets of notes; a start naming none keeps its terms and definitio
 Before a word is typed, the draft offer's `notes` says whether this person may ask for notes here
 (by the codes of section 8, or `references_not_permitted` without `references.request`), the
 planner's limit on searches, and the most the notes' two model calls may add at current rates.
+Make a creature asks the same way: the creature offer's `notes` states the same figures for
+purpose `things`, and a creature draft's `references` the same searches and spend
+([things](things-contract.md)).
 
 ## 10. Notes from a person's own pictures
 

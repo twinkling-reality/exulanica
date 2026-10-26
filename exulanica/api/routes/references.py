@@ -41,6 +41,7 @@ import json
 import logging
 import unicodedata
 import uuid
+from decimal import Decimal
 from typing import Annotated, Any, Final, Literal
 
 from fastapi import APIRouter, Depends, Path, Request
@@ -63,9 +64,12 @@ from exulanica.api.dependencies import (
     ScopedConnection,
     get_services,
 )
+from exulanica.api.permissions import Permission
 from exulanica.api.reference_pictures import picture_refusal
 from exulanica.api.services import Services
+from exulanica.api.world_draft_offer import notes_maximum_usd
 from exulanica.ingest.personal_admission import model_right_offers
+from exulanica.models.usage import usd_string
 from exulanica.references import store
 from exulanica.references.adapters import ReferenceSourceUnavailable
 from exulanica.references.boundary import MAX_QUERY_CHARACTERS, MAX_QUERY_WORDS
@@ -83,7 +87,13 @@ from exulanica.world.kept_web_pictures import (
     keep_held_picture,
 )
 
-__all__ = ["REFERENCE_UNAVAILABLE", "router"]
+__all__ = [
+    "NOTES_PRICE_UNAVAILABLE",
+    "REFERENCE_UNAVAILABLE",
+    "notes_figures",
+    "notes_offer",
+    "router",
+]
 
 router = APIRouter(prefix="/worlds", tags=["world"])
 _LOG = logging.getLogger(__name__)
@@ -95,6 +105,9 @@ REFERENCE_UNAVAILABLE: Final = (
     "references_not_run_here",
     "reference_budget_unavailable",
 )
+#: Web notes are offered and permitted, but no current rate prices their model calls, so no most
+#: can be said before anything is sent: they are not offered.
+NOTES_PRICE_UNAVAILABLE: Final = "references_price_unavailable"
 _LISTED: Final = 20
 #: Another requester's request answers exactly as one that does not exist, and as an id-addressed
 #: route answers a credential that may not reach it (exulanica/api/permissions.py).
@@ -190,6 +203,58 @@ def _granted(services: Services, workspace_id: uuid.UUID, provider: str) -> bool
 def _running(request: Request) -> bool:
     thread = getattr(request.app.state, "reference_thread", None)
     return thread is not None and thread.is_alive()
+
+
+def notes_offer(
+    request: Request,
+    services: Services,
+    workspace_id: uuid.UUID,
+    held: frozenset[Permission],
+    *,
+    purpose: str,
+) -> dict[str, Any]:
+    """Web notes a draft of ``purpose`` may be asked with here, as this person would meet them now.
+
+    ``offered`` where this workspace may ask for web notes here and this person may (a guest never
+    holds ``references.request``); else ``code`` names why, as the references read names it,
+    ``references_not_permitted``, or :data:`NOTES_PRICE_UNAVAILABLE` where no current rate prices
+    their model calls. ``searches_at_most`` is the planner's limit in the words a new request of
+    ``purpose`` is planned with; ``maximum_usd`` the most their two model calls may add at current
+    rates (:func:`exulanica.api.world_draft_offer.notes_maximum_usd`), null where not offered.
+    """
+    searches = prompts_for_request(purpose).subjects_maximum
+    if Permission.REFERENCES_REQUEST not in held:
+        code: str | None = "references_not_permitted"
+    else:
+        code = unavailable_because(services, workspace_id, running=_running(request), web=True)
+    most = None if code is not None else notes_maximum_usd(services.model_client)
+    if code is None and most is None:
+        code = NOTES_PRICE_UNAVAILABLE
+    return {
+        "offered": code is None,
+        "code": code,
+        "searches_at_most": searches,
+        "maximum_usd": None if most is None else usd_string(Decimal(most)),
+    }
+
+
+def notes_figures(
+    connection: Any,
+    workspace_id: uuid.UUID,
+    actor: uuid.UUID,
+    reference_id: uuid.UUID,
+    *,
+    purpose: str,
+) -> tuple[int | None, str | None]:
+    """How many searches ``actor``'s own notes request for a draft of ``purpose`` sent and what its
+    model calls spent, as its bundle records them; none for a request without a bundle, another
+    person's, or one made for another kind of draft, whose spend is not that draft's."""
+    found = store.read_request(connection, workspace_id, reference_id, owner_actor_id=actor)
+    if found is None or found.purpose != purpose or found.bundle is None:
+        return None, None
+    bundle = read_bundle(found.bundle)
+    spent = sum((Decimal(call.usd) for call in bundle.model_calls), Decimal(0))
+    return len(bundle.lookups), usd_string(spent)
 
 
 def _sweep(services: Services, workspace_id: uuid.UUID) -> None:
