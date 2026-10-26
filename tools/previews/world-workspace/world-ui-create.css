@@ -18,6 +18,8 @@
   --l-rim: linear-gradient(110deg, rgb(100 150 166 / 36%), rgb(255 255 255 / 50%) 57%, rgb(27 48 52 / 20%));
   position: absolute; inset: 0; overflow: hidden; isolation: isolate; background: #ffffff; color: var(--l-ink); font-family: var(--font-sans);
   text-shadow: none; pointer-events: auto;
+  /* On the light pages' frame (world-page-frame.css), whose scrolling column's track takes the page's quiet ink. */
+  --hr-quiet: var(--l-muted);
 }
 .wu-light :focus-visible { outline: 1px solid var(--l-focus); outline-offset: 2px; }
 /* The page's own container takes focus when the making page shows, for its keys and status: no ring round the
@@ -38,19 +40,39 @@
 /* The wordmark, as the front door's .ux-entry-brand. */
 .wu-light-wordmark { position: absolute; left: calc(58 * var(--u)); top: calc(34 * var(--u)); margin: 0; font: 400 calc(28 * var(--u))/1.4 var(--font-sans); letter-spacing: -.035em; color: var(--l-ink); }
 
-/* The stepped surface: front-door.css's .ux-entry-hero::before, unchanged, at frame 20's and 21's sizes. */
-.wu-light-surface { position: absolute; z-index: -1; left: calc(64 * var(--u)); top: calc(150 * var(--u)); width: calc(930 * var(--u)); height: calc(470 * var(--u)); pointer-events: none;
+/* The stepped surface: front-door.css's .ux-entry-hero::before, unchanged, at frame 20's and 21's sizes, 46u above and
+   left of the head in the column, so it scrolls with the parts it holds. */
+.wu-light-surface { position: absolute; z-index: -1; left: 0; top: calc(var(--light-top) - 46 * var(--u)); width: calc(930 * var(--u)); height: calc(470 * var(--u)); pointer-events: none;
   background: radial-gradient(ellipse at 12% 75%, rgb(125 166 179 / 38%), transparent 80%), linear-gradient(105deg, rgb(168 203 210 / 64%), rgb(232 240 237 / 14%) 94%);
   -webkit-mask: var(--nav-shape) center / 100% 100% no-repeat; mask: var(--nav-shape) center / 100% 100% no-repeat; }
 .wu-light[data-form="creating"] .wu-light-surface { width: calc(1060 * var(--u)); height: calc(300 * var(--u)); }
 
-/* Where the parts sit on the page. */
-.wu-light-head { position: absolute; left: calc(110 * var(--u)); top: calc(196 * var(--u)); width: calc(840 * var(--u)); }
-.wu-light[data-form="creating"] .wu-light-head { top: calc(192 * var(--u)); width: calc(980 * var(--u)); }
-.wu-light-lower { position: absolute; left: calc(110 * var(--u)); right: calc(40 * var(--u)); bottom: calc(118 * var(--u)); }
-.wu-light[data-form="creating"] .wu-light-lower { top: calc(520 * var(--u)); bottom: auto; right: auto; width: calc(720 * var(--u)); }
-.wu-light-quiet { position: absolute; left: calc(100 * var(--u)); bottom: calc(34 * var(--u)); }
-.wu-light-keys { position: absolute; right: calc(100 * var(--u)); bottom: calc(34 * var(--u)); display: flex; align-items: center; gap: calc(26 * var(--u)); }
+/* Where the parts sit: one column in reading order in the frame's body (the field, the price line, the notes box, any
+   refusal, then "Or start from" and the cards, which move down as lines come; frame 21's quote, then its steps),
+   scrolling where it is longer than the window. A tall window keeps frame 20's cards at its foot. The column reaches
+   46u left of the frame's side for the stepped surface; its first line stands lower on a tall window. */
+.wu-light-column { grid-area: 2 / 1; z-index: 0; margin-left: calc(-46 * var(--u)); }
+.wu-light-body { position: relative; flex: 1 1 auto; overflow-x: hidden; display: flex; flex-direction: column; align-items: flex-start;
+  --light-top: calc(196 * var(--u)); padding-top: var(--light-top); padding-left: calc(46 * var(--u)); padding-bottom: calc(40 * var(--u)); }
+.wu-light[data-form="creating"] .wu-light-body { --light-top: calc(192 * var(--u)); }
+.wu-light-head { position: relative; flex: none; width: min(calc(840 * var(--u)), 100%); }
+.wu-light[data-form="creating"] .wu-light-head { width: min(calc(980 * var(--u)), 100%); }
+.wu-light-lower { flex: none; align-self: stretch; margin-top: auto; }
+.wu-light[data-form="creating"] .wu-light-lower, .wu-light[data-sentence="true"] .wu-light-lower { margin-top: 0; }
+.wu-light[data-form="creating"] .wu-light-lower { align-self: flex-start; width: min(calc(720 * var(--u)), 100%); }
+/* The key row is the frame's own row under the body: the quiet command at its start, the keys at its end. */
+.wu-light-quiet { grid-area: 3 / 1; align-self: center; justify-self: start; }
+.wu-light-keys { grid-area: 3 / 1; align-self: center; justify-self: end; }
+@media (max-height: 899px) {
+  .wu-light-body, .wu-light[data-form="creating"] .wu-light-body { --light-top: calc(150 * var(--u)); }
+  /* Where the column can scroll, it ends just past the stepped surface, so its track stands beside the surface and
+     never over the world; the cards' strip scrolls sideways in it with its own fades. */
+  .wu-light[data-form="create"] .wu-light-column { justify-self: start; width: min(calc(930 * var(--u) + 16px), 100%); }
+  .wu-light[data-form="creating"] .wu-light-column { justify-self: start; width: min(calc(1060 * var(--u) + 16px), 100%); }
+}
+@media (max-height: 699px) {
+  .wu-light-body, .wu-light[data-form="creating"] .wu-light-body { --light-top: calc(110 * var(--u)); padding-bottom: calc(24 * var(--u)); }
+}
 
 .wu-light-title { margin: 0; font: 200 calc(60 * var(--u))/1.1 var(--font-sans); letter-spacing: -.025em; color: var(--l-ink); }
 .wu-light-title:focus { outline: none; }
@@ -69,7 +91,6 @@
 /* The no-model and budget sentence in place of the field and orb (N7, N24): the surface is 930u by
    300u and the cards stand 48u under it, with no "Or start from" (the sentence ends "these:"). */
 .wu-light[data-sentence="true"] .wu-light-surface { height: calc(300 * var(--u)); }
-.wu-light[data-sentence="true"] .wu-light-lower { top: calc(498 * var(--u)); bottom: auto; }
 /* The bottom veil rises with the cards, so their captions stay on white as on frame 20. */
 .wu-light[data-sentence="true"] .wu-light-veil {
   background: linear-gradient(90deg, rgba(255, 255, 255, .94) 0%, rgba(255, 255, 255, .86) 38%, rgba(255, 255, 255, .40) 60%, rgba(255, 255, 255, 0) 78%),

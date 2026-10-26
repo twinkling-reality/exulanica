@@ -18,18 +18,26 @@ body.ux-review #shell .ux-world-entry .ux-entry-integrations { vertical-align: t
 .wu-light[data-form="integrations"] .wu-light-surface { display: none; }
 .wu-light[data-form="integrations"] .wu-light-wordmark { top: calc(40 * var(--u)); font-size: calc(26 * var(--u)); letter-spacing: -.01em; }
 
+/* Two columns in the page's body (world-ui-create.css's frame), side by side and never past the window's sides: they
+   share the width between them, the left up to 600u and the right up to 900u, and scroll together under the head's
+   top where they are taller than the window. */
+.wu-light[data-form="integrations"] .wu-light-body { --light-top: calc(150 * var(--u));
+  display: grid; grid-template-columns: minmax(0, calc(600 * var(--u))) minmax(0, calc(900 * var(--u))); column-gap: var(--frame-gap);
+  align-items: start; align-content: start; justify-content: start; }
+@media (max-height: 699px) { .wu-light[data-form="integrations"] .wu-light-body { --light-top: calc(110 * var(--u)); } }
+
 /* Left: the over-label, the title and what the page is. */
-.wu-light[data-form="integrations"] .wu-light-head { left: calc(120 * var(--u)); top: calc(150 * var(--u)); width: calc(600 * var(--u)); }
+.wu-light[data-form="integrations"] .wu-light-head { width: auto; }
 .wu-int-over { margin: 0; font: 400 max(12px, calc(14 * var(--u)))/1 var(--font-mono); letter-spacing: .02em; color: var(--l-muted); }
 .wu-light[data-form="integrations"] .wu-light-title { margin-top: calc(16 * var(--u)); font-size: calc(64 * var(--u)); line-height: 1.05; text-wrap: balance; }
 .wu-int-sub { margin: calc(22 * var(--u)) 0 0; font: 400 calc(19 * var(--u))/1.45 var(--font-sans); color: var(--l-sub); text-wrap: pretty; }
 .wu-int-small { margin: calc(18 * var(--u)) 0 0; font: 400 max(12px, calc(14 * var(--u)))/1.5 var(--font-sans); color: var(--l-muted); text-wrap: pretty; }
 
 /* Right: the groups and their rows. */
-.wu-light[data-form="integrations"] .wu-light-lower { left: calc(860 * var(--u)); top: calc(150 * var(--u)); bottom: auto; right: auto; width: calc(900 * var(--u)); }
+.wu-light[data-form="integrations"] .wu-light-lower { min-width: 0; margin-top: 0; }
 .wu-int-group { margin-bottom: calc(30 * var(--u)); }
 .wu-int-label { margin: 0 0 calc(10 * var(--u)) calc(18 * var(--u)); font: 400 max(12px, calc(13 * var(--u)))/1 var(--font-mono); letter-spacing: .02em; color: var(--l-muted); }
-.wu-int-row { position: relative; display: grid; grid-template-columns: calc(34 * var(--u)) 1fr auto; column-gap: calc(16 * var(--u)); align-items: start;
+.wu-int-row { position: relative; display: grid; grid-template-columns: calc(34 * var(--u)) minmax(0, 1fr) auto; column-gap: calc(16 * var(--u)); align-items: start;
   padding: calc(16 * var(--u)) calc(18 * var(--u)); border: 1.5px solid transparent; border-bottom: 1px solid rgba(18, 23, 21, .10); cursor: pointer; }
 .wu-int-row:last-child { border-bottom-color: transparent; }
 .wu-int-row[data-focus="true"] { border: 1.5px solid #6496a6; border-radius: calc(12 * var(--u)); background: rgba(255, 255, 255, .72);
@@ -50,8 +58,7 @@ body.ux-review #shell .ux-world-entry .ux-entry-integrations { vertical-align: t
 .wu-int-open dd { margin: 0; font: 400 max(12px, calc(15 * var(--u)))/1.5 var(--font-sans); color: var(--l-ink); text-wrap: pretty; }
 .wu-int-faint { grid-column: 2 / 4; margin: calc(12 * var(--u)) 0 0; font: 400 max(12px, calc(14 * var(--u)))/1.45 var(--font-sans); color: var(--l-faint); }
 
-/* The key row at the bottom right, Esc among its keys; Enter's key is the link to the focused row's guide. */
-.wu-light[data-form="integrations"] .wu-light-keys { bottom: calc(40 * var(--u)); gap: calc(30 * var(--u)); }
+/* The key row (the frame's), Esc among its keys; Enter's key is the link to the focused row's guide. */
 .wu-int-guide { color: inherit; text-decoration: none; }
 
 @media (forced-colors: active) {

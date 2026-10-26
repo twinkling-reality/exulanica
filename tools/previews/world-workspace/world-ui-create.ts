@@ -5,6 +5,7 @@
 // world-ui-create.css, from world-ui.css's tokens and front-door.css's materials.
 import { breath, orb, workingWords, type Step } from './world-ui.ts';
 import { CREATE_WORDS, NOTES_WORDS, aspectLabel, countWords } from './create-words.mjs';
+import { scrollingColumn } from './world-page-frame.ts';
 import './front-door.css';
 import './world-ui-create.css';
 
@@ -52,7 +53,7 @@ export interface LightPage {
  * dialog named by `labelledBy` (the caller's title).
  */
 export function lightPage({ form = 'create', picture = null, labelledBy }: { readonly form?: LightForm; readonly picture?: string | null; readonly labelledBy?: string } = {}): LightPage {
-  const root = element('section', 'wu-light ux-noveuis');
+  const root = element('section', 'wu-light wu-frame ux-noveuis');
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
   if (labelledBy) root.setAttribute('aria-labelledby', labelledBy);
@@ -61,8 +62,16 @@ export function lightPage({ form = 'create', picture = null, labelledBy }: { rea
   for (const quietPart of [world, veil, surface]) quietPart.setAttribute('aria-hidden', 'true');
   const wordmark = element('p', 'wu-light-wordmark', CREATE_WORDS.wordmark);
   const head = element('div', 'wu-light-head'), lower = element('div', 'wu-light-lower');
-  const quiet = element('div', 'wu-light-quiet'), keys = element('div', 'wu-light-keys');
-  root.append(world, veil, surface, wordmark, head, lower, keys, quiet);
+  const quiet = element('div', 'wu-light-quiet'), keys = element('div', 'wu-light-keys wu-frame-keys');
+  // The light pages' frame (world-page-frame.css): the parts flow in one column, the stepped surface behind the head
+  // with them, which fills the window down to the key row and scrolls with its fades and track where it is longer.
+  const body = element('div', 'wu-light-body');
+  body.append(surface, head, lower);
+  const column = scrollingColumn(body);
+  column.column.classList.add('wu-light-column');
+  const measure = new ResizeObserver(() => column.update());
+  for (const part of [body, head, lower]) measure.observe(part);
+  root.append(world, veil, wordmark, column.column, keys, quiet);
   const page: LightPage = {
     root, head, lower, quiet, keys, surface,
     form(next) { root.dataset.form = next; },

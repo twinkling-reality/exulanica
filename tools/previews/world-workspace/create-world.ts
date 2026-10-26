@@ -54,6 +54,8 @@ const EDGE_SHARE = 0.912;
 const STEPS_BELOW_SURFACE = 70;
 /** The least room between frame 20's surface and the cards, in u. */
 const CARDS_CLEARANCE = 24;
+/** The cards under the no-model and budget sentence's surface (N7, N24), in u. */
+const SENTENCE_CARDS_BELOW = 48;
 /** The quote's most lines at 44u, then at 28u (N24). */
 const QUOTE_LINES = [3, 5] as const;
 
@@ -247,41 +249,37 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
 
   /**
    * The stepped surface holds every line in the head (N24): from its own height, it grows so its
-   * lower edge stays `SURFACE_BELOW` under the last line, and never reaches what is under it. On
-   * frame 20 its curved edge, which rises where the lines start, also stays `EDGE_BELOW_PX` under
-   * the last line; with no field, the cards under the surface move down with it.
+   * lower edge stays `SURFACE_BELOW` under the last line. On frame 20 its curved edge, which rises
+   * where the lines start, also stays `EDGE_BELOW_PX` under the last line. What is under the head
+   * flows after it in the page's one column (the short-window ruling) and stands clear of the
+   * surface: the cards `CARDS_CLEARANCE` under it (`SENTENCE_CARDS_BELOW` under the sentence's),
+   * frame 21's steps `STEPS_BELOW_SURFACE`; a tall window keeps frame 20's cards at its foot.
    */
   const fit = (): void => {
     page.surface.style.removeProperty('height');
-    page.lower.style.removeProperty('top');
+    page.lower.style.removeProperty('margin-top');
     const unit = page.root.getBoundingClientRect().width / 1920 || 1;
     const top = page.surface.offsetTop, drawn = page.surface.offsetHeight;
     const last = page.head.lastElementChild as HTMLElement | null;
     if (!last || drawn === 0) return;
     const bottom = page.head.offsetTop + last.offsetTop + last.offsetHeight;
-    if (form === 'creating') {
-      // Frame 21: the surface grows with the quote, and the steps move down with it.
-      const wanted = bottom + SURFACE_BELOW * unit - top;
-      if (wanted > drawn) {
-        page.surface.style.height = `${wanted}px`;
-        page.lower.style.top = `${top + wanted + STEPS_BELOW_SURFACE * unit}px`;
-      }
-      return;
+    const wanted = form === 'creating'
+      ? bottom + SURFACE_BELOW * unit - top
+      : Math.max(bottom - top + SURFACE_BELOW * unit, (bottom - top + EDGE_BELOW_PX) / EDGE_SHARE);
+    const height = Math.max(drawn, wanted);
+    if (height > drawn) page.surface.style.height = `${height}px`;
+    const gap = (form === 'creating' ? STEPS_BELOW_SURFACE : page.root.dataset.sentence === 'true' ? SENTENCE_CARDS_BELOW : CARDS_CLEARANCE) * unit;
+    const least = top + height + gap;
+    if (page.lower.offsetTop < least) {
+      const margin = Number.parseFloat(getComputedStyle(page.lower).marginTop) || 0;
+      page.lower.style.marginTop = `${least - (page.lower.offsetTop - margin)}px`;
     }
-    const wanted = Math.max(bottom - top + SURFACE_BELOW * unit, (bottom - top + EDGE_BELOW_PX) / EDGE_SHARE);
-    if (wanted <= drawn) return;
-    if (page.root.dataset.sentence === 'true') {
-      const below = page.lower.offsetTop - top - drawn;
-      page.surface.style.height = `${wanted}px`;
-      page.lower.style.top = `${top + wanted + below}px`;
-      return;
-    }
-    const ceiling = page.lower.offsetTop - top - CARDS_CLEARANCE * unit;
-    page.surface.style.height = `${Math.min(wanted, ceiling)}px`;
   };
-  // The head's sizes are in u and its type may arrive after it is drawn: whenever it changes size, fit again.
+  // The head's sizes are in u and its type may arrive after it is drawn, and the window's height moves what is under
+  // it: whenever either changes size, fit again.
   const refit = new ResizeObserver(() => fit());
   refit.observe(page.head);
+  if (page.lower.parentElement) refit.observe(page.lower.parentElement);
   signal.addEventListener('abort', () => refit.disconnect());
 
   const drawCards = (): void => {
