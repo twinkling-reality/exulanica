@@ -4,28 +4,28 @@
  "worlds": [
   {
    "key": "fishing-village",
-   "version": 1,
-   "sha256": "157471c823fa0b9f06ab717ad1ea36ae5a713ff097425ef2d2282e34ed296311"
+   "version": 2,
+   "sha256": "d2e7a451b07c90c81d636d312e2e7bfe168695ab4f1262b3adebb391f9a77f55"
   },
   {
    "key": "lighthouse-island",
-   "version": 1,
-   "sha256": "364fd033baf98caabf5c60eb9895b4773c623047cdb92ca7ddaef88cda891f6e"
+   "version": 2,
+   "sha256": "2a4deca1e53e32e5e692a7a0cf241d66ceda4197c96b85f64f44b50ab7e02529"
   },
   {
    "key": "mountain-town",
-   "version": 1,
-   "sha256": "8a21e261cf1997d14885f7f5c28ffeb23ab9dc5c13cf6cd07f17aecba692a644"
+   "version": 2,
+   "sha256": "5a011fa3693cc401c4008f711f02f9816ed222196a088d884d82426a7f8cdcec"
   },
   {
    "key": "night-market",
-   "version": 1,
-   "sha256": "d4c57664b91208ee158c448c0893ef8ba32d1972759b5b233897fdf9302b96e7"
+   "version": 2,
+   "sha256": "428c9c426a40cc9f0124da92d42f3a8daa34448e151b6fa740d7da9d4118f4d3"
   },
   {
    "key": "windmill-village",
-   "version": 1,
-   "sha256": "fc4ec5f028b95e035906f3d94cdb53c879c9299f1d8ced2021e5eefc755c781a"
+   "version": 2,
+   "sha256": "aaee9d1853d3f4c115352b1e3753e8641de9149c2921074d34c6ff8b566da0f7"
   }
  ]
 }

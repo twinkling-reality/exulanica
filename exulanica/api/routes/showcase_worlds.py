@@ -31,6 +31,7 @@ from exulanica.api.dependencies import (
     get_services,
     holds_as_guest,
 )
+from exulanica.api.routes.society_control import host_base_tick_interval_ms
 from exulanica.api.routes.world_entries import SavedWorldEntryView, _view
 from exulanica.api.sayable import sayable
 from exulanica.api.services import Services
@@ -115,6 +116,8 @@ def open_showcase_world(
             Session(workspace_id=session.workspace_id, actor=session.actor),
             entry.entry_id,
             world,
+            # A visitor's copy opens playing, at the host's tick, as a made town does.
+            playing_tick_ms=host_base_tick_interval_ms(request),
         )
         if made
         else []

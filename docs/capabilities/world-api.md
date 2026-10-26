@@ -82,7 +82,13 @@ kind document and values), the land, the look and setting, the made world's iden
 digest, the society's engine, and the cast: the people given an open model, by their place in the
 society. `POST /worlds/showcase/{showcase}` makes that world in the caller's own workspace under its
 identity, so a copy is the same streets, buildings, land and look, then makes its society on the
-document's engine and records each cast member's model as the owner's choice. It answers 201 with
+document's engine, records each cast member's model as the owner's choice and sets it playing at
+the host's tick, so its people walk from the first frame (the routine alone: models are asked only
+under a run's bound, and from then on the copy keeps whatever its visitor chooses). A document may
+also name the world's card paintings, kept for the copy right after it is made and again on a later
+ask when one is missing, so a copy without one is only ever a missing card picture; they are
+deleted with the copy's world. Each document's painting bytes and look's setting are checked when
+the catalog loads, so a host never offers a copy it could not draw. It answers 201 with
 `{"entry", "made": true, "incomplete"}`, where `incomplete` names any step of that dressing that
 did not happen, or 200 with the copy the workspace already holds, as its owner left it. A key the
 installation does not serve answers 404 `unknown_showcase_world` to everyone. The copy is held to

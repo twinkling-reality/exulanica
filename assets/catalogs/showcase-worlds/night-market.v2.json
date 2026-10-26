@@ -59,13 +59,52 @@
   ],
   "tool": "place"
  },
+ "paintings": [
+  {
+   "camera": "{\"camera_to_world_column_major\":[1,0,0,0,0,0.857493,-0.514496,0,0,0.514496,0.857493,0,10.373184,24.537001,16.225363,1],\"fov_deg\":70,\"height\":480,\"pitch\":-0.540419,\"position_m\":[10.3732,24.537,16.2254],\"width\":832,\"yaw\":0.0}",
+   "cost_microusd": 7181,
+   "height": 480,
+   "held_permille": 613,
+   "media_type": "image/jpeg",
+   "painter": {
+    "control": "depth without trees, one range over the orbit",
+    "control_scale_milli": 950,
+    "guidance_milli": 4000,
+    "machine": "NVIDIA RTX PRO 6000 Blackwell Server Edition, Nebius AI Cloud",
+    "models": [
+     {
+      "licence": "apache-2.0",
+      "repository": "Tongyi-MAI/Z-Image",
+      "revision": "04cc4abb7c50"
+     },
+     {
+      "licence": "apache-2.0",
+      "repository": "alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1",
+      "revision": "755999a93490"
+     }
+    ],
+    "steps": 25
+   },
+   "recipe": "z-image-orbit-still/v1",
+   "run_id": "graphics-s1",
+   "sha256": "248d689afdc2065e97ed352a9bbb1fcc51bc2df801be581bb77c085e4693940c",
+   "view": "orbit",
+   "width": 832,
+   "words": {
+    "negative": "text, letters, words, signs, logo, watermark, signature, people, crowds, blurry, low quality, flicker, distortion, static frame",
+    "prompt": "aerial photograph of a rainy night market in the city, rows of market stalls under colourful awnings and glowing paper lanterns, wet streets reflecting warm and neon light, city buildings with lit windows around, light rain, realistic, cinematic, sharp detail",
+    "seed": 7,
+    "sentence": "a rainy night market in the city"
+   }
+  }
+ ],
  "profile": "exulanica.showcase-world/v1",
  "sentence": "a rainy night market in the city",
  "society": {
   "engine": "exulanica-society/v7"
  },
  "title": "Night market",
- "version": 1,
+ "version": 2,
  "world": {
   "kind": {
    "generator": {

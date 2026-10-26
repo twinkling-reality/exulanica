@@ -19,7 +19,114 @@
  "look": {
   "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
   "pack_id": "exulanica.cozy-town",
-  "setting": null,
+  "setting": {
+   "edge": {
+    "ground": [
+     226,
+     232,
+     242
+    ]
+   },
+   "light": {
+    "changes": {},
+    "from": "day"
+   },
+   "origin": "authored",
+   "parts": [
+    {
+     "axis": "ground",
+     "key": "snowfield"
+    },
+    {
+     "axis": "cover",
+     "key": "snow"
+    }
+   ],
+   "profile": "exulanica.world-setting/v1",
+   "provenance": {
+    "kind": "authored"
+   },
+   "surfaces": {
+    "ground.default": {
+     "srgb8": [
+      238,
+      242,
+      248
+     ]
+    },
+    "ground.tree_pit_soil": {
+     "srgb8": [
+      238,
+      242,
+      248
+     ]
+    },
+    "path.footway_paving": {
+     "srgb8": [
+      217,
+      229,
+      243
+     ]
+    },
+    "road.carriageway_asphalt": {
+     "srgb8": [
+      192,
+      200,
+      214
+     ]
+    },
+    "roof.default": {
+     "srgb8": [
+      240,
+      244,
+      250
+     ]
+    }
+   },
+   "swatches": {},
+   "up": {
+    "wall.awning_canvas": [
+     240,
+     244,
+     250
+    ],
+    "wall.brick_running_bond": [
+     240,
+     244,
+     250
+    ],
+    "wall.cast_concrete": [
+     240,
+     244,
+     250
+    ],
+    "wall.default": [
+     240,
+     244,
+     250
+    ],
+    "wall.limestone_ashlar": [
+     240,
+     244,
+     250
+    ],
+    "wall.painted_render": [
+     240,
+     244,
+     250
+    ],
+    "wall.painted_timber": [
+     240,
+     244,
+     250
+    ],
+    "wall.storefront_metal": [
+     240,
+     244,
+     250
+    ]
+   }
+  },
   "version": 3
  },
  "made": {
@@ -59,13 +166,52 @@
   ],
   "tool": "town"
  },
+ "paintings": [
+  {
+   "camera": "{\"camera_to_world_column_major\":[-0.5,0,0.866025,0,0.445566,0.857493,0.257248,0,-0.742611,0.514496,-0.428746,0,24.385365,84.247375,-119.124588,1],\"fov_deg\":70,\"height\":480,\"pitch\":-0.540419,\"position_m\":[24.3854,84.2474,-119.1246],\"width\":832,\"yaw\":-2.094395}",
+   "cost_microusd": 7181,
+   "height": 480,
+   "held_permille": 607,
+   "media_type": "image/jpeg",
+   "painter": {
+    "control": "depth without trees, one range over the orbit",
+    "control_scale_milli": 950,
+    "guidance_milli": 4000,
+    "machine": "NVIDIA RTX PRO 6000 Blackwell Server Edition, Nebius AI Cloud",
+    "models": [
+     {
+      "licence": "apache-2.0",
+      "repository": "Tongyi-MAI/Z-Image",
+      "revision": "04cc4abb7c50"
+     },
+     {
+      "licence": "apache-2.0",
+      "repository": "alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1",
+      "revision": "755999a93490"
+     }
+    ],
+    "steps": 25
+   },
+   "recipe": "z-image-orbit-still/v1",
+   "run_id": "graphics-s1",
+   "sha256": "91a3c555f323216b2dc6ab521ad157396e56fb1b1433af879369496a768a188b",
+   "view": "orbit",
+   "width": 832,
+   "words": {
+    "negative": "text, letters, words, signs, logo, watermark, signature, people, crowds, blurry, low quality, flicker, distortion, static frame",
+    "prompt": "aerial photograph of a snowy mountain town with a bakery, stone and dark timber houses with thick snow on steep roofs, warm light in the windows, a little square with a bakery, snowy pines and high peaks around, crisp winter light, realistic, cinematic, sharp detail",
+    "seed": 7,
+    "sentence": "a snowy mountain town with a bakery"
+   }
+  }
+ ],
  "profile": "exulanica.showcase-world/v1",
  "sentence": "a snowy mountain town with a bakery",
  "society": {
   "engine": "exulanica-society/v7"
  },
  "title": "A snowy mountain town with a bakery",
- "version": 1,
+ "version": 2,
  "world": {
   "kind": null,
   "land": {

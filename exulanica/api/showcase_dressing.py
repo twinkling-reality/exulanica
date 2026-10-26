@@ -9,12 +9,19 @@ its actor:
     (:func:`~exulanica.api.society_making.make_society`), and opened awake;
 2.  each member of the cast given its open model, recorded as the world owner's choice for the
     person at that place in the society (``ordinal``), so the copy's own allowance pays for what
-    those minds decide and the routine decides once it is spent.
+    those minds decide and the routine decides once it is spent;
+3.  where its caller asks (a visitor's copy, at the host's tick), the society set playing, so the
+    copy's people walk and its clock runs from its first frame as a made town's do. Playing runs the
+    routine alone (:meth:`~exulanica.world.society_control_repository.SocietyControlRepository.
+    configure`, never a guest's session): its models are asked only under a run's bound. A host with
+    no place for it now shows its waiting line, never a silent pause, and from then on the copy
+    keeps what its visitor chooses.
 
 It runs only for a copy just made: a copy the workspace already holds is the visitor's own, with
 whatever they chose since, and is never dressed again. What did not happen is answered as
 ``incomplete`` steps, never raised, so the world stands with what was laid: ``{"step":
-"society", "code": ...}`` by the code the society routes answer with, and ``{"step": "cast",
+"society", "code": ...}`` and ``{"step": "playing", "code": ...}`` by the code the society routes
+answer with, and ``{"step": "cast",
 "code": ..., "ordinal": n}`` for a person the society does not hold (``person_not_in_this_world``)
 or a choice refused by its own code.
 
@@ -60,10 +67,17 @@ INSTALLATION_ACTOR: Final = uuid.uuid5(uuid.NAMESPACE_URL, "exulanica:installati
 
 
 def dress_showcase(
-    hooks: SocietyHooks, connection: Any, session: Any, entry_id: uuid.UUID, world: ShowcaseWorld
+    hooks: SocietyHooks,
+    connection: Any,
+    session: Any,
+    entry_id: uuid.UUID,
+    world: ShowcaseWorld,
+    *,
+    playing_tick_ms: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Make the copy's society on ``world.engine`` and record the cast's models; answer what did
-    not happen, an empty list when everything was done. ``connection`` is the workspace's, idle."""
+    """Make the copy's society on ``world.engine``, record the cast's models and, given the host's
+    tick (``playing_tick_ms``), set it playing; answer what did not happen, an empty list when
+    everything was done. ``connection`` is the workspace's, idle."""
     entry = SavedWorldEntryRepository(connection, session.workspace_id, hooks.services.store).entry(
         entry_id
     )
@@ -118,7 +132,50 @@ def dress_showcase(
             )
         except ModelChoiceRefused as exc:
             problems.append({"step": "cast", "code": exc.code, "ordinal": member.ordinal})
+    if playing_tick_ms is not None:
+        problems.extend(_play(hooks, connection, session, entry, playing_tick_ms))
     return problems
+
+
+def _play(
+    hooks: SocietyHooks, connection: Any, session: Any, entry: Any, tick_ms: int
+) -> list[dict[str, Any]]:
+    """Set the copy's society playing at ``tick_ms``, the routine alone, as the control route sets
+    one for anyone but a guest; answer the step's refusal, or nothing."""
+    from exulanica.selection.validation import Session
+    from exulanica.world.society_control_repository import SocietyControlRepository
+
+    def acting(actor: uuid.UUID) -> Session:
+        return Session(workspace_id=session.workspace_id, actor=actor)
+
+    authorize, refresh = hooks.input_authorizer, hooks.authored_edit
+    controls = SocietyControlRepository(
+        connection,
+        session.workspace_id,
+        world_id=entry.world_id,
+        base_tick_interval_ms=tick_ms,
+        input_authorizer=None
+        if authorize is None
+        else lambda actor, document: authorize(connection, acting(actor), document),
+        input_refresher=None
+        if refresh is None
+        else lambda actor, version: refresh(connection, acting(actor), version),
+    )
+    try:
+        revision = controls.read(entry.authored_version_id)["revision"]
+        controls.configure(
+            entry.authored_version_id,
+            actor=session.actor,
+            base_revision=revision,
+            mode="playing",
+            speed=1,
+        )
+    except Exception as exc:
+        refusal = society_refusal(exc)
+        if refusal is None:
+            raise
+        return [{"step": "playing", "code": refusal.code}]
+    return []
 
 
 def main(argv: Sequence[str] | None = None, *, stream: Any = None) -> int:
