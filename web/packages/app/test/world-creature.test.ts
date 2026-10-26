@@ -8,6 +8,7 @@ import type { CreatureDraft, CreatureOffer, SocietyStand } from '../src/creature
 import type { ReferenceNote, ReferenceRequest } from '../src/references-api.js';
 
 const screen = async () => import('../../../../tools/previews/world-workspace/' + 'world-creature.ts');
+const ui = async () => import('../../../../tools/previews/world-workspace/' + 'world-ui-creature.ts');
 
 const offer: CreatureOffer = Object.freeze({
   offered: true, code: null, timing: { typicalSeconds: 18, longestSeconds: 25, timeoutSeconds: 50 },
@@ -25,7 +26,7 @@ const stand: SocietyStand = Object.freeze({ nodeId: 'n-7', positionMm: [4200, -1
 function world(answers: { readonly offer?: CreatureOffer; readonly drafts?: readonly CreatureDraft[]; readonly stand?: SocietyStand | null; readonly reads?: CreatureDraft[]; readonly at?: { readonly x: number; readonly y: number } } = {}) {
   const root = document.createElement('div');
   document.body.append(root);
-  const calls = { stand: [] as unknown[], ask: [] as string[], hold: [] as unknown[], closed: 0, released: 0, marked: [] as (SocietyStand | null)[] };
+  const calls = { stand: [] as unknown[], ask: [] as string[], hold: [] as unknown[], closed: 0, released: 0, marked: [] as (SocietyStand | null)[], creatures: [] as string[] };
   // A hold ends when the person places the creature or puts it back: here, when the test says so.
   const holds: ((outcome: { readonly outcome: 'placed'; readonly thingId: string }) => void)[] = [];
   const reads = [...(answers.reads ?? [kept])];
@@ -48,6 +49,7 @@ function world(answers: { readonly offer?: CreatureOffer; readonly drafts?: read
       head: () => ({ x: 400, y: 300 }),
       hold: (kind: unknown, at: unknown) => { calls.hold.push({ kind, at }); return new Promise<{ readonly outcome: 'placed'; readonly thingId: string }>((settle) => { holds.push(settle); }); },
       close: () => { calls.closed += 1; },
+      creatures: (sha256: string) => { calls.creatures.push(sha256); },
       release: () => { calls.released += 1; },
       wait: async () => {},
     },
@@ -130,8 +132,9 @@ describe('making a creature where it will stand', () => {
     expect(root.textContent).not.toContain('wears a sketch');
   });
 
-  it('has no stand where the stand is out of view: no ring, no label, and the made creature waits in Creatures', async () => {
+  it('has no stand where the stand is out of view: the made creature waits in Creatures, the card says how to place it, and Back goes there', async () => {
     const { openCreatureScreen } = await screen();
+    const { CREATURE_WORDS } = await ui();
     // Past the window's side inset (happy-dom's window is 1024 wide).
     const { deps, calls, root } = world({ at: { x: 1020, y: 500 } });
     const opened = await openCreatureScreen(deps);
@@ -143,8 +146,28 @@ describe('making a creature where it will stand', () => {
     opened.key(press('Enter'));
     await settle();
     expect(root.textContent).toContain('Yellow pond wader');
-    expect(root.textContent).not.toContain('Place');
+    expect(root.querySelector('[aria-keyshortcuts="Enter"]')).toBeNull();
     expect(calls.hold).toEqual([]);
+    // Never a card with no next step (rehearsal run 7): where the creature is, how to place it, and Back takes the
+    // person to it in Creatures; Esc does the same.
+    const card = root.querySelector('.wu-creature-made')!;
+    expect(card.textContent).toContain(CREATURE_WORDS.nowhereToStand);
+    const back = card.querySelector<HTMLButtonElement>('button[aria-keyshortcuts="Escape"]')!;
+    expect(back.textContent).toContain(CREATURE_WORDS.back);
+    back.click();
+    expect(calls.closed).toBe(1);
+    expect(calls.creatures).toEqual([kept.kind!.sha256]);
+    expect(root.querySelector('.wu-creature-made')).toBeNull();
+    const again = world({ at: { x: 1020, y: 500 } });
+    const second = await openCreatureScreen(again.deps);
+    const words = again.root.querySelector('textarea')!;
+    words.value = 'a round yellow body';
+    words.dispatchEvent(new Event('input'));
+    second.key(press('Enter'));
+    await settle();
+    second.key(press('Escape'));
+    expect(again.calls.closed).toBe(1);
+    expect(again.calls.creatures).toEqual([kept.kind!.sha256]);
   });
 
   it('says where the creature appears while it is described, and no longer once it is being made', async () => {

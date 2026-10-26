@@ -100,6 +100,8 @@ export interface CreatureScreenDeps {
   ) => Promise<Held>;
   /** Back to building; the making, if any, carries on. */
   readonly close: () => void;
+  /** Build mode's tray on its Creatures tab with this made creature in focus, where it waits when nothing ahead took it. */
+  readonly creatures?: (sha256: string) => void;
   /**
    * Gives the keys back to the world while the step still shows: the made creature is held at the stand, and build
    * mode's own keys place it (Enter) or put it back (Esc).
@@ -140,6 +142,8 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
   let withNotes = false, notesAsked = false;
   const label = standLabel(), light = standLight();
   let standAt: { readonly x: number; readonly y: number } | null = null;
+  // The made creature that waits in Creatures, nothing ahead having taken it: Back goes there with it in focus.
+  let waiting: string | null = null;
   layer.append(field.root);
 
   /** The web notes the offer offers here, where the page can ask for them and the most they add is served. */
@@ -307,11 +311,12 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
         label: current.label, words, modelName: current.model?.name ?? null, spentUsd: spentOf(current),
         notes: current.references?.state === 'used' ? current.references.notes : 0,
         // Until its made look is made, the creature wears its sketch (M15).
-        sketch: current.lookStatus !== 'made', placeable: stand !== null,
+        sketch: current.lookStatus !== 'made', placeable: stand !== null, onBack: back,
       });
       besideStand(card);
       layer.append(card);
-      if (stand !== null) {
+      if (stand === null) waiting = current.kind.sha256;
+      else {
         // It stands where it was made, held to be placed (B8): build mode draws it there and its own keys place it or
         // put it back; either way this step ends, and a creature put back waits in Creatures.
         label.remove();
@@ -387,6 +392,13 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     await follow(asked, making ?? undefined);
   }
 
+  /** Back to building, and where the made creature waits in Creatures, to it there (Esc does the same). */
+  function back(): void {
+    destroy();
+    deps.close();
+    if (waiting !== null) deps.creatures?.(waiting);
+  }
+
   function destroy(): void {
     if (ended) return;
     ended = true;
@@ -406,7 +418,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
   return {
     key(event) {
       if (ended) return false;
-      if (event.key === 'Escape') { event.preventDefault(); destroy(); deps.close(); return true; }
+      if (event.key === 'Escape') { event.preventDefault(); back(); return true; }
       if (event.key === 'Enter' && !event.shiftKey) {
         if (state === 'describe') { event.preventDefault(); void make(); return true; }
         if (state === 'ended' && retryable) { event.preventDefault(); tryAgain(); return true; }
@@ -430,6 +442,8 @@ export interface BuildHand {
    * meanwhile and every key goes to the step first, so nothing else of the world acts on it.
    */
   readonly showing: (now: boolean, key?: (event: KeyboardEvent) => void) => void;
+  /** Opens the tray on its Creatures tab with that made creature in focus. */
+  readonly creatures: (sha256: string) => void;
 }
 
 /**
@@ -461,6 +475,7 @@ export function creatureMakerFor(state: {
       head: hand.head,
       mark: (stand) => hand.mark(stand === null ? null : { xMm: stand.positionMm[0], zMm: stand.positionMm[1] }, STAND_RING_M),
       hold: hand.hold,
+      creatures: hand.creatures,
       close,
       release: () => { hand.showing(true); },
     }).then((screen) => { open = screen; }, () => { close(); }).finally(() => { opening = false; });

@@ -17,6 +17,7 @@ interface Hand {
   mark(at: unknown, radiusM: number): unknown;
   head(): unknown;
   showing(now: boolean, key?: (event: KeyboardEvent) => void): void;
+  creatures(sha256: string): void;
 }
 interface BuildMode { active(): boolean; key(event: KeyboardEvent): boolean; frame(now: number): void; dispose(): void }
 interface Write { readonly actionId: string; readonly path: string; readonly body: Record<string, unknown> }
@@ -117,6 +118,21 @@ describe('build mode handing a creature maker what places what it makes', () => 
     expect(hand!.mark(null, 0.6)).toBeNull();
     // Nothing held yet: no head to lead to.
     expect(hand!.head()).toBeNull();
+  });
+
+  it('opens the tray on Creatures with the made creature in focus when the maker sends the person there', async () => {
+    const { mode, root, hands } = await mount();
+    // Made straight after B, on the Things tab the tray opens on.
+    mode.key(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b', bubbles: true }));
+    await vi.waitFor(() => expect(makeTile(root)).not.toBeNull());
+    mode.key(new KeyboardEvent('keydown', { code: 'Enter', key: 'Enter', bubbles: true }));
+    hands[0]!.showing(true);
+    hands[0]!.showing(false);
+    hands[0]!.creatures(PIP);
+    await vi.waitFor(() => expect(document.activeElement?.textContent).toContain('Pip'));
+    const chosen = [...root.querySelectorAll('.wu-tray-tab')].find((tab) => tab.getAttribute('aria-selected') === 'true');
+    expect(chosen?.textContent).toMatch(/creature/i);
+    expect(document.activeElement?.classList.contains('wu-tile')).toBe(true);
   });
 
   it('hides the tray while a creature step shows and brings it back once it is gone', async () => {

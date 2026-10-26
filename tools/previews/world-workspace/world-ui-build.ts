@@ -86,6 +86,8 @@ export interface Tray {
   set(state: TrayState): void;
   /** A tile's picture, drawn after the tray. */
   picture(id: string, url: string): void;
+  /** Gives a drawn tile the focus, shown and scrolled into view. */
+  focus(id: string): void;
   hide(): void;
 }
 
@@ -121,7 +123,7 @@ export function tray({ words, onTab, onPick }: {
     panel.scrollBy({ left: event.deltaY + event.deltaX, behavior: 'smooth' });
   }, { passive: false });
   root.append(tabs, panel);
-  const pictures = new Map<string, HTMLElement>();
+  const pictures = new Map<string, HTMLElement>(), buttons = new Map<string, HTMLButtonElement>();
   return {
     root,
     set({ tab, tiles, held, offline, empty }) {
@@ -132,6 +134,7 @@ export function tray({ words, onTab, onPick }: {
       panel.setAttribute('aria-labelledby', `${panel.id}-${tab}`);
       root.dataset.offline = String(offline);
       pictures.clear();
+      buttons.clear();
       if (tiles === null) { panel.replaceChildren(); panel.dataset.state = 'reading'; root.hidden = false; return; }
       const made = tiles.map((tile) => {
         const button = element('button', tile.make ? 'wu-tile wu-make' : 'wu-tile');
@@ -144,6 +147,7 @@ export function tray({ words, onTab, onPick }: {
         if (tile.make) picture.textContent = '+';
         else if (tile.picture) picture.style.backgroundImage = `url("${tile.picture}")`;
         pictures.set(tile.id, picture);
+        buttons.set(tile.id, button);
         button.append(picture, element('span', 'wu-tile-name', tile.name));
         button.addEventListener('click', () => onPick(tile));
         return button;
@@ -156,6 +160,15 @@ export function tray({ words, onTab, onPick }: {
     picture(id, url) {
       const picture = pictures.get(id);
       if (picture) picture.style.backgroundImage = `url("${url}")`;
+    },
+    focus(id) {
+      const button = buttons.get(id);
+      if (!button) return;
+      // Shown however the person got here, a click on Back as well as Esc (focusVisible is newer than TypeScript's DOM
+      // types; a browser without it focuses the tile all the same).
+      const shown: FocusOptions & { readonly focusVisible: boolean } = { preventScroll: true, focusVisible: true };
+      button.focus(shown);
+      button.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     },
     hide() { root.hidden = true; },
   };

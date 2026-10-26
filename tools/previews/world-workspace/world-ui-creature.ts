@@ -47,6 +47,8 @@ export const CREATURE_WORDS = Object.freeze({
   wentWrong: 'Something went wrong while making it, so nothing was made. Try again.',
   takingLonger: 'This is taking longer than usual. The creature waits in Creatures when it\'s done.',
   placingNow: 'Placing…',
+  /** The made card where no stand was found ahead (rehearsal run 7): where the creature is and how to place it. */
+  nowhereToStand: 'There is no open ground ahead to stand it on, so it waits in Creatures. Pick it there to place it.',
   /** The line under the field begins with what makes it: an open model, named where the offer names one (DESIGN, A1). */
   maker: 'An open model',
   makes: 'makes the creature from your words',
@@ -267,10 +269,10 @@ export function makingGroup({ words, priceUsdAtMost }: { readonly words: string;
 
 /**
  * Made (r19b): the name, how it was made, the quote, [Enter] Place and the small print. Place is said, not pressed
- * here: the creature is held at the stand by build mode, whose own Enter places it. With no stand it is left out, and
- * the creature waits in Creatures.
+ * here: the creature is held at the stand by build mode, whose own Enter places it. With no stand the creature waits
+ * in Creatures: the card says so and how to place it, and [Esc] Back opens Creatures with it in focus, as Esc does.
  */
-export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable, notes = 0 }: {
+export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable, notes = 0, onBack }: {
   readonly label: string | null;
   readonly words: string;
   readonly modelName: string | null;
@@ -280,6 +282,8 @@ export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable
   readonly placeable: boolean;
   /** How many web notes its drafter was handed; 0 or absent where it had none. */
   readonly notes?: number;
+  /** Back where it is not placeable, as Esc does: to the tray's Creatures with the creature in focus. */
+  readonly onBack?: () => void;
 }): HTMLElement {
   const root = shade();
   root.classList.add('wu-creature-group', 'wu-creature-made');
@@ -290,7 +294,9 @@ export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable
     element('h2', 'wu-creature-title', name),
     element('p', 'wu-creature-from', madeFromLine(notes)),
     element('p', 'wu-creature-quote', quoted(words)),
-    ...(placeable ? [glyphRows([{ key: 'Enter', word: CREATURE_WORDS.place, shortcut: 'Enter' }])] : []),
+    ...(placeable
+      ? [glyphRows([{ key: 'Enter', word: CREATURE_WORDS.place, shortcut: 'Enter' }])]
+      : [element('p', 'wu-creature-from', CREATURE_WORDS.nowhereToStand), glyphRows([{ key: 'Esc', word: CREATURE_WORDS.back, shortcut: 'Escape', onPress: onBack }])]),
     ...lines.map((line) => element('p', 'wu-creature-small', line)),
   );
   return root;

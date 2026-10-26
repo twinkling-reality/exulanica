@@ -368,6 +368,17 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     })();
     return creaturesRead;
   }
+  /**
+   * The tray on its creatures tab with the made creature `sha256` in focus: where the maker found nothing ahead to stand
+   * it on, its Back sends the person here to place it.
+   */
+  async function showCreature(sha256) {
+    trayTab = 'creatures';
+    await readCreatures(true);
+    if (!on || making || lifetime.signal.aborted) return;
+    drawTray();
+    trayView.focus('made:' + sha256);
+  }
   /** The tile of what is held: a new thing's, or a moved thing's own kind. */
   function heldTile() {
     if (placing !== null) return placing.tileId;
@@ -415,7 +426,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     // The maker is handed what places what it makes where it was made: hold, and the ground ahead of the eye.
     if (tile.make) {
       putBack(); deselect();
-      makeCreature?.({ hold: (kind, at, told) => built.hold(kind, at, told), ahead: groundAhead, mark: standMark, head: heldHeadOnScreen, showing: (now, key = null) => { making = now; makerKey = now ? key : null; drawTray(); renderCorners(); } });
+      makeCreature?.({ hold: (kind, at, told) => built.hold(kind, at, told), ahead: groundAhead, mark: standMark, head: heldHeadOnScreen, showing: (now, key = null) => { making = now; makerKey = now ? key : null; drawTray(); renderCorners(); }, creatures: (sha256) => { void showCreature(sha256); } });
       return;
     }
     if (placing?.tileId === tile.id) { putBack(); return; }

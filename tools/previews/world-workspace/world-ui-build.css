@@ -18,9 +18,11 @@
 #contextual-world .wu-tray .wu-tray-tabs .wu-tray-tab { margin: 0; padding: 0; border: 0; background: none; color: var(--ink-2); font: 400 max(12px, calc(14 * var(--u)))/1 var(--font-sans); cursor: pointer; }
 #contextual-world .wu-tray .wu-tray-tabs .wu-tray-tab[aria-selected="true"] { color: var(--ink); font-weight: 500; }
 .wu-tray-tab:focus-visible, .wu-tile:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: calc(4 * var(--u)); }
-/* Held at a tile's height while the tiles are read, so the tray does not jump when they arrive. */
+/* Held at a tile's height while the tiles are read, so the tray does not jump when they arrive. Its 6 px of room, given
+   back by the margin, keep a tile's focus ring (2 px at a 3 px offset) whole inside the scroll (DESIGN, 26 October; the
+   Create cards' strip does the same at 4 px). */
 .wu-tray-tiles { display: flex; gap: calc(8 * var(--u)); min-height: calc(var(--tile-height) + 8 * var(--u) + max(12px, calc(13 * var(--u))) * 1.2);
-  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  margin: -6px; padding: 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .wu-tray-tiles::-webkit-scrollbar { display: none; }
 /* A tile's picture stands at its top whatever its name's lines (a button would centre them). */
 .wu-tile { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; width: var(--tile-width); margin: 0; padding: 0;
