@@ -298,6 +298,40 @@ export const LAYOUTS = Object.freeze({
   }),
 });
 
+/**
+ * Under the line, a moment's time, two lines of words and who decided (world-ui-history.css: 40 + 13 + 10 + 55 + 27);
+ * over its picture, a run's bracket and, 22 above that, its words; and the least a picture steps down to.
+ */
+const UNDER_LINE = 150, RUN_WORDS_OVER = 22, LEAST_PICTURE = 90;
+
+/**
+ * The layout fitted to the page frame's body, from `top` to `bottom` in the page's pixels, and to its `side`
+ * (world-page-frame.css: under the head, over the key row, and the head's left edge; DESIGN's short-window review, 26
+ * October): the story's first card stands at the frame's side; the story line rises so a moment's words end above the
+ * key row, and the bracket and branches rise with it; where a run's words, its bracket and the pictures then no longer
+ * fit under the head, the pictures and cards step down in proportion, never under LEAST_PICTURE. A body tall enough
+ * keeps the layout's heights as drawn.
+ */
+export function fitLayout(drawn, { top, bottom, side = drawn.margin }) {
+  const layout = side === drawn.margin ? drawn : Object.freeze({ ...drawn, margin: side });
+  if (!(bottom > top)) return layout;
+  const lineY = Math.round(bottom - UNDER_LINE);
+  if (lineY >= layout.lineY) return layout;
+  const overPicture = layout.lineY - layout.picture - layout.bracketY;
+  const room = lineY - top - overPicture - RUN_WORDS_OVER;
+  const picture = Math.max(LEAST_PICTURE, Math.min(layout.picture, Math.round(room)));
+  const scale = picture / layout.picture;
+  return Object.freeze({
+    ...layout,
+    lineY,
+    picture,
+    card: Math.round(layout.card * scale),
+    orb: Math.round(layout.orb * Math.max(scale, .75)),
+    bracketY: lineY - picture - overPicture,
+    branchY: layout.branchY - (layout.lineY - lineY),
+  });
+}
+
 /** How far past its picture a card's words run: the card's box is 30 wider, its words 6 short of that edge. */
 const CARD_WORDS = 24;
 /** A change's words: a block 150 wide, its left edge 70 left of the dot, at least 16 clear of the picture before. */

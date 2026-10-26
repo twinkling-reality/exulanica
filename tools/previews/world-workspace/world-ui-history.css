@@ -1,11 +1,20 @@
 /* History as r23 (the user's yes on 16 October; DESIGN's R23 build sheet amended 08:36, design-2026-10-14/frames/
    r23-history.html): a light page over the world faded behind it; the story line, its moments, the person's changes,
    the runs, Now, and a moment opened over the story. Positions come from history-rows.mjs's layout; sizes and colours
-   are the sheet's. The parts every record page shares (ground, picture, portraits, keys) are in world-ui-record.css. */
-.wu-history-r23 .wu-hr-head { position: absolute; left: 120px; top: 84px; }
-.wu-history-r23.wu-hr-narrow .wu-hr-head { left: 80px; }
-.wu-history-r23 .wu-hr-title { margin: 14px 0 0; font: 200 72px/1 var(--font-sans); letter-spacing: -.025em; color: var(--hr-ink); }
-.wu-history-r23.wu-hr-narrow .wu-hr-title { font-size: 60px; }
+   are the sheet's. The parts every record page shares (ground, picture, portraits, keys) are in world-ui-record.css.
+   The head and the key row stand in the light pages' frame (world-page-frame.css), which sets their places and sizes
+   at every window; the story's layer lies under it, fitted to its body (history-rows.mjs fitLayout), and takes the
+   pointer where the frame's own parts do not. */
+.wu-history-r23 .wu-frame { pointer-events: none; }
+.wu-history-r23 .wu-frame-head, .wu-history-r23 .wu-frame-keys { pointer-events: auto; }
+.wu-history-r23 .wu-frame .wu-frame-keys .wu-hr-keys { display: contents; }
+.wu-history-r23 .wu-hr-title { margin: 14px 0 0; font-weight: 200; line-height: 1; font-family: var(--font-sans); letter-spacing: -.025em; color: var(--hr-ink); }
+/* At 900 tall and above History keeps its own title, as it passed at full size (DESIGN, 26 October): 72 from 1700 wide,
+   60 below; under 900 tall it takes the frame's steps. */
+@media (min-height: 900px) {
+  .wu-history-r23 .wu-hr-title { font-size: 72px; }
+  .wu-history-r23.wu-hr-narrow .wu-hr-title { font-size: 60px; }
+}
 .wu-history-r23 .wu-hr-kept { margin: 18px 0 0; font: 400 15px/1.4 var(--font-sans); color: var(--hr-quiet); }
 .wu-history-r23 .wu-hr-kept[data-refused="true"] { color: var(--hr-refused); }
 

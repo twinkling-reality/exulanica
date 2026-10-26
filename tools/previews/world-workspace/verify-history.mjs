@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { changeParts, changeWords } from './build-words.mjs';
-import { LAYOUTS, earlierBreak, historyPath, pathLayout, pathView, rowsWindow, runBrackets, targetObject } from './history-rows.mjs';
+import { LAYOUTS, earlierBreak, fitLayout, historyPath, pathLayout, pathView, rowsWindow, runBrackets, targetObject } from './history-rows.mjs';
 import {
   HEAD_WORDS, PATH_WORDS, branchWords, didWords, byParts, creationWhen, dayHeading, headLine, momentWords, money, partsText,
   personWhen, runSpanWords, youChangeWords, youModelParts, youPersonalityWords,
@@ -162,6 +162,25 @@ assert.equal(together.items[0].branch.outcome, 'Ines would have picked up the la
 // Where items sit (r23's own: creation 120, the change 510, moments 600, 1020, 1440, Now 1800), and what a view
 // draws: only whole items, the first at the margin, Now at its place while the newest end is in view.
 const wide = LAYOUTS.wide, narrow = LAYOUTS.narrow;
+// The page frame's body on a short window (DESIGN's short-window review, 26 October; world-page-frame.css): the line
+// rises so a moment's words (150 under it) end above the key row, a run's words (22 over its bracket) stay in the body,
+// and the bracket and branches keep their places from the line. At 1744 x 567 the body runs from 147 to 523 (the head
+// 28 down with a 34px title, the key row 44 tall) and the pictures step down; at 1440 x 600 from 147 to 556, the
+// pictures kept; a body as tall as 1920 x 1080's keeps the layout as drawn.
+assert.equal(fitLayout(wide, { top: 260, bottom: 1024 }), wide);
+for (const [base, top, bottom] of [[wide, 147, 523], [narrow, 147, 556]]) {
+  const fitted = fitLayout(base, { top, bottom });
+  assert.ok(fitted.lineY + 150 <= bottom, `words above the keys at ${bottom}`);
+  assert.ok(fitted.bracketY - 22 >= top, `the story in the body at ${bottom}`);
+  assert.equal(fitted.lineY - fitted.picture - fitted.bracketY, base.lineY - base.picture - base.bracketY);
+  assert.equal(fitted.branchY - fitted.lineY, base.branchY - base.lineY);
+}
+assert.ok(fitLayout(wide, { top: 147, bottom: 523 }).picture < wide.picture);
+assert.equal(fitLayout(narrow, { top: 147, bottom: 556 }).picture, narrow.picture);
+// The story's first card stands at the frame's side, the head's left edge (64 below 1700 wide), heights untouched.
+assert.equal(fitLayout(narrow, { top: 190, bottom: 664, side: 64 }).margin, 64);
+assert.equal(fitLayout(narrow, { top: 190, bottom: 664, side: 64 }).lineY, narrow.lineY);
+assert.equal(fitLayout(wide, { top: 260, bottom: 1024, side: 120 }), wide);
 const placed = pathLayout(path.items, wide);
 assert.deepEqual([...placed.x.values()], [120, 510, 600, 1020, 1440]);
 assert.equal(placed.nowAt, 1800);

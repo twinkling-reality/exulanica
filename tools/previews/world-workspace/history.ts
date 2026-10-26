@@ -8,12 +8,14 @@
 // The record pages' shared parts load first: History's own stylesheet refines them and must come after.
 import { ORBS, element, keyButton, orbs as recordOrbs, pictureBox, px, sentence } from './world-ui-record.ts';
 import { changeParts, thingName } from './build-words.mjs';
-import { LAYOUTS, earlierBreak, historyPath, pathLayout, pathView, rowsWindow, runBrackets, targetObject } from './history-rows.mjs';
+import { LAYOUTS, earlierBreak, fitLayout, historyPath, pathLayout, pathView, rowsWindow, runBrackets, targetObject } from './history-rows.mjs';
 import { openKeepCard, type KeepCard } from './history-keep.ts';
 import { KEEP_WORDS } from './history-keep-words.mjs';
 import { PATH_WORDS, headLine } from './history-words.mjs';
 import { MOMENT_FRAMING } from './moment-framing.mjs';
 import { page } from './world-ui.ts';
+// The light pages' frame (world-page-frame.css) holds History's head and key row.
+import './world-page-frame.css';
 import { storySvg, svgPart } from './world-ui-history.ts';
 
 /** A world generated from words: its draft is read for how it began. */
@@ -146,7 +148,7 @@ export function mountHistory(host: HistoryHost): History {
   /** What the characters are called, from the last read. */
   let called: { subject(id: string): string; speaker?(id: string): string } = { subject: () => '' };
   /** The page's lasting parts, made once when it opens, so the focus on its title stays through every draw. */
-  let lasting: { readonly world: HTMLElement; readonly head: HTMLElement; readonly kept: HTMLElement; readonly layer: HTMLElement } | null = null;
+  let lasting: { readonly world: HTMLElement; readonly kept: HTMLElement; readonly layer: HTMLElement; readonly body: HTMLElement; readonly keys: HTMLElement } | null = null;
   /** H12's question, while it is open over the page. */
   let card: KeepCard | null = null;
   /** After Create, until the follower links the project: the head says it is being put on GitHub. */
@@ -517,7 +519,7 @@ export function mountHistory(host: HistoryHost): History {
       },
       // The card's keys change as it learns more (GH4): the key row alone is drawn again, so the name field keeps focus.
       changed: () => {
-        const row = lasting?.layer.querySelector('.wu-hr-keys');
+        const row = lasting?.keys.querySelector('.wu-hr-keys');
         if (!card || !row) return;
         const fresh = element('div', 'wu-hr-keys');
         for (const one of card.keys()) fresh.append(keyButton(one.keys, one.word, () => one.press()));
@@ -561,25 +563,35 @@ export function mountHistory(host: HistoryHost): History {
     if (!made) return;
     const width = host.root.clientWidth || window.innerWidth;
     const narrow = width < NARROW_BELOW;
-    const layout = narrow ? LAYOUTS.narrow : LAYOUTS.wide;
     made.root.classList.toggle('wu-hr-narrow', narrow);
     made.root.classList.toggle('wu-hr-opened', opened !== null);
     if (!lasting) {
       const world = element('div', 'wu-hr-world');
-      const head = element('div', 'wu-hr-head');
-      const title = element('h1', 'wu-hr-title', host.title);
+      // The light pages' frame (world-page-frame.css): the head, the body and the key row in their own rows; the story
+      // stands on its own layer under them, fitted to the body (fitLayout), as it runs past the frame's sides.
+      const frame = element('div', 'wu-frame');
+      const head = element('div', 'wu-hr-head wu-frame-head');
+      const title = element('h1', 'wu-hr-title wu-frame-title', host.title);
       title.tabIndex = -1;
       const kept = element('p', 'wu-hr-kept');
       head.append(element('div', 'wu-hr-over', PATH_WORDS.history), title, kept);
+      const body = element('div', 'wu-frame-body'), keys = element('div', 'wu-frame-keys');
+      frame.append(head, body, keys);
       const layer = element('div', 'wu-hr-layer');
-      made.content.replaceChildren(world, element('div', 'wu-hr-wash'), head, layer, element('div', 'wu-hr-cardslot'));
-      lasting = { world, head, kept, layer };
+      made.content.replaceChildren(world, element('div', 'wu-hr-wash'), layer, frame, element('div', 'wu-hr-cardslot'));
+      lasting = { world, kept, layer, body, keys };
     }
     const ground = host.still?.() ?? host.entryPicture ?? null;
     lasting.world.style.backgroundImage = ground ? `url("${ground}")` : '';
     const kept = headLine(project, request, putting);
     lasting.kept.textContent = kept.words;
     lasting.kept.dataset.refused = String(kept.refused);
+    // Fitted to the frame (DESIGN's short-window review): the first card at its side, the head's left edge; under the
+    // head, a moment's words above the key row.
+    const side = Number.parseFloat(getComputedStyle(lasting.body.parentElement!).paddingLeft);
+    const layout = fitLayout(narrow ? LAYOUTS.narrow : LAYOUTS.wide, {
+      top: lasting.body.offsetTop, bottom: lasting.keys.offsetTop, ...(side > 0 ? { side } : {}),
+    });
     const content = lasting.layer;
     content.replaceChildren();
 
@@ -702,9 +714,9 @@ export function mountHistory(host: HistoryHost): History {
       }
     }
 
-    // Nothing on the story line enters the 24px over the key row's caps (H15): a card or a branch that would reach
-    // that band keeps its words to one line.
-    const band = (host.root.clientHeight || window.innerHeight) - layout.band;
+    // Nothing on the story line enters the frame's key row (H15's band where the frame is not laid out): a card or a
+    // branch that would reach it keeps its words to one line.
+    const band = lasting.keys.offsetTop || (host.root.clientHeight || window.innerHeight) - layout.band;
     for (const part of track.querySelectorAll<HTMLElement>('.wu-hr-card, .wu-hr-ghost')) {
       if (part.offsetHeight > 0 && part.offsetTop + part.offsetHeight > band) part.classList.add('wu-hr-clamped');
     }
@@ -777,7 +789,7 @@ export function mountHistory(host: HistoryHost): History {
       else if (offersKeep()) keys.append(keyButton(['K'], KEEP_WORDS.keepInProject, () => void keepInProject()));
       keys.append(keyButton(['Esc'], PATH_WORDS.back, () => close()));
     }
-    content.append(keys);
+    lasting.keys.replaceChildren(keys);
     if (card && fadeNext) requestAnimationFrame(() => fadeUnderCard(content));
     else if (card) fadeUnderCard(content);
     fadeNext = false;
