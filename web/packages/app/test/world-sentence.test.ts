@@ -49,7 +49,7 @@ const wire = (state: string, extra: Record<string, unknown> = {}) => ({
   started_at: '2026-10-10T12:00:00Z', elapsed_seconds: 4,
   poll_after_seconds: state === 'ready' || state === 'refused' ? null : 3, deadline_seconds: 240,
   tool: null, entry: null, made: [], left_out: [], look: null, setting: null, land: null, refusal: null, model_name: null,
-  execution: null, refusals: REFUSALS, ...extra,
+  execution: null, references: null, refusals: REFUSALS, ...extra,
 });
 
 const BOAT = { key: 'boat', label: 'fishing boat', form: 'fixture', look: 'vehicle.fishing_boat', drawn: 4, box_mm: [2400, 6000, 1800] };
@@ -68,6 +68,7 @@ const offerWire = (extra: Record<string, unknown> = {}) => ({
   operation: null, offered: true, code: null, detail: null, calls_at_most: 5,
   starts: { an_hour: 12, left: 12, retry_after_seconds: null },
   description_characters: 1000, running_draft_id: null, left_usd: null, host_keeps_until: null, own_key: false,
+  notes: { offered: false, code: 'references_operator_only', searches_at_most: 3, maximum_usd: null },
   refusals: [...REFUSALS, { code: 'world_limit_reached', meaning: 'The workspace already holds as many worlds as it may.' }],
   ...extra,
 });
