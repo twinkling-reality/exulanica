@@ -31,6 +31,7 @@ from typing import Any
 import psycopg
 import pytest
 from exulanica.api.authorisation import load_token_directory
+from exulanica.api.decision_admission import answer_tokens
 from exulanica.api.decision_host import (
     DecisionHost,
     ask_bound_usd,
@@ -415,6 +416,10 @@ def test_a_chosen_person_is_asked_and_the_minute_applies_the_choice_and_replays_
     not_acted = [e for e in applied if e["document"]["disposition"] != "applied"]
     assert summary["not_acted_on"] == dict(Counter(e["document"]["reason"] for e in not_acted))
     assert summary["latency_ms"]["p50"] is not None and summary["cost_known"] is True
+    # The middle of what its decisions cost here, one of them, and how many (G2's "about $Y").
+    costs = sorted(Decimal(r["provider"]["cost_usd"]) for r in receipts)
+    assert summary["costs_counted"] == len(receipts)
+    assert Decimal(summary["cost_median_usd"]) == costs[(len(costs) - 1) // 2]
     # The same read says what the decisions came to (decision_measures), per model and per being
     # under it: counts agree with the summary, each rate states its sample, and cost says how it
     # was found.
@@ -793,6 +798,18 @@ def test_only_a_caller_who_may_ask_models_changes_whose_model_runs_a_person(app,
     assert Decimal(offered[model_id]["decision_most_usd"]) == most > 0
     attempts = asked.value("answer_attempts_maximum")
     assert Decimal(offered[model_id]["attempt_most_usd"]) * attempts == most
+    # What it reads at once, and the largest request a decision here sends, which that most is
+    # reserved by: the page reads one against the other (G2).
+    assert (
+        offered[model_id]["context_window_tokens"] == manifest.spec(model_id).context_window_tokens
+    )
+    bound = after["contract"]["request_tokens_at_most"]
+    assert bound is not None and 0 < bound < offered[model_id]["context_window_tokens"]
+    assert most == attempts * estimator.estimate_usd(
+        manifest.spec(model_id),
+        extra_prompt_tokens=bound,
+        max_tokens=answer_tokens(manifest.spec(model_id)) or 0,
+    )
     assert "spend_here_usd" not in after
     # This process has no model client, so it says so for the host and for every provider.
     assert after["host_refusal"] == "provider_credential_absent"

@@ -27,12 +27,14 @@ import logging
 import uuid
 from collections import Counter
 from decimal import Decimal
+from statistics import median_low
 from typing import Annotated, Any, Final
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from exulanica.api.decision_admission import request_tokens_at_most
 from exulanica.api.decision_host import HOST_REFUSALS, ask_bound_usd
 from exulanica.api.dependencies import (
     CurrentSession,
@@ -183,6 +185,15 @@ def _not_acted_on(decision: dict[str, Any]) -> str | None:
     return decision["disposition_reason"]
 
 
+def _middle_cost(asked: list[dict[str, Any]]) -> dict[str, Any]:
+    """The middle of a model's known decision costs here and how many there are (G2)."""
+    costs = [Decimal(row["cost_usd"]) for row in asked if row["cost_known"]]
+    return {
+        "cost_median_usd": usd_string(median_low(costs)) if costs else None,
+        "costs_counted": len(costs),
+    }
+
+
 def _by_model(decisions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """What each model's decisions came to, the numbers a comparison of models reads."""
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
@@ -220,6 +231,9 @@ def _by_model(decisions: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     sum((Decimal(row["cost_usd"]) for row in asked), Decimal(0))
                 ),
                 "cost_known": all(row["cost_known"] for row in asked),
+                # The middle of the known costs of its decisions here, one of them (the lower of
+                # two), and how many it is the middle of: "about $Y a decision" (G2).
+                **_middle_cost(asked),
                 # Counts, rates with their sample, timeouts, repetition, latency and cost basis,
                 # added to the profile as an optional field (decision_measures).
                 "measures": measures(rows),
@@ -382,6 +396,8 @@ def offered_models(
                     "input": str(spec.input_usd_per_mtok),
                     "output": str(spec.output_usd_per_mtok),
                 },
+                # How much it reads at once, as its manifest entry states it (G2's "Reads").
+                "context_window_tokens": spec.context_window_tokens,
                 "refusal": services.provider_refusal(spec.provider),
                 "source": "shipped_manifest"
                 if spec.model_id in load_manifest().models
@@ -495,6 +511,9 @@ def society_models_view(
         "contract": {
             **contract.binding(),
             "model_people_maximum": contract.value(role.subjects_bound),
+            # The largest request a decision here may send, in tokens, as its reserve counts it;
+            # a model's context window is read against it (G2). None where no envelope is stated.
+            "request_tokens_at_most": request_tokens_at_most(role, asked),
         },
         "models": models,
         # Every model a person's own runner serves beside the manifest's, able (also offered in

@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { runnerRows } from './character-group.mjs';
-import { GROUP_LAYOUT, MODEL_ROWS, SAID_READ, choosableModels, offersModels, openWhileOffered, deciderOf, freeHere, groupContent, groupHeld, groupPlace, keepLastSaid, lastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, overRows, questionGroup, readLastSaid } from './character-group.mjs';
+import { GROUP_LAYOUT, SAID_READ, choosableModels, offersModels, deciderOf, freeHere, groupContent, groupHeld, groupPlace, keepLastSaid, lastSaid, noModelLine, noneRunningHere, overRows, questionGroup, readLastSaid } from './character-group.mjs';
 import { CHARACTER_WORDS, GROUP_WORDS, called, decidesPrint, modelsDecide, noModelRunning, quoted, saidUnder, stopsAfter } from './character-words.mjs';
 import { dayWord } from './talk-words.mjs';
 
@@ -132,7 +131,7 @@ assert.equal(groupContent({ who: teo, said: { line: 'Hello.', to: null, tick: 10
 assert.equal(groupContent({ who: resident, doing: '  ' }).doing, null);
 assert.equal(groupContent({ who: resident }).name, 'Resident');
 // While their record is read: the name and that it is reading, no keys and no small print yet.
-assert.deepEqual({ ...groupContent({ who: teo, reading: true, decider: 'model', model: 'M' }), rows: [] }, { name: 'Teo', doing: "Reading Teo's record…", said: null, note: null, rows: [], list: null, print: null, after: null, refused: false, declared: null });
+assert.deepEqual({ ...groupContent({ who: teo, reading: true, decider: 'model', model: 'M' }), rows: [] }, { name: 'Teo', doing: "Reading Teo's record…", said: null, note: null, rows: [], print: null, after: null, refused: false, declared: null });
 
 // An outside AI agent decides (AG1d 2): its day and Follow only, no Model and no Run; the print; its own words as
 // parts, each only where declared, exactly as sent; a game's program keeps its words and has none.
@@ -200,76 +199,12 @@ const served = [
 ];
 const ordered = choosableModels({ models: served });
 assert.deepEqual(ordered.map(model => model.name), ['Qwen3 4B Instruct', 'Nemotron 3 Nano 30B', 'Qwen3 235B Instruct'], 'this computer first, then the lowest price');
-const listed = modelGroup({ who: teo, models: ordered, current: { provider: 'nebius', modelId: 'nvidia/nano' }, focus: 1 });
-assert.equal(listed.name, 'Teo');
-assert.equal(listed.doing, 'Choose an AI model');
-assert.equal(listed.note, 'Open models, each from its maker. Picking one spends nothing. Only a run spends.');
-assert.deepEqual(listed.rows, [], 'the list takes the rows\' place');
-assert.equal(listed.list.waiting, null, 'a model runs on this computer: its group holds it');
-assert.deepEqual(listed.list.rows.map(row => [row.key, row.word, row.sub, row.price, row.current, row.on, row.index, row.label]), [
-  ['1', 'Qwen3 4B Instruct', 'Qwen · 4B', 'Free', false, false, 0, 'On this computer, free'],
-  ['2', 'Nemotron 3 Nano 30B', 'NVIDIA · 30B', '$0.06 in · $0.24 out', true, true, 1, 'With your Nebius Token Factory key, per million tokens'],
-  ['3', 'Qwen3 235B Instruct', 'Qwen · 235B', '$0.20 in · $0.60 out', false, false, 2, null],
-  ['4', 'Routine', null, 'No AI model · Free', false, false, 3, null],
-]);
-assert.deepEqual(listed.list.rows.map(row => row.open), [null, {
-  said: '\u201cA general purpose reasoning and chat model.\u201d', from: "from NVIDIA's model card · NVIDIA Nemotron Open Model License",
-}, null, null], 'only the focused row opens, with its maker\'s words');
-assert.equal(modelGroup({ who: teo, models: ordered, fromServer: true }).list.rows[1].label, "From this server's budget, per million tokens", 'a guest\'s page: the host pays');
-const bare = modelGroup({ who: teo, models: [{ ...served[1], card: null }], focus: 0 }).list.rows[0];
-assert.deepEqual([bare.sub, bare.open], [null, null], 'no card kept: no maker line and nothing opens');
-assert.equal(modelGroup({ who: teo, models: [{ ...served[1], card: { ...served[1].card, maker: 'DeepSeek', parameters: null } }] }).list.rows[0].sub, 'DeepSeek', 'no size stated: the maker alone');
 // This computer's group where none runs yet (A3 item 2): its label and one line, no key, never focused; left out where
 // the install does not let one in, or once one runs.
 assert.equal(noneRunningHere({ models: [{ ...served[2], refusal: 'provider_not_running' }, served[1]] }), true);
 assert.equal(noneRunningHere({ models: [{ ...served[2], refusal: 'provider_not_admitted' }, served[1]] }), false);
 assert.equal(noneRunningHere({ models: served }), false);
 assert.equal(noneRunningHere(null), false);
-const waiting = modelGroup({ who: teo, models: [served[1]], waiting: true });
-assert.deepEqual(waiting.list.waiting, { label: 'On this computer, free', line: 'None is running yet. Start one with a local model runner, and it shows here, free.' });
-assert.deepEqual(waiting.list.rows.map(row => [row.key, row.word, row.label]), [['1', 'Nemotron 3 Nano 30B', 'With your Nebius Token Factory key, per million tokens'], ['2', 'Routine', null]]);
-assert.deepEqual(listed.list.keys.map(item => [item.keys.join(' '), item.word]), [['↑ ↓', 'Choose'], ['Enter', 'Use this model']]);
-assert.equal(listed.print, null);
-assert.equal(modelGroup({ who: teo, models: served, current: null, focus: 3 }).list.rows[3].current, true, 'no model: Routine is theirs');
-assert.equal(modelGroup({ who: teo, models: [], current: null }).list.rows.length, 1, 'nothing served: Routine alone');
-assert.equal(modelGroup({ who: teo, models: served, focus: 99 }).list.rows.at(-1).on, true, 'focus held to the list');
-// A person's runner's models (L1): an able one is a row of this computer's group, named by family and size, told apart
-// by what the runner calls it where another row reads the same, opened with the licence its runner states; the rest
-// stand faint after that group's last row, being checked, then under their own label not able with why; none takes a
-// number or the focus. With no choosable row of this computer's, they stand under its label first.
-const runnerModel = (letter, name, state, reason = null) => ({ provider: 'ollama_local', modelId: `local/sha256-${letter.repeat(64)}`, name,
-  family: null, size: null, servedAs: `${letter}:latest`, licence: null, state, reason, contextTokens: 4096, deadlineMs: 20000 });
-const ableHere = { ...served[2], modelId: 'local/sha256-' + 'a'.repeat(64), name: 'Qwen3 · 4.0B', card: null,
-  runner: { family: 'qwen3', size: '4.0B', servedAs: 'qwen3:4b-instruct', licence: 'AN INVENTED LICENSE', checkedMs: 2104 } };
-const runner = [runnerModel('a', 'Qwen3 · 4.0B', 'able'), runnerModel('b', 'Qwen3 · 4.0B', 'checking'), runnerModel('c', 'Llama · 134.52M', 'not_able', 'form')];
-const withRunner = modelGroup({ who: teo, models: choosableModels({ models: [served[1], ableHere] }), runner, focus: 0 });
-assert.deepEqual(withRunner.list.rows.map(row => [row.key, row.word, row.sub, row.label]), [
-  ['1', 'Qwen3 · 4.0B', 'Your runner calls it qwen3:4b-instruct', 'On this computer, free'],
-  ['2', 'Nemotron 3 Nano 30B', 'NVIDIA · 30B', 'With your Nebius Token Factory key, per million tokens'],
-  ['3', 'Routine', null, null],
-]);
-assert.deepEqual(withRunner.list.rows[0].open, { said: 'Checked on this computer: it chose one of the offered choices in 2.1 s.', from: 'from your runner · \u201cAN INVENTED LICENSE\u201d' });
-assert.deepEqual(withRunner.list.rows.map(row => row.runner === null), [false, true, true], 'faint after this computer\'s last row only');
-// In the world's list the not-able rows fold into one line, where their reasons are told (DESIGN 11:58); the day page's
-// chooser lists each with its reason.
-assert.deepEqual(withRunner.list.rows[0].runner, {
-  checking: [{ word: 'Qwen3 · 4.0B · Checking that it can decide for a person here…', sub: 'Your runner calls it b' }],
-  label: null, notAble: [],
-  fold: { line: 'And 1 more on this computer that cannot decide for a person here.', sub: "Their reasons are on Teo's day page." },
-});
-assert.deepEqual(runnerRows(runner, [ableHere]), {
-  checking: [{ word: 'Qwen3 · 4.0B · Checking that it can decide for a person here…', sub: 'Your runner calls it b' }],
-  label: 'Also on this computer, not able to decide for a person here',
-  notAble: [{ word: 'Llama · 134.52M', sub: null, line: 'It did not answer with one of the offered choices when checked.' }],
-  fold: null,
-}, 'the day page: each with its reason');
-assert.equal(withRunner.list.runner, null);
-const noneAbleHere = modelGroup({ who: teo, models: [served[1]], runner: runner.slice(1) });
-assert.equal(noneAbleHere.list.runner.group, 'On this computer, free', 'no choosable row here: under the group\'s label, first');
-assert.equal(modelGroup({ who: teo, models: [served[1]], runner: runner.slice(1), focus: 1 }).list.first, 0);
-assert.equal(runnerRows([runnerModel('a', 'Qwen3 · 4.0B', 'able')], []), null, 'nothing faint where every runner model is offered');
-assert.equal(modelGroup({ who: teo, models: ordered }).list.runner, null, 'no runner: nothing faint');
-
 // F5: only a model this install can ask is offered. A server on this computer the install does not reach, or a hosted
 // provider it holds no key for, is refused in the models read and left out of both choosers.
 const refusedHere = [
@@ -278,10 +213,6 @@ const refusedHere = [
   { ...served[2], refusal: 'provider_not_admitted' },
 ];
 assert.deepEqual(choosableModels({ models: refusedHere }).map(model => model.name), ['Qwen3 235B Instruct']);
-assert.deepEqual(modelGroup({ who: teo, models: choosableModels({ models: refusedHere }) }).list.rows.map(row => [row.word, row.price]), [
-  ['Qwen3 235B Instruct', '$0.20 in · $0.60 out'],
-  ['Routine', 'No AI model · Free'],
-]);
 assert.deepEqual(new Set(choosableModels({ models: served })), new Set(served), 'nothing refused: every served model is offered');
 assert.deepEqual(choosableModels(null), [], 'no models read yet: nothing offered');
 // Every model refused (DESIGN, "F5 A"): nothing to choose, so neither the card nor the page offers [M] for a person on
@@ -294,121 +225,6 @@ assert.equal(offersModels({ takesModelChoices: false, models: served }), false, 
 const nothingToChoose = groupContent({ who: teo, doing: null, decider: 'routine', assignable: offersModels({ takesModelChoices: true, models: allRefused }) });
 assert.equal(nothingToChoose.rows.some(row => row.action === 'model'), false);
 assert.equal(groupContent({ who: teo, doing: null, decider: 'routine', assignable: offersModels({ takesModelChoices: true, models: refusedHere }) }).rows.some(row => row.action === 'model'), true);
-const open = { focus: 1 };
-assert.equal(openWhileOffered(open, { models: refusedHere }), open, 'a model to choose: the chooser stays open');
-assert.equal(openWhileOffered(open, { models: allRefused }), null, 'none left to choose: the chooser closes');
-{
-  let offered = served;
-  const picker = modelPicker({ models: () => offered, currentOf: () => null, write: async () => 'verified', refusal: () => '' });
-  const row = { key: 'teo' };
-  picker.open(row);
-  assert.equal(picker.of(row)?.focus, 0, 'Routine theirs: opens on the first model');
-  offered = [];
-  assert.equal(picker.of(row), null, 'every model refused while the card\'s list is open: it closes');
-  offered = served;
-  assert.equal(picker.of(row), null, 'closed stays closed');
-}
-const refusedChoice = modelGroup({ who: teo, models: served, refusal: 'This model cannot decide for Teo here.' });
-assert.equal(refusedChoice.print, 'This model cannot decide for Teo here.');
-assert.equal(refusedChoice.refused, true);
-// Past nine, the window follows the focus over the models alone and the number keys name its rows; Routine and the keys
-// never leave view (DESIGN 11:58): Routine stands under the window with the next number, and the window's foot fades
-// while more models lie past it.
-const many = Array.from({ length: 12 }, (_, index) => ({ provider: 'p', modelId: `m${index}`, name: `Model ${index + 1}`, price: { input: '0.1', output: '0.2' } }));
-assert.equal(MODEL_ROWS, 9);
-const top = modelGroup({ who: teo, models: many, focus: 0 }).list;
-assert.deepEqual(top.rows.map(row => [row.key, row.index]), [['1', 0], ['2', 1], ['3', 2], ['4', 3], ['5', 4], ['6', 5], ['7', 6], ['8', 7], ['9', 12]]);
-assert.equal(top.rows.at(-1).word, 'Routine');
-assert.equal(top.more, true);
-const scrolled = modelGroup({ who: teo, models: many, focus: 11 });
-assert.equal(scrolled.list.first, 4);
-assert.deepEqual(scrolled.list.rows.map(row => [row.key, row.index]), [['1', 4], ['2', 5], ['3', 6], ['4', 7], ['5', 8], ['6', 9], ['7', 10], ['8', 11], ['9', 12]]);
-assert.equal(scrolled.list.more, false);
-const onRoutine = modelGroup({ who: teo, models: many, focus: 12 }).list;
-assert.deepEqual([onRoutine.rows.at(-1).word, onRoutine.rows.at(-1).on, onRoutine.first], ['Routine', true, 4]);
-assert.equal(modelGroup({ who: teo, models: served }).list.more, false, 'all in view: no fade');
-{
-  // Its number reaches Routine however far the window has moved; a number past it names nothing.
-  const used = [];
-  const picker = modelPicker({ models: () => many, currentOf: () => null, write: async (_row, model) => { used.push(model?.name ?? 'Routine'); return null; }, refusal: () => null });
-  const digit = (code, first) => { picker.open('row'); picker.key({ code, repeat: false, preventDefault() {} }, first); };
-  digit('Digit9', 0);
-  await Promise.resolve();
-  digit('Digit1', 4);
-  await Promise.resolve();
-  digit('Digit9', 4);
-  await Promise.resolve();
-  assert.deepEqual(used, ['Routine', 'Model 5', 'Routine']);
-  const few = modelPicker({ models: () => served, currentOf: () => null, write: async (_row, model) => { used.push(model?.name ?? 'Routine'); return null; }, refusal: () => null });
-  few.open('row');
-  few.key({ code: 'Digit9', repeat: false, preventDefault() {} }, 0);
-  await Promise.resolve();
-  assert.equal(used.length, 3, 'no ninth row with three models: nothing chosen');
-}
-
-{
-  // The model list's state and keys (r07): opens on their model, the arrows move, a number on the window or Enter writes,
-  // Esc closes unchanged, movement keys pass, a key repeat is taken but does nothing.
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-  const row = { key: 'teo' }, writes = [], used = [];
-  let current = { provider: 'nebius', modelId: 'nvidia/nano' }, keys = 0, answer = null;
-  const picker = modelPicker({ models: () => ordered, currentOf: () => current, refusal: (error) => `refused ${error.code}`,
-    write: (at, selected, key) => { writes.push([at.key, selected?.modelId ?? null, key]); return answer ?? Promise.resolve('verified'); },
-    onUsed: (verified) => used.push(verified), newKey: () => `key-${++keys}` });
-  const press = (code, extra = {}) => { let prevented = false; const fate = picker.key({ code, repeat: false, ...extra, preventDefault: () => { prevented = true; } }, 0, extra.onButton === true); return [fate, prevented]; };
-  assert.equal(picker.key({ code: 'KeyM', preventDefault() {} }), false, 'no list: the key is not the list\'s');
-  picker.open(row);
-  assert.equal(picker.of(row).focus, 1, 'opens on their current model');
-  assert.equal(picker.of({ key: 'other' }), null);
-  assert.deepEqual(press('KeyW'), ['pass', false]);
-  assert.deepEqual(press('Enter', { onButton: true }), ['pass', false], 'a focused button presses itself');
-  assert.deepEqual(press('ArrowDown'), [true, true]);
-  assert.equal(picker.of(row).focus, 2);
-  press('ArrowDown'); press('ArrowDown'); press('ArrowDown');
-  assert.equal(picker.of(row).focus, 3, 'held at Routine, the last row');
-  press('ArrowUp', { repeat: true });
-  assert.equal(picker.of(row).focus, 3, 'a repeat does nothing');
-  press('Escape');
-  assert.equal(picker.of(row), null, 'Esc closes it unchanged');
-  assert.deepEqual(writes, []);
-  // A number writes the model on that row of the window, with one key for the write; the list closes and the read is kept.
-  picker.open(row);
-  press('Digit3');
-  await settle();
-  assert.deepEqual(writes, [['teo', 'qwen/235b', 'key-2']]);
-  assert.deepEqual(used, ['verified']);
-  assert.equal(picker.of(row), null);
-  // With nothing chosen it opens on the first model, choosing nothing; at Routine Enter writes Routine (null); a refusal
-  // keeps the list with its words and a new key.
-  current = null;
-  picker.open(row);
-  assert.equal(picker.of(row).focus, 0);
-  assert.equal(writes.length, 1, 'opening chooses nothing');
-  for (let step = 0; step < ordered.length; step += 1) press('ArrowDown');
-  assert.equal(picker.of(row).focus, ordered.length);
-  answer = Promise.reject({ code: 'stale' });
-  press('Enter');
-  await settle(); await settle();
-  assert.deepEqual(writes.at(-1), ['teo', null, 'key-3']);
-  assert.equal(picker.of(row).refusal, 'refused stale');
-  assert.equal(picker.of(row).key, 'key-4');
-  // While a write is on its way, Esc and the arrows wait; an index past Routine is no row.
-  let finish;
-  answer = new Promise((resolve) => { finish = resolve; });
-  void picker.use(0);
-  assert.equal(picker.of(row).busy, true);
-  press('Escape'); press('ArrowDown');
-  assert.equal(picker.of(row).focus, 0);
-  finish('verified-2'); await settle(); await settle();
-  assert.equal(picker.of(row), null);
-  picker.open(row);
-  const before = writes.length;
-  await picker.use(served.length + 1);
-  assert.equal(writes.length, before);
-  picker.drop();
-  assert.equal(picker.of(row), null, 'letting go of the character drops the list');
-}
-
 // Where it stands: its words 100 px past the person's right edge, its middle level with their head; the leader
 // from the head to an elbow 56 px before the words at the name line's middle, ending 36 px before them.
 const viewport = { width: 1920, height: 1080 }, size = { width: 420, height: 336 };
@@ -502,30 +318,9 @@ assert.equal(freeHere(read, []), false);
   const owner = { takesModelChoices: true, models: dear };
   assert.equal(choosableModels(owner).length, 3, "a person's own install: every model stays choosable");
   assert.deepEqual(overRows(owner), []);
-  // Faint after the last model offered, in its group; never a numbered row.
-  const shown = modelGroup({ who: teo, models: choosableModels(guest), fromServer: true, over: overRows(guest) });
-  assert.equal(shown.list.rows.at(-2).word, 'Nemotron 3 Nano 30B');
-  assert.deepEqual(shown.list.rows.at(-2).over.notAble.map(row => row.word), ['Qwen3 235B Instruct']);
-  assert.equal(shown.list.rows.at(-2).over.label, null, 'in the group of the last model offered');
-  assert.equal(shown.list.rows.filter(row => row.over).length, 1);
-  assert.equal(shown.list.rows.some(row => row.word === 'Qwen3 235B Instruct'), false);
-  // With only this computer's model left to choose, under the server's budget label; with none, first.
-  const poorer = { ...guest, spendHereUsd: { nebius: '0.00100000' } };
-  const onlyHere = modelGroup({ who: teo, models: choosableModels(poorer), fromServer: true, over: overRows(poorer) });
-  assert.equal(onlyHere.list.rows.at(-2).over.label, CHARACTER_WORDS.serverBudget);
-  const noneHere = { ...poorer, models: dear.filter(model => !model.local) };
+  const noneHere = { ...guest, spendHereUsd: { nebius: '0.00100000' }, models: dear.filter(model => !model.local) };
   assert.deepEqual(choosableModels(noneHere), []);
   assert.equal(offersModels(noneHere), true, '[M] still shows, so the list can say why');
-  assert.notEqual(openWhileOffered({ focus: 0 }, noneHere), null);
-  const first = modelGroup({ who: teo, models: [], fromServer: true, over: overRows(noneHere) });
-  assert.equal(first.list.over.label, CHARACTER_WORDS.serverBudget);
-  assert.equal(first.list.over.notAble.length, 2);
-  // The picker stays open on Routine, the one row left to choose, while faint ones show.
-  const picker = modelPicker({ models: () => choosableModels(noneHere), offered: () => offersModels(noneHere),
-    currentOf: () => null, write: async () => 'verified', refusal: () => '' });
-  const row = { key: 'teo' };
-  picker.open(row);
-  assert.equal(picker.of(row)?.focus, 0, 'Routine');
 }
 
 export default true;

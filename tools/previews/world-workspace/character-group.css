@@ -31,37 +31,6 @@
  * each whole on its line (DESIGN 19:13): the line breaks between parts, and one longer than the line still wraps. */
 .cg-declared { margin-top: var(--space-8); max-width: max(440px, calc(520 * var(--u))); text-wrap: pretty; font: 400 max(12px, calc(13 * var(--u)))/max(18px, calc(20 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .86); }
 .cg-declared-own { display: inline-block; max-width: 100%; color: #fff; font-weight: 500; }
-/* The model list (r07; a gallery that teaches, A3): rows in groups by where the model runs, each group under a small
-   label in the faint ink; a row per model (its number key, its name with "Current" after the character's own and under
-   it its maker and size in the faint ink, its price), the chosen row's marker 14 px left of its key, the focused row
-   opened beneath with its maker's own words; the small keys under. The group grows to hold the open row: 620 wide at
-   1920, the same at 1440 by the shared scale. While it holds the list its backing darkens, so every faint line reads at
-   4.5 to 1 or more and the names at 7 to 1 over a sunlit front (DESIGN 17:44, measured with its contrast.py). */
-.cg-group[data-list="true"] { width: calc(620 * var(--u)); --shade-fill: rgba(6, 12, 16, .88); }
-.cg-list { margin-top: var(--space-16); display: grid; row-gap: max(16px, calc(16 * var(--u))); --glyph: max(32px, calc(32 * var(--u))); pointer-events: auto; }
-/* The window's models (L1, DESIGN 11:58): the list's own spacing, the foot faded while more models lie past it, as the
-   told column's; Routine and the keys stand below. */
-.cg-window { display: grid; row-gap: max(16px, calc(16 * var(--u))); }
-.cg-window.cg-more { -webkit-mask-image: linear-gradient(#000 calc(100% - 48px), transparent); mask-image: linear-gradient(#000 calc(100% - 48px), transparent); }
-.cg-group-label { margin: var(--space-8) 0 calc(-8 * var(--u)); font: 400 max(12px, calc(13 * var(--u)))/max(14px, calc(16 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .80); }
-.cg-waiting { margin: 0; text-wrap: pretty; font: 400 max(14px, calc(15 * var(--u)))/max(20px, calc(22 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .86); }
-.wu-root .cg-list > .cg-model, .wu-root .cg-window > .cg-model { position: relative; display: grid; grid-template-columns: var(--glyph) minmax(0, 1fr) auto; column-gap: max(16px, calc(16 * var(--u))); align-items: center;
-  min-height: var(--glyph); margin: 0; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
-.cg-model-named { display: grid; }
-.cg-model-sub { font: 400 max(12px, calc(13 * var(--u)))/max(16px, calc(18 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .80); white-space: nowrap; }
-/* The focused row opened beneath it, inside the group: the maker's words, then where they come from, fainter. */
-.cg-model-open { margin: calc(-8 * var(--u)) 0 0 calc(var(--glyph) + max(16px, calc(16 * var(--u)))); text-wrap: pretty; font: 400 max(14px, calc(15 * var(--u)))/max(20px, calc(22 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .92); }
-.cg-model-from { display: block; color: rgba(255, 255, 255, .80); }
-.cg-model:disabled { cursor: default; }
-.cg-model:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: calc(var(--glyph) / 4); }
-.cg-model-word { font-size: max(18px, calc(19 * var(--u))); line-height: max(24px, calc(26 * var(--u))); white-space: nowrap; }
-.cg-model.cg-on .cg-model-word { font-weight: 500; }
-.cg-model.cg-on::before { content: ''; position: absolute; left: calc(-14 * var(--u)); top: calc(6 * var(--u)); width: 3px; height: calc(20 * var(--u)); border-radius: 1px;
-  background: var(--wash); box-shadow: 0 0 10px rgba(168, 203, 210, .8); }
-.cg-current { margin-left: calc(12 * var(--u)); font: 500 12px/1 var(--font-mono); letter-spacing: .02em; color: var(--live); position: relative; top: -1px; }
-.cg-price { justify-self: end; padding-left: calc(32 * var(--u)); font: 400 max(14px, calc(15 * var(--u)))/1 var(--font-sans); color: rgba(255, 255, 255, .88); white-space: nowrap; }
-.cg-keys { margin-top: var(--space-24); display: flex; gap: var(--space-24); font: 400 max(13px, calc(14 * var(--u)))/max(22px, calc(24 * var(--u))) var(--font-sans); }
-.cg-keys > span { display: flex; align-items: center; gap: var(--space-8); }
 /* The label over a looked-at character (r04): on the speech label's shade (.wu-speech), centred over the head. */
 .cg-look { left: 0; top: 0; color: var(--ink); white-space: nowrap; will-change: transform; }
 .cg-look > * { margin: 0; }

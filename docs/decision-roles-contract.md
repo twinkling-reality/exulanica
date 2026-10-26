@@ -278,7 +278,12 @@ comes from (`from`: `choice`, `choice_over_bound`, `travellers` or `travellers_o
 gate's travellers' mind (`travellers`: `{grant_id, choice_seq, decider, model}`); each person's latest
 model decision, including its `request_id`;
 per model the decisions asked, accepted and applied, why the rest were not acted on, latency and
-cost, over the society's latest 2,000 decisions (`DECISIONS_READ`); and every subject an outside
+cost, with the middle of its known decision costs and how many it is the middle of
+(`cost_median_usd`, the lower of two middles, and `costs_counted`), over the society's latest 2,000
+decisions (`DECISIONS_READ`); each offered model's context window as its manifest entry states it
+(`context_window_tokens`), and in `contract` the largest request a decision here may send, in
+tokens as the most a decision may cost reserves it (`request_tokens_at_most`, null where no
+envelope is stated; `exulanica/api/decision_admission.py`); and every subject an outside
 program decides for under a grant that stands (`outside`), with what the grant view says of its
 program. An outside program's decisions name no model and are neither summarised nor counted among
 the models'. Each `outside` entry gives its subject's latest receipt under the entry's own grant

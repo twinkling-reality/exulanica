@@ -41,7 +41,7 @@ function teoState(extra: State = {}): State {
     model: { name: NEMOTRON, price: { input: '0.06', output: '0.24' } }, connected: true, runLine: null,
     run: { open: false, big: '10 minutes · at most $0.05', small: "Teo's model decides. Everyone else keeps their routine.", busy: false, refusal: null },
     did: rows(), didFocus: 2, canAsk: true, ask: null, lastRun: 'Last run 06:00 to 07:15 · 12 decisions · spent $0.0042',
-    personality: { character: { name: 'Teo', about: ABOUT }, shown: true }, editing: null, choosing: null, canCompare: true, compare: null,
+    personality: { character: { name: 'Teo', about: ABOUT }, shown: true }, editing: null, canCompare: true, compare: null,
     portrait: '/portraits/teo.png', doing: 'Waiting by the bench', decides: `${NEMOTRON} decides for Teo`,
     ...extra,
   };
@@ -53,7 +53,7 @@ function residentState(extra: State = {}): State {
     who: resident, sub: 'Terraces on the bay', assignable: false, model: null, connected: true, runLine: 'The resident follows a routine.',
     run: { open: false, big: '10 minutes · at most $0.05', small: '', busy: false, refusal: null },
     did: [], didFocus: null, canAsk: false, ask: null, lastRun: null,
-    personality: { character: null, shown: true }, editing: null, choosing: null, canCompare: false, compare: null,
+    personality: { character: null, shown: true }, editing: null, canCompare: false, compare: null,
     decides: 'The resident follows a routine',
     ...extra,
   };
@@ -452,33 +452,23 @@ describe("Teo's day keys", () => {
     expect(one(root, '.wu-day-decides')).toBe('A person is playing Teo');
   });
 
-  it('is styled by its own sheet: the model list, Compare and Ask in the right column', () => {
+  it('is styled by its own sheet: Compare and Ask in the right column', () => {
     // The rules for these went with the run strip's sheet once (batch 42), and the list drew as bare bullets.
     const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../../tools/previews/world-workspace/character-page.css'), 'utf8');
     const page = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../../tools/previews/world-workspace/character-page.ts'), 'utf8');
     expect(page).toContain("import './character-page.css';");
-    for (const rule of ['.wu-model-rows {', '.wu-model-row {', '.wu-model-name {', '.wu-model-price {', '.wu-model-current {', '.wu-model-head {', '.wu-model-intro {', '.wu-char-note {', '.wu-orb-row {', '.wu-ask-line {', '.wu-cmp-explain {', '.wu-model-row > .wu-key {']) {
+    for (const rule of ['.wu-model-rows {', '.wu-model-row {', '.wu-model-name {', '.wu-model-price {', '.wu-model-current {', '.wu-model-head {', '.wu-char-note {', '.wu-orb-row {', '.wu-ask-line {', '.wu-cmp-explain {', '.wu-model-row > .wu-key {']) {
       expect(css).toContain(rule);
     }
     expect(css).toMatch(/\.wu-model-rows \{[^}]*list-style: none/u);
   });
 
-  it("keeps choosing a model, Compare's question and Ask in the right column with their own keys", async () => {
-    const { root, act, page } = await open();
+  it("keeps Compare's question and Ask in the right column with their own keys", async () => {
+    const { root, page } = await open();
     const choices = [
       { model: { provider: 'nebius', modelId: 'nvidia/nemotron', name: NEMOTRON, price: { input: '0.06', output: '0.24' } }, current: true },
       { model: null, current: false },
     ];
-    page.draw(teoState({ choosing: { choices, focus: 0, refusal: null, busy: false } }));
-    expect(root.querySelector('.wu-day-did')).toBeNull();
-    expect(all(root, '.wu-day-side .wu-model-name')).toEqual([`${NEMOTRON}Current`, 'Routine']);
-    // The same chooser as the card's (r07, F11): each of the first nine rows carries its number key.
-    expect([...root.querySelectorAll('.wu-model-row')].map((row) => [row.querySelector('.wu-key')?.textContent, row.getAttribute('aria-keyshortcuts')])).toEqual([['1', '1'], ['2', '2']]);
-    expect(keys(root)).toEqual(['↑↓Choose', 'EnterUse this model', 'EscBack']);
-    (root.querySelectorAll('.wu-model-row')[1] as HTMLElement).click();
-    expect(act).toHaveBeenLastCalledWith('choose', 1);
-    keyNamed(root, 'Use this model').click();
-    expect(act).toHaveBeenLastCalledWith('use');
     page.draw(teoState({ compare: { nothing: null, big: 'Ask another model', explain: 'The same moments.', choices: [choices[0]], focus: 0, figure: 'Asking 5 of 24 · $0.0008 of $0.01', asking: true, note: null, canStart: false } }));
     expect(keys(root)).toEqual(['EscStop']);
     // Compare's list is chosen with the arrows alone: no number keys there.
@@ -506,153 +496,6 @@ describe("Teo's day keys", () => {
     expect(act).not.toHaveBeenCalledWith('compareChoose', 0);
     rows[1]!.click();
     expect(act).toHaveBeenLastCalledWith('compareChoose', 1);
-  });
-
-  it("draws the chooser as a gallery: free first in groups, maker and size, the focused row opened with its maker's words (A3)", async () => {
-    const { root, page } = await open();
-    const card = (maker: string, total: string, says: string, licence: string) => ({
-      maker, parameters: { total, active: null }, licence, says, source: `https://huggingface.co/maker/model/blob/${'0'.repeat(40)}/README.md`, readOn: '2026-10-23',
-    });
-    const nebius = 'Nebius Token Factory, which serves open models behind one OpenAI-compatible API.';
-    const says = 'This model is optimized for collaborative agents and high-volume workloads.';
-    const choices = [
-      { model: { provider: 'ollama_local', providerDescription: 'This computer, through Ollama.', modelId: 'qwen/4b', name: 'Qwen3 4B Instruct', price: { input: '0', output: '0' }, local: true,
-        card: card('Qwen', '4.0B', 'Improvements in general capabilities.', 'Apache 2.0') }, current: false },
-      { model: { provider: 'nebius', providerDescription: nebius, modelId: 'nvidia/nemotron', name: NEMOTRON, price: { input: '0.06', output: '0.24' },
-        card: card('NVIDIA', '30B', says, 'NVIDIA Nemotron Open Model License') }, current: true },
-      { model: null, current: false },
-    ];
-    page.draw(teoState({ choosing: { choices, focus: 1, refusal: null, busy: false } }));
-    expect(all(root, '.wu-day-side .wu-model-intro')).toEqual(['Open models, each from its maker. Picking one spends nothing. Only a run spends.']);
-    expect(all(root, '.wu-gallery-label')).toEqual(['On this computer, free', 'With your Nebius Token Factory key, per million tokens']);
-    expect(all(root, '.wu-model-sub')).toEqual(['Qwen · 4B', 'NVIDIA · 30B']);
-    expect(all(root, '.wu-model-price')).toEqual(['Free', '$0.06 in · $0.24 out', 'No AI model · Free']);
-    // Only the focused row opens, inside itself: the maker's words, then on a line of their own where they come from and the licence.
-    expect([...root.querySelectorAll('.wu-model-open')].map((open) => open.firstChild?.textContent)).toEqual([`“${says}”`]);
-    expect(all(root, '.wu-model-open > .wu-model-from')).toEqual(["from NVIDIA's model card · NVIDIA Nemotron Open Model License"]);
-    expect(root.querySelectorAll('.wu-model-row')[1]!.querySelector('.wu-model-open')).not.toBeNull();
-    // None running on this computer yet: its group stands with its one line and no key; a guest's key group is the host's.
-    page.draw(teoState({ choosing: { choices: choices.slice(1), focus: 0, refusal: null, busy: false, waiting: true, fromServer: true } }));
-    expect(all(root, '.wu-gallery-label')).toEqual(['On this computer, free', "From this server's budget, per million tokens"]);
-    expect(all(root, '.wu-gallery-waiting')).toEqual(['None is running yet. Start one with a local model runner, and it shows here, free.']);
-    expect([...root.querySelectorAll('.wu-model-row')].map((row) => row.querySelector('.wu-key')?.textContent)).toEqual(['1', '2']);
-  });
-
-  it("stands a guest's model asking which once can cost more than they have left faint after the last model, with why and no key (U2)", async () => {
-    const { root, page } = await open();
-    const nemotron = { provider: 'nebius', providerDescription: 'Nebius Token Factory.', modelId: 'nvidia/nemotron', name: NEMOTRON, price: { input: '0.06', output: '0.24' }, card: null };
-    const line = 'Asking it once can cost up to $0.043, more than the $0.03 left for AI models here.';
-    const over = [{ word: 'Nemotron 3 Ultra 550B', sub: 'NVIDIA · 550B', line }];
-    page.draw(teoState({ choosing: { choices: [{ model: nemotron, current: false }, { model: null, current: true }], focus: 0, refusal: null, busy: false, fromServer: true, over } }));
-    expect(all(root, '.wu-gallery-waiting')).toEqual([`Nemotron 3 Ultra 550BNVIDIA · 550B${line}`]);
-    // In the group of the last model offered, under no label of its own; only the models offered and Routine have keys.
-    expect(all(root, '.wu-gallery-label')).toEqual(["From this server's budget, per million tokens"]);
-    expect([...root.querySelectorAll('.wu-model-row')].map((row) => row.querySelector('.wu-key')?.textContent)).toEqual(['1', '2']);
-    expect(root.querySelector('.wu-gallery-waiting')!.closest('button')).toBeNull();
-  });
-
-  it("keeps Current on a faint row that is the person's own model, after its name (U3b)", async () => {
-    const { root, page } = await open();
-    const nemotron = { provider: 'nebius', providerDescription: 'Nebius Token Factory.', modelId: 'nvidia/nemotron', name: NEMOTRON, price: { input: '0.06', output: '0.24' }, card: null };
-    const line = 'Asking it once can cost up to $0.043, more than the $0.03 left for AI models here.';
-    const over = [{ word: 'Nemotron 3 Ultra 550B', sub: 'NVIDIA · 550B', line, current: true }];
-    page.draw(teoState({ choosing: { choices: [{ model: nemotron, current: false }, { model: null, current: false }], focus: 0, refusal: null, busy: false, fromServer: true, over } }));
-    expect(all(root, '.wu-gallery-waiting')).toEqual([`Nemotron 3 Ultra 550BCurrentNVIDIA · 550B${line}`]);
-    expect(all(root, '.wu-gallery-waiting .wu-model-current')).toEqual(['Current']);
-  });
-});
-
-describe("a person's runner's models (L1)", () => {
-  // What a runner states (a model's family, the name it serves it by, its licence) is the person's own text: drawn as
-  // text in both choosers, never as markup.
-  const mark = '<img src=x onerror="window.ranMarkup = true">';
-  const digest = (c: string) => `local/sha256-${c.repeat(64)}`;
-  const able = {
-    provider: 'ollama_local', providerDescription: 'This computer, through Ollama.', modelId: digest('a'), name: `Llama · 1.2B${mark}`,
-    price: { input: '0', output: '0' }, local: true, card: null,
-    runner: { family: `llama${mark}`, size: '1.2B', servedAs: `small${mark}`, licence: `A LICENSE ${mark}`, checkedMs: 238 },
-  };
-  const faint = (c: string, name: string, state: string, reason: string | null) => ({
-    provider: 'ollama_local', modelId: digest(c), name, family: null, size: null, servedAs: `${c}${mark}`, licence: null, state, reason,
-    contextTokens: 4096, deadlineMs: 20000, checkedMs: null,
-  });
-  const runner = [faint('b', `Llama · 1.2B${mark}`, 'checking', null), faint('c', `tiny${mark}`, 'not_able', 'form')];
-
-  it('draws them on the page as text, never as markup', async () => {
-    const { root, page } = await open();
-    page.draw(teoState({ choosing: { choices: [{ model: able, current: false }, { model: null, current: false }], focus: 0, refusal: null, busy: false, runner } }));
-    expect(root.querySelector('img[src="x"]')).toBeNull();
-    expect(all(root, '.wu-model-name')[0]).toBe(`Llama · 1.2B${mark}`);
-    expect(all(root, '.wu-model-sub')).toEqual([`Your runner calls it small${mark}`]);
-    expect(all(root, '.wu-model-open > .wu-model-from')).toEqual([`from your runner · \u201cA LICENSE ${mark}\u201d`]);
-    expect(all(root, '.wu-gallery-waiting')).toEqual([
-      `Llama · 1.2B${mark} · Checking that it can decide for a person here…Your runner calls it b${mark}`,
-      `tiny${mark}It did not answer with one of the offered choices when checked.`,
-    ]);
-    expect(all(root, '.wu-gallery-label')).toEqual(['On this computer, free', 'Also on this computer, not able to decide for a person here']);
-  });
-
-  it('draws them in the model list as text, never as markup', async () => {
-    const { runnerRows } = await (import('../../../../tools/previews/world-workspace/' + 'character-group.ts') as Promise<{
-      runnerRows(block: unknown): HTMLElement[];
-    }>);
-    const host = document.createElement('div');
-    host.append(...runnerRows({
-      group: 'On this computer, free',
-      checking: [{ word: `Llama · 1.2B${mark} · Checking that it can decide for a person here…`, sub: `Your runner calls it b${mark}` }],
-      label: 'Also on this computer, not able to decide for a person here',
-      notAble: [{ word: `tiny${mark}`, sub: null, line: 'It did not answer with one of the offered choices when checked.' }],
-    }));
-    expect(host.querySelector('img')).toBeNull();
-    expect(all(host, '.cg-waiting')).toEqual([
-      `Llama · 1.2B${mark} · Checking that it can decide for a person here…Your runner calls it b${mark}`,
-      `tiny${mark}It did not answer with one of the offered choices when checked.`,
-    ]);
-    expect(all(host, '.cg-group-label')).toEqual(['On this computer, free', 'Also on this computer, not able to decide for a person here']);
-  });
-
-  it("keeps Current on the world list's faint row that is the person's own model (U3b)", async () => {
-    const { runnerRows } = await (import('../../../../tools/previews/world-workspace/' + 'character-group.ts') as Promise<{
-      runnerRows(block: unknown): HTMLElement[];
-    }>);
-    const host = document.createElement('div');
-    const line = 'Asking it once can cost up to $0.043, more than the $0.03 left for AI models here.';
-    host.append(...runnerRows({ checking: [], label: null, notAble: [
-      { word: 'Nemotron 3 Ultra 550B', sub: 'NVIDIA · 550B', line, current: true },
-      { word: 'Nemotron 3 Super 120B', sub: 'NVIDIA · 120B', line, current: false },
-    ] }));
-    expect(all(host, '.cg-waiting .cg-current')).toEqual(['Current']);
-    expect(all(host, '.cg-waiting')[0]).toBe(`Nemotron 3 Ultra 550BCurrentNVIDIA · 550B${line}`);
-  });
-});
-
-describe("the world's model list (L1, DESIGN 11:58)", () => {
-  it('keeps Routine below the window, fades the foot while more lie past it, and folds the runner\'s not-able rows', async () => {
-    const group = await (import('../../../../tools/previews/world-workspace/' + 'character-group.mjs') as Promise<{
-      modelGroup(input: Record<string, unknown>): unknown;
-    }>);
-    const drawn = await (import('../../../../tools/previews/world-workspace/' + 'character-group.ts') as Promise<{
-      characterGroup(input: { scale: () => number; onAction: (action: string) => void }): { root: HTMLElement; set(content: unknown): void };
-    }>);
-    const many = Array.from({ length: 12 }, (_, n) => ({ provider: 'ollama_local', modelId: `m${n}`, name: `Model ${n + 1}`, local: true, price: { input: '0', output: '0' } }));
-    const runner = [{ provider: 'ollama_local', modelId: `local/sha256-${'c'.repeat(64)}`, name: 'tiny', family: null, size: null,
-      servedAs: 'tiny:1m', licence: null, state: 'not_able', reason: 'form', contextTokens: 4096, deadlineMs: 20000, checkedMs: null }];
-    const shown = drawn.characterGroup({ scale: () => 1, onAction: () => {} });
-    document.body.append(shown.root);
-    shown.set(group.modelGroup({ who: teo, models: many, focus: 0, runner }));
-    const window = shown.root.querySelector('.cg-window')!;
-    expect(window.classList.contains('cg-more')).toBe(true);
-    expect([...window.querySelectorAll('.cg-model-word')].map((node) => node.textContent)).toEqual(Array.from({ length: 8 }, (_, n) => `Model ${n + 1}`));
-    // Routine stands below the window, in the list itself, with the next number (Teo's current: no model).
-    const routine = [...shown.root.querySelectorAll('.cg-list > .cg-model')];
-    expect(routine.map((node) => [node.querySelector('.wu-glyph')?.textContent, node.querySelector('.cg-model-word')?.textContent])).toEqual([['9', 'RoutineCurrent']]);
-    // The not-able rows fold into one faint line at the foot of this computer's group, with where their reasons are told:
-    // past the window here, in view once the window reaches the group's foot.
-    expect(all(shown.root, '.cg-waiting')).toEqual([]);
-    shown.set(group.modelGroup({ who: teo, models: many, focus: 11, runner }));
-    expect(shown.root.querySelector('.cg-window')!.classList.contains('cg-more')).toBe(false);
-    expect(all(shown.root, '.cg-window .cg-waiting')).toEqual(['And 1 more on this computer that cannot decide for a person here.Their reasons are on Teo\'s day page.']);
-    shown.root.remove();
   });
 });
 

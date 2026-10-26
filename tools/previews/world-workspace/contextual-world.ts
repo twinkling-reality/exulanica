@@ -11,7 +11,8 @@ import { accessHeaders } from '/src/config.ts';
 import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
-import { SAID_READ, choosableModels, deciderOf, freeHere, groupContent, keepLastSaid, modelGroup, modelPicker, noModelLine, noneRunningHere, offersModels, openWhileOffered, overBudget, overRows, questionGroup } from './character-group.mjs';
+import { SAID_READ, choosableModels, deciderOf, freeHere, groupContent, keepLastSaid, noModelLine, offersModels, overBudget, overRows, questionGroup } from './character-group.mjs';
+import { mountModelGallery } from './model-gallery.ts';
 import { compareFirst, compareStep } from './compare-words.mjs';
 import { PAGE_FRAMING, PERSON_RING_METRES, askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, modelChoosableFor, outsideDecider, outsideOf, ownPeople, unlistedOutside, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
 import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefusalWords, outOfViewNote, overLine, pageSub, runSectionLine } from './character-words.mjs';
@@ -504,7 +505,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   function release() {
     stopFollowing();
-    ++serial; held = null; picker.drop(); root.dataset.held = '';
+    ++serial; held = null; root.dataset.held = '';
     presence.choose(null); presence.group(null);
   }
   // A run (run-watch.ts): the pill's run line and Stop, and why it ended (r09).
@@ -519,8 +520,6 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const view = subjectView(row), { connected } = modelOf(row);
     const offer = offers.get(row.key)?.offer ?? null;
     const assignable = !readOnly && Boolean(inventory && offer && offersModels(subjectReads.models) && assignmentSubject(inventory, row, offer));
-    const picking = picker.of(row);
-    if (picking) return modelGroup({ who: view.who, models: choosableModels(subjectReads.models), current: modelOf(row).model, focus: picking.focus, refusal: picking.refusal, busy: picking.busy, waiting: noneRunningHere(subjectReads.models), fromServer: !state.credentials.token, runner: subjectReads.models?.runnerModels ?? [], over: overRows(subjectReads.models, modelOf(row).model) });
     if (asking) {
       // J28: the run asks everyone with a model, the chosen character first, each as the tag calls them (J20).
       const askerIds = [row.scene.id, ...(subjectReads.models?.choices ?? []).filter(item => item.model && item.subjectId !== row.scene.id).map(item => item.subjectId)];
@@ -534,12 +533,30 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       running: Boolean(runWatch.run), left: runWatch.run ? timeLeft(runWatch.run.endsBy, Date.now()) : null, following: followView.active(), reading: view.reading, noModel: noModelLine(subjectReads.models, view.who), declared: view.outside?.declared ?? null });
   }
   let groupActions = new Set(), groupFirst = 0;
-  // Choose a model in the group (r07, character-group.mjs): the page's own write; the Run question then asks again.
-  const picker = modelPicker({ models: () => choosableModels(subjectReads.models), offered: () => offersModels(subjectReads.models), currentOf: (row) => modelOf(row).model,
+  // Choose a model on the gallery page (G2, model-gallery.ts) over the world or the day page: the page's own write; the Run
+  // question, or the day page's run, then asks again. Esc goes back to where M was pressed, the person still chosen.
+  let galleryOver = null;
+  const gallery = mountModelGallery({ root, read: () => subjectReads.models, still: () => pictures.still(), fromServer: () => !state.credentials.token,
+    about: (row) => ({ who: subjectView(row).who, doing: subjectView(row).doing ?? null, current: modelOf(row).model ?? null }),
     write: async (row, selected, key) => (await recordEntityModel({ entry, subjectId: row.scene.id, selected, key, refresh: () => refreshSubject(row),
-      client: modelsClient, current: () => picker.of(row) !== null && held === row && current() })).verified,
+      client: modelsClient, current: () => gallery.isOpen && current() })).verified,
     refusal: (error, row) => modelRefusalWords(error.code ?? 'stale', subjectView(row).who),
-    onUsed: (verified) => { subjectReads.models = verified; if (asking) { asking.shown = runWatch.limits(verified); asking.refusal = null; } } });
+    chosen: (verified) => { subjectReads.models = verified; if (asking) { asking.shown = runWatch.limits(verified); asking.refusal = null; } if (galleryOver) { galleryOver.run.shown = runWatch.limits(verified); galleryOver.run.refusal = null; } },
+    closed() {
+      otherPage = null;
+      if (galleryOver) { const showing = galleryOver; galleryOver = null; showing.page.hide(false); drawPage(); return; }
+      pictures.release(); canvas.inert = false; b.setFreeCursorActive(false); b.setControlsEnabled(current());
+      guidance.hidden = false; worlds.hidden = false; presence.setCovered(false); canvas.focus({ preventScroll: true });
+    } });
+  function openGallery(row) {
+    if (!row || gallery.isOpen || readOnly || !subjectReads.models) return;
+    galleryOver = pageShown() ? pageView : null;
+    otherPage = gallery;
+    if (galleryOver) { galleryOver.page.hide(true); gallery.open(row); return; }
+    stopFollowing(); presence.setCovered(true); notice('');
+    b.setControlsEnabled(false); b.setFreeCursorActive(true); canvas.inert = true; guidance.hidden = true; worlds.hidden = true;
+    void pictures.takeStill().finally(() => gallery.open(row));
+  }
   // Every model a run asks here is on this computer, or null before the models are read: no money figure (A2).
   const runFree = () => subjectReads.models ? freeHere(subjectReads.models, subjectReads.models.choices.filter(choice => choice.model && !choice.refusal).map(choice => choice.model)) : null;
   const runWatch = mountRunWatch({ pill: corners, entry, credentials, isCurrent: current, readOnly, free: runFree,
@@ -653,8 +670,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   function act(action) {
     if (!held) return;
     if (action === 'details') void openPage(held);
-    else if (action === 'model' && held.scene.type === 'being' && !readOnly && subjectReads.models) picker.open(held);
-    else if (action.startsWith('use:')) void picker.use(Number(action.slice(4)));
+    else if (action === 'model' && held.scene.type === 'being' && !readOnly && subjectReads.models) openGallery(held);
     else if (action === 'follow' && held.scene.type === 'being') followView.toggle();
     else if (action === 'run') askRun();
     else if (action === 'stop') void stopNow();
@@ -673,9 +689,6 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const from = closed?.state === 'closed' && closed.endTick !== null ? worldTime(closed.startTick, start ?? -1) : null;
     const to = from ? worldTime(closed.endTick, start) : null;
     const lastRun = from && to && ranIn(pageView.events ?? [], pageView.row.scene.id, closed) ? lastRunLine({ from: from.hhmm, to: to.hhmm, decisions: closed.used.decisions, spent: closed.used.usd }) : null, lastRunWhy = lastRun ? runStopWords(closed) : null;
-    const choices = (pageView.choosing = openWhileOffered(pageView.choosing, subjectReads.models))
-      ? [...choosableModels(subjectReads.models).map(item => ({ model: item, current: Boolean(model && item.provider === model.provider && item.modelId === model.modelId) })), { model: null, current: !model }]
-      : null;
     const offer = offers.get(pageView.row.key)?.offer;
     const assignable = !readOnly && modelChoosableFor(subjectReads.models, pageView.row.scene.id) && Boolean(inventory && offers.has(pageView.row.key) && offersModels(subjectReads.models) && assignmentSubject(inventory, pageView.row, offer ?? null));
     return {
@@ -692,7 +705,6 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         asked: pageView.ask.asked, answer: pageView.ask.answer, failure: pageView.ask.failure } : null,
       personality: pageView.personality ? { character: pageView.personality.character, shown: pageView.personality.shown } : null,
       editing: pageView.editing ? { session: pageView.editing.session, refusal: pageView.editing.refusal, busy: pageView.editing.busy } : null,
-      choosing: pageView.choosing ? { choices, focus: pageView.choosing.focus, refusal: pageView.choosing.refusal, busy: pageView.choosing.busy, waiting: noneRunningHere(subjectReads.models), fromServer: !state.credentials.token, runner: subjectReads.models?.runnerModels ?? [], over: overRows(subjectReads.models, model) } : null,
       canCompare: comparable(pageView) && (pageView.did ?? []).some(modelAnswered),
       compare: pageView.compare ? records.compare(pageView, view.who) : null, ...records.day(pageView, view, Boolean(subjectReads.models)),
     };
@@ -740,33 +752,27 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   function pageAct(action, index?) {
     if (!pageView) return;
-    const choosing = pageView.choosing, editing = pageView.editing;
+    const editing = pageView.editing;
     const compare = pageView.compare;
     if (action === 'back') {
       if (compare) { pageView.compare = null; drawPage(); }
-      else if (editing) { pageView.editing = null; drawPage(); } else if (choosing) { pageView.choosing = null; drawPage(); } else if (pageView.ask) { pageView.ask = null; drawPage(); } else closePage();
+      else if (editing) { pageView.editing = null; drawPage(); } else if (pageView.ask) { pageView.ask = null; drawPage(); } else closePage();
     }
-    else if (action === 'compare' && !readOnly && !choosing && !editing && !compare) { pageView.compare = { focus: compareFirst(compareModels(pageView.row) ?? []), offers: new Map(), asking: null, answers: new Map(), single: index ?? null }; readOffer(pageView); drawPage(); }
+    else if (action === 'compare' && !readOnly && !editing && !compare) { pageView.compare = { focus: compareFirst(compareModels(pageView.row) ?? []), offers: new Map(), asking: null, answers: new Map(), single: index ?? null }; readOffer(pageView); drawPage(); }
     else if (action === 'compareChoose' && compare && !compare.asking && !compareModels(pageView.row)?.[index]?.over) { compare.focus = index; readOffer(pageView); drawPage(); }
     else if (action === 'compareStart' && compare && !compare.asking) void compareAsk(pageView);
     else if (action === 'row' && pageView.did?.[index] && !pageView.did[index].heard) { pageView.didFocus = index; pageView.didMoved = index > (dayFocus({ rows: pageView.did, focus: null }) ?? -1); drawPage(); }
-    else if (action === 'inspect' && !choosing && !pageView.ask) void openDecision(index ?? pageView.didFocus);
-    else if (action === 'ask' && !readOnly && !choosing) { pageView.ask = { focus: 0, busy: false, asked: null, answer: null, failure: null, serial: 0 }; drawPage(); }
+    else if (action === 'inspect' && !pageView.ask) void openDecision(index ?? pageView.didFocus);
+    else if (action === 'ask' && !readOnly) { pageView.ask = { focus: 0, busy: false, asked: null, answer: null, failure: null, serial: 0 }; drawPage(); }
     else if (action === 'question' && pageView.ask) void askQuestion(index ?? pageView.ask.focus);
-    else if (action === 'personality' && pageView.personality && pageView.placedId && !readOnly && !choosing) {
+    else if (action === 'personality' && pageView.personality && pageView.placedId && !readOnly) {
       const written = pageView.personality.character;
       pageView.editing = { session: crypto.randomUUID(), name: written?.name ?? '', about: written?.about ?? '', refusal: null, busy: false };
       drawPage();
     }
     else if (action === 'draft' && editing) { editing.name = index?.name ?? ''; editing.about = index?.about ?? ''; }
     else if (action === 'save' && editing) void savePersonality();
-    else if (action === 'model' && pageState().assignable) {
-      const current = choosableModels(subjectReads.models).findIndex(item => item.provider === modelOf(pageView.row).model?.provider && item.modelId === modelOf(pageView.row).model?.modelId);
-      pageView.choosing = { focus: Math.max(current, 0), refusal: null, busy: false, key: crypto.randomUUID() };
-      drawPage();
-    }
-    else if (action === 'choose' && choosing) { choosing.focus = index; choosing.refusal = null; drawPage(); }
-    else if (action === 'use' && choosing) void useModel(index ?? choosing.focus);
+    else if (action === 'model' && pageState().assignable) openGallery(pageView.row);
     else if (action === 'run' && !readOnly) void startNow(pageView.run);
     else if (action === 'stop') void stopNow();
   }
@@ -796,22 +802,6 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       }
     } catch { editing.refusal = personalityRefusalWords(null); }
     finally { editing.busy = false; drawPage(); }
-  }
-  async function useModel(index) {
-    const showing = pageView, choosing = showing?.choosing;
-    if (!choosing || choosing.busy || !subjectReads.models) return;
-    const list = choosableModels(subjectReads.models);
-    const picked = index < list.length ? list[index] : null;
-    choosing.busy = true; choosing.refusal = null; drawPage();
-    try {
-      const { verified } = await recordEntityModel({ entry, subjectId: showing.row.scene.id, selected: picked, key: choosing.key, refresh: () => refreshSubject(showing.row), client: modelsClient, current: () => showing === pageView && current() });
-      subjectReads.models = verified;
-      // A new model changes who decides in a run, so the run the page offers is read again; an R pressed while it saved starts it now.
-      if (showing === pageView) { showing.choosing = null; showing.run.shown = runWatch.limits(verified); showing.run.refusal = null; if (choosing.runAfter && !runWatch.run) void startNow(showing.run); }
-    } catch (error) {
-      choosing.refusal = modelRefusalWords(error.code ?? 'stale', subjectView(showing.row).who);
-      choosing.key = crypto.randomUUID(); choosing.runAfter = false;
-    } finally { choosing.busy = false; drawPage(); }
   }
   // Ask (8.6): the Companion's three questions, answered from this world's records alone.
   const companionClient = new CompanionAskClient(credentials);
@@ -1003,7 +993,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const page = openCharacterPage(root, (action, index) => pageAct(action, index));
     // Only a being its owner placed can have a personality: its inventory reference is the placed thing.
     const placedId = row.reference?.source === 'authored-thing' ? row.reference.id : null;
-    pageView = { page, row, did: null, didFocus: null, didMoved: false, events: [], ask: null, decision: null, compare: null, comparison: null, choosing: null, personality: null, editing: null, placedId, run: { busy: false, refusal: null, shown: runWatch.limits(subjectReads.models) }, before: { pose: { ...b.controls.state }, hold: b.controls.hold }, ease: null };
+    pageView = { page, row, did: null, didFocus: null, didMoved: false, events: [], ask: null, decision: null, compare: null, comparison: null, personality: null, editing: null, placedId, run: { busy: false, refusal: null, shown: runWatch.limits(subjectReads.models) }, before: { pose: { ...b.controls.state }, hold: b.controls.hold }, ease: null };
     presence.setCovered(true); notice('');
     b.setControlsEnabled(false); b.setFreeCursorActive(true); canvas.inert = true;
     guidance.hidden = true; worlds.hidden = true;
@@ -1158,9 +1148,9 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (otherPage) { otherPage.key(event); event.stopImmediatePropagation(); return; }
     if ((pageShown() || asking) && (event.metaKey || event.ctrlKey || event.altKey)) { event.stopImmediatePropagation(); return; }
     if (pageShown()) {
-      // A page: Esc back, M model, N personality, R run or stop; while choosing a model, arrows and
-      // Enter; while writing a personality, Enter saves, Esc cancels and every other key types.
-      const choosing = pageView.choosing, ask = pageView.ask, decision = pageView.decision;
+      // A page: Esc back, M model (the gallery page over it), N personality, R run or stop; while writing a
+      // personality, Enter saves, Esc cancels and every other key types.
+      const ask = pageView.ask, decision = pageView.decision;
       const comparison = pageView.comparison, compare = pageView.compare;
       if (comparison) {
         // Compare's result (12b): the arrows step the moments, Enter uses the asked model, Esc goes back.
@@ -1217,12 +1207,12 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         return;
       }
       if (event.code === 'Escape') { event.preventDefault(); if (!event.repeat) pageAct('back'); }
-      else if (event.code === 'KeyN' && !choosing && !event.repeat) { event.preventDefault(); pageAct('personality'); }
-      else if (event.code === 'KeyM' && !choosing && !event.repeat) { event.preventDefault(); pageAct('model'); }
-      else if (event.code === 'KeyR' && (!choosing || choosing.busy) && !event.repeat) { event.preventDefault(); if (choosing) choosing.runAfter = true; else pageAct(runWatch.run ? 'stop' : 'run'); }
-      else if (event.code === 'KeyC' && !choosing && !event.repeat && pageState().canCompare) { event.preventDefault(); pageAct('compare'); }
-      else if (event.code === 'KeyQ' && !choosing && !event.repeat) { event.preventDefault(); pageAct('ask'); }
-      else if (!choosing && (event.code === 'ArrowUp' || event.code === 'ArrowDown') && pageView.did?.length) {
+      else if (event.code === 'KeyN' && !event.repeat) { event.preventDefault(); pageAct('personality'); }
+      else if (event.code === 'KeyM' && !event.repeat) { event.preventDefault(); pageAct('model'); }
+      else if (event.code === 'KeyR' && !event.repeat) { event.preventDefault(); pageAct(runWatch.run ? 'stop' : 'run'); }
+      else if (event.code === 'KeyC' && !event.repeat && pageState().canCompare) { event.preventDefault(); pageAct('compare'); }
+      else if (event.code === 'KeyQ' && !event.repeat) { event.preventDefault(); pageAct('ask'); }
+      else if ((event.code === 'ArrowUp' || event.code === 'ArrowDown') && pageView.did?.length) {
         event.preventDefault();
         // The arrows step over the lines heard (T6).
         const step = event.code === 'ArrowUp' ? -1 : 1;
@@ -1231,22 +1221,12 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         if (pageView.did[next]) pageAct('row', next);
         else if (step > 0) void readDid(true);
       }
-      else if (choosing && ['ArrowUp', 'ArrowDown'].includes(event.code)) {
-        event.preventDefault();
-        const last = choosableModels(subjectReads.models).length;
-        pageAct('choose', Math.max(0, Math.min(last, choosing.focus + (event.code === 'ArrowUp' ? -1 : 1))));
-      }
-      else if (choosing && (event.code === 'Enter' || (/^Digit[1-9]$/u.test(event.code) && Number(event.code.slice(5)) <= choosableModels(subjectReads.models).length + 1)) && !event.repeat) { event.preventDefault(); pageAct('use', event.code === 'Enter' ? undefined : Number(event.code.slice(5)) - 1); }
       else if (event.code === 'Enter' && (event.target as Element | null)?.closest?.('.wu-page button')) return;
-      else if (event.code === 'Enter' && !choosing && !event.repeat) { event.preventDefault(); pageAct('inspect'); }
+      else if (event.code === 'Enter' && !event.repeat) { event.preventDefault(); pageAct('inspect'); }
       else if (event.code === 'Tab') return;
       else event.preventDefault();
       event.stopImmediatePropagation(); return;
     }
-    // The model list (r07) keeps its keys; movement still moves.
-    const listed = held ? picker.key(event, groupFirst, Boolean((event.target as Element | null)?.closest?.('.cw-beside button'))) : false;
-    if (listed === 'pass') return;
-    if (listed) { event.stopImmediatePropagation(); return; }
     if (asking) {
       // The question before a run keeps its answers together: Enter runs, Esc puts it away.
       if (event.code === 'Enter' && !event.repeat) { event.preventDefault(); if (!(event.target as Element | null)?.closest?.('.cw-beside button')) questionAct('run'); else return; }
@@ -1303,8 +1283,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const targetFrame = target && screenFrame(target);
     const distance = targetFrame ? reachDistance(target) : Infinity;
     targetReachable = Boolean(target && inspectionReach(distance, targetReachable));
-    corners.keysTaken(Boolean(held && (picker.of(held) || asking))); corners.frame(now);
-    // The Back corner says Back while something is chosen, the Run question and the model list included (r07, r08):
+    corners.keysTaken(Boolean(held && asking)); corners.frame(now);
+    // The Back corner says Back while something is chosen, the Run question included (r08):
     // they are the group's own states, and Esc goes back from them.
     if (!build?.active()) corners.back(held ? CORNER_WORDS.back : CORNER_WORDS.yourWorlds); // build mode keeps its own
     corners.reticle.hidden = pageShown(); presence.cover(corners.reticle);
@@ -1350,8 +1330,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
         const half = ring.rx * BODY_HALF_WIDTH;
         presence.place({ bounds: { left: Math.min(heldFrame.left, ring.x - half), right: Math.max(heldFrame.right, ring.x + half), top: heldFrame.top, bottom: heldFrame.bottom,
           headY, waistY: headY + (ring.y - headY) * CARD_WAIST }, prefer: awaySide(shownPops, ring.x), head: { x: heldFrame.headInView ? heldFrame.overhead.x : ring.x, y: headY } });
-      } else if (!scened.showing && (picker.of(held) || asking)) { const head = targetPoint(held, true), at = head && b.camera.camera.worldToScreen(head), right = head && head.clone().sub(b.camera.getPosition()).dot(b.camera.right) >= 0;
-        // P7: a group with its list or Run question open holds where it stood, its leader from where its person left the view.
+      } else if (!scened.showing && asking) { const head = targetPoint(held, true), at = head && b.camera.camera.worldToScreen(head), right = head && head.clone().sub(b.camera.getPosition()).dot(b.camera.right) >= 0;
+        // P7: a group with its Run question open holds where it stood, its leader from where its person left the view.
         presence.hold(at && at.z > 0 ? { x: Math.max(0, Math.min(innerWidth, at.x)), y: Math.max(0, Math.min(innerHeight, at.y)) } : { x: right ? innerWidth : 0, y: innerHeight / 2 }); } else presence.place(null);
     } else { groundRing.hide(); heldInView = false; }
     // Lines over whoever said one or whose mind chose something (N28 section 4, T1 to T4), none over a record page

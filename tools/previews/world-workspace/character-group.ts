@@ -13,57 +13,15 @@ const SVG = 'http://www.w3.org/2000/svg';
 /** One key row: what it does, its key, its word and its aria-keyshortcuts value. */
 export interface GroupRow { readonly action: string; readonly key: string; readonly word: string; readonly shortcut: string; readonly disabled?: boolean }
 
-/**
- * One row of the model list (r07, A3): its number key, the model's name and under it its maker and size (`sub`), its
- * price, whether it is theirs now or the one chosen, the label of the group it starts in the window (`label`), and on
- * the focused row its maker's own words (`open`).
- */
-export interface ModelRow {
-  readonly action: 'use'; readonly index: number; readonly key: string; readonly word: string; readonly sub: string | null; readonly price: string;
-  readonly current: boolean; readonly on: boolean; readonly label: string | null; readonly open: { readonly said: string; readonly from: string | null } | null;
-  /** After this computer's last choosable row: its runner's models not offered (character-group.mjs runnerRows). */
-  readonly runner?: RunnerRows | null;
-  /** After the last model offered: a guest's models one decision with which costs more than they have left (U2). */
-  readonly over?: RunnerRows | null;
-}
-
-/** A runner's models not offered (L1): faint, with no number and no focus; `group` where they stand under its label. */
-export interface RunnerRows {
-  readonly checking: readonly { readonly word: string; readonly sub: string | null }[];
-  readonly label: string | null;
-  readonly notAble: readonly { readonly word: string; readonly sub: string | null; readonly line: string; readonly current?: boolean }[];
-  /** In the world's list, the not-able rows folded into one line and where their reasons are told (DESIGN 11:58). */
-  readonly fold?: { readonly line: string; readonly sub: string } | null;
-  readonly group?: string;
-}
-
-/** The model list in the group's place of its rows (r07, A3): this computer's group where none runs yet, the rows in their groups, and the small keys. */
-export interface ModelList {
-  readonly waiting: { readonly label: string; readonly line: string } | null;
-  /** This computer's runner's models not offered, under its label at the top, where it offers none (L1). */
-  readonly runner?: RunnerRows | null;
-  /** A guest's models one decision with which costs more than they have left, first where no model is offered (U2). */
-  readonly over?: RunnerRows | null;
-  readonly first: number;
-  /** The rows: the window's models, then Routine, which stands below them whatever the window. */
-  readonly rows: readonly ModelRow[];
-  /** More models past the window's foot, which then fades (DESIGN 11:58). */
-  readonly more?: boolean;
-  readonly keys: readonly { readonly keys: readonly string[]; readonly word: string }[];
-  readonly busy: boolean;
-}
-
 /** What the group says (character-group.mjs groupContent). */
 export interface GroupContent {
   readonly name: string;
   readonly doing: string | null;
   /** The last line said, in curly quotes, and under it to whom and when; null when nothing was said yet. */
   readonly said: { readonly line: string; readonly under: string | null } | null;
-  /** The Run question's line of whose models decide (r08), or that picking spends nothing (r07); null in the group's own state. */
+  /** The Run question's line of whose models decide (r08); null in the group's own state. */
   readonly note: string | null;
   readonly rows: readonly GroupRow[];
-  /** The model list while a model is chosen (r07); null otherwise. */
-  readonly list: ModelList | null;
   /** Who decides for them now, or the run's model and cap; null while their record is read. */
   readonly print: string | null;
   /** Under the print, fainter: when a run stops (r08); null otherwise. */
@@ -149,7 +107,6 @@ export function characterGroup({ scale, onAction }: { readonly scale: () => numb
         rows.classList.add('cg-rows');
         parts.push(rows);
       }
-      if (content.list) parts.push(...modelList(content.list, onAction));
       if (content.print) {
         const print = text('p', 'cg-print', content.print);
         if (content.refused) { print.classList.add('cg-refused'); print.setAttribute('role', 'status'); }
@@ -164,7 +121,6 @@ export function characterGroup({ scale, onAction }: { readonly scale: () => numb
         parts.push(declared);
       }
       group.dataset.refused = String(content.refused);
-      group.dataset.list = String(content.list !== null);
       group.replaceChildren(...parts);
       group.setAttribute('aria-label', content.name);
       placed = '';
@@ -184,84 +140,6 @@ export function characterGroup({ scale, onAction }: { readonly scale: () => numb
     },
     remove() { root.remove(); },
   };
-}
-
-/**
- * The model list's parts (r07, A3): the rows in groups, each group under its label (this computer's with its one line
- * where none runs yet), a button per row with its maker and size under its name, the focused row opened beneath with
- * its maker's own words, and the small keys under them.
- */
-/** A runner's models not offered (L1), in the faint ink: each being checked, then, under their label, each not able
- * with why in a line beneath its name; another row's name told apart by what the runner calls it. */
-export function runnerRows(block: RunnerRows): HTMLElement[] {
-  const faint = (word: string, ...under: (string | null)[]): HTMLElement => {
-    const row = text('p', 'cg-waiting', word);
-    for (const line of under) if (line) row.append(text('span', 'cg-model-from', line));
-    return row;
-  };
-  return [
-    ...(block.group ? [text('p', 'cg-group-label', block.group)] : []),
-    ...block.checking.map(row => faint(row.word, row.sub)),
-    ...(block.label ? [text('p', 'cg-group-label', block.label)] : []),
-    ...block.notAble.map(row => {
-      const item = faint(row.word, row.sub, row.line);
-      // A faint row that is the person's own model keeps "Current" after its name (U3b).
-      if (row.current) item.firstChild?.after(text('span', 'cg-current', CHARACTER_WORDS.current));
-      return item;
-    }),
-    ...(block.fold ? [faint(block.fold.line, block.fold.sub)] : []),
-  ];
-}
-
-function modelList(list: ModelList, onAction: (action: string) => void): HTMLElement[] {
-  const rows = document.createElement('div');
-  rows.className = 'cg-list';
-  rows.setAttribute('role', 'listbox');
-  if (list.waiting) rows.append(text('p', 'cg-group-label', list.waiting.label), text('p', 'cg-waiting', list.waiting.line));
-  if (list.runner) rows.append(...runnerRows(list.runner));
-  if (list.over) rows.append(...runnerRows(list.over));
-  // The window's models scroll inside the list, faded at their foot while more lie past it; Routine stands below.
-  const models = document.createElement('div');
-  models.className = list.more ? 'cg-window cg-more' : 'cg-window';
-  rows.append(models);
-  for (const [at, row] of list.rows.entries()) {
-    const into = at === list.rows.length - 1 ? rows : models;
-    if (row.label) into.append(text('p', 'cg-group-label', row.label));
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = row.on ? 'cg-model cg-on' : 'cg-model';
-    button.disabled = list.busy;
-    button.setAttribute('role', 'option');
-    button.setAttribute('aria-selected', String(row.on));
-    button.setAttribute('aria-keyshortcuts', row.key);
-    const glyph = text('span', 'wu-glyph', row.key);
-    glyph.setAttribute('aria-hidden', 'true');
-    const word = text('span', 'cg-model-word', row.word);
-    if (row.current) word.append(text('span', 'cg-current', CHARACTER_WORDS.current));
-    const named = document.createElement('span');
-    named.className = 'cg-model-named';
-    named.append(word);
-    if (row.sub) named.append(text('span', 'cg-model-sub', row.sub));
-    button.append(glyph, named, text('span', 'cg-price', row.price));
-    button.addEventListener('click', () => onAction(`use:${row.index}`));
-    into.append(button);
-    if (row.open) {
-      const open = text('p', 'cg-model-open', row.open.said);
-      if (row.open.from) open.append(text('span', 'cg-model-from', row.open.from));
-      into.append(open);
-    }
-    if (row.runner) into.append(...runnerRows(row.runner));
-    if (row.over) into.append(...runnerRows(row.over));
-  }
-  const keys = document.createElement('p');
-  keys.className = 'cg-keys';
-  for (const item of list.keys) {
-    const group = document.createElement('span');
-    for (const key of item.keys) group.append(text('span', 'wu-key wu-small', key));
-    group.append(item.word);
-    keys.append(group);
-  }
-  return [rows, keys];
 }
 
 /**

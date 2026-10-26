@@ -151,6 +151,20 @@ describe('reading who decides', () => {
     expect(() => parseSocietyModels(read({ models: [{ ...read().models[0]!, decision_most_usd: -1 }] }))).toThrow();
   });
 
+  it("reads each model's context, the largest request a decision sends and the middle of its costs here, none from an older server (G2)", () => {
+    const summary = read().by_model[0]!;
+    const view = parseSocietyModels(read({
+      contract: { ...read().contract, request_tokens_at_most: 7200 },
+      models: [{ ...read().models[0]!, context_window_tokens: 262144 }],
+      by_model: [{ ...summary, cost_median_usd: '0.00010224', costs_counted: 9 }, { ...summary, cost_median_usd: null, costs_counted: 0 }],
+    }));
+    expect([view.requestTokensAtMost, view.models[0]!.contextWindowTokens]).toEqual([7200, 262144]);
+    expect(view.byModel.map((model) => [model.costMedianUsd, model.costsCounted])).toEqual([['0.00010224', 9], [null, 0]]);
+    const older = parseSocietyModels(read());
+    expect([older.requestTokensAtMost, older.models[0]!.contextWindowTokens, older.byModel[0]!.costMedianUsd]).toEqual([undefined, undefined, undefined]);
+    expect(() => parseSocietyModels(read({ by_model: [{ ...summary, cost_median_usd: 'about a cent', costs_counted: 1 }] }))).toThrow();
+  });
+
   it('reads which models run on this computer, and none from a server that does not say', () => {
     const laptop = { ...read().models[0]!, provider: 'ollama', model_id: 'qwen3:4b', name: 'Qwen3 4B Instruct', usd_per_mtok: { input: '0', output: '0' }, on_this_computer: true };
     const view = parseSocietyModels(read({ models: [{ ...read().models[0]!, on_this_computer: false }, laptop] }));

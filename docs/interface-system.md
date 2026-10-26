@@ -365,16 +365,25 @@ doing, the last line they said with to whom and when (read from the society's sa
 that work for them now (their day; letting their model decide, or stopping it while a run is on;
 choosing a model where they have none and the page may choose one; following them) and, as small
 print, who decides for them. R asks the run's question in the same place: how long it runs, whose
-models it asks, the model and the most it may spend. M lists the models the server offers there too,
-as the character page's chooser does, and a number or Enter gives the person that model by the same
-write the character page uses. Both choosers show the models as a gallery that teaches: in groups by
-where each runs, free first (what this computer runs, then the models a key pays for, or a guest's
-host's budget, by price), each group under its label, Routine last; under each model's name its maker
-and size, and on the focused row its maker's own words about it, quoted from its model card with that
-card named and the model's licence (the models read's `card`, [model and service
-selection](model-and-service-selection.md)). Where this install lets a model on this computer in and
-none runs yet, that group stands with one line saying how to start one. Nothing in the gallery sets one
-model against another. Looking at someone before choosing them shows one soft label over their head:
+models it asks, the model and the most it may spend. M, on the person or on their day page, opens the
+model gallery (`tools/previews/world-workspace/model-gallery.mjs` and `model-gallery.ts`): a light page
+over the world faded behind it, as the day page and the decision page are, and Esc goes back to where M
+was pressed with the person still chosen. A number chooses at once, as Enter chooses the model in
+focus, by the same write the day page used. Its head names who it is for and what the role is; at the
+left the models in groups by where each runs, free first (what this computer runs, then the models a
+person's own key pays for, or on a guest's page this server's budget, by price), each row with its
+maker's two letters, its name, maker and size (the size at work at a time for a mixture of experts),
+how many times it decided in this world, and what a decision costs: free on this computer, about the
+middle of its decisions' costs here once it has decided, else at most what one decision may reserve;
+Routine last under No AI model. A guest's model too dear to ask once, and this computer's models
+being checked or not able, stand faint with no number. At the right the model in focus: its maker
+with a link to its card at the pinned revision, why it can decide for a person here (the strict form
+of its answers; a context at least twice the largest request a decision sends), its maker's own
+words, and the facts from its card and the models read (the models read's `card`,
+`context_window_tokens`, `cost_median_usd` and `request_tokens_at_most`, [model and service
+selection](model-and-service-selection.md)), each left out where its fact is not held. Where this
+install lets a model on this computer in and none runs yet, that group stands with one line saying
+how to start one. Nothing in the gallery sets one model against another. Looking at someone before choosing them shows one soft label over their head:
 their name, what they are doing and [E] Inspect.
 
 People come into a saved world only when its owner asks (Bring people in). The page creates its society

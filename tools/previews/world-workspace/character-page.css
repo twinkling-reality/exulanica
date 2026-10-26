@@ -1,10 +1,9 @@
 /*
- * The character page's right column (character-page.ts): Choose a model, Compare's question and Ask. These are the
+ * The character page's right column (character-page.ts): Compare's question and Ask. These are the
  * rules world-ui-character.css held for them before it went with the run strip; the light day page restyles some
  * (world-ui-record-day.css).
  */
 .wu-char-note { margin: 0; font: 400 max(12px, calc(15 * var(--u)))/1.45 var(--font-sans); color: var(--ink-3); }
-.wu-model-intro { margin: calc(-2 * var(--u)) 0 calc(22 * var(--u)); }
 .wu-model-head { display: flex; justify-content: flex-end; padding: 0 calc(20 * var(--u)) calc(10 * var(--u)); }
 .wu-model-rows { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
 .wu-model-row { position: relative; display: flex; align-items: center; justify-content: space-between; height: calc(62 * var(--u)); padding: 0 calc(20 * var(--u)); border-radius: calc(14 * var(--u)); cursor: pointer; }
@@ -22,15 +21,6 @@
    of its own under it, never chosen. */
 .wu-model-row.wu-model-over { flex-wrap: wrap; height: auto; min-height: calc(62 * var(--u)); color: var(--ink-2); cursor: default; }
 .wu-model-row.wu-model-over > .wu-model-why { flex-basis: 100%; margin: calc(-6 * var(--u)) 0 calc(14 * var(--u)); text-wrap: pretty; }
-/* The chooser as a gallery that teaches (A3): rows in groups under their labels in the faint ink; a model's maker and
-   size under its name; the focused row opened beneath, inside the row, with its maker's own words. */
-.wu-gallery .wu-gallery-label { padding: calc(14 * var(--u)) calc(20 * var(--u)) calc(6 * var(--u)); }
-.wu-gallery .wu-gallery-waiting { padding: calc(6 * var(--u)) calc(20 * var(--u)) calc(10 * var(--u)); color: var(--ink-2); text-wrap: pretty; }
-.wu-gallery .wu-model-row { flex-wrap: wrap; height: auto; min-height: calc(62 * var(--u)); }
-.wu-gallery .wu-model-row > .wu-model-named { flex: 1; display: grid; row-gap: calc(4 * var(--u)); padding: calc(10 * var(--u)) 0; }
-.wu-gallery .wu-model-row > .wu-model-open { flex-basis: 100%; margin: 0 0 calc(14 * var(--u)); text-wrap: pretty; color: var(--ink-2); }
-.wu-gallery .wu-model-open > .wu-model-from { display: block; }
-.wu-gallery .wu-model-row[data-current="true"] .wu-model-name::before { display: none; }
 .wu-orb-row { display: flex; align-items: center; gap: calc(20 * var(--u)); }
 .wu-orb-row .wu-big, .wu-orb-row .wu-small-text { margin: 0; }
 .wu-orb-row .wu-small-text { margin-top: calc(8 * var(--u)); }

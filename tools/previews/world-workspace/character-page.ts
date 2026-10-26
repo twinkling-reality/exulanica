@@ -9,8 +9,7 @@
 import { label, orb as runOrb, page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orb as portraitOrb, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
 import { CHARACTER_WORDS, askWho, modelLine, routineRow, priceWords, whatDid, nothingYet, readingRecord, called } from './character-words.mjs';
-import { galleryItems, runnerRows } from './character-group.mjs';
-import type { ModelCard, RunnerModel } from '../../../web/packages/app/src/society-models-api.ts';
+import type { ModelCard } from '../../../web/packages/app/src/society-models-api.ts';
 import { PERSONALITY_LIMITS, PERSONALITY_WORDS, counter, length, notRead, readsEach, savedNote, writtenWords } from './personality-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
 import { PATH_WORDS, agentUnansweredWords, byParts, plural, unansweredParts } from './history-words.mjs';
@@ -110,16 +109,6 @@ export interface CharacterPageState {
   readonly personality: { readonly character: { readonly name: string | null; readonly about: string | null } | null; readonly shown: boolean } | null;
   /** The personality being written, or null: its fields hold their own words while a person types. */
   readonly editing: { readonly session: string; readonly refusal: string | null; readonly busy: boolean } | null;
-  /** The model list while choosing, or null. */
-  readonly choosing: {
-    readonly choices: readonly ModelChoice[] | null; readonly focus: number; readonly refusal: string | null; readonly busy: boolean;
-    /** This computer's group stands with its one line where none runs yet (A3); its key group is this server's budget on a guest's page. */
-    readonly waiting?: boolean; readonly fromServer?: boolean;
-    /** This computer's runner's models with their checks (L1): those not offered stand faint after its last row. */
-    readonly runner?: readonly RunnerModel[];
-    /** A guest's models asking which once can cost more than they have left (character-group.mjs overRows, U2). */
-    readonly over?: readonly { readonly word: string; readonly sub: string | null; readonly line: string; readonly current?: boolean }[];
-  } | null;
   /** Whether [C] Compare is offered (frame 12a). */
   readonly canCompare: boolean;
   /**
@@ -174,7 +163,7 @@ export interface CharacterPage {
 export const SAVED_NOTE_MS = 4000;
 
 /**
- * Opens the page in `host`; `act` hears model, run, stop, choose (with an index), use, back, row
+ * Opens the page in `host`; `act` hears model, run, stop, back, row
  * and inspect (with a row's index), ask and question (with a question's index), personality, draft
  * (with { name, about }), save, compare, compareChoose (with an index) and compareStart.
  */
@@ -241,7 +230,7 @@ export function openCharacterPage(host: HTMLElement, act: Act): CharacterPage {
       parts.push(who.column);
       keys = [];
     }
-    const side = !editing && (state.compare || state.choosing || state.ask);
+    const side = !editing && (state.compare || state.ask);
     if (side) {
       parts.push(drawSide(state, layout, width, act));
       keys = sideKeys(state, act);
@@ -297,7 +286,7 @@ function key(caps: readonly string[], word: string, shortcut: string, onPress: (
   return button;
 }
 
-/** A key the page answers with no button to press (the arrows while choosing). */
+/** A key the page answers with no button to press (the arrows while asking). */
 function hint(caps: readonly string[], word: string, shortcut: string): HTMLSpanElement {
   const made = element('span', 'wu-hr-key wu-day-hint');
   made.setAttribute('aria-keyshortcuts', shortcut);
@@ -511,7 +500,7 @@ function dayKeys(state: CharacterPageState, act: Act): HTMLElement[] {
   ];
 }
 
-/** The keys while choosing a model, asking Compare's question or Ask's. */
+/** The keys while asking Compare's question or Ask's. */
 function sideKeys(state: CharacterPageState, act: Act): HTMLElement[] {
   const back = (word: string = CHARACTER_WORDS.back) => key(['Esc'], word, 'Escape', () => act('back'));
   const choose = () => hint(['↑', '↓'], CHARACTER_WORDS.choose, 'ArrowUp ArrowDown');
@@ -520,7 +509,6 @@ function sideKeys(state: CharacterPageState, act: Act): HTMLElement[] {
     if (state.compare.nothing) return [back()];
     return [choose(), ...(state.compare.note ? [] : [key(['Enter'], COMPARE_WORDS.compare, 'Enter', () => act('compareStart'), !state.compare.canStart)]), back()];
   }
-  if (state.choosing) return [choose(), key(['Enter'], CHARACTER_WORDS.useThisModel, 'Enter', () => act('use'), state.choosing.busy || !state.choosing.choices), back()];
   if (state.ask) return [choose(), key(['Enter'], CHARACTER_WORDS.ask, 'Enter', () => act('question'), state.ask.busy), back()];
   return [back()];
 }
@@ -556,109 +544,6 @@ function modelRows(choices: readonly ModelChoice[], focus: number, labelled: str
     else if (onChoose) item.addEventListener('click', () => onChoose(index));
     if (onUse) item.addEventListener('dblclick', () => onUse(index));
     list.append(item);
-  });
-  return list;
-}
-
-/**
- * The chooser's rows as a gallery that teaches (A3, WORDS.md): in groups by where each model runs, free first, each
- * group under its label in the faint ink (this computer's with its one line and no key where none runs yet); a row
- * per model (its number key for the first nine, its name with Current after the character's own, under it its maker
- * and size, its price), the focused row opened with its maker's own words and, fainter, where they come from and the
- * licence; Routine last.
- */
-/** One row of the gallery as character-group.mjs galleryItems words it. */
-interface GalleryItem {
-  readonly word: string; readonly sub: string | null; readonly price: string; readonly group: string | null;
-  readonly open: { readonly said: string; readonly from: string | null } | null;
-}
-
-/** A runner's models not offered (character-group.mjs runnerRows, L1). */
-interface RunnerFaint {
-  readonly checking: readonly { readonly word: string; readonly sub: string | null }[];
-  readonly label: string | null;
-  readonly notAble: readonly { readonly word: string; readonly sub: string | null; readonly line: string; readonly current?: boolean }[];
-}
-
-function galleryRows(choices: readonly ModelChoice[], focus: number, waiting: boolean, fromServer: boolean, onChoose: (index: number) => void, onUse: (index: number) => void, runner: readonly RunnerModel[] = [], over: NonNullable<CharacterPageState['choosing']>['over'] = []): HTMLElement {
-  const list = element('ul', 'wu-model-rows wu-gallery');
-  list.setAttribute('role', 'listbox');
-  list.setAttribute('aria-label', CHARACTER_WORDS.chooseModel);
-  const groupLabel = (words: string) => {
-    const item = element('li', 'wu-gallery-label wu-small-text wu-faint', words);
-    item.setAttribute('role', 'presentation');
-    return item;
-  };
-  let group: string | null = null;
-  if (waiting) {
-    const here: string = CHARACTER_WORDS.hereFree;
-    const line = element('li', 'wu-gallery-waiting wu-small-text', CHARACTER_WORDS.noneRunning);
-    line.setAttribute('role', 'presentation');
-    list.append(groupLabel(here), line);
-    group = here;
-  }
-  const models = choices.flatMap((choice) => (choice.model ? [choice.model] : []));
-  const items: readonly GalleryItem[] = galleryItems(models, fromServer, runner);
-  // A runner's models not offered (L1): faint after this computer's last row, or under its label first where it has none.
-  const faint: RunnerFaint | null = runnerRows(runner, models);
-  const lastHere = items.reduce((found: number, item: GalleryItem, index: number) => (item.group === CHARACTER_WORDS.hereFree ? index : found), -1);
-  const faintRows = (block: RunnerFaint) => {
-    const row = (word: string, ...under: (string | null)[]) => {
-      const item = element('li', 'wu-gallery-waiting wu-small-text', word);
-      item.setAttribute('role', 'presentation');
-      for (const line of under) if (line) item.append(element('div', 'wu-model-from wu-faint', line));
-      return item;
-    };
-    list.append(...block.checking.map((one) => row(one.word, one.sub)));
-    if (block.label) list.append(groupLabel(block.label));
-    list.append(...block.notAble.map((one) => {
-      const item = row(one.word, one.sub, one.line);
-      // A faint row that is the person's own model keeps "Current" after its name (U3b).
-      if (one.current) item.firstChild?.after(element('span', 'wu-model-current', CHARACTER_WORDS.current));
-      return item;
-    }));
-  };
-  if (faint && lastHere < 0) {
-    if (group !== CHARACTER_WORDS.hereFree) list.append(groupLabel(CHARACTER_WORDS.hereFree));
-    faintRows(faint);
-  }
-  // A guest's models asking which once can cost more than they have left (U2) stand faint after the last model
-  // offered, under the server's budget label where that model is not in it, or, with none, here before Routine.
-  const lastModel = items.length - 2;
-  const dear: RunnerFaint | null = over.length
-    ? { checking: [], label: lastModel >= 0 && items[lastModel]!.group === CHARACTER_WORDS.serverBudget ? null : CHARACTER_WORDS.serverBudget, notAble: over }
-    : null;
-  if (dear && lastModel < 0) faintRows(dear);
-  items.forEach((item: GalleryItem, index: number) => {
-    if (item.group !== null && item.group !== group) list.append(groupLabel(item.group));
-    group = item.group;
-    const choice = choices[index]!;
-    const row = element('li', 'wu-model-row');
-    row.setAttribute('role', 'option');
-    row.setAttribute('aria-selected', String(index === focus));
-    row.dataset['current'] = String(choice.current);
-    const named = element('span', 'wu-model-named');
-    const name = element('span', 'wu-model-name', item.word);
-    if (choice.current) name.append(element('span', 'wu-model-current', CHARACTER_WORDS.current));
-    named.append(name);
-    if (item.sub) named.append(element('span', 'wu-model-sub wu-small-text wu-faint', item.sub));
-    if (index < 9) {
-      const cap = element('span', 'wu-key wu-small', String(index + 1));
-      cap.setAttribute('aria-hidden', 'true');
-      row.setAttribute('aria-keyshortcuts', String(index + 1));
-      row.append(cap);
-    }
-    row.append(named, element('span', 'wu-model-price', item.price));
-    if (index === focus && item.open) {
-      const open = element('p', 'wu-model-open wu-small-text', item.open.said);
-      if (item.open.from) open.append(element('span', 'wu-model-from wu-faint', item.open.from));
-      row.append(open);
-    }
-    row.addEventListener('click', () => onChoose(index));
-    row.addEventListener('dblclick', () => onUse(index));
-    list.append(row);
-    if (faint && index === lastHere) faintRows(faint);
-    if (dear && index === lastModel) faintRows(dear);
   });
   return list;
 }
@@ -706,14 +591,6 @@ function drawSide(state: CharacterPageState, layout: Layout, width: number, act:
       row.append(button, words);
       side.append(row);
     }
-    return side;
-  }
-  if (state.choosing) {
-    const choosing = state.choosing;
-    side.append(label(CHARACTER_WORDS.chooseModel), element('p', 'wu-small-text wu-model-intro', CHARACTER_WORDS.chooserIntro));
-    if (!choosing.choices) side.append(element('p', 'wu-char-note', CHARACTER_WORDS.readingModels));
-    else side.append(galleryRows(choosing.choices, choosing.focus, choosing.waiting === true, choosing.fromServer === true, (index) => act('choose', index), (index) => act('use', index), choosing.runner, choosing.over));
-    if (choosing.refusal) side.append(refusalLine(choosing.refusal));
     return side;
   }
   const ask = state.ask!;

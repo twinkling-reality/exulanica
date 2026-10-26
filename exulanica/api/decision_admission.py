@@ -84,6 +84,27 @@ def _askable(
     return None if mechanism is None else (spec, mechanism)
 
 
+def _asked_terms(role: DecisionRole, contract: DecisionContract) -> list[Any]:
+    """The terms asked under ``contract``: those naming its versions, else every terms the role
+    states."""
+    return [
+        terms for terms in role.every_terms() if dict(terms.versions) == dict(contract.versions)
+    ] or list(role.every_terms())
+
+
+def request_tokens_at_most(role: DecisionRole, contract: DecisionContract) -> int | None:
+    """The largest request one ask of ``role`` may send under ``contract``: the envelope of the
+    terms asked, each byte a token (:mod:`exulanica.world.decision_envelopes`), or None where a
+    terms the catalog names no envelope for is asked. What :func:`ask_bound_usd` reserves by, and
+    what a models read says a model's context is measured against (G2)."""
+    envelopes = [
+        request_bytes_at_most(role.key, terms.prompt_version)
+        for terms in _asked_terms(role, contract)
+    ]
+    stated = [envelope for envelope in envelopes if envelope is not None]
+    return max(stated) if stated and len(stated) == len(envelopes) else None
+
+
 def ask_bound_usd(
     role: DecisionRole, budget: BudgetGuard, spec: ModelSpec, contract: DecisionContract
 ) -> Decimal:
@@ -97,17 +118,12 @@ def ask_bound_usd(
     instruction, the note a retry adds and twice the largest situation a request may carry;
     tests/test_society_person_decisions.py holds the asks the small square makes under either.
     """
-    asked = [
-        terms for terms in role.every_terms() if dict(terms.versions) == dict(contract.versions)
-    ] or list(role.every_terms())
+    asked = _asked_terms(role, contract)
     attempts = contract.value("answer_attempts_maximum")
     answer = answer_tokens(spec) or 0
-    envelopes = [request_bytes_at_most(role.key, terms.prompt_version) for terms in asked]
-    stated = [envelope for envelope in envelopes if envelope is not None]
-    if len(stated) == len(envelopes):
-        return attempts * budget.estimate_usd(
-            spec, extra_prompt_tokens=max(stated), max_tokens=answer
-        )
+    envelope = request_tokens_at_most(role, contract)
+    if envelope is not None:
+        return attempts * budget.estimate_usd(spec, extra_prompt_tokens=envelope, max_tokens=answer)
     prompt_chars = max(
         len(terms.instruction) + len(terms.not_offered) for terms in asked
     ) + 2 * contract.value("context_bytes_maximum")

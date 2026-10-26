@@ -49,6 +49,8 @@ export interface SocietyModel extends NamedModelRef {
   readonly decisionMostUsd?: string;
   /** The most one attempt of a decision with it may cost, which a guest's chooser fades it at (U2); absent from an older server. */
   readonly attemptMostUsd?: string;
+  /** How many tokens it reads at once, as its manifest entry states (G2); absent from an older server. */
+  readonly contextWindowTokens?: number;
 }
 
 /**
@@ -254,6 +256,12 @@ export interface ModelDecisionSummary extends NamedModelRef {
   readonly latencyP95Ms: number | null;
   readonly costUsd: string;
   readonly costKnown: boolean;
+  /**
+   * The middle of its decisions' known costs here, one of them (the lower of two), in US dollars as a decimal string,
+   * and how many it is the middle of (G2's "about $Y a decision"); null with none, absent from an older server.
+   */
+  readonly costMedianUsd?: string | null;
+  readonly costsCounted?: number;
   /** Absent from a server that predates the measures. */
   readonly measures?: DecisionMeasures;
 }
@@ -304,6 +312,8 @@ export interface SocietyModels {
   /** Whether a person's recorded decisions may be asked again of another model here (Compare); absent, they may. */
   readonly asksAgain?: boolean;
   readonly modelPeopleMaximum: number;
+  /** The largest request a decision here may send, in tokens as its reserve counts them (G2); null where none is stated, absent from an older server. */
+  readonly requestTokensAtMost?: number | null;
   readonly models: readonly SocietyModel[];
   readonly choices: readonly PersonModelChoice[];
   readonly latest: readonly PersonDecision[];
@@ -499,6 +509,7 @@ export function parseSocietyModels(value: unknown): SocietyModels {
     hostRefusal: maybe(row['host_refusal'], text),
     asksAgain: row['asks_again'] === undefined ? true : flag(row['asks_again']),
     modelPeopleMaximum: count(contract['model_people_maximum']),
+    ...(contract['request_tokens_at_most'] === undefined ? {} : { requestTokensAtMost: maybe(contract['request_tokens_at_most'], count) }),
     models: list(row['models']).map((entry) => {
       const held = object(entry);
       return {
@@ -513,6 +524,7 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         ...(held['runner'] === undefined ? {} : { runner: maybe(held['runner'], runnerDetails) }),
         ...(held['decision_most_usd'] === undefined ? {} : { decisionMostUsd: amount(held['decision_most_usd']) }),
         ...(held['attempt_most_usd'] === undefined ? {} : { attemptMostUsd: amount(held['attempt_most_usd']) }),
+        ...(held['context_window_tokens'] === undefined ? {} : { contextWindowTokens: count(held['context_window_tokens']) }),
       };
     }),
     choices: list(row['choices']).map((entry) => {
@@ -562,6 +574,7 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         latencyP95Ms: maybe(latency['p95'], count),
         costUsd: text(held['cost_usd']),
         costKnown: flag(held['cost_known']),
+        ...(held['costs_counted'] === undefined ? {} : { costMedianUsd: maybe(held['cost_median_usd'], amount), costsCounted: count(held['costs_counted']) }),
         // Added to the profile as an optional field: absent from an older server.
         ...(held['measures'] === undefined ? {} : { measures: decisionMeasures(held['measures']) }),
       };
