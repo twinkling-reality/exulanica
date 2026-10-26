@@ -62,7 +62,11 @@ def test_selected_picture_version_preserves_legacy_prompts_and_closed_bundles():
     )
     for prompt in (legacy, web, picture):
         assert drafting.prompts_for_request("things", prompt.sha256).sha256 == prompt.sha256
-    assert drafting.prompts_for_request("kind", pictures=True) == legacy
+    # Any other purpose never takes the things picture words: a new request takes its own newest
+    # words (the notes kept to their searches), and one pinned to the legacy words keeps them.
+    world = drafting.reference_prompts(drafting.WORLD_PROMPT_PATH)
+    assert drafting.prompts_for_request("kind", pictures=True) == world
+    assert drafting.prompts_for_request("kind", legacy.sha256) == legacy
     old = scripted_bundle(uuid.uuid4(), purpose="things")
     source = BundlePicture(uuid.uuid4(), (uuid.uuid4(),), ("nebius", "reference_vision", "model"))
     values = dict(
