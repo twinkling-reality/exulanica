@@ -66,7 +66,8 @@ ERASED_WITH_PARTICIPATION = "participation_erase(uuid,text)"
 #: A saved world's picture hangs from its entry alone (0218): the entry's own BEFORE DELETE trigger
 #: runs this definer, which deletes the picture as world_erase_rows deletes the entry.
 ERASED_WITH_ITS_ENTRY = "saved_world_entry_picture_erase()"
-#: The world identity's own trigger: deletes its History's pictures before it (0223).
+#: The world identity's own trigger: deletes its History's pictures (0223) and its paintings (0226)
+#: before it.
 ERASED_WITH_ITS_IDENTITY = "world_history_pictures_erase()"
 PARTICIPATION_GUARD = "tg_participation_record_guard"
 #: The guard 0182 put on a society's tables, and the one this erasure puts on a world's.
@@ -361,6 +362,15 @@ def _pictures(admin) -> None:
         "select e.workspace_id,e.world_id,%s,'portrait/v1','image/jpeg',%s,%s,%s,256,256,"
         "e.created_by from saved_world_entry e on conflict do nothing",
         (digest, data, len(data), digest),
+    )
+    admin.execute(
+        "insert into world_painting (workspace_id,world_id,view,recipe,media_type,bytes,byte_size,"
+        "sha256,width,height,camera,words,painter,held_permille,cost_microusd,run_id) "
+        "select e.workspace_id,e.world_id,'first','z-image-depth/v1','image/jpeg',%s,%s,%s,"
+        "1280,720,"
+        "'{}'::jsonb,'{}'::jsonb,'{}'::jsonb,900,0,'erasure' from saved_world_entry e "
+        "on conflict do nothing",
+        (data, len(data), digest),
     )
 
 

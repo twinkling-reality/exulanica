@@ -219,6 +219,8 @@ INSERT_ONLY_TABLES: Final = (
     # A History picture is kept once under its name (0223): the first stays, another is refused.
     "world_moment_picture",
     "world_look_portrait",
+    # A world's painting is kept by the operator's painting run and never changed (0226).
+    "world_painting",
     "material_bake_request",
     "material_recipe",
     "material_recipe_source",

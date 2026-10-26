@@ -1353,6 +1353,22 @@ def history_picture(owner) -> str:
     return _kept_moment_picture(owner)[2]
 
 
+def world_painting(owner) -> str:
+    """A painting's digest in the owner's world, written as the operator's painting run keeps one
+    (domain: the run refuses a world that holds a photograph, which the sweep's world is)."""
+    world(owner)
+    data = b"a painting"
+    digest = hashlib.sha256(data + owner.workspace_id.bytes).hexdigest()
+    owner.repository.connection.execute(
+        "insert into world_painting (workspace_id,world_id,view,recipe,media_type,bytes,byte_size,"
+        "sha256,width,height,camera,words,painter,held_permille,cost_microusd,run_id) "
+        "values (%s,%s,'first','z-image-depth/v1','image/jpeg',%s,%s,%s,1280,720,"
+        "'{}'::jsonb,'{}'::jsonb,'{}'::jsonb,900,0,'probe')",
+        (owner.workspace_id, WORLD, data, len(data), digest),
+    )
+    return digest
+
+
 def history_moment(owner) -> dict[str, Any]:
     """A moment of one of the owner's versions that keeps a picture."""
     version_id, moment_id, _digest = _kept_moment_picture(owner)

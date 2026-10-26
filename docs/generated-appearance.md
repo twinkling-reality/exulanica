@@ -5,8 +5,9 @@ structure (section 9): seams sit inside the published sets' own range, structure
 and every picked tile was looked at at 1:1. No model-made set is published or pinned, and Track B
 has not run. Generated assets (section 11), static pieces a model makes for a style pack, are a
 prototype: the records, the post-process and the writer also run with a stub. Rented sessions
-have made pieces, and section 11 records them, including each refusal. The code is `ml/appearance/`
-([its README](../ml/appearance/README.md)).
+have made pieces, and section 11 records them, including each refusal. A world's paintings (section
+12), its own views painted from its words on its exact layout, are kept and served by the product.
+The code is `ml/appearance/` ([its README](../ml/appearance/README.md)).
 
 ## 1. In plain words
 
@@ -743,3 +744,26 @@ pieces for a pack. Route C's checks refined for thin bodies (an allowance for th
 in the proportion check, rig voxels sized to the thinnest limb, a bone's inside share for a thin
 wing), to be judged on freshly drafted bodies in another pre-registered trial.
 
+## 12. A world's paintings
+
+A made world can be painted: an open picture model paints the world's own views from the words
+written for it (its sentence and, where it has them, its notes), held by depth to the world's exact
+layout, so each world looks like itself and unlike every other. The structure is the truth here as
+everywhere: the painting changes only how the views look.
+
+- **What one is.** A JPEG or WebP of a saved world's card picture's bounds (320 by 180 to 1280 by
+  720, at most 512 KiB), walked whole by the server, with what it is of and how it was made: the
+  view's name and its camera (the lens and the camera-to-world matrix the structure was drawn
+  from), the words it was painted from (the prompt, the words kept out, the seed), the painter
+  (each model's repository, revision and licence, the steps and the control), the share of the
+  structure's edges the painting kept, and its share of the run's cost.
+- **Who makes them.** The operator's painting run: it draws the world's structure through the
+  install's own page, paints it on a GPU on Nebius AI Cloud with the models of section 3, measures
+  the hold, and keeps what passes (`exulanica/world/world_paintings.py`). No route writes one.
+- **Who reads them.** `GET /world/paintings?world_id=` lists a world's paintings, newest first, and
+  `GET /world/paintings/{sha256}?world_id=` answers one's bytes; both need `world.read`. Every
+  painting is labelled invented appearance wherever it is shown.
+- **What may be painted.** No world that holds, or held, a photograph is given a painting, so
+  nothing derived from a photograph is sent to a GPU or kept.
+- **Erasure.** A world's paintings are deleted with it by its identity's own trigger (migration
+  0226), so a world's erasure and a workspace tombstone reach them; nobody else deletes them.

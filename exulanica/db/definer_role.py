@@ -564,6 +564,8 @@ GRANTS_BY_MIGRATION: Final[Mapping[str, DefinerGrants]] = {
             "world_look_portrait": frozenset(("SELECT", "DELETE")),
         }
     ),
+    # The world identity's trigger, made again, deletes its paintings too (0226).
+    "0226": DefinerGrants(tables={"world_painting": frozenset(("SELECT", "DELETE"))}),
 }
 
 

@@ -718,6 +718,8 @@ _WORLD_READS: Final = _every(
     "GET /world/interactions/proposals/{proposal_id}",
     "GET /world/interactions/recommendations",
     "GET /world/interactions/versions",
+    "GET /world/paintings",
+    "GET /world/paintings/{sha256}",
     "GET /world/piece-requests",
     "GET /world/piece-requests/{piece_request_id}",
     "GET /world/projects",

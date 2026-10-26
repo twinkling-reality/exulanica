@@ -1076,6 +1076,9 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/world/interactions/previews/{preview_id}": Owned(build.interaction_preview),
     "/world/interactions/proposals/{proposal_id}": Owned(build.interaction_proposal),
     "/world/invitations/{grant_id}": Owned(build.invitation, owner_succeeds=True),
+    "/world/paintings/{sha256}": Owned(
+        build.world_painting, build.invented_digest, owner_succeeds=True
+    ),
     "/world/pictures/{sha256}": Owned(
         build.history_picture, build.invented_digest, owner_succeeds=True
     ),

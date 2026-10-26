@@ -18558,6 +18558,144 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/world/paintings",
+    "method": "get",
+    "id": "paintings_world_paintings_get",
+    "title": "Paintings",
+    "description": "The world's paintings, newest first, without their bytes.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response Paintings World Paintings Get"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/world/paintings/{sha256}",
+    "method": "get",
+    "id": "painting_world_paintings__sha256__get",
+    "title": "Painting",
+    "description": "A kept painting's bytes in the world, by its digest.",
+    "group": "world",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "sha256",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/world/versions/{version_id}/things/on-support/preview",
     "method": "post",
     "id": "preview_supported_thing_world_versions__version_id__things_on_support_preview_post",

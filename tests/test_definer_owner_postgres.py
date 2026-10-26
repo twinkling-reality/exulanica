@@ -192,6 +192,7 @@ TABLE_PRIVILEGES = {
     "saved_world_entry_picture": {"SELECT", "DELETE"},
     "world_moment_picture": {"SELECT", "DELETE"},
     "world_look_portrait": {"SELECT", "DELETE"},
+    "world_painting": {"SELECT", "DELETE"},
     "saved_world_source_attachment": {"SELECT", "DELETE"},
     "saved_world_source_detach": {"SELECT", "DELETE"},
     "saved_world_source_detach_operation": {"SELECT", "DELETE"},
