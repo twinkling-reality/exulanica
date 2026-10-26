@@ -167,7 +167,6 @@ SESSION_LIMIT_REASONS: Final = (
     "session_minutes",
     "session_decisions",
     "session_spending_limit",
-    "session_liability_unknown",
 )
 #: The limit the worker's reaper closes a session by, where no claim found it past its deadline.
 SESSION_DEADLINE: Final = SESSION_LIMIT_REASONS[0]
@@ -179,7 +178,11 @@ PAUSED_BY_PERSON: Final = "paused_by_person"
 LEASE_RECOVERY_LIMIT: Final = "lease_recovery_limit"
 SOURCE_UNAVAILABLE: Final = "source_unavailable"
 INVALID_SOCIETY_STATE: Final = "invalid_society_state"
-#: Every reason a session is closed with.
+#: A call under the session's bound whose cost was not known closed sessions by this reason until a
+#: bound that holds such a call at its reservation let a run play on; no session closes by it now,
+#: and a session it closed reads with its words.
+LIABILITY_UNKNOWN: Final = "session_liability_unknown"
+#: Every reason a session is closed with, or was.
 SESSION_CLOSE_REASONS: Final = (
     STOPPED_BY_PERSON,
     PAUSED_BY_PERSON,
@@ -187,6 +190,7 @@ SESSION_CLOSE_REASONS: Final = (
     LEASE_RECOVERY_LIMIT,
     SOURCE_UNAVAILABLE,
     INVALID_SOCIETY_STATE,
+    LIABILITY_UNKNOWN,
 )
 
 #: Why a session closed, in words, by its reason: the one wording a page, History and a project's
@@ -235,13 +239,6 @@ _DECISIONS: Final = (
     "and d.document->>'reason' = 'spending_limit_reached') as refused, "
     "count(*) as total" + _SESSION_DECISIONS
 )
-_UNKNOWN: Final = """
-select 1
-  from spending_reservation v
-  join spending_grant g on g.workspace_id = v.workspace_id and g.grant_id = v.bound_id
- where v.workspace_id = %s and v.state = 'unknown' and starts_with(g.bound_key, %s)
- limit 1
-"""
 #: Each bound a session's key names, with what it committed and what its reservations hold. A
 #: dispatched attempt older than ``UNRESOLVED_AFTER`` is unresolved, as the workspace's spending
 #: read says it.
@@ -400,9 +397,12 @@ def limit_reached(
     """The first of ``SESSION_LIMIT_REASONS`` that holds for the open session ``opened`` of
     ``society`` (its row: ``society_id``, ``current_tick``) at ``now``, or None while none does.
 
-    Its wall deadline passed; its minutes are played; its decisions are asked; a decision of it was
-    refused because its bound (or the grant under it) had nothing left; or a call under its bound
-    may have cost what is not known, which only an operator's reconciliation settles.
+    Its wall deadline passed; its minutes are played; its decisions are asked; or a decision of it
+    was refused because its bound (or the grant under it) had nothing left. A call under its bound
+    whose cost is not known (a provider's error, a timeout) closes nothing: the bound holds it at
+    its reservation, the most it could have cost, until an operator's reconciliation settles it,
+    so the run plays on within its ceiling (``LIABILITY_UNKNOWN`` names sessions closed by the
+    earlier rule).
     """
     limits = opened["limits"]
     if now >= dt.datetime.fromisoformat(opened["ends_by"]):
@@ -414,7 +414,4 @@ def limit_reached(
         return "session_decisions"
     if asked["refused"]:
         return "session_spending_limit"
-    prefix = f"living-session:{opened['session_id']}:"
-    if connection.execute(_UNKNOWN, (workspace_id, prefix)).fetchone() is not None:
-        return "session_liability_unknown"
     return None

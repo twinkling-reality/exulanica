@@ -1521,10 +1521,12 @@ enforced by the playback worker. Before each claimed minute of a society with an
 checks them in this order, and the first that holds closes the session under the claim's lease,
 pauses the society with that reason, and runs no minute: the wall deadline passed
 (`session_deadline`); the session played its minutes (`session_minutes`); its model decisions
-(below) reached their limit (`session_decisions`); a decision of it was refused because its bound or the grant under it had
-nothing left (`session_spending_limit`); or a call under its bound may have cost what is not known
-(`session_liability_unknown`), which only an operator's reconciliation settles
-(`limit_reached`, `exulanica/world/society_sessions.py`). While a session is open each claim runs
+(below) reached their limit (`session_decisions`); or a decision of it was refused because its bound or the grant under it
+had nothing left (`session_spending_limit`) (`limit_reached`, `exulanica/world/society_sessions.py`). A call under its
+bound whose cost is not known (a provider's error or a timeout) closes nothing: the bound holds it at its reservation, the
+most it could have cost, until an operator's reconciliation settles it, so the run plays on within its ceiling
+(`tests/test_living_session_limits_postgres.py`). `session_liability_unknown` names sessions closed by that rule before
+it changed. While a session is open each claim runs
 one minute, so catch-up never plays past its minutes; its asks end by its wall deadline, and a
 minute asks no more models than its decisions have left.
 

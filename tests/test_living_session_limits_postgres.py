@@ -8,8 +8,9 @@ Shown against the database with the real playback worker, in this order:
     reaper closes one whose world is no longer claimed;
 *   a minute asks no more models than the session's decisions have left, and the session closes
     once they are used;
-*   a session whose bound is spent, or whose call may have cost what nobody knows, closes, and its
-    bounds close with it.
+*   a session whose bound is spent closes, and its bounds close with it; one whose calls may have
+    cost what nobody knows plays on to its own limits, each such call held at the most it could
+    have cost against its bound, which never passes its ceiling.
 """
 
 from __future__ import annotations
@@ -222,7 +223,7 @@ def _durable(services, world, spine_schema, tmp_path, provider):
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
 @pytest.mark.parametrize("ending", ["spent", "unknown"])
-def test_a_spent_or_unknown_bound_closes_the_session_and_the_reaper_closes_its_bounds(
+def test_a_spent_bound_closes_the_session_an_unknown_cost_plays_on_and_its_bounds_close(
     app, spine_schema, tmp_path, ending
 ):
     world, client = app
@@ -238,7 +239,7 @@ def test_a_spent_or_unknown_bound_closes_the_session_and_the_reaper_closes_its_b
         person_decisions._Chooser()
         if ending == "spent"
         else FakeTransport(
-            [TransportError("timed out", timed_out=True, reached_provider=None)] * 10
+            [TransportError("timed out", timed_out=True, reached_provider=None)] * 60
         )
     )
     model_client = ModelClient(
@@ -259,12 +260,13 @@ def test_a_spent_or_unknown_bound_closes_the_session_and_the_reaper_closes_its_b
         ),
     )
     # One call where it is spent: once it is, the next ask is refused by the bound, not the
-    # grant. Room for many where a timed-out call's cost is unknown.
-    calls = 1 if ending == "spent" else 100
-    opened = _session(client, world, limits={**SAVED_LIMITS, "calls": calls})
+    # grant. Where every call times out and its cost is unknown, the run plays on to its own
+    # minutes: an unknown cost is held at its most, so it never stops a run by itself.
+    limits = {"calls": 1} if ending == "spent" else {"calls": 100, "minutes": 3}
+    opened = _session(client, world, limits={**SAVED_LIMITS, **limits})
     worker = _played(services, world, host, spending=durable)
     result = _play_until_closed(services, world, worker)
-    expected = "session_spending_limit" if ending == "spent" else "session_liability_unknown"
+    expected = "session_spending_limit" if ending == "spent" else "session_minutes"
     assert result["reason"] == expected
     bounds = admin_rows(
         admin,
@@ -287,14 +289,29 @@ def test_a_spent_or_unknown_bound_closes_the_session_and_the_reaper_closes_its_b
     assert [row["reason"] for row in closed()] == ["the living session closed"]
     assert worker.reap(world["workspace"]) == 0
     assert len(closed()) == 1
-    # An unknown cost stays held: closing the bound returns nothing of it.
+    # An unknown cost stays held at its reservation: closing the bound returns nothing of it, and
+    # what the bound committed is those reservations, within its ceiling.
     if ending == "unknown":
         held = admin_rows(
             admin,
-            "select state from spending_reservation where workspace_id = %s",
+            "select state, reserved_usd, settled_usd from spending_reservation "
+            "where workspace_id = %s and bound_id = %s",
             world["workspace"],
+            bounds[0]["grant_id"],
         )
-        assert {row["state"] for row in held} == {"unknown"}
+        assert len(held) >= 2 and {row["state"] for row in held} == {"unknown"}
+        assert all(row["settled_usd"] == row["reserved_usd"] for row in held)
+        [bound] = admin_rows(
+            admin,
+            "select g.ceiling_usd, s.committed_usd from spending_grant g "
+            "join spending_grant_state s on s.workspace_id = g.workspace_id "
+            "and s.grant_id = g.grant_id "
+            "where g.workspace_id = %s and g.grant_id = %s",
+            world["workspace"],
+            bounds[0]["grant_id"],
+        )
+        assert bound["committed_usd"] == sum(row["reserved_usd"] for row in held)
+        assert bound["committed_usd"] <= bound["ceiling_usd"]
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
