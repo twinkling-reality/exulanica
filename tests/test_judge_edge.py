@@ -20,6 +20,7 @@ import stat
 import subprocess
 
 import pytest
+from exulanica.world.baked_tiles import TILE_MEDIA_TYPE
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 JUDGE = ROOT / "deploy" / "judge"
@@ -84,11 +85,12 @@ def test_the_edge_proxies_to_the_web_proxy_and_never_to_the_api():
 
 
 def test_the_edge_compresses_binary_assets_as_well_as_text():
-    """A world's texture sets and tile bytes are served as application/octet-stream, which Caddy's
-    own match leaves raw: the edge's match keeps its text types and adds that one."""
+    """A world's texture sets are served as application/octet-stream and its baked tiles as their
+    own container type, which Caddy's own match leaves raw: the edge's match keeps its text types
+    and adds those two."""
     matched = set(re.findall(r"header Content-Type (\S+)", _directives(CADDYFILE)))
     assert {"text/*", "application/json*", "application/javascript*"} <= matched
-    assert "application/octet-stream*" in matched
+    assert {"application/octet-stream*", f"{TILE_MEDIA_TYPE}*"} <= matched
 
 
 def test_the_edge_host_and_issuer_have_no_default():
