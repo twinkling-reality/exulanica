@@ -186,7 +186,9 @@ def test_reference_worker_v2_reaches_creature_consumer_and_keeps_explicit_edits(
     messages = transport.requests[0]["payload"]["messages"]
     assert words in messages[1]["content"]
     assert "yellow feathers" in messages[1]["content"]
-    assert "explicit requested changes take precedence" in messages[0]["content"]
+    # Creature drafting v5: the person's own words win over the notes, and requested changes too.
+    assert "The person's own words win over the notes" in messages[0]["content"]
+    assert "explicit requested changes also take precedence" in messages[0]["content"]
     with database.session(workspace) as connection:
         draft = creature_drafts.read_draft(connection, workspace, queued.draft_id)
         assert draft.reference_usage["bundle_sha256"] == ref.bundle_sha256
