@@ -1,12 +1,34 @@
 import { el } from './dom.js';
 import { icon } from './icons.js';
 import { action } from './action.js';
-import { WORLD_ORBIT_SLOTS, ORBIT_OUTER_COUNT, ORBIT_INNER_COUNT, ORBIT_PERIOD } from './world-orbit-geometry.js';
+import { WORLD_ORBIT_SLOTS, ORBIT_OUTER_COUNT, ORBIT_INNER_COUNT, ORBIT_PERIOD, orbitDrawn, orbitPose } from './world-orbit-geometry.js';
 import { orbitGradient } from './world-materials.js';
 import { mountWorldOptics } from './world-optics.js';
 import { WORLD_SCENES, worldEntryHref } from './world-scenes.js';
 export { WORLD_SCENES } from './world-scenes.js';
 import '../world-showcase.css';
+
+/** The room a centre preview's title keeps from the nearest orb on either side. */
+export const PREVIEW_TITLE_ROOM_PX = 16;
+
+/**
+ * The widest a centre preview's title may stand on a stage: the ring's clear width at the title's middle line
+ * (the least room, over a whole period, between the middle and any orb of the ring drawn nearest it that crosses
+ * that line: the inner ring, or the outer where a narrow stage draws only that), less that orb's half width and
+ * `PREVIEW_TITLE_ROOM_PX` either side, so a long title takes another line instead of running into an orb. The
+ * preview stands at the orbit's own middle height.
+ */
+export function previewTitleWidth(width: number, height: number): number {
+  const ring = orbitDrawn(ORBIT_OUTER_COUNT, width, height) ? ORBIT_OUTER_COUNT : 0;
+  let least = Number.POSITIVE_INFINITY;
+  // One orb of the ring travels its whole track in a period, so its passes are every orb's.
+  for (let step = 0; step < 720; step += 1) {
+    const pose = orbitPose(ring, (step * ORBIT_PERIOD) / 720, width, height);
+    if (Math.abs(pose.y - height * .44) > Math.hypot(pose.ay, pose.by)) continue;
+    least = Math.min(least, Math.abs(pose.x - width / 2) - Math.hypot(pose.ax, pose.bx));
+  }
+  return Number.isFinite(least) ? Math.max(0, 2 * (least - PREVIEW_TITLE_ROOM_PX)) : width;
+}
 
 export interface WorldShowcaseOptions { atlasHref?: string | null; portals?: boolean; onSelectionChange?: (selected: boolean) => void }
 
@@ -58,7 +80,14 @@ export function buildWorldShowcase(options: WorldShowcaseOptions = {}): HTMLElem
     previous?.setAttribute('aria-expanded', 'false');
     if (restore && previous) { ignoreFocus = true; previous.focus({ preventScroll: true }); ignoreFocus = false; }
   };
+  // A centre preview's title keeps its room from the orbs on the stage as it stands now.
+  const titleRoom = () => {
+    if (!options.portals) return;
+    const { width, height } = root.getBoundingClientRect();
+    if (width > 0 && height > 0) panel.style.setProperty('--preview-title-width', `${Math.round(previewTitleWidth(width, height))}px`);
+  };
   const place = () => {
+    titleRoom();
     if (!selected || panel.hidden || options.portals) return;
     const width = panel.offsetWidth, height = panel.offsetHeight;
     const compact = window.innerWidth < 700;
@@ -100,7 +129,7 @@ export function buildWorldShowcase(options: WorldShowcaseOptions = {}): HTMLElem
     button.setAttribute('aria-expanded', 'true');
     root.dataset.selected = String(index);
     // Follow the selected control in tab order, even inside the orbit field.
-    button.after(panel); panel.hidden = false;
+    button.after(panel); panel.hidden = false; titleRoom();
     options.onSelectionChange?.(true);
     if (animateCopy) {
       const enter = () => {

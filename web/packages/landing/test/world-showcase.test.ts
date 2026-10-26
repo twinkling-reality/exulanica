@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildWorldShowcase, WORLD_SCENES } from '../src/ui/world-showcase.js';
-import { ORBIT_COUNT } from '../src/ui/world-orbit-geometry.js';
+import { buildWorldShowcase, PREVIEW_TITLE_ROOM_PX, previewTitleWidth, WORLD_SCENES } from '../src/ui/world-showcase.js';
+import { ORBIT_COUNT, ORBIT_PERIOD, orbitDrawn, orbitPose } from '../src/ui/world-orbit-geometry.js';
 import { retiredWorldDestination } from '../src/ui/world-scenes.js';
 
 afterEach(() => { document.body.replaceChildren(); vi.useRealTimers(); vi.restoreAllMocks(); });
@@ -11,6 +11,25 @@ function fixture(atlasHref: string | null = null, portals = false) {
   return { root, choices: WORLD_SCENES.map(scene => root.querySelector<HTMLButtonElement>(`#${portals ? 'home' : 'worlds'}-${scene.id}`)!), panel: root.querySelector<HTMLElement>('.world-context')! };
 }
 describe('contextual world previews', () => {
+  it('keeps a centre preview title clear of every orb crossing its middle line, so a long title takes another line', () => {
+    // At 1440x900 the title's box stands 16 px inside the nearest orb that crosses its middle line all period long.
+    const [width, height] = [1440, 900];
+    const title = previewTitleWidth(width, height);
+    expect(title).toBeGreaterThan(180);
+    expect(title).toBeLessThan(272);
+    for (let time = 0; time < ORBIT_PERIOD; time += 0.25) {
+      for (let index = 0; index < ORBIT_COUNT; index += 1) {
+        if (!orbitDrawn(index, width, height)) continue;
+        const pose = orbitPose(index, time, width, height);
+        const half = Math.hypot(pose.ax, pose.bx), tall = Math.hypot(pose.ay, pose.by);
+        if (Math.abs(pose.y - height * .44) > tall) continue;
+        expect(Math.abs(pose.x - width / 2) - half, `orb ${index} at ${time} s`).toBeGreaterThanOrEqual(title / 2 + PREVIEW_TITLE_ROOM_PX - 1);
+      }
+    }
+    // On a phone, where only the outer ring is drawn, the room is the outer ring's: still a title's two lines.
+    expect(previewTitleWidth(390, 844)).toBeGreaterThan(140);
+  });
+
   it('reserves preview controls for real captures and keeps gradient forms decorative', () => {
     const { root, choices } = fixture(null, true);
     expect(choices).toHaveLength(WORLD_SCENES.length);

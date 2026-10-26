@@ -44,3 +44,6 @@
 
 /* The contextual artwork card keeps its light material in either interface scheme. */
 .world-context:not(.world-center-preview) { --ink: var(--ui-light-ink); --ink-soft: var(--ui-light-ink-soft); --ink-faint: var(--ui-light-ink-faint); --focus: var(--ui-light-focus); }
+
+/* A showcase title in the centre preview keeps its room from the orbs (`previewTitleWidth`): a long one takes another line. */
+.world-context.world-center-preview h2 { max-width: var(--preview-title-width, none); margin-inline: auto; }
