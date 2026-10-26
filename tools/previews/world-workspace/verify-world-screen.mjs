@@ -1,7 +1,7 @@
 // Checks world-screen.mjs in Node: the rail's buttons, the keys card's rows, the clock's line and when
 // the first-minute hint leaves (R-WORLD-BUILD-SHEET). Run: node verify-world-screen.mjs
 import assert from 'node:assert/strict';
-import { SCREEN_TIMING, clockLabel, clockText, firstHintLeaves, firstHintMeasure, keysCardRows, railButtonOf, railEntries } from './world-screen.mjs';
+import { SCREEN_TIMING, clockLabel, clockText, clockWaiting, firstHintLeaves, firstHintMeasure, keysCardRows, railButtonOf, railEntries } from './world-screen.mjs';
 
 // The rail: Your worlds, a divider, Build and History only where they work here, Fly last; flying
 // lights Fly and names it Land.
@@ -27,6 +27,14 @@ assert.equal(clockText('06:55', 1), '06:55 · Day 1');
 assert.equal(clockLabel({ hhmm: '06:55', day: 1 }, 'playing'), '06:55 · Day 1');
 assert.equal(clockLabel({ hhmm: '06:55', day: 1 }, 'paused'), '06:55 · Day 1 · Paused');
 assert.equal(clockLabel({ hhmm: '06:55', day: 1 }, null), '06:55 · Day 1 · Paused');
+// A world set to play that this server does not advance says why under its clock, in the words the clock is handed (a
+// guest's town waiting for a place: the judges' server plays at most 8 at once); a paused one says nothing more.
+const full = "Many visitors' worlds are playing on this server right now, so yours waits until one of them stops.";
+assert.equal(clockWaiting({ mode: 'playing', waiting: full }), full);
+assert.equal(clockWaiting({ mode: 'paused', waiting: full }), null);
+assert.equal(clockWaiting({ mode: 'playing', waiting: null }), null);
+assert.equal(clockWaiting({ mode: 'playing', waiting: '  ' }), null);
+assert.equal(clockWaiting({ mode: 'playing' }), null);
 // A world that keeps no time of day still has its clock: whether it plays.
 assert.equal(clockLabel(null, 'playing'), 'Playing');
 assert.equal(clockLabel(null, 'paused'), 'Paused');

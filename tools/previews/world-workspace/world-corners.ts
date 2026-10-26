@@ -13,7 +13,7 @@ import { SPEED_SCALE, speedBars } from './opening-steps.mjs';
 import { CORNER_WORDS, NOTE_WORDS, PEOPLE_WORDS, SCREEN_WORDS } from './world-words.mjs';
 import { RUN_WORDS } from './run-words.mjs';
 import { mountPeople } from './world-people.mjs';
-import { SCREEN_TIMING, clockLabel, firstHintLeaves, firstHintMeasure, keysCardRows, railButtonOf, railEntries } from './world-screen.mjs';
+import { SCREEN_TIMING, clockLabel, clockWaiting, firstHintLeaves, firstHintMeasure, keysCardRows, railButtonOf, railEntries } from './world-screen.mjs';
 import { WORLD_UI_TIMING, hintsShown } from './world-ui-layout.mjs';
 import { keyWord, notes as mountNotes, pill, promptColumn, promptRow, tip as railTip, type Notes } from './world-ui.ts';
 import './world-ui-world.css';
@@ -27,6 +27,8 @@ export interface CornerPeople {
     readonly startMinuteOfDay?: number | null;
     readonly population?: number | null;
     readonly busy: boolean;
+    /** Why this server does not advance the world while it is set to play, in the page's words for its code, or null. */
+    readonly waiting?: string | null;
   };
   play(): Promise<void>;
   pause(): Promise<void>;
@@ -249,6 +251,10 @@ export function mountCorners({
   clock.setAttribute('aria-keyshortcuts', 'P');
   clock.addEventListener('click', () => togglePlay());
   clock.hidden = true;
+  // Under a clock set to play that this server does not advance, why (a guest's town waiting for a place).
+  const waitingLine = div('wu-glass-thin wu-clock-waiting');
+  waitingLine.setAttribute('role', 'status');
+  waitingLine.hidden = true;
   // Where nobody lives yet (K13): "[P] Bring people in", then "Bringing people in…", or "[B] Build"
   // where people have nowhere to go (the pill's people line says why).
   const offer = button('wu-glass-thin wu-pill wu-clock-pill wu-screen-in');
@@ -321,7 +327,7 @@ export function mountCorners({
     return true;
   }
 
-  host.append(scrim, backRoot, top, clock, offer, reticle, hintsRoot, firstHint, keysCard, keysButton);
+  host.append(scrim, backRoot, top, clock, waitingLine, offer, reticle, hintsRoot, firstHint, keysCard, keysButton);
   const notes = mountNotes(host, { place: 'world' });
 
   let own: readonly Hint[] = [], handed: readonly Hint[] | null = null, vertical = false;
@@ -379,6 +385,9 @@ export function mountCorners({
     // Every present society has its clock: its time of day where it keeps one, else whether it plays.
     const at = present && read ? worldTime(read.minute ?? NaN, read.startMinuteOfDay ?? NaN) : null;
     clock.hidden = !present;
+    const waiting = present && read ? clockWaiting(read) : null;
+    waitingLine.hidden = waiting === null;
+    if (waiting !== null && waitingLine.textContent !== waiting) waitingLine.textContent = waiting;
     drawOffer();
     if (!present || !read) return;
     playing = read.mode === 'playing';

@@ -45,6 +45,9 @@
 .wu-clock-pill:disabled { cursor: default; }
 .wu-clock-pill.wu-offer { cursor: pointer; }
 .wu-clock-pill.wu-waiting { cursor: default; color: var(--ink-2); }
+.wu-clock-waiting { position: absolute; right: var(--edge-inset); top: calc(var(--edge-inset) + var(--pill-height) + var(--space-8)); max-width: calc(360 * var(--u));
+  margin: 0; padding: var(--space-8) calc(12 * var(--u)); border-radius: var(--pill-radius); font-size: max(12px, calc(13 * var(--u))); line-height: 1.45;
+  color: var(--ink-2); text-wrap: pretty; pointer-events: none; }
 
 /* ---------- The first-minute hint (section 7) ---------- */
 .wu-first-hint { position: absolute; left: 50%; bottom: var(--edge-inset); transform: translateX(-50%); font-size: max(13px, calc(14 * var(--u))); pointer-events: none;

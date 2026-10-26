@@ -7,6 +7,7 @@ import type { AlternateVersion } from '../src/world-objects-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 import { parseSociety, type SocietyEvent, type SocietySnapshot } from '../src/society-api.js';
 import { parseSocietyControl } from '../src/society-control-api.js';
+import { HOST_PLAYBACK_WORDS } from '../src/ui/world-inhabitants.js';
 
 /*
  * Watching a person's own world live: the page reads the playback control about every two seconds,
@@ -54,17 +55,17 @@ const walked = (tick: number): SocietyEvent => ({
     motion_path_mm: [[(tick - 1) * 1000, 0], [tick * 1000, 0]] },
 });
 const HOST_INTERVAL_MS = 4_000;
-const control = (tick: number, mode: 'playing' | 'paused', host: unknown) => parseSocietyControl({
+const control = (tick: number, mode: 'playing' | 'paused', host: unknown, code: string | null = null) => parseSocietyControl({
   profile: 'exulanica.society-control/v1', society_id: 'society', branch_id: 'version', persisted: true,
   revision: mode === 'playing' ? 1 : 2, mode, speed: 2, base_tick_interval_ms: 8000, tick_interval_ms: HOST_INTERVAL_MS,
   interval_semantics: 'minimum_wait_after_batch_completion', last_batch_execution: null,
   simulated_seconds_per_tick: 60, max_catchup_ticks: 3, next_due_at: null, reason: null,
   lease_expires_at: null, last_event_seq: 0, current_tick: tick, state_sha256: String(tick % 10).repeat(64),
-  play_ineligible_reason: null, play_eligible: true, host_playback: host,
+  play_ineligible_reason: null, play_eligible: true, host_playback: host, host_playback_code: code,
 }, 'version');
 const RUNNING = { running: true, interval_ms: HOST_INTERVAL_MS, reason: null };
 
-function mount(options: { mode: 'playing' | 'paused'; host: unknown }) {
+function mount(options: { mode: 'playing' | 'paused'; host: unknown; code?: string | null }) {
   const server = { tick: 5, inputSeq: 1, mode: options.mode, events: [] as SocietyEvent[] };
   let version = versionWith([object('plate', 'Marker plate', 3000, 5000)]);
   const crowd = {
@@ -87,10 +88,10 @@ function mount(options: { mode: 'playing' | 'paused'; host: unknown }) {
     create: vi.fn(), connect: vi.fn(), advance: vi.fn(), requestAction: vi.fn(),
   };
   const controlClient = {
-    read: vi.fn(async () => control(server.tick, server.mode, options.host)),
+    read: vi.fn(async () => control(server.tick, server.mode, options.host, options.code ?? null)),
     configure: vi.fn(async (_control: unknown, mode: 'playing' | 'paused') => {
       server.mode = mode;
-      return control(server.tick, mode, options.host);
+      return control(server.tick, mode, options.host, options.code ?? null);
     }),
     step: vi.fn(),
   };
@@ -230,6 +231,20 @@ describe('watching a saved world live', () => {
     expect(controlClient.read.mock.calls.length).toBeGreaterThan(reads);
     expect(drawnTicks()).toEqual([5, 6]);
     expect(panel().textContent).toContain(`${reason} Use Next minute to move on one minute at a time instead.`);
+    mounted.dispose();
+  });
+
+  it('tells the clock why it does not move, in the page\'s own words by the server\'s code, and nothing once paused', async () => {
+    // A guest's town on the judges' server while eight others play: the server's sentence ends with a control the
+    // workspace does not have, so the clock says the page's own sentence for the code (DESIGN, 26 October).
+    const served = "Many visitors' worlds are playing on this server right now, so yours waits until one of them stops. Advance one minute at a time meanwhile.";
+    const { mounted, server } = mount({ mode: 'playing', host: { running: false, interval_ms: HOST_INTERVAL_MS, reason: served }, code: 'guest_towns_full' });
+    await mounted.begin();
+    expect(mounted.people.clock().waiting).toBe(HOST_PLAYBACK_WORDS['guest_towns_full']);
+    expect(mounted.people.clock().waiting).not.toContain('Advance one minute');
+    server.mode = 'paused';
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(mounted.people.clock().waiting).toBeNull();
     mounted.dispose();
   });
 

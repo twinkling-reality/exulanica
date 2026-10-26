@@ -64,6 +64,7 @@ import {
   type SocietyDirectedActionControl,
 } from '../ui/society-directed-action.js';
 import {
+  HOST_PLAYBACK_WORDS,
   buildWorldInhabitants,
   inhabitantWords,
   modelMinds,
@@ -356,6 +357,8 @@ export interface PeopleClock {
   /** Why one minute cannot be advanced by hand now, in the panel's own words, or null. */
   readonly advanceBlocked: string | null;
   readonly playEligible: boolean;
+  /** Why this server does not advance the world while it is set to play (the page's words for `host_playback_code`), or null. */
+  readonly waiting: string | null;
 }
 
 export interface PeopleControls {
@@ -3219,6 +3222,10 @@ export function mountEnvironmentSelection(
           busy: controlBusy || view?.busy === true,
           advanceBlocked: advanceBlocked(),
           playEligible: control?.playEligible === true,
+          // The page's own sentence for the server's code, as the People panel says it (its parity test holds the codes to
+          // the server's); the server's own words only for a code the page does not know.
+          waiting: control?.mode === 'playing' && control.hostPlayback?.running === false
+            ? (control.hostPlayback.code === null ? undefined : HOST_PLAYBACK_WORDS[control.hostPlayback.code]) ?? control.hostPlayback.reason : null,
         };
       },
       onChange: (listener) => { peopleListeners.add(listener); return () => peopleListeners.delete(listener); },

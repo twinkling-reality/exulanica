@@ -4,7 +4,7 @@
 // run on shows in the top pill in place of the people line, with Stop, then says why it ended.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-interface Clock { society: 'present' | 'absent'; mode: 'paused' | 'playing' | null; minute: number | null; startMinuteOfDay: number | null; population: number | null; busy: boolean }
+interface Clock { society: 'present' | 'absent'; mode: 'paused' | 'playing' | null; minute: number | null; startMinuteOfDay: number | null; population: number | null; busy: boolean; waiting?: string | null }
 interface Corners {
   frame(now: number): void;
   togglePlay(): void;
@@ -53,6 +53,30 @@ describe('the clock of a world that keeps no time of day', () => {
     const playing = document.createElement('div');
     mountCorners({ host: playing, people: { clock: () => ({ ...state, mode: 'playing' }), play: vi.fn(async () => {}), pause: vi.fn(async () => {}) }, onLeave: () => {} });
     expect(clockOf(playing)?.textContent).toBe('06:55 · Day 1');
+  });
+});
+
+describe('a world set to play that this server does not advance', () => {
+  // As the judges' server answers a ninth guest while eight towns play (host_playback_code guest_towns_full).
+  const FULL = "Many visitors' worlds are playing on this server right now, so yours waits until one of them stops.";
+  const line = (host: HTMLElement) => host.querySelector<HTMLElement>('.wu-clock-waiting');
+
+  it('says why under its clock, and says nothing once it plays or its person pauses it', async () => {
+    const { mountCorners } = await corners();
+    const host = document.createElement('div');
+    const state: Clock = { society: 'present', mode: 'playing', minute: 55, startMinuteOfDay: 360, population: 128, busy: false, waiting: FULL };
+    const made = mountCorners({ host, people: { clock: () => state, play: vi.fn(async () => {}), pause: vi.fn(async () => {}) }, onLeave: () => {} });
+    expect(clockOf(host)?.textContent).toBe('06:55 · Day 1');
+    expect(line(host)?.hidden).toBe(false);
+    expect(line(host)?.textContent).toBe(FULL);
+    expect(line(host)?.getAttribute('role')).toBe('status');
+    state.waiting = null;
+    made.frame(performance.now() + 1000);
+    expect(line(host)?.hidden).toBe(true);
+    Object.assign(state, { mode: 'paused', waiting: FULL });
+    made.frame(performance.now() + 2000);
+    expect(line(host)?.hidden).toBe(true);
+    made.dispose();
   });
 });
 

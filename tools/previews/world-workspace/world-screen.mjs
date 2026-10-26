@@ -75,6 +75,15 @@ export function clockLabel(at, mode) {
 }
 
 /**
+ * The line under a clock set to play that this server does not advance, in the words the clock is handed (the page's
+ * own sentence for `host_playback_code`: a guest's town waiting for a place among those playing, or a server that plays
+ * nothing by itself); null for a clock that plays or one its person paused.
+ */
+export function clockWaiting({ mode, waiting = null }) {
+  return mode === 'playing' && typeof waiting === 'string' && waiting.trim() !== '' ? waiting : null;
+}
+
+/**
  * Whether the first-minute hint leaves now: once the person has both walked and looked, or once it
  * has shown for its time. `shownMs` is how long it has shown; `walkedM` how far the person has moved
  * in plan; `turnedRad` how far the view has turned (yaw and pitch together).
