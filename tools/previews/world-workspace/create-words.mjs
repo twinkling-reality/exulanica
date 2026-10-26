@@ -16,7 +16,7 @@ export const CREATE_WORDS = Object.freeze({
   orStartFrom: 'Or start from',
   noModelFree: 'No AI model · Free',
   blank: 'Blank',
-  buildItYourself: 'Build it yourself',
+  buildItYourself: 'Build it yourself · Free',
   /** Blank's sub-line where the workspace's blank world already exists: Blank reopens it (N27). */
   opensMyWorldAgain: 'Opens My world again',
   yourWorlds: 'Your worlds',

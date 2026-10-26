@@ -98,7 +98,7 @@ describe('the cards to start from', () => {
   it('name themselves, keep Blank last and make one Tab stop that arrows move', async () => {
     const { strip } = await frame20();
     expect(strip.cards.map(nameOf)).toEqual(['Small town', 'Wall city', 'Blank']);
-    expect(strip.cards.map((card) => document.getElementById(card.getAttribute('aria-describedby')!)!.textContent)).toEqual(['No AI model · Free', 'At most $0.40', 'Build it yourself']);
+    expect(strip.cards.map((card) => document.getElementById(card.getAttribute('aria-describedby')!)!.textContent)).toEqual(['No AI model · Free', 'At most $0.40', 'Build it yourself · Free']);
     expect(strip.cards.map((card) => card.tabIndex)).toEqual([0, -1, -1]);
     expect(strip.cards.map((card) => card.getAttribute('aria-keyshortcuts'))).toEqual(['Enter', 'Enter', 'Enter']);
     strip.choose(2, true);
@@ -617,12 +617,12 @@ describe('Create a world as a page', () => {
     serve(offerOf());
     await mount();
     const sub = () => document.querySelector('.wu-film-card[data-key="blank"] .wu-film-sub')!.textContent;
-    expect(sub()).toBe('Build it yourself');
+    expect(sub()).toBe('Build it yourself · Free');
     // A personal install makes My world at once: saved, but nothing placed in it yet.
     document.body.replaceChildren();
     saved = [{ entryId: 'other', authoredScene: null, currentAuthoredEditSeq: 3 }, { entryId: 'starter', authoredScene: { kind: 'authored-starter' }, currentAuthoredEditSeq: 0 }];
     await mount();
-    expect(sub()).toBe('Build it yourself');
+    expect(sub()).toBe('Build it yourself · Free');
     document.body.replaceChildren();
     saved = [{ entryId: 'other', authoredScene: null, currentAuthoredEditSeq: 0 }, { entryId: 'starter', authoredScene: { kind: 'authored-starter' }, currentAuthoredEditSeq: 1 }];
     await mount();

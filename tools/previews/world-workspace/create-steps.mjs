@@ -112,7 +112,7 @@ export function spentOf(accounting) {
  * The cards under "Or start from" (N3): the server's recipes, then the workspace's kinds, each
  * { key, name, picture, priceUsd } as served, then Blank last. None is named in code but Blank,
  * which says it opens the workspace's blank world again once that world holds something its person
- * placed (N27, C4b): a newcomer's My world, made with the install, still reads "Build it yourself".
+ * placed (N27, C4b): a newcomer's My world, made with the install, still reads "Build it yourself · Free".
  */
 export function startCards(recipes = [], kinds = [], { blankHolds = false } = {}) {
   const served = [...recipes, ...kinds]

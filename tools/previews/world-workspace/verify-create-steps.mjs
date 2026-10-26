@@ -72,11 +72,11 @@ assert.equal(spentOf(null), null);
 
 // Cards: served recipes, then kinds, Blank last; no name comes from code but Blank's.
 const cards = startCards([{ key: 'r1', name: 'Small town', picture: 'data:image/png;base64,x', priceUsd: null }], [{ key: 'k1', name: 'Wall city', priceUsd: '0.4' }, { key: 'k2', name: ' ' }]);
-assert.deepEqual(cards.map(card => [card.name, card.sub]), [['Small town', 'No AI model · Free'], ['Wall city', 'At most $0.40'], ['Blank', 'Build it yourself']]);
+assert.deepEqual(cards.map(card => [card.name, card.sub]), [['Small town', 'No AI model · Free'], ['Wall city', 'At most $0.40'], ['Blank', 'Build it yourself · Free']]);
 // N27, C4b: once the workspace's blank world holds something its person placed, Blank says it opens it again; empty,
-// as a personal install makes it, it still reads "Build it yourself".
+// as a personal install makes it, it still reads "Build it yourself · Free".
 assert.equal(startCards([], [], { blankHolds: true }).at(-1).sub, 'Opens My world again');
-assert.equal(startCards([], [], { blankHolds: false }).at(-1).sub, 'Build it yourself');
+assert.equal(startCards([], [], { blankHolds: false }).at(-1).sub, 'Build it yourself · Free');
 assert.equal(cards.at(-1).blank, true);
 assert.deepEqual(startCards().map(card => card.name), [CREATE_WORDS.blank]);
 assert.equal(moveChoice(0, 3, -1), 0);

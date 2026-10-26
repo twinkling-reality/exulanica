@@ -13,7 +13,7 @@ assert.equal(CREATE_WORDS.create, 'Create');
 assert.equal(CREATE_WORDS.orStartFrom, 'Or start from');
 assert.equal(CREATE_WORDS.noModelFree, 'No AI model · Free');
 assert.equal(CREATE_WORDS.blank, 'Blank');
-assert.equal(CREATE_WORDS.buildItYourself, 'Build it yourself');
+assert.equal(CREATE_WORDS.buildItYourself, 'Build it yourself · Free');
 assert.equal(CREATE_WORDS.opensMyWorldAgain, 'Opens My world again');
 assert.equal(CREATE_WORDS.yourWorlds, 'Your worlds');
 assert.equal(CREATE_WORDS.loading, 'Reading what you can make here…');
