@@ -2,7 +2,7 @@
 // it is looked at, and the ring and card once it is chosen. Pure: the reads come in as data and the
 // words from character-words.mjs; character-presence.ts draws the answer. verify-character-view.mjs
 // holds it.
-import { CHARACTER_WORDS, called, chosenLine, deciderWords, readingRecord, routineBetween, rowSub } from './character-words.mjs';
+import { CHARACTER_WORDS, OUTSIDE_AGENT, called, chosenLine, deciderWords, readingRecord, routineBetween, rowSub } from './character-words.mjs';
 import { RUN_WORDS, atMost, runFor, runRefusalWords, whoDecides } from './run-words.mjs';
 import { plural } from './history-words.mjs';
 import { heardRow, saidRow } from './talk-words.mjs';
@@ -294,6 +294,13 @@ export function didRows({ events, subjectId, startMinute = null, wordGoal, model
     const chose = run ? rows.filter(one => one.model && one.unanswered !== 'none' && runOf(one.tick) === run) : [];
     const by = chose.find(one => one.tick <= row.tick) ?? chose.at(-1);
     if (by) row.sub = routineBetween(by.model);
+  }
+  // A routine row while an outside AI agent decides (AG1c): after a turn it answered and before its next turn, it lies
+  // between its choices as a model's does; before its first answered turn, or after its last, it stays "Routine".
+  const agentTurns = rows.filter(one => one.decider === 'agent');
+  for (const row of rows) {
+    if (row.model || row.decider || row.heard || row.sub !== CHARACTER_WORDS.routine) continue;
+    if (agentTurns.some(one => !one.unanswered && one.tick <= row.tick) && agentTurns.some(one => one.tick >= row.tick)) row.sub = routineBetween(OUTSIDE_AGENT);
   }
   return foldRows(rows, foldable).slice(0, limit);
 }

@@ -128,6 +128,9 @@ export function rowSub(decision) {
  * 120B's choices". */
 export const routineBetween = model => `${CHARACTER_WORDS.routine}, between ${possessive(model)} choices`;
 
+/** The outside AI agent as a routine row between its choices names it (AG1c): "Routine, between the outside AI agent's choices". */
+export const OUTSIDE_AGENT = 'the outside AI agent';
+
 /** Who decides where a model does not (T7, AG1d): "A person playing", "An outside program", "An outside AI agent", or
  * null. */
 export const deciderWords = decider => decider === 'person' ? CHARACTER_WORDS.personPlaying : decider === 'external' ? CHARACTER_WORDS.outsideProgram

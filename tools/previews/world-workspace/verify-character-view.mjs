@@ -173,6 +173,18 @@ const picked = (tick, model) => ({ subject_id: 't', tick, event_kind: 'decision_
 const named = model => (model.model_id === 'nano' ? 'Nemotron 3 Nano 30B' : 'Nemotron 3 Super 120B');
 assert.deepEqual(inRuns([{ from: 0, to: null }], served([[picked(1, nanoModel)], [aim(2, { kind: 'rest', target_id: 'bench', reason: 'resting' })], [picked(3, nemo)]]), named),
   [['06:02', "Routine, between Nemotron 3 Nano 30B's choices"]], 'the choice before it names the model');
+// A routine row while an outside AI agent decides (AG1c, DESIGN 12:10) lies between its choices, as a model's does: after a
+// turn it answered and before its next turn; before its first answered turn, or after its last, it stays "Routine".
+const agentTurn = (tick, chose) => ({ subject_id: 'v1', tick, event_kind: 'decision_applied', document: chose
+  ? { request_id: `a${tick}`, chose, disposition: 'applied', origin: 'external', model: null }
+  : { request_id: `a${tick}`, chose: null, disposition: 'unavailable', reason: 'no_answer_in_time', origin: 'external', model: null, goal: { kind: 'stand' } } });
+const routineAim = (tick, kind) => ({ subject_id: 'v1', tick, event_kind: 'goal_selected', document: { reason: 'stopping_a_while', goal: { kind } } });
+const agentDay = didRows({ events: [routineAim(12, 'eat'), agentTurn(11, 'wait here'), routineAim(10, 'rest'), agentTurn(9, null), agentTurn(8, 'wait here'), routineAim(5, 'eat')],
+  subjectId: 'v1', wordGoal: goalWords, modelName: () => null, agent: true });
+assert.deepEqual(agentDay.map(row => [row.what, row.sub]), [
+  ['Went to eat', 'Routine'], ['Wait here', 'An outside AI agent'], ['Went to rest', "Routine, between the outside AI agent's choices"],
+  ['Went to stand a while', 'An outside AI agent'], ['Wait here', 'An outside AI agent'], ['Went to eat', 'Routine'],
+]);
 // A decision with no usable answer is no choice (U3b, DESIGN 15:58): a run of only those leaves the routine "Routine";
 // a choice made too late is still the model's choice.
 const unused = (tick, model, disposition = 'unavailable') => ({ subject_id: 't', tick, event_kind: 'decision_applied',
