@@ -296,7 +296,7 @@ export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable
     element('p', 'wu-creature-quote', quoted(words)),
     ...(placeable
       ? [glyphRows([{ key: 'Enter', word: CREATURE_WORDS.place, shortcut: 'Enter' }])]
-      : [element('p', 'wu-creature-from', CREATURE_WORDS.nowhereToStand), glyphRows([{ key: 'Esc', word: CREATURE_WORDS.back, shortcut: 'Escape', onPress: onBack }])]),
+      : [element('p', 'wu-creature-from', CREATURE_WORDS.nowhereToStand), glyphRows([{ key: 'Esc', word: CREATURE_WORDS.back, shortcut: 'Escape', ...(onBack ? { onPress: onBack } : {}) }])]),
     ...lines.map((line) => element('p', 'wu-creature-small', line)),
   );
   return root;
