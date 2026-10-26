@@ -1,5 +1,141 @@
 // Generated from public/worlds/sources.json. Run scripts/generate-world-catalog.mjs.
-export const WORLD_CAPTURES = [
+export interface ShowcaseCapture {
+  readonly id: string;
+  readonly world: string;
+  readonly title: string;
+  readonly sentence: string;
+  readonly image: string;
+  readonly made: Readonly<Record<string, unknown>>;
+}
+export interface ConfigurationCapture {
+  readonly id: string;
+  readonly recipe: string;
+  readonly values: Readonly<Record<string, string | number>>;
+  readonly style_pack: { readonly pack_id: string; readonly version: number; readonly manifest_sha256: string };
+  readonly image: string;
+  readonly saved_world_title: string;
+  readonly style_title: string;
+}
+export const WORLD_CAPTURES: readonly (ShowcaseCapture | ConfigurationCapture)[] = [
+  {
+    "id": "mountain-town",
+    "world": "mountain-town",
+    "title": "A snowy mountain town with a bakery",
+    "sentence": "a snowy mountain town with a bakery",
+    "image": "showcase-mountain-town.jpg",
+    "made": {
+      "main": "4a878448e",
+      "draft_id": "7faa20c2-4813-51ef-ad07-c4834d634b0e",
+      "tool": "town",
+      "people": [
+        "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      ],
+      "decisions": 25,
+      "creature": "White horned grazer",
+      "spend_usd": {
+        "draft": "0.00520320",
+        "run": "0.00868198",
+        "creature": "0.0047"
+      },
+      "spend_account": "Nebius Token Factory, the user's key, APPROVALS item 36 allocation WORLDS-SHOWCASE-1"
+    }
+  },
+  {
+    "id": "fishing-village",
+    "world": "fishing-village",
+    "title": "Fishing village",
+    "sentence": "a fishing village by the sea at sunset",
+    "image": "showcase-fishing-village.jpg",
+    "made": {
+      "main": "4a878448e",
+      "draft_id": "d16b2a23-c4a0-5d37-b368-e178e48ec7eb",
+      "tool": "place",
+      "people": [
+        "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "nvidia/nemotron-3-super-120b-a12b"
+      ],
+      "decisions": 35,
+      "creature": "Harbour napper",
+      "spend_usd": {
+        "draft": "0.00628430",
+        "run": "0.01661950",
+        "creature": "0.0053"
+      },
+      "spend_account": "Nebius Token Factory, the user's key, APPROVALS item 36 allocation WORLDS-SHOWCASE-1"
+    }
+  },
+  {
+    "id": "night-market",
+    "world": "night-market",
+    "title": "Night market",
+    "sentence": "a rainy night market in the city",
+    "image": "showcase-night-market.jpg",
+    "made": {
+      "main": "4a878448e",
+      "draft_id": "089859e9-f12f-5761-ac2b-a317e9ddc175",
+      "tool": "place",
+      "people": [
+        "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+      ],
+      "decisions": 30,
+      "creature": "Sleepy stall wanderer",
+      "spend_usd": {
+        "draft": "0.00420398",
+        "run": "0.01078080",
+        "creature": "0.0046"
+      },
+      "spend_account": "Nebius Token Factory, the user's key, APPROVALS item 36 allocation WORLDS-SHOWCASE-1"
+    }
+  },
+  {
+    "id": "windmill-village",
+    "world": "windmill-village",
+    "title": "Farming village",
+    "sentence": "a farming village in the hills with an old windmill",
+    "image": "showcase-windmill-village.jpg",
+    "made": {
+      "main": "4a878448e",
+      "draft_id": "bf6a6d68-67b7-5b5d-8f07-23449f246b4a",
+      "tool": "place",
+      "people": [
+        "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "nvidia/nemotron-3-super-120b-a12b"
+      ],
+      "decisions": 38,
+      "creature": "Shaggy herd guardian",
+      "spend_usd": {
+        "draft": "0.00562204",
+        "run": "0.01371620",
+        "creature": "0.0039"
+      },
+      "spend_account": "Nebius Token Factory, the user's key, APPROVALS item 36 allocation WORLDS-SHOWCASE-1"
+    }
+  },
+  {
+    "id": "lighthouse-island",
+    "world": "lighthouse-island",
+    "title": "Tiny Island Lighthouse",
+    "sentence": "a tiny island with a lighthouse",
+    "image": "showcase-lighthouse-island.jpg",
+    "made": {
+      "main": "4a878448e",
+      "draft_id": "6fa10c0e-95ce-5f95-8651-08b4878c71a4",
+      "tool": "place",
+      "people": [
+        "nvidia/nemotron-3-super-120b-a12b"
+      ],
+      "decisions": 30,
+      "creature": "Crimson beaked seabird",
+      "spend_usd": {
+        "draft": "0.01433550",
+        "run": "0.01086570",
+        "creature": "0.01"
+      },
+      "spend_account": "Nebius Token Factory, the user's key, APPROVALS item 36 allocation WORLDS-SHOWCASE-1"
+    }
+  },
   {
     "id": "compact-cozy",
     "recipe": "small_town",
@@ -396,4 +532,4 @@ export const WORLD_CAPTURES = [
     "saved_world_title": "Shophouse Quarter · Toon",
     "style_title": "Toon town"
   }
-] as const;
+];

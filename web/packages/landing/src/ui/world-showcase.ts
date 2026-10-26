@@ -22,7 +22,10 @@ export function buildWorldShowcase(options: WorldShowcaseOptions = {}): HTMLElem
   image.addEventListener('load', () => { imageNote.hidden = true; image.hidden = false; });
   image.addEventListener('error', () => { image.hidden = true; imageNote.hidden = false; imageNote.textContent = 'Capture unavailable. You can still read about this world.'; });
   const close = el('button', { type: 'button', class: 'context-close', 'aria-label': 'Close world preview', text: '×' });
-  const link = action(options.atlasHref ? 'Create World' : 'Set Up Exulanica', options.atlasHref ?? '/docs/self-hosting', true);
+  const linkLabel = options.atlasHref ? 'Create World' : 'Set Up Exulanica';
+  // A showcase world is opened, not made: its link says so wherever an application can open it.
+  const opens = (scene: (typeof WORLD_SCENES)[number]) => Boolean(scene.world && options.atlasHref);
+  const link = action(linkLabel, options.atlasHref ?? '/docs/self-hosting', true);
   const panel = el('section', { id: `${prefix}-preview`, class: `world-context${options.portals ? ' world-center-preview' : ''}`, 'aria-labelledby': heading.id, hidden: '' }, options.portals ? [
     heading, description, invitation,
   ] : [
@@ -81,6 +84,7 @@ export function buildWorldShowcase(options: WorldShowcaseOptions = {}): HTMLElem
       heading.textContent = options.portals ? scene.name ?? scene.title : scene.title;
       description.textContent = options.portals ? '' : scene.description;
       description.hidden = !description.textContent;
+      invitation.textContent = opens(scene) ? 'Open this world' : 'Click to explore';
     };
     const animateCopy = options.portals && typeof panel.animate === 'function' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!animateCopy || !replacing) updateCopy();
@@ -88,6 +92,9 @@ export function buildWorldShowcase(options: WorldShowcaseOptions = {}): HTMLElem
     image.src = scene.image; image.alt = scene.alt;
     if (image.complete && image.naturalWidth) imageNote.hidden = true;
     link.href = worldEntryHref(scene, options.atlasHref ?? null);
+    const said = opens(scene) ? 'Open this world' : linkLabel;
+    link.querySelector('.secondary-label')!.textContent = said;
+    if (link.hasAttribute('aria-label')) link.setAttribute('aria-label', `${said} (external)`);
     link.dataset.returnFocus = button.id;
     link.dataset.returnWorld = scene.id;
     button.setAttribute('aria-expanded', 'true');
@@ -136,7 +143,7 @@ export function buildWorldShowcase(options: WorldShowcaseOptions = {}): HTMLElem
     const button: HTMLElement = el(options.portals ? 'a' : 'button', {
       id: `${prefix}-${scene.id}`, type: 'button', class: `world-choice world-choice-${index + 1}`,
       ...(options.portals ? { href: worldEntryHref(scene, options.atlasHref ?? null) } : {}),
-      'data-scene-index': String(index), 'aria-label': `${options.portals ? 'Explore' : 'Preview'} ${scene.title}`, 'aria-expanded': 'false', 'aria-controls': panel.id,
+      'data-scene-index': String(index), 'aria-label': `${options.portals ? (opens(scene) ? 'Open' : 'Explore') : 'Preview'} ${scene.title}`, 'aria-expanded': 'false', 'aria-controls': panel.id,
     }, [el('span', { class: 'portal-orbit' }, [visual]),
       el('span', { class: 'portal-label' }, [el('span', { text: scene.title }), el('span', { class: 'portal-invitation', text: 'Still preview' }), el('span', { class: 'catalog-arrow action-icon', 'aria-hidden': 'true' }, [icon('arrow')])]),
     ]);

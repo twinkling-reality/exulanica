@@ -1,9 +1,14 @@
 import { WORLD_CAPTURES } from '../content/world-captures.js';
 
-/** Genuine app captures. These identifiers describe configurations, not hosted world IDs. */
+/**
+ * Genuine app captures. A configuration's identifiers describe how to make a world, not a hosted one; a showcase
+ * world's `world` is the key a server opens the visitor's own copy of that made world by.
+ */
 export interface WorldScene {
   readonly id: string;
-  readonly recipe: string;
+  readonly recipe?: string;
+  readonly world?: string;
+  readonly sentence?: string;
   readonly title: string;
   readonly image: string;
   readonly alt: string;
@@ -21,7 +26,14 @@ const LEGACY_WORLD_SCENES: readonly WorldScene[] = [
 ];
 
 /** The featured catalog is derived from saved-world capture records, not independent prose. */
-export const WORLD_SCENES: readonly WorldScene[] = WORLD_CAPTURES.map(capture => {
+export const WORLD_SCENES: readonly WorldScene[] = WORLD_CAPTURES.map((capture): WorldScene => {
+  if ('world' in capture) {
+    return {
+      id: capture.id, world: capture.world, sentence: capture.sentence, title: capture.title, name: capture.title,
+      image: `/worlds/${capture.image}`, alt: `${capture.title}, made in Exulanica from the words “${capture.sentence}”.`,
+      description: `“${capture.sentence}”`, values: {},
+    };
+  }
   const name = capture.saved_world_title.split(' · ')[0]!;
   const appearance = capture.style_title.replace(/\b\w/g, character => character.toUpperCase());
   const values = capture.values;
@@ -33,10 +45,15 @@ export const WORLD_SCENES: readonly WorldScene[] = WORLD_CAPTURES.map(capture =>
   };
 });
 
-/** Preserve deployment parameters and carry the actual configuration into app selection. */
+/** Preserve deployment parameters; open a showcase world by its key, or carry a configuration into app selection. */
 export function worldEntryHref(scene: WorldScene, atlasHref: string | null): string {
   if (!atlasHref) return '/docs/self-hosting';
   const destination = new URL(atlasHref);
+  if (scene.world) {
+    destination.searchParams.set('world', scene.world);
+    return destination.href;
+  }
+  if (!scene.recipe) return '/docs/self-hosting';
   destination.searchParams.set('recipe', scene.recipe);
   destination.searchParams.set('values', JSON.stringify(scene.values));
   if (scene.stylePack) {

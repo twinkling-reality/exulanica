@@ -92,7 +92,7 @@ describe('contextual world previews', () => {
     expect(panel.querySelector('h2')?.textContent).toBe(WORLD_SCENES[0]!.title);
     expect(panel.querySelector('a')?.getAttribute('href')).toBe('/docs/self-hosting');
   });
-  it('hands every configuration straight to the app with their recipe, preserving deployment parameters', () => {
+  it('hands every configuration straight to the app with their recipe, and every showcase world by its key, preserving deployment parameters', () => {
     const { choices, panel } = fixture('https://atlas.example/session?tenant=one#worlds');
     for (const [index, scene] of WORLD_SCENES.entries()) {
       choices[index]!.click();
@@ -100,6 +100,14 @@ describe('contextual world previews', () => {
       const url = new URL(href);
       expect(url.pathname).toBe('/session');
       expect(url.searchParams.get('tenant')).toBe('one');
+      expect(url.hash).toBe('#worlds');
+      if (scene.world) {
+        // A made world opens as the visitor's own copy, by its key alone: no configuration rides along.
+        expect(url.searchParams.get('world')).toBe(scene.world);
+        expect(panel.querySelector('a')!.textContent).toBe('Open this world');
+        expect(url.searchParams.has('recipe')).toBe(false);
+        continue;
+      }
       expect(url.searchParams.get('recipe')).toBe(scene.recipe);
       expect(JSON.parse(url.searchParams.get('values')!)).toEqual(scene.values);
       expect(JSON.parse(url.searchParams.get('style_pack')!)).toEqual(scene.stylePack);
@@ -114,12 +122,15 @@ describe('contextual world previews', () => {
     for (const [index, scene] of WORLD_SCENES.entries()) {
       const orb = choices[index]!;
       expect(orb.tagName).toBe('A');
-      expect(new URL(orb.getAttribute('href')!).searchParams.get('recipe')).toBe(scene.recipe);
+      const opens = new URL(orb.getAttribute('href')!).searchParams;
+      expect(scene.world ? opens.get('world') : opens.get('recipe')).toBe(scene.world ?? scene.recipe);
       orb.focus();
       expect(panel.querySelector('h2')?.textContent).toBe(scene.name);
       expect(panel.querySelector('.preview-description')?.textContent).toBe('');
       expect(panel.querySelector<HTMLElement>('.preview-description')?.hidden).toBe(true);
-      expect(panel.querySelector('.preview-invitation')?.textContent).toBe('Click to explore');
+      // A showcase world's orb opens the visitor's copy, and says so; a configuration's is explored.
+      expect(panel.querySelector('.preview-invitation')?.textContent).toBe(scene.world ? 'Open this world' : 'Click to explore');
+      expect(orb.getAttribute('aria-label')).toBe(`${scene.world ? 'Open' : 'Explore'} ${scene.title}`);
       expect(panel.querySelector('a,button')).toBeNull();
     }
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
