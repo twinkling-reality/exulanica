@@ -77,6 +77,30 @@ def test_a_note_the_bound_stopped_inside_a_word_is_dropped_and_a_whole_one_is_ke
     assert dict(screened.dropped) == {"cut_word": 2}
 
 
+def test_a_note_that_only_says_the_material_holds_nothing_is_dropped() -> None:
+    # Live notes of 26 October: the first three empty ones are rehearsal run 7's town's, and the
+    # first two saying ones open with "No" and go on to say what a creature is (CREATURE's runs).
+    empty = [
+        DraftedNote("clothing", "No visible garments described in the material."),
+        DraftedNote("food_and_goods", "No goods or food described in the material."),
+        DraftedNote("vehicles_and_boats", "No vehicles or boats described in the material."),
+        DraftedNote("clothing", "Clothing isn't mentioned in the material."),
+    ]
+    saying = [
+        DraftedNote("clothing", "No garments; robot has mechanical shell and control panels."),
+        DraftedNote(
+            "vehicles_and_boats",
+            "No vehicles; robot moves on foot or roller-skates on flat surfaces",
+        ),
+        DraftedNote("buildings", "Roofs described as steep, with no gutters"),
+    ]
+    screened = keep_notes(
+        [*empty, *saying], sources=[], catalogs=load_reference_catalogs(aspect_version=2)
+    )
+    assert screened.kept == tuple(saying)
+    assert dict(screened.dropped) == {"says_nothing": 4}
+
+
 def test_notes_are_dropped_by_reason_and_never_quoted() -> None:
     drafted = [
         DraftedNote("buildings", "x" * 81),

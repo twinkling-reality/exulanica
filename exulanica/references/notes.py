@@ -3,10 +3,11 @@
 A reader model drafts notes from a source's excerpts and picture descriptions, which are not ours to
 keep. A note is kept only if it is one short line about one aspect of the reference catalogs, whole
 (a note the length bound stopped inside a word, :func:`cut_at_bound`, is not: a note shows whole or
-not at all), shares no run of :data:`COPY_RUN_WORDS` consecutive words with any of those texts, and
-passes the outgoing screen (:func:`exulanica.references.boundary.screen_text`): no link, email
-address, long number, screened word or withheld word. Everything else is dropped and counted by
-reason; a dropped note is never quoted, since it may be a source's words.
+not at all), says something of the thing (a note that only says the material holds nothing of it,
+:func:`says_nothing`, does not), shares no run of :data:`COPY_RUN_WORDS` consecutive words with any
+of those texts, and passes the outgoing screen (:func:`exulanica.references.boundary.screen_text`):
+no link, email address, long number, screened word or withheld word. Everything else is dropped and
+counted by reason; a dropped note is never quoted, since it may be a source's words.
 
 Saved names are not judged here: a note reaches a hosted model only inside a drafter's request,
 which the workspace's request policy judges like every other.
@@ -31,14 +32,36 @@ __all__ = [
     "NoteScreen",
     "cut_at_bound",
     "keep_notes",
+    "says_nothing",
 ]
 
 MAX_NOTE_CHARACTERS: Final = 80
 #: A note sharing this many consecutive words with a source text is that text, not a note.
 COPY_RUN_WORDS: Final = 6
+#: A note naming no more than what the material lacks (run 7's "No goods or food described in the
+#: material.") has a negation, and after it one of the words a note uses of the material it was
+#: given rather than of the thing.
+_NEGATIONS: Final = frozenset({"no", "not", "none", "nothing", "neither", "nor"})
+_OF_THE_MATERIAL: Final = frozenset(
+    {
+        "material",
+        "excerpt",
+        "excerpts",
+        "described",
+        "describe",
+        "describes",
+        "mentioned",
+        "mention",
+        "mentions",
+        "specified",
+        "stated",
+        "information",
+    }
+)
 NOTE_DROPS: Final = (
     "note_shape",
     "cut_word",
+    "says_nothing",
     "aspect_unknown",
     "copied_run",
     "duplicate",
@@ -68,6 +91,15 @@ def cut_at_bound(text: str) -> bool:
     """Whether a note reached the length bound ending inside a word: a reader's structured answer
     stops a longer note at the bound, wherever it falls, so such a note was cut there."""
     return len(text) >= MAX_NOTE_CHARACTERS and text[-1:].isalnum()
+
+
+def says_nothing(text: str) -> bool:
+    """Whether a note only says the material holds nothing of what it is about: a negation, then a
+    word about the material, as in "Clothing not mentioned in the material." A note that opens with
+    a negation and goes on to the thing ("No garments; a mechanical shell") says something."""
+    words = words_of(text.lower().replace("n't", " not").replace("n\u2019t", " not"))
+    first = next((at for at, word in enumerate(words) if word in _NEGATIONS), None)
+    return first is not None and not _OF_THE_MATERIAL.isdisjoint(words[first + 1 :])
 
 
 def _runs(text: str) -> set[tuple[str, ...]]:
@@ -110,6 +142,9 @@ def keep_notes(
             continue
         if cut_at_bound(text):
             dropped["cut_word"] += 1
+            continue
+        if says_nothing(text):
+            dropped["says_nothing"] += 1
             continue
         if note.aspect not in catalogs.aspects:
             dropped["aspect_unknown"] += 1
