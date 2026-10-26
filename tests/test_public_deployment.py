@@ -94,6 +94,14 @@ def test_the_edge_reaches_the_client_proxy_and_never_the_api():
     assert "api:" not in conf
 
 
+def test_the_edge_compresses_binary_assets_as_well_as_text():
+    """A world's texture sets and tile bytes are served as application/octet-stream, which Caddy's
+    own match leaves raw: the edge's match keeps its text types and adds that one."""
+    matched = set(re.findall(r"header Content-Type (\S+)", _directives(CADDYFILE)))
+    assert {"text/*", "application/json*", "application/javascript*"} <= matched
+    assert "application/octet-stream*" in matched
+
+
 def _script_value(name: str) -> str:
     match = re.search(rf'^{name}="(\S+)"$', SCRIPT.read_text(encoding="utf-8"), re.M)
     assert match is not None, name

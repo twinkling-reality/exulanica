@@ -83,6 +83,14 @@ def test_the_edge_proxies_to_the_web_proxy_and_never_to_the_api():
     assert "./Caddyfile:/etc/caddy/Caddyfile:ro" in _directives(EDGE)
 
 
+def test_the_edge_compresses_binary_assets_as_well_as_text():
+    """A world's texture sets and tile bytes are served as application/octet-stream, which Caddy's
+    own match leaves raw: the edge's match keeps its text types and adds that one."""
+    matched = set(re.findall(r"header Content-Type (\S+)", _directives(CADDYFILE)))
+    assert {"text/*", "application/json*", "application/javascript*"} <= matched
+    assert "application/octet-stream*" in matched
+
+
 def test_the_edge_host_and_issuer_have_no_default():
     for variable in ("EXULANICA_PUBLIC_HOST", "EXULANICA_TLS"):
         assert f"${{{variable}:?" in _directives(EDGE), variable
