@@ -117,7 +117,8 @@ import {
   buildYourWorlds,
   type PersonalWorldControl,
 } from './composition/world-entry.js';
-import { keepFirstViewPicture, keepWorldPicture, readServedPictures, worldPicture } from './composition/world-pictures.js';
+import { keepFirstViewPicture, keepWorldPicture, readPaintedPictures, readServedPictures, worldPicture } from './composition/world-pictures.js';
+import { WorldPaintingsClient } from './world-paintings-api.js';
 import { CapabilitiesClient } from './capabilities-api.js';
 import { mountEnvironmentSelection } from './composition/environment-selection.js';
 import { mountThingCard } from './composition/thing-card-mount.js';
@@ -570,12 +571,11 @@ async function mountWorldEntry(failed?: string): Promise<void> {
   replaceSurface(shell, [yourWorlds.root]);
   shell.removeAttribute('aria-busy');
   shell.removeAttribute('data-booting');
-  // The pictures the server keeps, read by their digests; the cards are drawn again with them.
-  if (entries !== null) {
-    void readServedPictures(entries, state.savedWorldEntries).then((added) => {
-      if (added > 0 && yourWorlds.root.isConnected) yourWorlds.refreshPictures();
-    });
-  }
+  // The pictures the server keeps, read by their digests, and each world's painting of its first view, shown first
+  // on its card with its label; the cards are drawn again with them.
+  const redrawn = (added: number): void => { if (added > 0 && yourWorlds.root.isConnected) yourWorlds.refreshPictures(); };
+  if (entries !== null) void readServedPictures(entries, state.savedWorldEntries).then(redrawn);
+  if (state.credentials !== null) void readPaintedPictures(new WorldPaintingsClient(state.credentials), state.savedWorldEntries).then(redrawn);
   // Create a world's availability, read the way a mounted world's registry reads it.
   if (entries !== null && state.credentials !== null) {
     const spec = actionSpec('world.make');

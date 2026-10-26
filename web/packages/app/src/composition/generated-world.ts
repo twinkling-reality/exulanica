@@ -62,6 +62,11 @@ import { committedTextureLibrary } from '../texture-library.js';
 import { arrivalView, lowOf, parkedFootprint, seatsOf, type PlanFootprint, type SightBlocker, type TownLife } from './arrival-view.js';
 import { TOWN_FIRST_VIEW } from '../town-first-view.js';
 import { WORLD_LOOK_ATTRIBUTE, swappableDrawing } from './world-look-redraw.js';
+import { WorldPaintingsClient, type WorldPainting } from '../world-paintings-api.js';
+import {
+  WORLD_PAINTING_ATTRIBUTE, firstViewPainting, paintedStart, placedCamera, showWorldPainting, standsAtPainting,
+  type LiveCamera,
+} from './world-painting.js';
 
 /** The media type a baked tile's container is served as. */
 const CONTAINER_MEDIA_TYPE = 'application/vnd.exulanica.owd';
@@ -201,6 +206,11 @@ export interface GeneratedWorld {
    * first view was chosen by, kept for what hides a being while the town is mounted.
    */
   readonly sightBlockers: readonly SightBlocker[];
+  /**
+   * The painting of its first view the world opens at, or none: where it keeps one, the world opens at the camera it
+   * was painted from and the painting lies over the live view until the person moves (`./world-painting.ts`).
+   */
+  readonly painting: WorldPainting | null;
   /**
    * The same tiles, as loaded, in another look: nothing is fetched, verified or decoded again;
    * refused, and nothing changed, when the pack cannot be read.
@@ -343,6 +353,10 @@ export async function loadGeneratedWorld(
   // What the first look faces and sees past, read beside the tiles: the version's placed things,
   // waited for, and, only where something is placed, what is parked now, never waited on for long.
   const placing = placedThings(access, entry).then((targets) => targets ?? []);
+  // The world's painting of its first view, read beside its tiles; a world whose paintings cannot be read opens as
+  // it always did.
+  const painting = new WorldPaintingsClient(access).paintings(entry.worldId)
+    .then(firstViewPainting, () => null);
   const parking = placing.then((targets) => (targets.length === 0 ? [] : parkedNow(access, entry)));
   const [route, { parseTextureSetManifest, isNavigationGroundPathContinuous, atlasVec3 }, library] = await Promise.all([
     import('@exulanica/atlas-react/generated-tile'),
@@ -471,19 +485,24 @@ export async function loadGeneratedWorld(
     }),
   });
   const standHeight = view.moved ? surface.sample(view.eastMm / 1000, view.southMm / 1000)?.height ?? null : null;
-  const start = {
+  const arrived = {
     x: view.eastMm / 1000,
     y: (standHeight ?? stand?.heightM ?? height / 1000) + loaded.navigationWorld.eyeHeight,
     z: view.southMm / 1000,
     yaw: view.yaw,
     pitch: 0,
   };
+  // A world with a painting of its first view opens where that painting was painted from, so the two line up.
+  const painted = await painting;
+  const paintedAt = painted === null ? null : paintedStart(painted);
+  const start = paintedAt ?? arrived;
   return {
     tile: { ...onLand(loaded), start },
     ground,
     look: { pack: choice.packId, source: choice.source, drawn: prepared !== null, reason, ...settingOf(prepared) },
     bodies: drawn.bodies,
     sightBlockers,
+    painting: paintedAt === null ? null : painted,
     async relook(asked) {
       const next = await resolved(asked);
       const nextPrepared = await prepare(next);
@@ -668,6 +687,26 @@ async function withWorldTraffic(
 }
 
 /**
+ * Lay the world's painting of its first view over the live view while `camera` (the live camera, once the world is
+ * drawn under one) stands where it was painted from; a painting that cannot be read is not shown.
+ */
+async function showPainting(
+  env: AppEnvironment, access: Credentials, entry: SavedWorldEntry, painting: WorldPainting,
+  camera: () => LiveCamera | null,
+): Promise<void> {
+  try {
+    const bytes = await new WorldPaintingsClient(access).picture(entry.worldId, painting.sha256);
+    const standing = (): boolean | null => {
+      const live = camera();
+      return live === null ? null : standsAtPainting(painting, live);
+    };
+    showWorldPainting(env.canvas, painting, URL.createObjectURL(bytes), env.systemReducedMotion.matches, standing);
+  } catch {
+    // The world stands as it is drawn.
+  }
+}
+
+/**
  * The tile to mount for a saved generated world, with its traffic, or null while the world is not
  * drawn yet, in which case the page says why and, while tiles are baking, opens the world again
  * once every one is baked or one has failed.
@@ -683,6 +722,8 @@ export async function openGeneratedWorld(
   running?: () => boolean,
 ): Promise<LoadedGeneratedTile | null> {
   env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
+  // A painting another world laid over the page goes with it, its words too.
+  env.shell.ownerDocument.querySelectorAll(`[${WORLD_PAINTING_ATTRIBUTE}]`).forEach((node) => node.remove());
   const loaded = await loadGeneratedWorld(access, entry, undefined, bound);
   if (loaded === null) return null;
   if (isGeneratedWorld(loaded)) {
@@ -690,7 +731,13 @@ export async function openGeneratedWorld(
     const stated = (look: GeneratedWorld['look']): void => env.shell.setAttribute(WORLD_LOOK_ATTRIBUTE, JSON.stringify(look));
     stated(loaded.look);
     const world = switchableWorld(loaded, stated, env.shell);
-    return withWorldTraffic(env, access, entry, world.tile, world.bodies, world.bodiesChanged, running);
+    let tile = world.tile;
+    if (loaded.painting !== null) {
+      const drawn = placedCamera(tile);
+      tile = drawn.tile;
+      void showPainting(env, access, entry, loaded.painting, drawn.camera);
+    }
+    return withWorldTraffic(env, access, entry, tile, world.bodies, world.bodiesChanged, running);
   }
   const words = loaded.waiting === 'baking'
     ? fill('world.generated.baking', { recipe: loaded.ground.recipeLabel })

@@ -7,7 +7,7 @@ import { endOpening, handOverOpening } from './world-opening.ts';
 import { showBeingMade } from './create-world.ts';
 import { offerIntegrations } from './integrations.ts';
 import { capturedPicture, frontDoorAddress, leadsWithCreate, openWorldAddress, worldAddress } from './front-door-routes.mjs';
-import { worldPicture } from '/src/composition/world-pictures.ts';
+import { ownWorldPicture, worldPicture } from '/src/composition/world-pictures.ts';
 import { icon, type IconName } from '/src/ui/system/icon.ts';
 import type { Credentials } from '/src/config.ts';
 import type { SavedWorldEntry } from '/src/world-entry-api.ts';
@@ -24,6 +24,14 @@ export function frontDoorPicture(entry: SavedWorldEntry): string | null {
   return capturedPicture(captures, entry);
 }
 
+/**
+ * What stands behind the page and opens a world: its own picture, never its painting. The live preview and the world
+ * that follow it are drawn live, so a painting there would turn into another look a moment later (a painting stands
+ * only where it holds its view, world-painting.ts), and the words a card's painting carries are drawn for a card's
+ * size. A card still shows its world's painting (`worldPicture`).
+ */
+const backdropPicture = (entry: SavedWorldEntry): string | null => frontDoorPicture(entry) ?? ownWorldPicture(entry);
+
 /** Whether a world's land is still baking, which its opening names from its first frame (C3b). */
 const stillBaking = (entry: SavedWorldEntry): boolean => entry.generatedGround?.tiles.some((tile) => tile.state === 'baking') ?? false;
 
@@ -34,7 +42,7 @@ let shownEntries: readonly SavedWorldEntry[] = [];
 export async function openFromFrontDoor(entryId: string): Promise<void> {
   history.replaceState({ ...history.state, [CHOSEN]: entryId }, '', location.href);
   const entry = shownEntries.find(one => one.entryId === entryId);
-  if (entry) await handOverOpening(entryId, entry.title, frontDoorPicture(entry) ?? worldPicture(entry), stillBaking(entry));
+  if (entry) await handOverOpening(entryId, entry.title, backdropPicture(entry), stillBaking(entry));
   location.assign(worldAddress(entryId, location.origin));
   return new Promise(resolve => window.addEventListener('pagehide', () => resolve(), { once: true }));
 }
@@ -49,7 +57,7 @@ export const chosenWorldPicture = (): string | null => chosenPicture;
  */
 export async function openMadeWorld(entry: SavedWorldEntry): Promise<void> {
   history.replaceState({ ...history.state, [CHOSEN]: entry.entryId }, '', location.href);
-  await handOverOpening(entry.entryId, entry.title, frontDoorPicture(entry) ?? worldPicture(entry), stillBaking(entry));
+  await handOverOpening(entry.entryId, entry.title, backdropPicture(entry), stillBaking(entry));
   location.assign(worldAddress(entry.entryId, location.origin));
   return new Promise(resolve => window.addEventListener('pagehide', () => resolve(), { once: true }));
 }
@@ -153,7 +161,7 @@ export function mountFrontDoor({ root, entries, credentials }: { root: HTMLEleme
     title.textContent = entry.title;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!reduce) title.animate([{ opacity: 0, filter: 'blur(7px)', transform: 'translateY(5px)' }, { opacity: 1, filter: 'blur(0px)', transform: 'translateY(0px)' }], { duration: 420, easing: 'cubic-bezier(.25,.46,.45,.94)' });
-    chosenPicture = frontDoorPicture(entry) ?? card.querySelector('img')?.getAttribute('src') ?? null;
+    chosenPicture = backdropPicture(entry);
     preview.select(entry, chosenPicture);
     const inset = card.offsetLeft - strip.offsetLeft;
     if (inset < strip.scrollLeft || inset + card.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollTo({ left: Math.max(0, inset - 4), behavior: reduce ? 'instant' : 'smooth' });

@@ -61,6 +61,8 @@ body.ux-review #shell .ux-world-entry .your-worlds-card:focus-visible { outline:
 body.ux-review #shell .ux-world-entry .your-worlds-card:focus-visible .your-worlds-picture { outline:1px solid var(--entry-focus); outline-offset:3px; }
 /* A scene preview shows the world alone. */
 body.ux-capture-world #shell { display:none!important; }
+/* As it is drawn, never its painting: behind the front door stands the world's own look (front-door.ts). */
+body.ux-capture-world [data-world-painting] { display:none!important; }
 html[data-ui-scheme="dark"] body.ux-review #shell .ux-world-entry { --entry-ground:#14191c; --entry-ink:#edf1f3; --entry-muted:#c1ccd1; }
 @media(prefers-color-scheme:dark) { html[data-ui-scheme="system"] body.ux-review #shell .ux-world-entry { --entry-ground:#14191c; --entry-ink:#edf1f3; --entry-muted:#c1ccd1; } }
 @media(max-width:760px) {
