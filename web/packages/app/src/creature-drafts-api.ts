@@ -12,6 +12,9 @@
  * and the model that drafted it), `refused` (the check's code, the field and the code's fixed
  * sentence), `failed` or `cancelled` (why, by code), or `erased` (kept, and erased since). The page
  * reads these and restates none of them; the server decides.
+ * A draft may be asked with web notes (`reference_id`, a finished request of the person's own made
+ * for things: references-api.ts): the offer says whether notes may be asked for here and the most
+ * they add, and the draft says whether its drafter was handed them and what their request spent.
  */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
@@ -37,6 +40,32 @@ export interface CreatureOffer {
   readonly model?: { readonly modelId: string; readonly name: string | null } | null;
   /** The most one draft may be charged, a decimal string of dollars; null or absent where the server states none. */
   readonly priceUsdAtMost?: string | null;
+  /** Web notes a draft may be asked with here; null or absent from a server that states none. */
+  readonly notes?: CreatureNotesOffer | null;
+}
+
+/** Whether this person may ask for web notes with a draft here, and what they add. */
+export interface CreatureNotesOffer {
+  readonly offered: boolean;
+  /** Why not, by code; null when they may. */
+  readonly code: string | null;
+  /** The most searches one request sends. */
+  readonly searchesAtMost: number;
+  /** The most the notes' model calls may add, a decimal string of dollars; null where no rate prices them. */
+  readonly maximumUsd: string | null;
+}
+
+/** Whether a draft's drafter was handed the web notes it was asked with, and what their request sent and spent. */
+export interface CreatureDraftNotes {
+  readonly referenceId: string;
+  /** used, unknown (sent, its answer not known), not_used (with `code`), pending or not_attempted. */
+  readonly state: string;
+  readonly code: string | null;
+  /** How many notes the drafter was handed. */
+  readonly notes: number;
+  /** How many searches the notes' request sent and what its model calls spent; null where the server states neither. */
+  readonly searches: number | null;
+  readonly spentUsd: string | null;
 }
 
 /** Where a being put down at a point would stand: the walking node its society would take it in at. */
@@ -70,6 +99,8 @@ export interface CreatureDraft {
   readonly spentUsd?: string | null;
   /** How its creature's made look stands once one is asked (`look_job.status`: queued, staged, made, ...); null or absent before. */
   readonly lookStatus?: string | null;
+  /** The web notes it was asked with; null or absent where it was asked with none. */
+  readonly references?: CreatureDraftNotes | null;
 }
 
 type Json = Readonly<Record<string, unknown>>;
@@ -134,6 +165,16 @@ export function parseCreatureOffer(raw: unknown): CreatureOffer {
     }),
     model: maybe(held['model'], (value) => model(value, 'creature offer model')),
     priceUsdAtMost: maybe(held['price'], (value) => dollars(object(value, 'creature price')['usd_at_most'], 'creature price')),
+    notes: maybe(held['notes'], (value) => {
+      const notes = object(value, 'creature notes offer');
+      if (typeof notes['offered'] !== 'boolean') throw new TypeError('The server returned an invalid creature notes offer.');
+      return Object.freeze({
+        offered: notes['offered'],
+        code: maybe(notes['code'], (code) => text(code, 'creature notes offer code')),
+        searchesAtMost: whole(notes['searches_at_most'], 'creature notes searches'),
+        maximumUsd: maybe(notes['maximum_usd'], (most) => dollars(most, 'creature notes price')),
+      });
+    }),
   });
 }
 
@@ -176,6 +217,17 @@ export function parseCreatureDraft(raw: unknown): CreatureDraft {
     failure: maybe(held['failure'], (value) => text(value, 'creature failure code')),
     spentUsd: maybe(held['spend'], (value) => dollars(object(value, 'creature spend')['spent_usd'], 'creature spend')),
     lookStatus: maybe(held['look_job'], (value) => text(object(value, 'creature look job')['status'], 'creature look job status')),
+    references: maybe(held['references'], (value) => {
+      const notes = object(value, 'creature notes');
+      return Object.freeze({
+        referenceId: text(notes['reference_id'], 'creature notes reference'),
+        state: text(notes['state'], 'creature notes state'),
+        code: maybe(notes['code'], (code) => text(code, 'creature notes code')),
+        notes: maybe(notes['notes'], (count) => whole(count, 'creature notes count')) ?? 0,
+        searches: maybe(notes['searches'], (count) => whole(count, 'creature notes searches')),
+        spentUsd: maybe(notes['spent_usd'], (spent) => dollars(spent, 'creature notes spend')),
+      });
+    }),
   });
 }
 
@@ -202,8 +254,9 @@ export class CreatureDraftsClient {
     return Object.freeze(drafts.map(parseCreatureDraft));
   }
 
-  async ask(words: string): Promise<CreatureDraft> {
-    return parseCreatureDraft(await this.#transport.postJson<unknown>('/things/creatures', { words }));
+  /** Ask for a creature from `words`, with the web notes of the person's own finished request `referenceId` where given. */
+  async ask(words: string, referenceId: string | null = null): Promise<CreatureDraft> {
+    return parseCreatureDraft(await this.#transport.postJson<unknown>('/things/creatures', referenceId === null ? { words } : { words, reference_id: referenceId }));
   }
 
   async draft(draftId: string): Promise<CreatureDraft> {

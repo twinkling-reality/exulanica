@@ -5,6 +5,7 @@
 // place it. The server's answers are written down here; no model is asked and no 3D view is drawn.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CreatureDraft, CreatureOffer, SocietyStand } from '../src/creature-drafts-api.js';
+import type { ReferenceNote, ReferenceRequest } from '../src/references-api.js';
 
 const screen = async () => import('../../../../tools/previews/world-workspace/' + 'world-creature.ts');
 
@@ -390,5 +391,123 @@ describe('making a creature where it will stand', () => {
     await settle();
     expect(root.textContent).toContain('Spending on AI models is paused here.');
     expect(root.textContent).not.toContain('The budget for AI models here is spent.');
+  });
+});
+
+describe('web notes before a creature is made', () => {
+  const notesOffer: CreatureOffer = Object.freeze({ ...offer, priceUsdAtMost: '0.10000000', notes: { offered: true, code: null, searchesAtMost: 3, maximumUsd: '0.02000000' } });
+  const step = (name: string, state: string) => ({ step: name, state, reason: null, facts: {} });
+  const request = (status: string, steps: ReturnType<typeof step>[], notes: ReferenceNote[] = []): ReferenceRequest => Object.freeze({
+    referenceId: 'ref-1', purpose: 'things', web: true, status, steps, notes, missed: [], failure: null,
+    searches: notes.length ? [1, 2, 3].map(() => ({ source: 'tavily_search', outcome: 'sent', resultCount: 5, credits: 1, sentAt: '2026-10-26T15:00:00+00:00' })) : [],
+    bundleSha256: null, cancelRequested: false, createdAt: '2026-10-26T15:00:00+00:00', finishedAt: null,
+  });
+  const stopped: CreatureDraft = Object.freeze({ ...queued, status: 'failed', failure: 'expired' });
+  const seven: ReferenceNote[] = ['anatomy', 'anatomy', 'materials_and_colour', 'scale', 'part_layout', 'anatomy', 'scale']
+    .map((aspect, at) => ({ aspect, text: `Note ${at + 1} on a round body`, basis: 'web_description' }));
+
+  /** A world whose offer offers notes, with a notes client answering `reads` in turn after the request's own answer. */
+  function noted(reads: ReferenceRequest[], draft: CreatureDraft = kept) {
+    const made = world({ offer: notesOffer, reads: [draft] });
+    const asked: { words: string; referenceId: string | null }[] = [], requested: unknown[] = [], cancelled: string[] = [];
+    const deps = {
+      ...made.deps,
+      client: { ...made.deps.client, ask: async (words: string, referenceId: string | null = null) => { asked.push({ words, referenceId }); return queued; }, draft: async () => draft },
+      notes: {
+        request: async (body: unknown) => { requested.push(body); return request('queued', [step('plan', 'waiting'), step('search', 'waiting'), step('read', 'waiting'), step('bundle', 'waiting')]); },
+        read: async () => reads.shift() ?? reads.at(-1)!,
+        cancel: async (id: string) => { cancelled.push(id); return request('cancelled', []); },
+      },
+      key: () => 'key-1',
+    };
+    return { ...made, deps, asked, requested, cancelled };
+  }
+  const type = (root: HTMLElement, words: string): void => {
+    const field = root.querySelector('textarea')!;
+    field.value = words;
+    field.dispatchEvent(new Event('input'));
+  };
+  const tick = (root: HTMLElement): void => { root.querySelector<HTMLInputElement>('.wu-creature-notes-box')!.click(); };
+
+  it('offers the box only where notes are offered here, and ticked, the line gives the whole most and no time', async () => {
+    const { openCreatureScreen } = await screen();
+    const without = world();
+    await openCreatureScreen(without.deps);
+    expect(without.root.querySelector('.wu-creature-notes-box')).toBeNull();
+    const { deps, root } = noted([]);
+    await openCreatureScreen(deps);
+    expect(root.textContent).toContain('Read the web first for what such a creature looks like');
+    expect(root.textContent).toContain('Up to 3 web searches go to Tavily, made from your words with the names and details this install holds as yours left out, and Tavily keeps them. Adds at most $0.02.');
+    expect(root.textContent).toContain('at most $0.10, about 18 seconds,');
+    tick(root);
+    expect(root.textContent).toContain('An open model, Nemotron 3 Super 120B, makes the creature from your words: at most $0.12, and you see what it really spent.');
+  });
+
+  it('ticked, asks for notes on the words, shows them, and asks the drafter with them; the spend counts the notes', async () => {
+    const { openCreatureScreen } = await screen();
+    const done = request('complete', [step('plan', 'done'), step('search', 'done'), step('read', 'done'), step('bundle', 'done')], seven);
+    const { deps, root, asked, requested } = noted(
+      [request('running', [step('plan', 'running'), step('search', 'waiting'), step('read', 'waiting'), step('bundle', 'waiting')]), done],
+      { ...kept, spentUsd: '0.00420000', references: { referenceId: 'ref-1', state: 'used', code: null, notes: 7, searches: 3, spentUsd: '0.00110000' } },
+    );
+    const opened = await openCreatureScreen(deps);
+    type(root, '  a little yellow robot duck ');
+    tick(root);
+    opened.key(press('Enter'));
+    await settle();
+    expect(requested).toEqual([{ purpose: 'things', description: 'a little yellow robot duck', idempotencyKey: 'key-1' }]);
+    expect(asked).toEqual([{ words: 'a little yellow robot duck', referenceId: 'ref-1' }]);
+    expect(root.textContent).toContain('Made from your words and 7 notes from the web');
+    expect(root.textContent).toContain('Made by Nemotron 3 Super 120B · spent $0.0053 · kept in Creatures');
+  });
+
+  it('shows at most four notes in the making group, counts the rest, and says what wrote them', async () => {
+    const { openCreatureScreen } = await screen();
+    const done = request('partial', [step('plan', 'done'), step('search', 'done'), step('read', 'done'), step('bundle', 'done')], seven);
+    // The draft ends with nothing made, so the making group with its notes stays to be read.
+    const { deps, root } = noted([done], stopped);
+    const opened = await openCreatureScreen(deps);
+    type(root, 'a little yellow robot duck');
+    tick(root);
+    opened.key(press('Enter'));
+    await settle();
+    const notes = root.querySelector('.wu-creature-notes')!;
+    expect(notes.textContent).toContain('From the web');
+    expect(notes.textContent).toContain('Anatomy · Note 1 on a round body');
+    expect(notes.textContent).toContain('Note 4 on a round body');
+    expect(notes.textContent).not.toContain('Note 5 on a round body');
+    expect(notes.textContent).toContain('And 3 more notes.');
+    expect(notes.textContent).toContain('A model wrote these from 3 web searches. They help make the creature and are never facts about it.');
+  });
+
+  it('makes it from the words alone, and says why, where the notes fail or find nothing', async () => {
+    const { openCreatureScreen } = await screen();
+    for (const [ended, words] of [
+      [request('failed', [step('plan', 'missed'), step('search', 'missed'), step('read', 'missed'), step('bundle', 'done')]), 'The web notes could not be made, so it is made from your words alone.'],
+      [request('partial', [step('plan', 'done'), step('search', 'done'), step('read', 'done'), step('bundle', 'done')]), 'The searches found nothing to use, so it is made from your words alone.'],
+    ] as const) {
+      const { deps, root, asked } = noted([ended], stopped);
+      const opened = await openCreatureScreen(deps);
+      type(root, 'a little yellow robot duck');
+      tick(root);
+      opened.key(press('Enter'));
+      await settle();
+      expect(asked).toEqual([{ words: 'a little yellow robot duck', referenceId: null }]);
+      expect(root.querySelector('.wu-creature-notes')!.textContent).toBe(words);
+      document.body.replaceChildren();
+    }
+  });
+
+  it('says no spend at all where the notes were asked for and their spend is not served', async () => {
+    const { openCreatureScreen } = await screen();
+    const done = request('complete', [step('plan', 'done'), step('search', 'done'), step('read', 'done'), step('bundle', 'done')], seven);
+    const { deps, root } = noted([done], { ...kept, spentUsd: '0.00420000', references: { referenceId: 'ref-1', state: 'used', code: null, notes: 7, searches: null, spentUsd: null } });
+    const opened = await openCreatureScreen(deps);
+    type(root, 'a little yellow robot duck');
+    tick(root);
+    opened.key(press('Enter'));
+    await settle();
+    expect(root.textContent).toContain('Made by Nemotron 3 Super 120B · kept in Creatures');
+    expect(root.textContent).not.toContain('spent');
   });
 });

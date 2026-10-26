@@ -1,9 +1,19 @@
 // Making a creature where it will stand (DESIGN's R-CREATURE-BUILD-SHEET.md, pictures r-creature17t, 19t and
-// 19b; the money words of WORDS.md's unit 9 entry of 22 October): the field low in the middle, the line under
-// it, the label over the stand, the making group and the made group beside it. They only draw; what a key does
-// is world-creature.ts's. Their look lives in world-ui-creature.css, from world-ui.css's tokens.
+// 19b; the money words of WORDS.md's unit 9 entry of 22 October; web notes in Create's words of 25 October, with
+// "creature" for "place", WORDS.md 12:34): the field low in the middle, the line under it and the web notes box,
+// the label over the stand, the making group with the notes from the web, and the made group beside it. They only
+// draw; what a key does is world-creature.ts's. Their look lives in world-ui-creature.css, from world-ui.css's
+// tokens.
 import { glyphRows, shade } from './world-ui.ts';
 import './world-ui-creature.css';
+
+/** Each note aspect's label by its key, from the reference aspect catalogs (a later version's label wins). */
+const ASPECT_LABELS: ReadonlyMap<string, string> = new Map(
+  Object.entries(import.meta.glob('../../../assets/catalogs/reference-sources/reference-aspect.v*.json', { eager: true, import: 'default' }))
+    .sort(([a], [b]) => a.localeCompare(b, 'en', { numeric: true }))
+    .flatMap(([, catalog]) => ((catalog as { readonly entries?: readonly { readonly key: string; readonly label: string }[] }).entries ?? [])
+      .map((entry) => [entry.key, entry.label] as const)),
+);
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
   const made = document.createElement(tag);
@@ -43,7 +53,34 @@ export const CREATURE_WORDS = Object.freeze({
   seenSpend: 'and you see what it really spent',
   leave: 'You can leave this page: the making carries on, and the creature waits in Creatures.',
   kept: 'kept in Creatures',
+  /** The web notes box under the line (Create's frame 20 words). */
+  notesAsk: 'Read the web first for what such a creature looks like',
+  /** The notes' steps before the drafting's (Create's frame 21), by the request's step names. */
+  notesSteps: Object.freeze({ plan: 'Choosing what to look up', search: 'Searching the web', read: 'Writing notes from what it found' }) as Readonly<Record<string, string>>,
+  fromWeb: 'From the web',
+  notesFailed: 'The web notes could not be made, so it is made from your words alone.',
+  notesNone: 'The searches found nothing to use, so it is made from your words alone.',
 });
+
+/** At most this many notes in the making group; the rest are counted under them (DESIGN, 12:34). */
+export const NOTES_SHOWN = 4;
+
+const searchesWord = (count: number): string => `${count} web ${count === 1 ? 'search' : 'searches'}`;
+
+/** Under the web notes box: where the person's words go and the most the notes add (Create's frame 20). */
+export function notesAskLine(searchesAtMost: number, maximumUsd: string): string {
+  return `Up to ${searchesWord(searchesAtMost)} ${searchesAtMost === 1 ? 'goes' : 'go'} to Tavily, made from your words with the names and details this install holds as yours left out, and Tavily keeps them. Adds at most ${money(maximumUsd)}.`;
+}
+
+/** Under the notes from the web: what wrote them and what they are (Create's frame 21). */
+export function notesWrote(searches: number): string {
+  return `A model wrote these from ${searchesWord(searches)}. They help make the creature and are never facts about it.`;
+}
+
+/** The made group's line: "Made from your words", and where its drafter was handed notes, "... and 7 notes from the web". */
+export function madeFromLine(notes: number): string {
+  return notes > 0 ? `${CREATURE_WORDS.madeFrom} and ${notes} ${notes === 1 ? 'note' : 'notes'} from the web` : CREATURE_WORDS.madeFrom;
+}
 
 /** Dollars as the workspace writes them (P1): "$0.37", under a cent "$0.0042", "less than $0.0001". */
 export function money(usd: string): string {
@@ -62,8 +99,10 @@ export function money(usd: string): string {
  */
 export function makerLine(priceUsdAtMost: string | null, typicalSeconds: number | null, modelName: string | null = null): string {
   const who = modelName === null ? CREATURE_WORDS.maker : `${CREATURE_WORDS.maker}, ${modelName},`;
-  if (priceUsdAtMost === null || typicalSeconds === null) return `${who} ${CREATURE_WORDS.makes}.`;
-  return `${who} ${CREATURE_WORDS.makes}: at most ${money(priceUsdAtMost)}, about ${typicalSeconds} seconds, ${CREATURE_WORDS.seenSpend}.`;
+  if (priceUsdAtMost === null) return `${who} ${CREATURE_WORDS.makes}.`;
+  // With web notes asked for, no measured time covers the searches, so the line gives the most alone.
+  const about = typicalSeconds === null ? '' : ` about ${typicalSeconds} seconds,`;
+  return `${who} ${CREATURE_WORDS.makes}: at most ${money(priceUsdAtMost)},${about} ${CREATURE_WORDS.seenSpend}.`;
 }
 
 /** The made group's small print: the model, the whole spend where served (M2), and where it is kept. */
@@ -112,6 +151,27 @@ export function creatureField({ maximum, onMake }: { readonly maximum: number; r
   };
 }
 
+export interface NotesAsk {
+  readonly root: HTMLElement;
+  readonly input: HTMLInputElement;
+}
+
+/**
+ * The web notes box under the line (Create's frame 20): off until the person ticks it, each creature its own choice;
+ * a click, or Tab and Space, ticks it, and Enter still makes. Its line says where the words go and the most it adds.
+ */
+export function notesAsk({ searchesAtMost, maximumUsd, onChange }: { readonly searchesAtMost: number; readonly maximumUsd: string; readonly onChange: (on: boolean) => void }): NotesAsk {
+  const root = shade({ small: true });
+  root.classList.add('wu-creature-notes-ask');
+  const label = element('label', 'wu-creature-notes-label');
+  const input = element('input', 'wu-creature-notes-box');
+  input.type = 'checkbox';
+  input.addEventListener('change', () => onChange(input.checked));
+  label.append(input, element('span', '', CREATURE_WORDS.notesAsk));
+  root.append(label, element('span', 'wu-creature-notes-line', notesAskLine(searchesAtMost, maximumUsd)));
+  return { root, input };
+}
+
 /** The small label over the stand (r17t). */
 export function standLabel(): HTMLDivElement {
   const made = shade({ small: true });
@@ -131,6 +191,12 @@ export interface MakingGroup {
   ended(words: string, onRetry: (() => void) | null, spentUsd: string | null): void;
   /** Still being made when the page stops following it: the step says so, and the small print keeps only the price. */
   late(words: string): void;
+  /** A step that has ended, above the current one, with its time: done, or not done (`missed`) and drawn faint. */
+  passed(words: string, time: string, missed?: boolean): void;
+  /** The notes from the web under the steps, as the request serves them, and what wrote them. */
+  notes(notes: readonly { readonly aspect: string; readonly text: string }[], searches: number): void;
+  /** Why the creature is made from the words alone, where the notes would stand. */
+  alone(words: string): void;
 }
 
 /** The light rising from the stand while the creature is made (r19t; still, M13). The caller places it. */
@@ -148,6 +214,9 @@ export function makingGroup({ words, priceUsdAtMost }: { readonly words: string;
   const atMost = priceUsdAtMost === null ? null : `At most ${money(priceUsdAtMost)}.`;
   const small = element('p', 'wu-creature-small', [atMost, CREATURE_WORDS.leave].filter(Boolean).join(' '));
   root.append(element('h2', 'wu-creature-title', CREATURE_WORDS.making), element('p', 'wu-creature-quote', quoted(words)), step, small);
+  // The notes from the web, or why there are none, between the steps and the small print once the request ends.
+  const fromWeb = element('div', 'wu-creature-notes');
+  fromWeb.setAttribute('aria-live', 'polite');
   return {
     root,
     step(words, refused = false, time = null) {
@@ -168,6 +237,31 @@ export function makingGroup({ words, priceUsdAtMost }: { readonly words: string;
       step.textContent = words;
       if (atMost === null) small.remove(); else small.textContent = atMost;
     },
+    passed(words, time, missed = false) {
+      const done = element('p', missed ? 'wu-creature-step wu-creature-passed wu-creature-missed' : 'wu-creature-step wu-creature-passed');
+      const mark = element('span', 'wu-creature-tick');
+      mark.setAttribute('aria-hidden', 'true');
+      done.append(mark, element('span', '', words), element('span', 'wu-creature-time', time));
+      step.before(done);
+    },
+    notes(notes, searches) {
+      const list = element('ul', 'wu-creature-notes-list');
+      for (const note of notes.slice(0, NOTES_SHOWN)) {
+        const item = element('li');
+        const aspect = ASPECT_LABELS.get(note.aspect);
+        if (aspect) item.append(element('span', 'wu-creature-notes-aspect', `${aspect} · `));
+        item.append(element('span', '', note.text));
+        list.append(item);
+      }
+      const more = notes.length - NOTES_SHOWN;
+      if (more > 0) list.append(element('li', 'wu-creature-notes-aspect', `And ${more} more ${more === 1 ? 'note' : 'notes'}.`));
+      fromWeb.replaceChildren(element('p', 'wu-creature-notes-over', CREATURE_WORDS.fromWeb), list, element('p', 'wu-creature-notes-line', notesWrote(searches)));
+      if (!fromWeb.isConnected) small.before(fromWeb);
+    },
+    alone(words) {
+      fromWeb.replaceChildren(element('p', 'wu-creature-notes-line', words));
+      if (!fromWeb.isConnected) small.before(fromWeb);
+    },
   };
 }
 
@@ -176,7 +270,7 @@ export function makingGroup({ words, priceUsdAtMost }: { readonly words: string;
  * here: the creature is held at the stand by build mode, whose own Enter places it. With no stand it is left out, and
  * the creature waits in Creatures.
  */
-export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable }: {
+export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable, notes = 0 }: {
   readonly label: string | null;
   readonly words: string;
   readonly modelName: string | null;
@@ -184,6 +278,8 @@ export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable
   /** True while the creature wears its sketch, its made look not ready yet (M15). */
   readonly sketch: boolean;
   readonly placeable: boolean;
+  /** How many web notes its drafter was handed; 0 or absent where it had none. */
+  readonly notes?: number;
 }): HTMLElement {
   const root = shade();
   root.classList.add('wu-creature-group', 'wu-creature-made');
@@ -192,7 +288,7 @@ export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable
   if (sketch && label !== null) lines.push(`${name} wears a sketch until the made look is ready.`);
   root.append(
     element('h2', 'wu-creature-title', name),
-    element('p', 'wu-creature-from', CREATURE_WORDS.madeFrom),
+    element('p', 'wu-creature-from', madeFromLine(notes)),
     element('p', 'wu-creature-quote', quoted(words)),
     ...(placeable ? [glyphRows([{ key: 'Enter', word: CREATURE_WORDS.place, shortcut: 'Enter' }])] : []),
     ...lines.map((line) => element('p', 'wu-creature-small', line)),

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { draftEnded, parseCreatureDraft, parseCreatureOffer, parseSocietyStand } from '../src/creature-drafts-api.js';
+import { describe, expect, it, vi } from 'vitest';
+import { CreatureDraftsClient, draftEnded, parseCreatureDraft, parseCreatureOffer, parseSocietyStand } from '../src/creature-drafts-api.js';
 
 /*
  * The creature routes' answers as exulanica/api/routes/thing_creatures.py writes them, written here
@@ -34,8 +34,26 @@ describe('a creature from words, as the server answers it', () => {
   it('reads the offer: whether a world may ask here, why not by code, and how long a draft takes', () => {
     expect(parseCreatureOffer(offer)).toEqual({
       offered: false, code: 'creatures_not_run_here', timing: { typicalSeconds: 18, longestSeconds: 25, timeoutSeconds: 50 },
-      model: null, priceUsdAtMost: null,
+      model: null, priceUsdAtMost: null, notes: null,
     });
+  });
+
+  it('reads the web notes a draft may be asked with, and asks with a reference only when one is given', async () => {
+    const noted = parseCreatureOffer({ ...offer, notes: { offered: true, code: null, searches_at_most: 3, maximum_usd: '0.02000000' } });
+    expect(noted.notes).toEqual({ offered: true, code: null, searchesAtMost: 3, maximumUsd: '0.02000000' });
+    expect(() => parseCreatureOffer({ ...offer, notes: { offered: 'yes', code: null, searches_at_most: 3, maximum_usd: null } })).toThrow(TypeError);
+    const used = parseCreatureDraft({ ...kept, references: { reference_id: 'ref-1', state: 'used', code: null, notes: 7, bundle_sha256: 'c'.repeat(64), basis: ['web_description'], searches: 3, spent_usd: '0.00110000' } });
+    expect(used.references).toEqual({ referenceId: 'ref-1', state: 'used', code: null, notes: 7, searches: 3, spentUsd: '0.00110000' });
+    // A server before the notes' figures states neither.
+    expect(parseCreatureDraft({ ...kept, references: { reference_id: 'ref-1', state: 'pending' } }).references).toMatchObject({ notes: 0, searches: null, spentUsd: null });
+
+    const posting = vi.fn(async (_url: unknown, _init?: RequestInit) => new Response(JSON.stringify({ ...kept, status: 'queued', kind: null, look: null, model: null }), { status: 202, headers: { 'content-type': 'application/json' } }));
+    const client = new CreatureDraftsClient({ baseUrl: 'https://example.test', token: 'token', fetch: posting as typeof fetch });
+    await client.ask('a little yellow robot duck');
+    await client.ask('a little yellow robot duck', 'ref-1');
+    expect(posting.mock.calls.map((call) => JSON.parse(String(call[1]?.body)))).toEqual([
+      { words: 'a little yellow robot duck' }, { words: 'a little yellow robot duck', reference_id: 'ref-1' },
+    ]);
   });
 
   it('reads the model a draft asks first and the most it may be charged, and what a draft spent', () => {
