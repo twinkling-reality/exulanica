@@ -390,7 +390,13 @@
   },
   "left_usd": null,
   "host_keeps_until": null,
-  "own_key": false
+  "own_key": false,
+  "notes": {
+   "offered": false,
+   "code": "references_operator_only",
+   "searches_at_most": 3,
+   "maximum_usd": null
+  }
  },
  "started": {
   "draft_id": "00000000-0000-0000-0000-000000000001",
@@ -798,7 +804,8 @@
     "code": "worlds_read_only",
     "meaning": "This server's database role cannot register a world."
    }
-  ]
+  ],
+  "references": null
  },
  "offer_while_mine_runs": {
   "offered": false,
@@ -965,7 +972,8 @@
   "operation": null,
   "left_usd": null,
   "host_keeps_until": null,
-  "own_key": false
+  "own_key": false,
+  "notes": null
  },
  "ready_place": {
   "draft_id": "00000000-0000-0000-0000-000000000001",
@@ -1624,7 +1632,8 @@
     "code": "worlds_read_only",
     "meaning": "This server's database role cannot register a world."
    }
-  ]
+  ],
+  "references": null
  },
  "ready_town": {
   "draft_id": "00000000-0000-0000-0000-000000000001",
@@ -2236,7 +2245,8 @@
     "code": "worlds_read_only",
     "meaning": "This server's database role cannot register a world."
    }
-  ]
+  ],
+  "references": null
  },
  "refused": {
   "draft_id": "00000000-0000-0000-0000-000000000001",
@@ -2698,6 +2708,7 @@
     "code": "worlds_read_only",
     "meaning": "This server's database role cannot register a world."
    }
-  ]
+  ],
+  "references": null
  }
 }

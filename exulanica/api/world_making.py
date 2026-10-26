@@ -43,16 +43,22 @@ import logging
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Final
 
 from exulanica.api.kind_drafts import KindDraft, KindDrafts, Opener, budget_refusal, drafted_kind
 from exulanica.api.world_draft_offer import calls_at_most as counted_calls
+from exulanica.epistemics.saved_names import PLACEHOLDER, redact_names, saved_names
 from exulanica.grammar.catalogs import CatalogSchema, load_catalog, text_field
 from exulanica.grammar.landform import LandformRefused
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import BudgetExceededError, ModelError
 from exulanica.models.manifest import load_manifest
+from exulanica.models.usage import usd_string
+from exulanica.references import store as reference_store
+from exulanica.references.bundle import read_bundle
+from exulanica.references.for_drafting import NotesRefused, notes_for_draft
 from exulanica.selection.calls import CallLog
 from exulanica.selection.look_choosing import LookOption, choose_look
 from exulanica.selection.setting_choosing import SettingAxis, SettingOption, choose_setting
@@ -60,6 +66,7 @@ from exulanica.selection.tool_choosing import choose_tool
 from exulanica.selection.world_drafting import (
     SentDescription,
     draft_world_specification,
+    notes_prompt,
     specification_view,
 )
 from exulanica.world import specification_source
@@ -452,6 +459,107 @@ def _worn(
         return _Taken()
 
 
+#: Why a draft's web notes were not used where the tool chosen for its words drafts without them:
+#: only the describe-a-town drafter takes notes (docs/reference-notes-contract.md, section 9).
+NOTES_NOT_FOR_TOOL: Final = "reference_not_for_this_tool"
+NOTES_NOT_FOR_TOOL_DETAIL: Final = "the tool chosen for these words drafts without notes"
+
+
+@dataclass(frozen=True, slots=True)
+class DraftNotes:
+    """A world draft's web notes as its drafter is handed them: the block with every saved name
+    replaced under the description's own placeholders, those placeholders with the notes' own
+    added, and what the draft's read says of them once they are used."""
+
+    text: str
+    placeholders: Mapping[uuid.UUID, str]
+    used: Mapping[str, Any]
+
+
+def _notes_view(
+    reference_id: uuid.UUID,
+    code: str | None,
+    detail: str | None,
+    *,
+    notes: int = 0,
+    bundle_sha256: str | None = None,
+    basis: Sequence[str] = (),
+    figures: tuple[int | None, str | None] = (None, None),
+) -> dict[str, Any]:
+    """What a draft's read says of the web notes its start named, as the specification route's
+    ``references`` says it: used, or not used with the code and words naming why; with ``figures``,
+    how many searches the notes' request sent and what its model calls spent, where known."""
+    return dict(
+        state="not_used" if code is not None else "used",
+        reference_id=str(reference_id),
+        code=code,
+        detail=detail,
+        notes=notes,
+        bundle_sha256=bundle_sha256,
+        basis=list(basis),
+        searches=figures[0],
+        spent_usd=figures[1],
+    )
+
+
+def _notes_figures(
+    connection: Any, workspace_id: uuid.UUID, actor: uuid.UUID, reference_id: uuid.UUID
+) -> tuple[int | None, str | None]:
+    """How many searches a person's own world-draft notes request sent and what its model calls
+    spent, as its bundle records them; none for a request without a bundle, another person's, or one
+    made for another kind of draft, whose spend is not this draft's."""
+    found = reference_store.read_request(
+        connection, workspace_id, reference_id, owner_actor_id=actor
+    )
+    if found is None or found.purpose != "world_draft" or found.bundle is None:
+        return None, None
+    bundle = read_bundle(found.bundle)
+    spent = sum((Decimal(call.usd) for call in bundle.model_calls), Decimal(0))
+    return len(bundle.lookups), usd_string(spent)
+
+
+def draft_notes(
+    connection: Any,
+    workspace_id: uuid.UUID,
+    actor: uuid.UUID,
+    reference_id: uuid.UUID,
+    sent: SentDescription,
+) -> tuple[DraftNotes | None, dict[str, Any] | None]:
+    """The web notes ``reference_id`` names for a world draft by ``actor``: ready for its drafter,
+    or None with what the draft's read says instead, where the request is not this person's own
+    finished ``world_draft`` request with notes (each code of NOTES_REFUSALS; any other's id is
+    ``reference_unknown``), and the draft is drafted from its words alone. Web notes only: a picture
+    note would need its picture declared to the request policy, and the drafter is offered none."""
+    try:
+        found = notes_for_draft(
+            connection,
+            workspace_id,
+            actor,
+            reference_id,
+            purpose="world_draft",
+            bases=("web_description",),
+        )
+    except NotesRefused as refused:
+        figures = _notes_figures(connection, workspace_id, actor, reference_id)
+        return None, _notes_view(reference_id, refused.code, refused.detail, figures=figures)
+    redacted = redact_names(
+        found.rendered.text,
+        saved_names(connection, workspace_id),
+        sent.placeholders,
+        reserved=[match.group(0) for match in PLACEHOLDER.finditer(sent.text)],
+    )
+    used = _notes_view(
+        reference_id,
+        None,
+        None,
+        notes=found.rendered.used,
+        bundle_sha256=str(found.provenance["bundle_sha256"]),
+        basis=found.rendered.bases,
+        figures=_notes_figures(connection, workspace_id, actor, reference_id),
+    )
+    return DraftNotes(text=redacted.text, placeholders=redacted.placeholders, used=used), None
+
+
 def make_world(
     draft: KindDraft,
     drafts: KindDrafts,
@@ -464,6 +572,8 @@ def make_world(
     guest: bool,
     fixed_world_id: str | None = None,
     on_land: bool = False,
+    notes: DraftNotes | None = None,
+    references: Mapping[str, Any] | None = None,
 ) -> None:
     """Choose the tool for ``sent`` (the words as sent, every saved name replaced), draft with it
     and make the world, leaving the draft ``ready`` with its saved entry or ``refused`` by name,
@@ -473,7 +583,11 @@ def make_world(
     ``opened`` opens a connection scoped to the draft's workspace that may write; none is held
     while a model runs. ``fixed_world_id`` fixes the world's identity instead of drawing one: the
     world draft job passes its draft's own, so a draft taken up again after a restart finds the
-    world it made, and a test makes the same world every run."""
+    world it made, and a test makes the same world every run.
+
+    ``notes`` are the web notes the start named (:func:`draft_notes`): a town's drafter is handed
+    them; a kind of place is drafted from the words alone and its read says so. ``references`` is
+    what the read says where the notes could not be read, and the draft is made from the words."""
     log = CallLog()
 
     def refused(refusal: Mapping[str, Any]) -> None:
@@ -503,6 +617,20 @@ def make_world(
     chosen = tool is not None
     tool = tool_for_unsure() if tool is None else tool
     drafts.advance(draft, stage="drafting", tool=tool.key, tool_chosen=chosen)
+    if notes is not None and tool.drafter == "kind":
+        reference = uuid.UUID(str(notes.used["reference_id"]))
+        figures = (notes.used["searches"], notes.used["spent_usd"])
+        drafts.advance(
+            draft,
+            references=_notes_view(
+                reference, NOTES_NOT_FOR_TOOL, NOTES_NOT_FOR_TOOL_DETAIL, figures=figures
+            ),
+        )
+        notes = None
+    elif notes is not None:
+        drafts.advance(draft, references=dict(notes.used))
+    elif references is not None:
+        drafts.advance(draft, references=dict(references))
 
     try:
         if tool.drafter == "kind":
@@ -532,6 +660,7 @@ def make_world(
                 guest,
                 fixed_world_id,
                 on_land,
+                notes,
             )
     except Exception as failed:  # anything unnamed, after paid calls, still shows what it cost
         _LOG.warning("a world draft failed: %s", type(failed).__qualname__)
@@ -729,6 +858,7 @@ def _make_town(
     guest: bool,
     fixed_world_id: str | None,
     on_land: bool,
+    notes: DraftNotes | None = None,
 ) -> None:
     def refused(refusal: Mapping[str, Any]) -> None:
         drafts.finish(draft, state="refused", refusal=dict(refusal), calls=log.calls)
@@ -739,12 +869,17 @@ def _make_town(
         return
     view = specification_view(specification_source.served_document())
     try:
+        # With web notes, the drafter is asked with the words that say what notes are and that
+        # the person's words win (notes_prompt), the notes after the words, as the specification
+        # route asks.
         outcome = draft_world_specification(
             client.with_attempts(log.attempt),
             sent.text,
             view,
-            placeholders=sent.placeholders,
+            prompt=None if notes is None else notes_prompt(notes.text),
+            placeholders=sent.placeholders if notes is None else notes.placeholders,
             log=log,
+            notes=None if notes is None else notes.text,
         )
     except ModelError as failed:
         refused(_model_refusal(failed))

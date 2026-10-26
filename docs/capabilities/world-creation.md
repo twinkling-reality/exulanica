@@ -139,6 +139,10 @@ follows it step by step and lists what was made, what was taken from the words f
 its setting (an hour and sky, a ground and what lies beyond, snow) beside the words that chose it,
 and what the words asked for that was left out
 ([a world made from a sentence](../world-kinds-contract.md#a-world-made-from-a-sentence)). Where
+the install offers web notes, a person may ask for them first: a few searches made from their words
+go to the web source, a model writes short notes from what they find, and a town's drafter reads
+them after the words; the notes help plan the place and are never facts about it
+([reference notes](../reference-notes-contract.md#9-notes-for-a-drafter)). Where
 it does not, or the person may ask no model, Create a world is the recipes, where a sentence
 drafts a town's values. A place made this way is laid out by the site grammar and drawn as boxes,
 in the look and under the setting its words asked for or else the default; a town made this way is

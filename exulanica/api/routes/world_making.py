@@ -53,6 +53,7 @@ from exulanica.api.kind_drafts import (
     draft_deadline_seconds,
 )
 from exulanica.api.permissions import Permission
+from exulanica.api.routes.references import unavailable_because as references_unavailable
 from exulanica.api.routes.selection import ExecutionView, ModelNotConfigured, _execution
 from exulanica.api.routes.world_entries import SavedWorldEntryView, _view
 from exulanica.api.sayable import sayable
@@ -60,6 +61,7 @@ from exulanica.api.services import Services
 from exulanica.api.world_draft_offer import (
     WorldDraftOfferRefused,
     confirm_operation,
+    notes_maximum_usd,
     read_operation_sheet,
     stages,
 )
@@ -68,6 +70,7 @@ from exulanica.api.world_making import WORLD_DRAFT_CODES, calls_at_most
 from exulanica.canonical import canonical_json
 from exulanica.models.manifest import load_manifest
 from exulanica.models.usage import usd_string
+from exulanica.references.drafting import reference_prompts
 from exulanica.selection.calls import AttemptOutcome, CallCost, ModelCall
 from exulanica.selection.tool_choosing import chooser_prompt
 from exulanica.world.saved_entries import SavedWorldEntryRepository
@@ -105,6 +108,11 @@ class DraftWorldBody(BaseModel):
     idempotency_key: uuid.UUID | None = None
     operation: dict[str, Any] | None = None
     maximum_usd: str | None = Field(default=None, pattern=r"^[0-9]{1,6}(\.[0-9]{1,8})?$")
+    #: Web notes to draft with: a finished reference request of the caller's own made for a world
+    #: draft (``POST /worlds/references``, purpose ``world_draft``). A town's drafter is handed them
+    #: after the words; any other id, or a kind of place, is drafted from the words alone, and the
+    #: draft's ``references`` says which (docs/reference-notes-contract.md, section 9).
+    reference_id: uuid.UUID | None = None
 
     @field_validator("operation")
     @classmethod
@@ -207,6 +215,31 @@ class CodeView(BaseModel):
     meaning: str
 
 
+class DraftReferencesView(BaseModel):
+    """Whether a draft's drafter was handed the web notes its start named.
+
+    ``used``: it saw ``notes`` web notes from the request ``reference_id``, whose bundle
+    ``bundle_sha256`` names them (their text stays with the request), with ``basis`` the notes'
+    bases. ``not_used``: the world was drafted from the words alone, and ``code`` and ``detail`` say
+    why: a reason of the notes themselves, as the specification route names it (any id not a
+    request of the caller's own is ``reference_unknown``), or ``reference_not_for_this_tool``,
+    where the tool chosen for the words drafts without notes.
+    """
+
+    state: Literal["used", "not_used"]
+    reference_id: str
+    code: str | None
+    detail: str | None
+    notes: int
+    bundle_sha256: str | None
+    basis: list[str]
+    #: How many searches the notes' request sent and what its two model calls spent, as its bundle
+    #: records them: a person's own request made for a world draft only (the spend line counts
+    #: them); null where no bundle says, a request of another person's among them.
+    searches: int | None = None
+    spent_usd: str | None = None
+
+
 class MadeWorldDraftView(BaseModel):
     draft_id: uuid.UUID
     request_id: uuid.UUID | None = None
@@ -244,6 +277,25 @@ class MadeWorldDraftView(BaseModel):
     execution: ExecutionView | None
     #: Every code a draft's routes and its job answer with, and what each means.
     refusals: list[CodeView]
+    #: Present where the start named web notes, once the job has read them; absent otherwise.
+    references: DraftReferencesView | None = None
+
+
+class NotesOfferView(BaseModel):
+    """Whether this person may ask for web notes with a draft here, and what they add.
+
+    ``offered`` where the references read offers web notes to this workspace and this person may
+    ask for them (a guest never holds ``references.request``); else ``code`` names why, as the
+    references read names it, or ``references_not_permitted``. ``searches_at_most`` is the
+    planner's limit, the most searches one request sends; ``maximum_usd`` the most its two model
+    calls may add at current rates (``world_draft_offer.NOTES_PATHS``), or null where no current
+    rate prices them, when notes are not offered either.
+    """
+
+    offered: bool
+    code: str | None
+    searches_at_most: int
+    maximum_usd: str | None
 
 
 class DraftStartsView(BaseModel):
@@ -289,6 +341,8 @@ class WorldDraftOfferView(BaseModel):
     #: (``EXULANICA_PERSONAL_INSTALL``), false on a shared server, where a server's budget pays (a
     #: guest's allowance among them).
     own_key: bool = False
+    #: Web notes a draft may be made with here: present where a draft is offered.
+    notes: NotesOfferView | None = None
 
 
 #: The offer's code where the workspace has less left (``left_usd``) than one step of a draft may
@@ -477,6 +531,9 @@ def _durable_view(row: dict[str, Any], connection: Any, services: Services) -> M
             "accounting": WorldDraftRepository(connection, row["workspace_id"]).accounting(
                 row["actor_id"], row["draft_id"]
             ),
+            "references": None
+            if doc.get("references") is None
+            else DraftReferencesView(**doc["references"]),
         }
     )
 
@@ -515,7 +572,7 @@ def start_world_draft(
     """
     workspace_id = session.workspace_id
     key = body.idempotency_key or uuid.uuid4()
-    terms = terms_sha256(body.description, body.operation, body.maximum_usd)
+    terms = terms_sha256(body.description, body.operation, body.maximum_usd, body.reference_id)
     repository = WorldDraftRepository(scoped, workspace_id)
     prior = repository.by_request(session.actor, key)
     if prior is not None:
@@ -596,6 +653,8 @@ def start_world_draft(
             deadline_seconds=deadline,
             funding_valid_until=(now + timedelta(seconds=deadline + 120)).isoformat(),
             funding=_funding(quote, _left_by_provider(services, connection, workspace_id, quote)),
+            # Named only where the start names notes: a start without keeps its definition.
+            **({} if body.reference_id is None else {"reference_id": str(body.reference_id)}),
         )
         ident = repository.submit(
             actor=session.actor,
@@ -732,6 +791,7 @@ def read_world_draft_offer(
                 "This host is not running its world draft worker.",
             )
     return WorldDraftOfferView(
+        notes=None if code is not None else _notes_offer(request, services, workspace_id, held),
         offered=code is None,
         code=code,
         detail=None if detail is None else sayable(detail),
@@ -752,6 +812,30 @@ def read_world_draft_offer(
             None if services.host_keeps_until is None else services.host_keeps_until.isoformat()
         ),
         own_key=services.personal_install and not guest,
+    )
+
+
+def _notes_offer(
+    request: Request, services: Services, workspace_id: uuid.UUID, held: frozenset[Permission]
+) -> NotesOfferView:
+    """Web notes for a draft, as this person would meet them now (:class:`NotesOfferView`)."""
+    searches = reference_prompts().subjects_maximum
+    if Permission.REFERENCES_REQUEST not in held:
+        return NotesOfferView(
+            offered=False,
+            code="references_not_permitted",
+            searches_at_most=searches,
+            maximum_usd=None,
+        )
+    thread = getattr(request.app.state, "reference_thread", None)
+    code = references_unavailable(
+        services, workspace_id, running=thread is not None and thread.is_alive(), web=True
+    )
+    most = None if code is not None else notes_maximum_usd(services.model_client)
+    if code is None and most is None:
+        code = "world_draft_price_unavailable"
+    return NotesOfferView(
+        offered=code is None, code=code, searches_at_most=searches, maximum_usd=most
     )
 
 

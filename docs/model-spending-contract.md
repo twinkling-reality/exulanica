@@ -69,6 +69,10 @@ admission:
   ([a model on this computer](model-and-service-selection.md#a-model-on-this-computer)).
   VERIFIED (`tests/test_laptop_models.py`).
 
+Web notes asked for with a draft are their own request, admitted call by call under the
+workspace's grants; the draft offer prices their two model calls at fresh rates (`notes`) so a
+page can say the whole most before anything is sent.
+
 A whole-world draft (`GET /worlds/drafts`) quotes fresh provider rates separately from its
 operation ceiling. The ceiling covers full admitted input contexts, actual output limits,
 schema repairs, transport retries and fallbacks across either tool path. Provider ceilings sum

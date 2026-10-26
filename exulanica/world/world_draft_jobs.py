@@ -420,10 +420,17 @@ class WorldDraftRepository:
 
 
 def terms_sha256(
-    description: str, quoted: Mapping[str, Any] | None, maximum_usd: str | None
+    description: str,
+    quoted: Mapping[str, Any] | None,
+    maximum_usd: str | None,
+    reference_id: uuid.UUID | None = None,
 ) -> str:
+    """The digest of a start's terms, so one request key never names two: the words, the operation
+    confirmed, the most it may spend and, where the start names one, the web notes it drafts with. A
+    start naming no notes keeps the digest it had before notes could be named."""
     import hashlib
 
-    return hashlib.sha256(
-        canonical_json(dict(description=description, quote=quoted, maximum_usd=maximum_usd))
-    ).hexdigest()
+    terms: dict[str, Any] = dict(description=description, quote=quoted, maximum_usd=maximum_usd)
+    if reference_id is not None:
+        terms["reference_id"] = str(reference_id)
+    return hashlib.sha256(canonical_json(terms)).hexdigest()

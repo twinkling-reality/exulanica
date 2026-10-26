@@ -34125,6 +34125,100 @@
     ],
     "title": "DraftKindBody"
    },
+   "DraftReferencesView": {
+    "properties": {
+     "state": {
+      "type": "string",
+      "enum": [
+       "used",
+       "not_used"
+      ],
+      "title": "State"
+     },
+     "reference_id": {
+      "type": "string",
+      "title": "Reference Id"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail"
+     },
+     "notes": {
+      "type": "integer",
+      "title": "Notes"
+     },
+     "bundle_sha256": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bundle Sha256"
+     },
+     "basis": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Basis"
+     },
+     "searches": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Searches"
+     },
+     "spent_usd": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spent Usd"
+     }
+    },
+    "type": "object",
+    "required": [
+     "state",
+     "reference_id",
+     "code",
+     "detail",
+     "notes",
+     "bundle_sha256",
+     "basis"
+    ],
+    "title": "DraftReferencesView",
+    "description": "Whether a draft's drafter was handed the web notes its start named.\n\n``used``: it saw ``notes`` web notes from the request ``reference_id``, whose bundle\n``bundle_sha256`` names them (their text stays with the request), with ``basis`` the notes'\nbases. ``not_used``: the world was drafted from the words alone, and ``code`` and ``detail`` say\nwhy: a reason of the notes themselves, as the specification route names it (any id not a\nrequest of the caller's own is ``reference_unknown``), or ``reference_not_for_this_tool``,\nwhere the tool chosen for the words drafts without notes."
+   },
    "DraftRefusalView": {
     "properties": {
      "code": {
@@ -34244,6 +34338,18 @@
        }
       ],
       "title": "Maximum Usd"
+     },
+     "reference_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reference Id"
      }
     },
     "additionalProperties": false,
@@ -38568,6 +38674,16 @@
       },
       "type": "array",
       "title": "Refusals"
+     },
+     "references": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DraftReferencesView"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "type": "object",
@@ -39301,6 +39417,49 @@
      "reason"
     ],
     "title": "NotDeliveredBody"
+   },
+   "NotesOfferView": {
+    "properties": {
+     "offered": {
+      "type": "boolean",
+      "title": "Offered"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "searches_at_most": {
+      "type": "integer",
+      "title": "Searches At Most"
+     },
+     "maximum_usd": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Maximum Usd"
+     }
+    },
+    "type": "object",
+    "required": [
+     "offered",
+     "code",
+     "searches_at_most",
+     "maximum_usd"
+    ],
+    "title": "NotesOfferView",
+    "description": "Whether this person may ask for web notes with a draft here, and what they add.\n\n``offered`` where the references read offers web notes to this workspace and this person may\nask for them (a guest never holds ``references.request``); else ``code`` names why, as the\nreferences read names it, or ``references_not_permitted``. ``searches_at_most`` is the\nplanner's limit, the most searches one request sends; ``maximum_usd`` the most its two model\ncalls may add at current rates (``world_draft_offer.NOTES_PATHS``), or null where no current\nrate prices them, when notes are not offered either."
    },
    "ObjectActivityView": {
     "properties": {
@@ -51406,6 +51565,16 @@
       "type": "boolean",
       "title": "Own Key",
       "default": false
+     },
+     "notes": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/NotesOfferView"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "type": "object",

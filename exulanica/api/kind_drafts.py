@@ -286,6 +286,9 @@ class KindDraft:
     #: words, its setting or the default), and whether its layout did not fit and it was made on
     #: level ground instead; None where it was made on level ground as asked.
     land: Mapping[str, Any] | None = None
+    #: For a world started with web notes: whether its drafter was handed them, as the
+    #: specification route's ``references`` says it; None where the start named none.
+    references: Mapping[str, Any] | None = None
     #: Content erased with the resulting world; timing remains for the starts-per-hour budget.
     erased: bool = False
 

@@ -621,7 +621,10 @@ over 131,072 bytes, including operation metadata, is refused 413 before it is re
 | `refused` | `refusal` names why by code and sentence, and no world was written. `refusals` lists every code of the draft's own routes and job with what each means; a refusal by the composer or by a town's values carries that check's own code and sentence |
 
 Ready and refused both carry what the draft cost, every call included. A world that was made
-always ends `ready`: nothing that happens after its making reports it as not made. A further
+always ends `ready`: nothing that happens after its making reports it as not made. A start may
+name web notes to draft with (`reference_id`): a town's drafter is handed them, any other place is
+drafted from the words alone, and `references` says which
+([reference notes](reference-notes-contract.md#9-notes-for-a-drafter)). A further
 generator is one more entry of the tool catalog and no change to the choosing.
 
 **Before a word is typed.** `GET /worlds/drafts` (world read) says what a start would meet, for
@@ -648,7 +651,9 @@ kind and whole-world starts;
 `description_characters`;
 `running_draft_id`, this person's own draft of a world still running here; and, where the host
 states one (`EXULANICA_HOST_KEEPS_UNTIL`), `host_keeps_until`, the day it keeps what is made on it
-until, which the page says under the field; and `own_key`, true on a person's own install
+until, which the page says under the field; `notes`, where a draft is offered, whether web notes
+may be asked for with it, the most searches they send and the most their two model calls may add
+([reference notes](reference-notes-contract.md#9-notes-for-a-drafter)); and `own_key`, true on a person's own install
 (`EXULANICA_PERSONAL_INSTALL`), whose models run on its owner's key, so the page's price line names
 that key ("with your Nebius key"), false on a shared server, where a server's budget pays. A page shows the calls
 and the starts before the words are sent. Another person's running draft is `kind_draft_busy`

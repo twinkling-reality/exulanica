@@ -22,7 +22,7 @@ from exulanica.api.kind_drafts import (
     KindDraftLimit,
     KindDrafts,
 )
-from exulanica.api.world_making import make_world
+from exulanica.api.world_making import draft_notes, make_world
 from exulanica.canonical import canonical_json
 from exulanica.db.session import Database
 from exulanica.models.client import ModelClient
@@ -41,6 +41,7 @@ from exulanica.world.workspace_model_bindings import _document
 from exulanica.world.world_draft_contract import (
     OUTCOME_PROFILE,
     funding_of,
+    reference_of,
     validate_definition,
 )
 from exulanica.world.world_draft_jobs import ClaimedDraft, WorldDraftRefused, WorldDraftRepository
@@ -66,6 +67,10 @@ FIELDS = (
 
 def snapshot(draft: KindDraft, *, manifest: Manifest | None = None) -> dict[str, Any]:
     doc = {key: _document(getattr(draft, key)) for key in FIELDS}
+    # Kept only where the start named web notes, so a draft made from its words alone keeps the
+    # document it had before notes could be named.
+    if draft.references is not None:
+        doc["references"] = _document(draft.references)
     doc["entry_id"] = None if draft.entry_id is None else str(draft.entry_id)
     doc["profile"] = OUTCOME_PROFILE
     if manifest is not None:
@@ -445,8 +450,17 @@ class WorldDraftWorker:
                     .with_policy(self.policy_for(workspace_id))
                     .with_spending(DraftSpending(self, claimed, bounds))
                 )
+                # The web notes the start named are read with the words, by the person who
+                # started it: a request of anyone else's reads as unknown, and the draft is then
+                # made from its words alone.
+                reference = reference_of(claimed.definition)
+                notes, references = None, None
                 with self._opened(claimed) as connection:
                     sent = sendable(connection, workspace_id, claimed.description)
+                    if reference is not None:
+                        notes, references = draft_notes(
+                            connection, workspace_id, claimed.actor, reference, sent
+                        )
                 with spending_request_key(f"world-draft:{claimed.draft_id}"):
                     make_world(
                         draft,
@@ -459,6 +473,8 @@ class WorldDraftWorker:
                         guest=claimed.guest,
                         fixed_world_id=claimed.world_id,
                         on_land=self.on_land,
+                        notes=notes,
+                        references=references,
                     )
             except Exception as failure:
                 if draft.state == "drafting":

@@ -11,7 +11,7 @@ contract; the hosted-request boundary itself belongs to the
 | --- | --- |
 | Web notes from one source (Tavily), off by default and offered to listed workspaces only | Implemented |
 | A drafter's notes from a finished request: the quoted block, its bound and its provenance | Implemented |
-| A drafter's prompt carrying the notes | Implemented for the describe-a-town drafter (`POST /worlds/specification/drafts` with `reference_id`, prompt version 3) and creature drafts (`POST /things/creatures`, purpose `things`, web or authorized selected-picture notes and prompt version 2); not built for the kind, look and piece drafters, each of which adds them in a prompt version of its own |
+| A drafter's prompt carrying the notes | Implemented for the describe-a-town drafter (`POST /worlds/specification/drafts` with `reference_id`, prompt version 3, and a town Create makes from a sentence, `POST /worlds/drafts` with `reference_id`) and creature drafts (`POST /things/creatures`, purpose `things`, web or authorized selected-picture notes and prompt version 2); not built for the kind, look and piece drafters, each of which adds them in a prompt version of its own |
 | Notes read from a person's own pictures: the reading call, its role, the checks on its notes, the job's picture step and the routes | Implemented, off by default (`EXULANICA_REFERENCE_PICTURES`) and never offered on a `public` installation; it stays off until Nebius Token Factory Sales confirms in writing that its terms allow it |
 | A picture search for a creature: the person's words as its one search, the pictures it finds passed to its requester from memory and never stored | Implemented, off by default (`EXULANICA_REFERENCE_WEB_PICTURES`), offered to listed workspaces only and never on a `public` installation; no live picture search has run through the product |
 | Keeping a picture a person picks from a picture search: fetched once, kept apart from their photographs, read and erased | Implemented (migration 0215, section 13), off with picture searches; no live fetch has run through the product |
@@ -317,6 +317,19 @@ how many, and the request, bundle digest and bases that name them, or the code a
 not; any id that is not a request of the caller's own is answered `reference_unknown`, whoever made
 it, and the draft is drafted from the words alone. A draft naming no reference asks with
 version 2, byte for byte, and its `references` is null.
+
+Create's making from a sentence takes notes the same way. `POST /worlds/drafts` takes an optional
+`reference_id`, the person's own request with purpose `world_draft`; its job reads the notes with
+the words, by the person who started it, with saved names replaced as above, and where the words
+choose a town hands them to the same drafter with the same words. Where they choose another place,
+whose kind drafter takes no notes yet, the world is drafted from the words alone. The draft's read
+says which in `references`, as above, or `reference_not_for_this_tool`, with `searches` and
+`spent_usd`, how many searches the person's own request sent and what its two model calls spent,
+for the page's spend line. A start naming notes keeps the id in its terms, so one request key
+never names two sets of notes; a start naming none keeps its terms and definition byte for byte.
+Before a word is typed, the draft offer's `notes` says whether this person may ask for notes here
+(by the codes of section 8, or `references_not_permitted` without `references.request`), the
+planner's limit on searches, and the most the notes' two model calls may add at current rates.
 
 ## 10. Notes from a person's own pictures
 

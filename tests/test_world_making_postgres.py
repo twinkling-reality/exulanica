@@ -478,6 +478,242 @@ def test_a_sentence_that_asks_for_a_town_is_made_by_the_town_tool(drafts, fixed_
         assert _count(client, "world_kind_version") == 0
 
 
+def _owner(client: TestClient) -> uuid.UUID:
+    """The owner token's actor: the person a web notes request must be made by to be read."""
+    return client.app.state.services.tokens.session_for(TOKEN).actor
+
+
+def _notes_request(client: TestClient, actor: uuid.UUID, purpose: str = "world_draft") -> uuid.UUID:
+    """A finished web notes request of ``actor``'s, as its worker keeps one (reference_fixtures)."""
+    from reference_fixtures import finished_reference
+
+    with client.app.state.services.database.session(_workspace()) as connection:
+        return finished_reference(connection, _workspace(), actor=actor, purpose=purpose)
+
+
+def _start_with_notes(client: TestClient, description: str, reference_id: uuid.UUID, **more: Any):
+    return client.post(
+        "/worlds/drafts",
+        headers={"Authorization": f"Bearer {TOKEN}"},
+        json={"description": description, "reference_id": str(reference_id), **more},
+    )
+
+
+def _sent_text(request: dict[str, Any]) -> str:
+    """Everything a model request said, its messages joined."""
+    return "\n".join(str(message.get("content")) for message in request["payload"]["messages"])
+
+
+def test_a_town_started_with_web_notes_hands_them_to_its_drafter_and_says_so(
+    drafts, fixed_identities
+):
+    from exulanica.selection.world_drafting import notes_prompt
+
+    from reference_fixtures import WEB_NOTES_BLOCK
+
+    app, transport = drafts
+    transport.release.set()
+    transport.responses.extend([_tool("town", "a quiet town"), _json(_town_form()), *_plain()])
+    with app() as client:
+        reference = _notes_request(client, _owner(client))
+        started = _start_with_notes(client, TOWN_WORDS, reference)
+        assert started.status_code == 202, started.text
+        ended = _ended(client, started.json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        used = ended["references"]
+        assert (
+            used["state"],
+            used["reference_id"],
+            used["code"],
+            used["notes"],
+            used["basis"],
+        ) == (
+            "used",
+            str(reference),
+            None,
+            3,
+            ["web_description"],
+        )
+        assert re.fullmatch(r"[0-9a-f]{64}", used["bundle_sha256"])
+        # What the notes' request sent and spent, as its bundle records it, for the spend line.
+        assert (used["searches"], used["spent_usd"]) == (1, "0.00020000")
+        # The town's drafter, the second model asked, was handed the notes after the words and
+        # asked with the words that say what notes are; the chooser was handed none.
+        chooser, drafter = transport.requests[0], transport.requests[1]
+        assert WEB_NOTES_BLOCK in _sent_text(drafter)
+        assert TOWN_WORDS in _sent_text(drafter)
+        assert notes_prompt(WEB_NOTES_BLOCK).instructions in _sent_text(drafter)
+        assert "Reference notes" not in _sent_text(chooser)
+
+
+def test_a_saved_name_in_a_web_note_reaches_the_town_s_drafter_only_under_its_label(
+    drafts, fixed_identities, monkeypatch
+):
+    """A note naming a place or a person the account holder saved is sent under the label the words
+    gave it, or a label of its own, as the specification route sends it: never by name. Both where
+    the job hands the notes to the drafter and in what the drafter's request sends, since the
+    client's boundary replacing saved names again must not be the only thing that does."""
+    from exulanica.references.bundle import BundleNote
+
+    from reference_fixtures import finished_reference, scripted_bundle
+
+    app, transport = drafts
+    transport.release.set()
+    handed: list[str | None] = []
+    draft_specification = world_making.draft_world_specification
+
+    def recording(*args: Any, **kwargs: Any) -> Any:
+        handed.append(kwargs.get("notes"))
+        return draft_specification(*args, **kwargs)
+
+    monkeypatch.setattr(world_making, "draft_world_specification", recording)
+    words = "a quiet town with a harbour like Lantern House"
+    transport.responses.extend([_tool("town", "a quiet town"), _json(_town_form()), *_plain()])
+    notes = (
+        BundleNote("landscape_and_plants", "a quay like Lantern House", "web_description", None),
+        BundleNote("buildings", "a cottage where Maria Estrada lives", "web_description", None),
+    )
+    with app() as client:
+        bundle = scripted_bundle(_workspace(), notes=notes, purpose="world_draft")
+        with client.app.state.services.database.session(_workspace()) as connection:
+            reference = finished_reference(
+                connection, _workspace(), actor=_owner(client), purpose="world_draft", bundle=bundle
+            )
+        ended = _ended(client, _start_with_notes(client, words, reference).json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        assert (ended["references"]["state"], ended["references"]["notes"]) == ("used", 2)
+    (notes,) = handed
+    assert notes is not None and "a quay like [place A]" in notes and "[person A]" in notes
+    assert not any(name in notes.lower() for name in ("lantern", "maria", "estrada"))
+    drafter = transport.requests[1]
+    assert "a quay like [place A]" in _sent_text(drafter)
+    assert "a cottage where [person A] lives" in _sent_text(drafter)
+    for name in ("lantern", "maria", "estrada"):
+        assert name not in json.dumps(drafter["payload"]).lower(), name
+
+
+def test_a_place_started_with_web_notes_is_drafted_from_the_words_alone_and_says_so(
+    drafts, fixed_identities
+):
+    app, transport = drafts
+    transport.release.set()
+    transport.responses.extend([_tool("place", "a small farm"), _brief(_farm()), *_plain()])
+    with app() as client:
+        reference = _notes_request(client, _owner(client))
+        ended = _ended(client, _start_with_notes(client, FARM_WORDS, reference).json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        assert ended["references"] == {
+            "state": "not_used",
+            "reference_id": str(reference),
+            "code": "reference_not_for_this_tool",
+            "detail": "the tool chosen for these words drafts without notes",
+            "notes": 0,
+            "bundle_sha256": None,
+            "basis": [],
+            # The notes were made all the same: what they sent and spent still counts.
+            "searches": 1,
+            "spent_usd": "0.00020000",
+        }
+        assert not any("Reference notes" in _sent_text(sent) for sent in transport.requests)
+
+
+def test_another_persons_web_notes_are_read_as_unknown_and_the_town_drafted_from_the_words(
+    drafts, fixed_identities
+):
+    app, transport = drafts
+    transport.release.set()
+    transport.responses.extend([_tool("town", "a quiet town"), _json(_town_form()), *_plain()])
+    with app() as client:
+        someone_else = _notes_request(client, uuid.uuid4())
+        ended = _ended(
+            client, _start_with_notes(client, TOWN_WORDS, someone_else).json()["draft_id"]
+        )
+        assert ended["state"] == "ready", ended
+        assert (ended["references"]["state"], ended["references"]["code"]) == (
+            "not_used",
+            "reference_unknown",
+        )
+        # Nothing of another person's request is said: not what it sent, nor what it spent.
+        assert (ended["references"]["searches"], ended["references"]["spent_usd"]) == (None, None)
+        assert not any("Reference notes" in _sent_text(sent) for sent in transport.requests)
+
+
+def test_a_request_key_names_one_set_of_web_notes_and_a_start_without_keeps_its_digest(drafts):
+    from exulanica.world.world_draft_jobs import terms_sha256
+
+    app, transport = drafts
+    transport.release.clear()
+    key = str(uuid.uuid4())
+    with app() as client:
+        reference = _notes_request(client, _owner(client))
+        first = _start_with_notes(client, TOWN_WORDS, reference, idempotency_key=key)
+        assert first.status_code == 202, first.text
+        other = _start_with_notes(
+            client, TOWN_WORDS, _notes_request(client, _owner(client)), idempotency_key=key
+        )
+        assert (other.status_code, other.json()["code"]) == (409, "world_draft_key_reused")
+        bare = client.post(
+            "/worlds/drafts",
+            headers={"Authorization": f"Bearer {TOKEN}"},
+            json={"description": TOWN_WORDS, "idempotency_key": key},
+        )
+        assert (bare.status_code, bare.json()["code"]) == (409, "world_draft_key_reused")
+        again = _start_with_notes(client, TOWN_WORDS, reference, idempotency_key=key)
+        assert (again.status_code, again.json()["draft_id"]) == (202, first.json()["draft_id"])
+        stored = client.app.state.services.database
+        with stored.session(_workspace()) as connection:
+            row = connection.execute(
+                "select r.terms_sha256, r.document from world_draft_request r "
+                "where r.workspace_id=%s and r.draft_id=%s",
+                (_workspace(), uuid.UUID(first.json()["draft_id"])),
+            ).fetchone()
+        assert row["document"]["reference_id"] == str(reference)
+        assert row["terms_sha256"] == terms_sha256(TOWN_WORDS, None, None, reference)
+    # A start naming no notes digests its terms exactly as before notes could be named.
+    assert terms_sha256(TOWN_WORDS, None, None) == terms_sha256(TOWN_WORDS, None, None, None)
+    transport.release.set()
+
+
+def test_a_draft_started_without_web_notes_keeps_its_terms_definition_and_outcome_as_before(
+    drafts, fixed_identities
+):
+    import hashlib
+
+    from exulanica.canonical import canonical_json
+
+    app, transport = drafts
+    transport.release.set()
+    transport.responses.extend([_tool("town", "a quiet town"), _json(_town_form()), *_plain()])
+    with app() as client:
+        started = _start(client, TOWN_WORDS)
+        assert started.status_code == 202, started.text
+        ended = _ended(client, started.json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        assert ended["references"] is None
+        with client.app.state.services.database.session(_workspace()) as connection:
+            row = connection.execute(
+                "select r.terms_sha256, r.document as definition, o.document as outcome "
+                "from world_draft_request r "
+                "join world_draft_outcome o using (workspace_id, draft_id) "
+                "where r.workspace_id=%s and r.draft_id=%s",
+                (_workspace(), uuid.UUID(started.json()["draft_id"])),
+            ).fetchone()
+    # The digest the terms had before a start could name notes, written out from its three terms.
+    before = hashlib.sha256(
+        canonical_json(dict(description=TOWN_WORDS, quote=None, maximum_usd=None))
+    ).hexdigest()
+    assert row["terms_sha256"] == before
+    assert set(row["definition"]) == {
+        "profile",
+        "quote",
+        "manifest_sha256",
+        "deadline_seconds",
+        "funding_valid_until",
+        "funding",
+    }
+    assert "references" not in row["outcome"]
+
+
 def test_on_land_a_town_stands_on_the_land_its_words_name_and_says_so(drafts, fixed_identities):
     from exulanica.grammar.landform import land_recipes
 
@@ -656,6 +892,23 @@ def test_the_offer_says_what_a_draft_may_spend_before_a_word_is_typed(drafts, fi
         assert spent["code"] in {code["code"] for code in spent["refusals"]}
         again = _start(client, FARM_WORDS)
         assert (again.status_code, again.json()["code"]) == (429, "kind_draft_limit")
+
+
+def test_the_offer_says_whether_web_notes_may_be_asked_for_with_the_planner_s_limit(drafts):
+    app, _transport = drafts
+    with app() as client:
+        notes = _offer(client)["notes"]
+        # Not offered on this server, by the code the references read names, with the planner's
+        # limit, the most searches one request sends, and no figure for what is not offered.
+        assert (notes["offered"], notes["searches_at_most"], notes["maximum_usd"]) == (
+            False,
+            3,
+            None,
+        )
+        references = client.get("/worlds/references", headers={"Authorization": f"Bearer {TOKEN}"})
+        assert notes["code"] and notes["code"] in references.text
+        # One who may not draft is offered no draft, and nothing of notes either.
+        assert _offer(client, NO_MODEL_TOKEN)["notes"] is None
 
 
 def test_the_offer_says_the_day_a_host_keeps_what_is_made_on_it_until(drafts):

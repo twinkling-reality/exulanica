@@ -12,7 +12,7 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import Callable, Mapping
 from decimal import ROUND_CEILING, Decimal
-from typing import Any
+from typing import Any, Final
 
 from exulanica.errors import CanonicalisationError
 from exulanica.models.manifest import Manifest, Role
@@ -57,6 +57,14 @@ def stages() -> dict[str, tuple[tuple[Role, int], ...]]:
     }
 
 
+#: The web notes a draft may be made with (docs/reference-notes-contract.md, section 4), priced as a
+#: draft's stages are: their request's two calls of the reference_drafting role, its planner and its
+#: reader, each with every wire attempt its chain may make. The searches themselves cost no USD.
+NOTES_PATHS: Final[Mapping[str, tuple[tuple[Role, int], ...]]] = {
+    "notes": ((Role.REFERENCE_DRAFTING, 2),)
+}
+
+
 def calls_at_most(manifest: Manifest, maximum_wire_attempts: Callable[[Role], int]) -> int:
     """The most dispatches one draft can make, counted as :func:`operation_sheet` counts them and
     with no prices needed: each stage's schema attempts times its wire attempts (every fallback and
@@ -80,6 +88,7 @@ def operation_sheet(
     maximum_wire_attempts: Callable[[Role], int],
     *,
     now: dt.datetime,
+    stage_paths: Mapping[str, tuple[tuple[Role, int], ...]] | None = None,
 ) -> dict[str, Any]:
     """A finite envelope for every native path, including retries and fallbacks, and its largest
     step: ``step_usd_at_most``, the dearest single dispatch's worst case, overall and for each
@@ -90,6 +99,7 @@ def operation_sheet(
     the actual stage output bound. The stage states the envelope (``request_bytes_at_most``), which
     the draft's chain refuses any request beyond. Separate provider ceilings sum to the accepted
     total; switching paths or providers cannot obtain another copy of that total after a restart.
+    ``stage_paths`` prices other stages so (:data:`NOTES_PATHS`); a draft's own by default.
     """
     if now.tzinfo is None:
         raise WorldDraftOfferRefused("world_draft_price_unavailable")
@@ -99,7 +109,7 @@ def operation_sheet(
     provider_calls: dict[str, int] = {}
     # The dearest single dispatch each provider can be sent: what one step of the draft holds.
     provider_steps: dict[str, Decimal] = {}
-    for tool, stages_ in stages().items():
+    for tool, stages_ in (stages() if stage_paths is None else stage_paths).items():
         path_caps: dict[str, Decimal] = {}
         path_calls: dict[str, int] = {}
         entries = []
@@ -218,9 +228,12 @@ def operation_sheet(
     )
 
 
-def read_operation_sheet(client: Any) -> dict[str, Any]:
+def read_operation_sheet(
+    client: Any, stage_paths: Mapping[str, tuple[tuple[Role, int], ...]] | None = None
+) -> dict[str, Any]:
     """Metadata-only rate reads through the admitted client; no model is asked."""
-    providers = {client.manifest[role].provider for rows in stages().values() for role, _ in rows}
+    priced = stages() if stage_paths is None else stage_paths
+    providers = {client.manifest[role].provider for rows in priced.values() for role, _ in rows}
     prices = {}
     at = {}
     try:
@@ -229,12 +242,26 @@ def read_operation_sheet(client: Any) -> dict[str, Any]:
             at[provider] = dt.datetime.now(dt.UTC)
             prices.update({(provider, key): price for key, price in quoted.items()})
         return operation_sheet(
-            client.manifest, prices, at, client.maximum_wire_attempts, now=dt.datetime.now(dt.UTC)
+            client.manifest,
+            prices,
+            at,
+            client.maximum_wire_attempts,
+            now=dt.datetime.now(dt.UTC),
+            stage_paths=stage_paths,
         )
     except WorldDraftOfferRefused:
         raise
     except Exception as failed:
         raise WorldDraftOfferRefused("world_draft_price_unavailable") from failed
+
+
+def notes_maximum_usd(client: Any) -> str | None:
+    """The most web notes for a draft may add, in USD, as fresh rates price their two model calls
+    (:data:`NOTES_PATHS`); None where no current rate prices them."""
+    try:
+        return str(read_operation_sheet(client, NOTES_PATHS)["maximum_usd"])
+    except WorldDraftOfferRefused:
+        return None
 
 
 #: What of a priced model a confirmation compares: everything but when its list was read and the

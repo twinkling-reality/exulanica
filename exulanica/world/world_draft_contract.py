@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import uuid
 from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any
@@ -25,6 +26,7 @@ def validate_definition(document: Mapping[str, Any]) -> None:
         or re.fullmatch(r"[0-9a-f]{64}", document["manifest_sha256"]) is None
         or type(document.get("deadline_seconds")) is not int
         or not 1 <= document["deadline_seconds"] <= 86400
+        or not _reference_or_none(document.get("reference_id"))
     ):
         raise ValueError("world_draft_definition_invalid")
     providers = quote.get("providers")
@@ -68,6 +70,24 @@ def validate_definition(document: Mapping[str, Any]) -> None:
             or row.get("max_calls") != quoted[row["provider"]]["max_calls"]
         ):
             raise ValueError("world_draft_definition_invalid")
+
+
+def _reference_or_none(value: Any) -> bool:
+    """Whether a definition's ``reference_id`` is absent or names a request by its id: the web notes
+    a start asked its draft to be made with (docs/reference-notes-contract.md section 9)."""
+    if value is None:
+        return True
+    try:
+        return isinstance(value, str) and str(uuid.UUID(value)) == value
+    except ValueError:
+        return False
+
+
+def reference_of(definition: Mapping[str, Any]) -> uuid.UUID | None:
+    """The web notes request a draft's definition names, or None for a draft drafted from its words
+    alone."""
+    value = definition.get("reference_id")
+    return None if value is None else uuid.UUID(value)
 
 
 def funding_of(definition: Mapping[str, Any]) -> list[Mapping[str, Any]]:

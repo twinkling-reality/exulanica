@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 from exulanica.api.world_draft_offer import (
+    NOTES_PATHS,
     WorldDraftOfferRefused,
     calls_at_most,
     confirm_operation,
@@ -13,7 +14,7 @@ from exulanica.api.world_draft_offer import (
     read_operation_sheet,
     stages,
 )
-from exulanica.models.manifest import load_manifest
+from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.provider_catalog import ProviderPrice
 
 NOW = dt.datetime(2026, 10, 11, tzinfo=dt.UTC)
@@ -61,6 +62,40 @@ def test_full_operation_includes_actual_repairs_fallbacks_and_alternative_tool_p
             != manifest.spec(rate["model_id"]).input_usd_per_mtok
         )
         assert rate["rate_response_sha256"] == "f" * 64
+
+
+def test_web_notes_are_priced_as_two_calls_of_the_notes_role_with_every_wire_attempt():
+    manifest = load_manifest()
+    chain = manifest[Role.REFERENCE_DRAFTING].chain
+    prices = {
+        (s.provider, s.model_id): ProviderPrice(
+            s.model_id,
+            s.input_usd_per_mtok,
+            s.output_usd_per_mtok,
+            s.context_window_tokens,
+            "f" * 64,
+        )
+        for s in chain
+    }
+
+    def wire(role):
+        return len(manifest[role].chain) * 3
+
+    sheet = operation_sheet(
+        manifest, prices, {s.provider: NOW for s in chain}, wire, now=NOW, stage_paths=NOTES_PATHS
+    )
+    (path,) = sheet["paths"]
+    (stage,) = path["stages"]
+    assert (path["tool"], stage["role"]) == ("notes", "reference_drafting")
+    assert stage["dispatches_at_most"] == 2 * wire(Role.REFERENCE_DRAFTING)
+    dearest = max(Decimal(model["reservation_usd"]) for model in stage["models"])
+    assert Decimal(sheet["maximum_usd"]) == dearest * stage["dispatches_at_most"] > 0
+    # A draft's own sheet names no notes: its paths are its tools' alone.
+    manifest_, draft_prices, at, draft_wire = inputs()
+    assert {
+        p["tool"]
+        for p in operation_sheet(manifest_, draft_prices, at, draft_wire, now=NOW)["paths"]
+    } == set(stages())
 
 
 def test_the_sheet_states_its_largest_step_overall_and_for_each_provider():
