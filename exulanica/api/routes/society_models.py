@@ -211,11 +211,15 @@ def _run_spending(
     workspace_id: uuid.UUID,
     society_id: uuid.UUID,
     decisions: list[dict[str, Any]],
-) -> list[dict[str, Any]] | None:
+    full: bool,
+) -> dict[str, Any] | None:
     """What each person's model has spent in the society's open run (D9): among ``decisions``,
     the stored receipts whose request the run's own bounds admitted an attempt for, by person,
-    with their known costs summed and how many costs are not known yet; None while no run is open.
-    A person with no such receipt has no entry, and nothing is estimated."""
+    with their known costs summed and how many costs are not known yet (``run_spending``); None
+    while no run is open. A person with no such receipt has no entry, and nothing is estimated.
+    Where the read holds as many decisions as it may (``full``) and the run asked for a request
+    none of them is, the read did not reach all of the run's receipts and the figures may read
+    low: ``run_spending_partial`` says so, so a page says "at least"."""
     opened = open_session_receipt(connection, workspace_id, society_id)
     if opened is None:
         return None
@@ -228,7 +232,7 @@ def _run_spending(
     for decision in decisions:
         if str(decision["request_id"]) in requests:
             held.setdefault(decision["subject_id"], []).append(decision)
-    return [
+    entries = [
         {
             "subject_id": subject_id,
             "decisions": len(receipts),
@@ -239,6 +243,9 @@ def _run_spending(
         }
         for subject_id, receipts in sorted(held.items())
     ]
+    reached = {str(decision["request_id"]) for decision in decisions}
+    partial = full and not requests <= reached
+    return {"run_spending": entries, **({"run_spending_partial": True} if partial else {})}
 
 
 def _by_model(decisions: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -543,7 +550,13 @@ def society_models_view(
         latest[decision["subject_id"]] = decision
     spending = _spending(services, connection, session.workspace_id)
     here = spend_here_usd(spending, holds_as_guest(request))
-    run = _run_spending(connection, session.workspace_id, snapshot["society_id"], asked_models)
+    run = _run_spending(
+        connection,
+        session.workspace_id,
+        snapshot["society_id"],
+        asked_models,
+        full=len(decisions) >= DECISIONS_READ,
+    )
     return {
         "profile": PROFILE,
         "society_id": str(snapshot["society_id"]),
@@ -630,8 +643,9 @@ def society_models_view(
             {**entry, "name": name_of(entry["model_id"])} for entry in by_being(asked_models)
         ],
         # What each person's model has spent in the open run, from its stored receipts, an
-        # optional field absent while no run is open (D9): a page says it beside the run's time.
-        **({} if run is None else {"run_spending": run}),
+        # optional field absent while no run is open (D9): a page says it beside the run's time,
+        # "at least" where the read did not reach all of the run's receipts.
+        **({} if run is None else run),
         "decisions_read": {"counted": len(decisions), "maximum": DECISIONS_READ},
         # Every subject an outside program decides for now under a grant that stands, the world's
         # own people a grant names (came "run") and the visitors that crossed in ("crossed"), with

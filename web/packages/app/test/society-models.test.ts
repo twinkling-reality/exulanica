@@ -169,6 +169,8 @@ describe('reading who decides', () => {
     const spent = parseSocietyModels(read({ run_spending: [{ subject_id: 'teo', decisions: 3, known_cost_usd: '0.00030000', costs_unknown: 1 }] }));
     expect(spent.runSpending).toEqual([{ subjectId: 'teo', decisions: 3, knownCostUsd: '0.00030000', costsUnknown: 1 }]);
     expect(parseSocietyModels(read()).runSpending).toBeUndefined();
+    expect(parseSocietyModels(read({ run_spending: [], run_spending_partial: true })).runSpendingPartial).toBe(true);
+    expect(spent.runSpendingPartial).toBeUndefined();
     expect(() => parseSocietyModels(read({ run_spending: [{ subject_id: 'teo', decisions: 1, known_cost_usd: 'a little', costs_unknown: 0 }] }))).toThrow();
   });
 

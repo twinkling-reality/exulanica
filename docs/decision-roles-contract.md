@@ -297,7 +297,10 @@ while none is open: for each person whose model has a stored receipt in that run
 `{subject_id, decisions, known_cost_usd, costs_unknown}`. A receipt is the run's when its request
 reserved an attempt under the run's own bound of its provider (as `decision:<request_id>#n`,
 `exulanica/api/session_spending.py`); its known costs are summed, and how many are not known yet
-is counted. Nothing is estimated, and the page says it beside the run's time left.
+is counted. Nothing is estimated, and the page says it beside the run's time left. Where the read
+holds its 2,000 decisions before reaching every request the run asked for, the figures may read
+low, and the read says so (`run_spending_partial`, true, present only then): the page then says
+"at least", as it does while a cost is not known.
 
 Each per-model summary also carries `measures`, and the read carries `by_being`: the same measures
 for each being under each model (`{subject_id, provider, model_id, name, measures}`). Both are

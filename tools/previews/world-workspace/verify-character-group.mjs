@@ -24,6 +24,7 @@ assert.equal(runSpentWords({ knownCostUsd: '0.00030000', costsUnknown: 1 }), 'at
 assert.equal(runSpentWords({ knownCostUsd: '0.00002000', costsUnknown: 0 }), 'less than $0.0001 spent');
 assert.equal(runSpentWords({ knownCostUsd: '0.00000000', costsUnknown: 1 }), null, 'no estimate before a cost is known');
 assert.equal(runSpentWords(null), null);
+assert.equal(runSpentWords({ knownCostUsd: '0.00030000', costsUnknown: 0 }, true), 'at least $0.0003 spent', 'a read that did not reach every receipt never reads low unsaid');
 assert.equal(decidesPrint(teo, { decider: 'routine' }), 'Teo follows a routine');
 assert.equal(decidesPrint(resident, { decider: 'routine' }), 'The resident follows a routine');
 assert.equal(decidesPrint(teo, { decider: 'person' }), 'A person is playing Teo');

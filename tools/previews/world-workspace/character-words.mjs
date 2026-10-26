@@ -366,12 +366,12 @@ export function decidesPrint(who, { decider, model = null, left = null, spent = 
 
 /**
  * What a person's model has spent in the open run (D9), from the models read's entry for them: "$0.0003 spent", or "at
- * least $0.0003 spent" while one of its costs is not known yet; null before a cost is known, and where the caller knows
- * the run is free.
+ * least $0.0003 spent" while one of its costs is not known yet, or where the read did not reach all of the run's
+ * receipts (`partial`); null before a cost is known, and where the caller knows the run is free.
  */
-export function runSpentWords(entry) {
+export function runSpentWords(entry, partial = false) {
   if (!entry || !(Number(entry.knownCostUsd) > 0)) return null;
-  return `${entry.costsUnknown > 0 ? 'at least ' : ''}${amount(entry.knownCostUsd)} spent`;
+  return `${entry.costsUnknown > 0 || partial ? 'at least ' : ''}${amount(entry.knownCostUsd)} spent`;
 }
 
 /** A line as it was said, in curly quotes. */

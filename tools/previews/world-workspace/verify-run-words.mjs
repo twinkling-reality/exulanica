@@ -89,6 +89,7 @@ assert.equal(pillRunLine(open, now, [teo], false, runSpent(cards)), "Teo's model
 assert.equal(runningLine(open, now, false, runSpent([{ ...cards[0], costsUnknown: 1 }])), '9:13 left · at least $0.0003 of $0.05');
 assert.equal(runningLine(open, now, true, runSpent(cards)), '9:13 left', 'a free run says no money');
 assert.equal(runSpent(null), null);
+assert.equal(runningLine(open, now, false, runSpent(cards, true)), '9:13 left · at least $0.0008 of $0.05', 'a partial read says at least');
 assert.equal(runSpent([{ ...cards[0], knownCostUsd: '0.00000000', costsUnknown: 1 }]), null, 'nothing known yet: the run figure stands');
 assert.equal(runningLine(open, now, false, null), '9:13 left · $0.0011 of $0.05');
 assert.equal(decidingWords([teo, ines]), "Teo's and Ines's models are deciding");

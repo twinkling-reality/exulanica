@@ -117,14 +117,15 @@ export function pillRunLine(run, now, whos, free = false, spent = null) {
 
 /**
  * What a run has spent as the people's cards say it (D9, DESIGN's fold-in): their models' known receipts in it summed
- * (`entries`, the models read's run spending), "at least" while one of their costs is not known yet; null where nothing
- * is read yet or no cost is known, when the run's own figure stands.
+ * (`entries`, the models read's run spending), "at least" while one of their costs is not known yet or the read did not
+ * reach all of the run's receipts (`partial`); null where nothing is read yet or no cost is known, when the run's own
+ * figure stands.
  */
-export function runSpent(entries) {
+export function runSpent(entries, partial = false) {
   if (!entries) return null;
   const usd = entries.reduce((sum, entry) => sum + Number(entry.knownCostUsd), 0);
   if (!(usd > 0)) return null;
-  return Object.freeze({ usd: usd.toFixed(8), unknown: entries.some(entry => entry.costsUnknown > 0) });
+  return Object.freeze({ usd: usd.toFixed(8), unknown: partial || entries.some(entry => entry.costsUnknown > 0) });
 }
 
 /**

@@ -23,6 +23,7 @@ from decimal import Decimal
 
 import pytest
 from exulanica.api.decision_host import DecisionHost
+from exulanica.api.routes import society_models
 from exulanica.api.session_spending import SessionGate
 from exulanica.api.society_control_worker import SocietyControlWorker
 from exulanica.epistemics.hosted_requests import no_place_released
@@ -407,7 +408,7 @@ class _TimesOutWhenTold(person_decisions._Chooser):
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_each_person_s_spending_in_a_run_counts_that_run_s_receipts_alone(
-    app, spine_schema, tmp_path
+    app, spine_schema, tmp_path, monkeypatch
 ):
     world, client = app
     services = person_decisions._services(client)
@@ -464,3 +465,7 @@ def test_each_person_s_spending_in_a_run_counts_that_run_s_receipts_alone(
     assert sum(entry["costs_unknown"] for entry in spending) == used["unresolved"]["count"] == 1
     known = sum(Decimal(entry["known_cost_usd"]) for entry in spending)
     assert known == Decimal(used["usd"]) - Decimal(used["unresolved"]["usd"]) > 0
+    # A read whose window is full before it reaches all of the run's receipts says it may read low.
+    assert "run_spending_partial" not in read(society + "/models")
+    monkeypatch.setattr(society_models, "DECISIONS_READ", 1)
+    assert read(society + "/models")["run_spending_partial"] is True

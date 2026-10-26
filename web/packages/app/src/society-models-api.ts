@@ -343,6 +343,8 @@ export interface SocietyModels {
    * their known costs summed and how many are not known yet; absent while no run is open and from an older server.
    */
   readonly runSpending?: readonly RunSpending[];
+  /** True where the read did not reach all of the open run's receipts, so each figure is at least what it says; absent otherwise. */
+  readonly runSpendingPartial?: boolean;
   /** Every model a person's own runner serves beside the manifest's, with its check's state; absent from an older server. */
   readonly runnerModels?: readonly RunnerModel[];
   /**
@@ -621,6 +623,7 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         return { subjectId: text(held['subject_id']), decisions: count(held['decisions']), knownCostUsd: amount(held['known_cost_usd']), costsUnknown: count(held['costs_unknown']) };
       }),
     }),
+    ...(row['run_spending_partial'] === true ? { runSpendingPartial: true } : {}),
     // Added to the profile as an optional field: absent from an older server.
     ...(row['runner_models'] === undefined ? {} : { runnerModels: list(row['runner_models']).map(runnerModel) }),
     ...(row['spend_here_usd'] === undefined ? {} : {
