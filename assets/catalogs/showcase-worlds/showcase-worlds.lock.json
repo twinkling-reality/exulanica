@@ -5,7 +5,7 @@
   {
    "key": "fishing-village",
    "version": 1,
-   "sha256": "b148a457000e944eee264447c13b0572527b6a9f3711001071040dbca01d9208"
+   "sha256": "157471c823fa0b9f06ab717ad1ea36ae5a713ff097425ef2d2282e34ed296311"
   },
   {
    "key": "lighthouse-island",
@@ -20,12 +20,12 @@
   {
    "key": "night-market",
    "version": 1,
-   "sha256": "a325944cbc0c667b84514df5fa5ab0b301d603cfde6d26d1151c141d2f3c3642"
+   "sha256": "d4c57664b91208ee158c448c0893ef8ba32d1972759b5b233897fdf9302b96e7"
   },
   {
    "key": "windmill-village",
    "version": 1,
-   "sha256": "5d7b066bba0208bb15e3b76b56d05ab8be3b1941a1af8bf7ed2a77d759c435b3"
+   "sha256": "fc4ec5f028b95e035906f3d94cdb53c879c9299f1d8ced2021e5eefc755c781a"
   }
  ]
 }

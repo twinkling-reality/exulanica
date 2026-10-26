@@ -313,6 +313,21 @@ def test_a_sentence_becomes_a_place_made_with_no_kind_kept(drafts, fixed_identit
         assert site.status_code == 200, site.text
 
 
+def test_a_place_is_titled_with_a_capital_and_its_kind_keeps_the_drafter_s_label(
+    drafts, fixed_identities
+):
+    """A drafter may name a place in lower case; the world's title takes a capital first letter,
+    as a town's does, and the rest as written."""
+    app, transport = drafts
+    brief = {**_farm(), "label": "a test farm"}
+    transport.responses.extend([_tool("place", "a small farm"), _brief(brief), *_plain()])
+    with app() as client:
+        ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
+        assert ended["state"] == "ready", ended
+        assert ended["entry"]["title"] == "A test farm"
+        assert _receipt(client, ended["entry"])["kind"]["document"]["label"] == "a test farm"
+
+
 def test_a_site_reports_missing_content_even_when_an_overlapping_setting_is_taken(
     drafts, fixed_identities
 ):

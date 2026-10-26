@@ -266,7 +266,12 @@ def title_from_words(sent: SentDescription) -> str | None:
     title = " ".join(words).rstrip(" .,;:")
     if len(title.split()) < 2:
         return None
-    return title[0].upper() + title[1:]
+    return _with_capital(title)
+
+
+def _with_capital(title: str) -> str:
+    """A made world's title as it is saved: a capital first letter, the rest as written."""
+    return title[:1].upper() + title[1:]
 
 
 def _take(client: ModelClient, sent: SentDescription, log: CallLog) -> _Taken:
@@ -764,7 +769,8 @@ def _make_place(
         with opened() as connection:
             entries = SavedWorldEntryRepository(connection, draft.workspace_id, store, guest=guest)
             return entries.create_from_kind(
-                title=kind.label,
+                # Titled as a town is; the kind in the receipt keeps the label its drafter wrote.
+                title=_with_capital(kind.label),
                 kind=kind,
                 values=kind.values(kind.presets[0][0]),
                 created_by=actor,
