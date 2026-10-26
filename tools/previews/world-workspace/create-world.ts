@@ -26,7 +26,7 @@ import {
 } from './create-words.mjs';
 import {
   MADE_HANDOFF_KEY, SHORT_CODE, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, notesNotUsedLine, notesOutcome, notesSteps,
-  offerState, pollDelay, spentOf, startCards, withNotesSpent, wrapStop, writeMade,
+  offerState, partNames, pollDelay, spentOf, startCards, withNotesSpent, wrapStop, writeMade,
 } from './create-steps.mjs';
 import { chosenWorldPicture, openMadeWorld } from './front-door.ts';
 import { mountUiScale } from './world-ui.ts';
@@ -607,7 +607,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     const draft = parseWorldMakingDraft(raw);
     if (draft.entry === null) { refused('world_draft_failed', null); return; }
     const columns = madeColumns({
-      inIt: draft.made.map((part) => part.label).join(', ') || null,
+      inIt: partNames(draft.made.map((part) => part.label)) || null,
       set: setValue(raw['land'] as Parameters<typeof setValue>[0], raw['setting'] as Parameters<typeof setValue>[1]),
       web,
       notInItYet: draft.leftOut.join(', ') || null,

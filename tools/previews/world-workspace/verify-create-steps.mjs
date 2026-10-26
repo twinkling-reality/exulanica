@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { CREATE_WORDS } from './create-words.mjs';
 import {
-  MADE_HANDOFF_KEY, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, pollDelay, readMade, spentOf, wrapStop,
+  MADE_HANDOFF_KEY, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, partNames, pollDelay, readMade, spentOf,
+  wrapStop,
   startCards, writeMade, notesNotUsedLine, notesOutcome, notesSteps, withNotesSpent,
 } from './create-steps.mjs';
 
@@ -134,6 +135,14 @@ for (const code of ['Enter', 'KeyW', 'ArrowLeft', 'Space']) assert.equal(createK
 // The made note's columns, in order, an empty one left out (N13), and the handoff round trip.
 assert.deepEqual(madeColumns({ inIt: 'Four pools, a hotel', set: 'on gentle hills, with mountains far off', notInItYet: '', spent: '$0.31 of at most $1.43' }).map(one => one.label), ['In it', 'Set', 'Spent']);
 const columns = madeColumns({ inIt: 'Four pools', notInItYet: 'a lighthouse', spent: '$0.31 of at most $1.43' });
+// "In it" names each kind of part once, as a person would, without the drafter's numbering of like parts (REHEARSAL
+// run 3: a snowy village's card read "village path, bed one, bedroom one, house one, bed two, bedroom two, house two").
+assert.equal(partNames(['village path', 'bed one', 'bedroom one', 'house one', 'bed two', 'bedroom two', 'house two']), 'village path, bed, bedroom, house');
+assert.equal(partNames(['street', 'footway', 'home', 'street tree']), 'street, footway, home, street tree');
+// A number is the drafter's only where it tells like parts apart; one that is part of a name stays.
+assert.equal(partNames(['house 1', 'house 2', 'route 66']), 'house, route 66');
+assert.equal(partNames(['Barn Two']), 'Barn');
+assert.equal(partNames([]), '');
 assert.equal(MADE_HANDOFF_KEY, 'exulanica.made.v1');
 assert.deepEqual(readMade(writeMade('w-1', columns), 'w-1'), { entryId: 'w-1', columns, build: false });
 // Blank's handoff opens build mode, with no note; a handoff that says nothing of it opens none.

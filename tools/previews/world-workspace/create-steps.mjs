@@ -176,6 +176,32 @@ export function createKey(event, state) {
 /** What the page hands the opening world after a world is made, under this key in sessionStorage. */
 export const MADE_HANDOFF_KEY = 'exulanica.made.v1';
 
+/** A spelled number the drafter ends a part's label with, to tell like parts apart ("bed one", "house two"). */
+const SPELLED = /\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)$/iu;
+/** A figure a part's label ends with ("house 2"). */
+const FIGURE = /\s+\d+$/u;
+
+/**
+ * "In it" on the made note: each kind of part a world was made with, named once as a person would name it, in the
+ * draft's order: the drafter's spelled numbering always left off, and a figure only where another part of the same name
+ * has one too ("route 66" stays).
+ */
+export function partNames(labels) {
+  const figured = new Map();
+  for (const label of labels) {
+    const stem = label.trim().replace(FIGURE, '');
+    if (stem !== label.trim()) figured.set(stem, (figured.get(stem) ?? 0) + 1);
+  }
+  const names = [];
+  for (const label of labels) {
+    let name = label.trim().replace(SPELLED, '');
+    const stem = name.replace(FIGURE, '');
+    if (stem !== name && (figured.get(stem) ?? 0) > 1) name = stem;
+    if (name && !names.includes(name)) names.push(name);
+  }
+  return names.join(', ');
+}
+
 /**
  * The made note's columns in order (N13), each { label, value }; an empty one is left out. `web`, where web notes
  * were used, stands after Set (WORDS.md "Web notes in Create, the words", item 5).
