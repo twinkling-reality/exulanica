@@ -56,8 +56,11 @@ discover models through a world rather than a list or a leaderboard is the hypot
 
 World models generate how a world looks. Exulanica is the world AI models live in: structured,
 versioned state with fixed engine rules, in which models decide what agents do and the engine
-validates every decision before it takes effect. Exulanica does not generate a world's appearance
-with a learned model, and it is not a learned predictor of what happens next.
+validates every decision before it takes effect. A world's shape and the look it is drawn with come
+from its own records, and Exulanica is not a learned predictor of what happens next. A world's
+paintings, its own views painted from its words by an open image model, are labelled "invented
+appearance" and show only on its cards and at a first view they were checked against; one
+showcase world's colours were measured from its painting ([a world's paintings](generated-appearance.md#12-a-worlds-paintings)).
 
 A world has three layers, and each is replaceable on its own:
 

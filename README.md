@@ -35,8 +35,11 @@ You learn what a model does by trying it in your world, never from a leaderboard
 
 Hosted model calls go to Nebius Token Factory, and a model can also run on your own computer. The
 [model manifest](exulanica/models/models.manifest.json) names the models, including NVIDIA
-Nemotron, Qwen, and DeepSeek. Exulanica does not generate a world's appearance with a learned
-model.
+Nemotron, Qwen, and DeepSeek. A world's shape and the look it is drawn with come from its own
+records. Its paintings, its own views painted from its words by an open image model on Nebius AI
+Cloud, are labelled "invented appearance" and show only on the world's cards and at a first view
+they were checked against; one showcase world's colours were measured from its painting
+([a world's paintings](docs/generated-appearance.md#12-a-worlds-paintings)).
 
 <p align="center">
   <img src="assets/brand/exulanica/readme-worlds-for-ai-agents.svg" width="100%" alt="Product direction: a world you build sits at the centre, and open models run the agents in it, each model in its own role. Swap the model behind a role and compare the two runs. Hand building, photographs and imported content are ways to build the world.">
@@ -47,8 +50,8 @@ model.
 
 A person builds a world. The things in it that act are its agents: people, animals, vehicles,
 and decision-makers such as a shopkeeper. Open models can take the roles the engine registers.
-Comparing two models on the same saved world is one capability. Exulanica does not generate a
-world's appearance with a learned model.
+Comparing two models on the same saved world is one capability. No learned model writes a world's
+shape; an open image model paints the world's labelled pictures.
 
 A model is a proposer, not an authority. Two decision roles are registered: a person, and a
 generated town's junction signal. Each role's contract declares what the model is shown and which

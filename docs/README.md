@@ -2,7 +2,9 @@
 
 Exulanica: Worlds for AI Agents. This hub routes a task to the document that owns it.
 [Product direction](product-direction.md) owns the public name, scope and delivery order.
-Exulanica does not generate a world's appearance with a learned model. Comparing models on one
+A world's shape and drawn look come from its own records; its paintings, made by an open image
+model and labelled "invented appearance", show only on its cards and at a checked first view, and
+one showcase world's colours were measured from its painting ([a world's paintings](generated-appearance.md#12-a-worlds-paintings)). Comparing models on one
 saved world is one capability. The
 [people and models guide](capabilities/simulation.md) explains it. The
 [root README](../README.md) introduces the product.
