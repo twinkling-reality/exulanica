@@ -1,6 +1,6 @@
 {
   "profile": "exulanica.integrations/v1",
-  "note": "What a person's worlds connect to, as the Integrations page lists it (integrations.ts; DESIGN's build sheet of 24 October and WORDS.md). One catalog over the model providers and the door: each row names where its state is read from, the words for each state, its Connects, Reads and Goes to lines, its guide (a document under docs/ and one of its headings, opened at guides) and its mark, a plain line drawing in a 24 by 24 box. A row whose state this install cannot give is left out. verify-integration-words.mjs holds every guide to a heading that exists.",
+  "note": "What a person's worlds connect to, as the Integrations page lists it (integrations.ts; DESIGN's build sheet of 24 October and WORDS.md). One catalog over the model providers and the door: each row names where its state is read from, the words for each state, its Connects, Reads and Goes to lines, its guide (a document under docs/ and one of its headings, opened at guides) and its mark, a plain line drawing in a 24 by 24 box. A row whose state this install cannot give is left out. Each row's guest words are what a guest, or an account on a hosted server, reads in their place: only what this server offers, and nothing a guest sets up or can end. verify-integration-words.mjs holds every guide to a heading that exists.",
   "guides": "https://github.com/twinkling-reality/exulanica/blob/main/",
   "groups": [
     {
@@ -17,6 +17,12 @@
           "reads": "What a person's model is told at a decision, word for word as that decision's page shows it.",
           "goes_to": "Nebius Token Factory, with your key. The key stays on this computer and is sent only to them.",
           "guide": { "document": "docs/development-setup.md", "heading": "Running your own install" },
+          "guest": {
+            "line": "Open models from their makers answer for your people, from this server's budget, usually for a fraction of a cent a decision.",
+            "states": { "on": "This server's budget" },
+            "connects": "The open models this server offers, each from its maker, priced per million tokens.",
+            "goes_to": "Nebius Token Factory, under this server's own key."
+          },
           "mark": [
             { "rect": { "x": 4, "y": 4, "width": 16, "height": 7, "rx": 2 } },
             { "rect": { "x": 4, "y": 13, "width": 16, "height": 7, "rx": 2 } },
@@ -33,6 +39,13 @@
           "reads": "What a person's model is told at a decision, word for word as that decision's page shows it.",
           "goes_to": "Nowhere else: your runner answers on this computer.",
           "guide": { "document": "docs/development-setup.md", "heading": "Running your own install" },
+          "guest": {
+            "name": "A model on this server",
+            "line": "A local model runner answers on this server, free.",
+            "states": { "on": "Running · {model}" },
+            "connects": "The models this server's runner holds and offers, each checked here before a person may choose it.",
+            "goes_to": "Nowhere else: the runner answers on this server."
+          },
           "mark": [
             { "rect": { "x": 5, "y": 5, "width": 14, "height": 10, "rx": 1.5 } },
             { "path": { "d": "M3 19h18" } }
@@ -54,6 +67,7 @@
           "reads": "What the world's own models are shown for that person, and the world's rules in words.",
           "goes_to": "The game, under the grant you give it.",
           "guide": { "document": "docs/door-contract.md", "heading": "Bridges" },
+          "guest": { "states": { "here": "On your own install" }, "goes_to": "The game, on your own install." },
           "mark": [
             { "path": { "d": "M7 9h10a4 4 0 0 1 4 4v1a3 3 0 0 1-5 2l-1-1H9l-1 1a3 3 0 0 1-5-2v-1a4 4 0 0 1 4-4z" } },
             { "path": { "d": "M8 11.5v3M6.5 13h3M15.5 12.5h.01M17.5 14h.01" } }
@@ -76,6 +90,7 @@
             "refused": "It could not be ended just then; it still stands."
           },
           "guide": { "document": "docs/capabilities/outside-agents.md", "heading": "On your own install" },
+          "guest": { "states": { "here": "On your own install" }, "goes_to": "The agent you run, on your own install." },
           "mark": [
             { "circle": { "cx": 12, "cy": 12, "r": 3 } },
             { "circle": { "cx": 5, "cy": 6, "r": 1.8 } },

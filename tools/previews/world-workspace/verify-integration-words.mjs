@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import catalog from './integrations.v1.json' with { type: 'json' };
 import {
-  INTEGRATIONS, INTEGRATION_WORDS, alreadyEnded, catalogRows, endable, endedState, fill, guideAddress, handedBackLine, headingAnchor, joinNames,
-  markShapes, namesFor, namesOf, refusedLine, releasedSubjects, rowState,
+  INTEGRATIONS, INTEGRATION_WORDS, alreadyEnded, catalogRows, endable, endedState, fill, guestRow, guestState, guideAddress, handedBackLine,
+  headingAnchor, joinNames, markShapes, namesFor, namesOf, refusedLine, releasedSubjects, rowState,
   severalLine, standingGrants, stepRow,
 } from './integration-words.mjs';
 
@@ -163,6 +163,37 @@ assert.equal(endable(row('agent'), []), null);
 assert.equal(endable(row('agent'), [standing[0], { ...standing[0], grantId: 'g5' }]), null);
 assert.equal(endable(row('game'), [standing[1]]), null);
 assert.equal(endable(row('nebius'), [standing[0]]), null);
+
+// A guest's page, or a hosted account's (DESIGN's guest sheet and WORDS.md 11:16 item 1): its own title and sub, each
+// row's guest words, only what this server offers, and nothing that sets anything up or ends a grant.
+assert.equal(INTEGRATION_WORDS.guestTitle, 'What this server connects to');
+assert.equal(INTEGRATION_WORDS.guestSub, "Each one says what it connects, what it reads and where anything goes. This server's owner set them up. On your own install, you set up your own and can end them.");
+const guest = key => guestRow(row(key));
+assert.deepEqual(rows.map(one => guestRow(one).name), ['Nebius Token Factory', 'A model on this server', 'A game', 'An AI agent you build']);
+assert.deepEqual([guest('nebius').line, guest('nebius').connects, guest('nebius').reads, guest('nebius').goes_to], [
+  "Open models from their makers answer for your people, from this server's budget, usually for a fraction of a cent a decision.",
+  'The open models this server offers, each from its maker, priced per million tokens.', told,
+  "Nebius Token Factory, under this server's own key.",
+]);
+assert.deepEqual([guest('this-computer').line, guest('this-computer').connects, guest('this-computer').reads, guest('this-computer').goes_to], [
+  'A local model runner answers on this server, free.',
+  "The models this server's runner holds and offers, each checked here before a person may choose it.", told,
+  'Nowhere else: the runner answers on this server.',
+]);
+assert.deepEqual([guest('game').line, guest('game').connects, guest('game').reads, guest('game').goes_to], [row('game').line, row('game').connects, shown, 'The game, on your own install.']);
+assert.deepEqual([guest('agent').line, guest('agent').connects, guest('agent').reads, guest('agent').goes_to], [row('agent').line, row('agent').connects, row('agent').reads, 'The agent you run, on your own install.']);
+assert.deepEqual(guest('agent').guide, row('agent').guide);
+// A provider's row only where one of its models is not refused here; the door's rows on your own install, no dot.
+assert.deepEqual(guestState(guest('nebius'), keyed), { words: "This server's budget", on: true });
+assert.deepEqual(guestState(guest('this-computer'), keyed), { words: 'Running \u00b7 Qwen3 4B Instruct', on: true });
+assert.equal(guestState(guest('nebius'), bare), null);
+assert.equal(guestState(guest('this-computer'), bare), null);
+assert.equal(guestState(guest('this-computer'), [keyed[0]]), null);
+assert.deepEqual(guestState(guest('game'), keyed), { words: 'On your own install', on: false });
+assert.deepEqual(guestState(guest('agent'), []), { words: 'On your own install', on: false });
+// No Del and no faint line of grants for a guest, whatever stands.
+assert.equal(endable(guest('agent'), [standing[0]]), null);
+assert.equal(severalLine(guest('agent'), two), null);
 
 // Marks are line drawings: rects, circles and paths with their geometry, nothing else.
 assert.deepEqual(markShapes(row('this-computer').mark), [

@@ -21,6 +21,9 @@ export const INTEGRATION_WORDS = Object.freeze({
   setUp: 'How to set it up ↗',
   back: 'Back',
   end: 'End this grant',
+  /** A guest's page, or a hosted account's, in place of the title and sub (WORDS.md 11:16 on 25 October, item 1). */
+  guestTitle: 'What this server connects to',
+  guestSub: "Each one says what it connects, what it reads and where anything goes. This server's owner set them up. On your own install, you set up your own and can end them.",
 });
 
 /** The shapes a row's mark may draw, and the attributes each may carry: a plain line drawing, never a picture. */
@@ -166,6 +169,26 @@ export function endable(row, standing) {
   if (!row.ends) return null;
   const grants = standing.filter(grant => grant.ai === row.from.ai);
   return grants.length === 1 ? grants[0] : null;
+}
+
+/**
+ * A row as a guest, or an account on a hosted server, reads it (DESIGN's guest sheet of 25 October): its guest words in
+ * place of the owner's, and nothing that ends a grant or speaks of grants standing.
+ */
+export function guestRow(row) {
+  const { guest, ends: _ends, several: _several, ...own } = row;
+  return Object.freeze({ ...own, ...guest });
+}
+
+/**
+ * A guest row's state, `{ words, on }`, from the models read alone: a provider's row where one of its models is not
+ * refused here (this server's budget, or its runner by the first such model's name), null, the row left out, where
+ * none is; a door's row on your own install, with no dot, since a guest sets nothing up here and holds no grant.
+ */
+export function guestState(row, models) {
+  if (!row.from.provider) return Object.freeze({ words: row.states.here, on: false });
+  const asked = models.find(model => model.provider === row.from.provider && !model.runtime?.provider_refusal);
+  return asked ? Object.freeze({ words: fill(row.states.on, { model: asked.name }), on: true }) : null;
 }
 
 /** The row ↑ or ↓ chooses from `index` among `count`, held at the first and the last. */

@@ -1,11 +1,13 @@
 // The Integrations page (DESIGN's build sheet of 24 October, frames r30-integrations-a and -b; WORDS.md "The
 // Integrations page" and its rulings of 11:16 on 25 October): one light page over the front door, opened from
-// "Integrations" beside "Create a world" on the install owner's own page. Each row is the catalog's
+// "Integrations" beside "Create a world". Each row is the catalog's
 // (integrations.v1.json) and says what this install serves now: the models read's refusal of each provider, the
 // bridges the door admits, the AI grants that stand in any saved world and whom each decides for, by the names their
 // society gives them. Nothing is set up here. Enter opens a row's guide elsewhere; the one action is Del, which ends
 // the one AI grant that stands through the door's own revoke and then says who decides again, as the record shows.
-// Words and rules are integration-words.mjs's; the look is world-ui-integrations.css's.
+// A guest's page, or a hosted account's (frame r30-integrations-c), says only what this server offers, from the models
+// read alone: no door read, no grant, no Del. Words and rules are integration-words.mjs's; the look is
+// world-ui-integrations.css's.
 import { DoorBridgesClient, type DoorBridge } from '../../../web/packages/app/src/door-bridges-api.ts';
 import { DoorGrantsClient, type DoorGrant } from '../../../web/packages/app/src/door-grants-api.ts';
 import { worldPath } from '../../../web/packages/app/src/world-scope.ts';
@@ -16,8 +18,8 @@ import { lightHint, lightPage, quietCommand } from './world-ui-create.ts';
 import { tabStops } from './create-world.ts';
 import { wrapStop } from './create-steps.mjs';
 import {
-  INTEGRATIONS, INTEGRATION_WORDS, alreadyEnded, catalogRows, endable, endedState, guideAddress, handedBackLine, markShapes, namesFor, namesOf,
-  refusedLine, releasedSubjects, rowState, severalLine, standingGrants, stepRow,
+  INTEGRATIONS, INTEGRATION_WORDS, alreadyEnded, catalogRows, endable, endedState, guestRow, guestState, guideAddress, handedBackLine, markShapes,
+  namesFor, namesOf, refusedLine, releasedSubjects, rowState, severalLine, standingGrants, stepRow,
 } from './integration-words.mjs';
 import { mountUiScale } from './world-ui.ts';
 import './world-ui-integrations.css';
@@ -124,19 +126,24 @@ function markOf(row: Row): HTMLElement {
 }
 
 /**
- * Offers "Integrations" beside "Create a world" in the front door's glass, where `offer` (the draft offer the front
- * door read) says this page is the install owner's own: a guest or a hosted account sets nothing up here.
+ * Offers "Integrations" beside "Create a world" in the front door's glass once `offer` (the draft offer the front door
+ * read) says whose page this is: the install owner's own page, or a guest's or hosted account's read-only page, where
+ * nothing is set up.
  */
 export function offerIntegrations(row: HTMLElement, offer: Readonly<Record<string, unknown>> | null, options: IntegrationsOptions): HTMLButtonElement | null {
-  if (offer?.['own_key'] !== true || !row.isConnected || row.querySelector('.ux-entry-integrations')) return null;
+  if (typeof offer?.['own_key'] !== 'boolean' || !row.isConnected || row.querySelector('.ux-entry-integrations')) return null;
+  const guest = offer['own_key'] !== true;
   const opener = button({ label: INTEGRATION_WORDS.button, variant: 'secondary', size: 'lg', className: 'entry-command ux-entry-integrations' });
-  opener.addEventListener('click', () => { mountIntegrations({ ...options, onClose: () => opener.focus({ preventScroll: true }) }); });
+  opener.addEventListener('click', () => { mountIntegrations({ ...options, guest, onClose: () => opener.focus({ preventScroll: true }) }); });
   row.append(opener);
   return opener;
 }
 
-/** Opens the Integrations page over the front door. `onClose` hears it go (Esc or Back). */
-export function mountIntegrations({ credentials, entries, picture, onClose }: IntegrationsOptions & { readonly onClose: () => void }): IntegrationsSurface {
+/**
+ * Opens the Integrations page over the front door, a guest's where `guest` (own_key false). `onClose` hears it go (Esc
+ * or Back).
+ */
+export function mountIntegrations({ credentials, entries, picture, onClose, guest = false }: IntegrationsOptions & { readonly onClose: () => void; readonly guest?: boolean }): IntegrationsSurface {
   const lifetime = new AbortController();
   const signal = lifetime.signal;
   const page = lightPage({ form: 'integrations', picture: picture(), labelledBy: 'wu-int-title' });
@@ -153,11 +160,11 @@ export function mountIntegrations({ credentials, entries, picture, onClose }: In
     onClose();
   };
 
-  const title = element('h1', 'wu-light-title', INTEGRATION_WORDS.title);
+  const title = element('h1', 'wu-light-title', guest ? INTEGRATION_WORDS.guestTitle : INTEGRATION_WORDS.title);
   title.id = 'wu-int-title';
-  page.head.append(element('p', 'wu-int-over', INTEGRATION_WORDS.overLabel), title, element('p', 'wu-int-sub', INTEGRATION_WORDS.sub), element('p', 'wu-int-small', INTEGRATION_WORDS.small));
+  page.head.append(element('p', 'wu-int-over', INTEGRATION_WORDS.overLabel), title, element('p', 'wu-int-sub', guest ? INTEGRATION_WORDS.guestSub : INTEGRATION_WORDS.sub), element('p', 'wu-int-small', INTEGRATION_WORDS.small));
 
-  const rows = catalogRows(INTEGRATIONS) as readonly Row[];
+  const rows = (guest ? catalogRows(INTEGRATIONS).map(guestRow) : catalogRows(INTEGRATIONS)) as readonly Row[];
   let reads: Reads | null = null;
   let societies = new Map<string, unknown>();
   /** The row each key and the open lines are for, by its key. */
@@ -173,6 +180,7 @@ export function mountIntegrations({ credentials, entries, picture, onClose }: In
   /** A row's state: undefined where its read has not answered, null where the row is left out. */
   const stateOf = (row: Row): { words: string; on: boolean } | null | undefined => {
     if (reads === null) return undefined;
+    if (guest) return reads.models === null ? undefined : guestState(row, reads.models);
     const needed = row.from.provider ? reads.models : row.from.door === 'bridges' ? reads.bridges : reads.standing;
     if (needed === null) return undefined;
     return rowState(row, { models: reads.models ?? [], bridges: reads.bridges ?? [], standing: reads.standing ?? [] });
@@ -316,10 +324,11 @@ export function mountIntegrations({ credentials, entries, picture, onClose }: In
   list.querySelector<HTMLElement>('.wu-int-row[data-focus="true"]')?.focus({ preventScroll: true });
 
   const worldIds = [...new Set(entries.map(entry => entry.worldId))];
+  // A guest's page reads the models alone: it makes no door read, so it lists no grant and settles none.
   void Promise.allSettled([
     readJson(credentials, '/models', signal),
-    new DoorBridgesClient({ ...credentials, signal }).read(),
-    readStanding(credentials, worldIds, signal),
+    guest ? Promise.resolve(new Map<string, DoorBridge>()) : new DoorBridgesClient({ ...credentials, signal }).read(),
+    guest ? Promise.resolve({ standing: [], societies: new Map<string, unknown>() }) : readStanding(credentials, worldIds, signal),
   ]).then(([models, bridges, standing]) => {
     if (signal.aborted) return;
     const served = models.status === 'fulfilled' ? (models.value as { models?: unknown }).models : null;

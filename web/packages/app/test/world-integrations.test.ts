@@ -2,7 +2,7 @@
 // The Integrations page (tools/previews/world-workspace/integrations.ts, DESIGN's frames r30-integrations-a and -b)
 // over stand-in answers of the server's own reads: GET /models, GET /door/bridges, GET /door/grants for each saved
 // world, a version's society for whom a grant decides for, and its model history after Del ends a grant through
-// POST /door/grants/{id}/revoke, the one thing this page writes.
+// POST /door/grants/{id}/revoke, the one thing this page writes; and a guest's page, which reads the models alone.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../tools/previews/world-workspace/front-door.ts', () => ({
@@ -97,12 +97,12 @@ async function open(served: Served, onClose = () => {}): Promise<Call[]> {
 afterEach(() => { vi.unstubAllGlobals(); document.body.replaceChildren(); });
 
 describe('the Integrations button on the front door', () => {
-  it('stands beside Create a world only on the install owner\'s own page', async () => {
+  it('stands beside Create a world once the offer says whose page it is', async () => {
     const { offerIntegrations } = await page();
     const row = document.createElement('div'); row.className = 'your-worlds-create-row'; document.body.append(row);
     const options = { credentials: CREDENTIALS, entries: ENTRIES, picture: () => null };
-    expect(offerIntegrations(row, { own_key: false }, options)).toBeNull();
     expect(offerIntegrations(row, null, options)).toBeNull();
+    expect(offerIntegrations(row, {}, options)).toBeNull();
     expect(row.children).toHaveLength(0);
     const opener = offerIntegrations(row, { own_key: true }, options)!;
     expect(opener.textContent).toBe('Integrations');
@@ -276,5 +276,49 @@ describe('the Integrations page', () => {
     key(focused(), 'n');
     expect(reached).not.toHaveBeenCalled();
     document.removeEventListener('keydown', reached);
+  });
+});
+
+describe("a guest's Integrations page", () => {
+  /** Opens the page from the button, as a guest or an account on a hosted server meets it (own_key false). */
+  async function openAsGuest(served: Served): Promise<Call[]> {
+    const calls = serve(served);
+    const row = document.createElement('div'); document.body.append(row);
+    (await page()).offerIntegrations(row, { own_key: false }, { credentials: CREDENTIALS, entries: ENTRIES, picture: () => null })!.click();
+    await settle();
+    return calls;
+  }
+
+  it('says only what this server offers, from the models read alone, and sets up or ends nothing', async () => {
+    const opened = vi.fn();
+    vi.stubGlobal('open', opened);
+    const calls = await openAsGuest({ grants: { 'world:a': [grant('g-1', 'world:a', ['p-1'])] } });
+    expect(document.getElementById('wu-int-title')?.textContent).toBe('What this server connects to');
+    expect(document.querySelector('.wu-int-sub')?.textContent).toBe("Each one says what it connects, what it reads and where anything goes. This server's owner set them up. On your own install, you set up your own and can end them.");
+    expect(rows().map(row => row.querySelector('.wu-int-name')?.textContent)).toEqual(['Nebius Token Factory', 'A model on this server', 'A game', 'An AI agent you build']);
+    expect(stateOf('Nebius Token Factory')).toEqual({ words: "This server's budget", on: true });
+    expect(stateOf('A model on this server')).toEqual({ words: 'Running · Qwen3 4B Instruct', on: true });
+    expect(stateOf('A game')).toEqual({ words: 'On your own install', on: false });
+    expect(stateOf('An AI agent you build')).toEqual({ words: 'On your own install', on: false });
+    expect(focused().querySelector('dl dd:last-of-type')?.textContent).toBe("Nebius Token Factory, under this server's own key.");
+    // No door read at all: a guest's page lists no grant and settles none.
+    expect(calls.map(call => `${call.method} ${call.path}`)).toEqual(['GET /models']);
+    for (let i = 0; i < 3; i++) key(focused(), 'ArrowDown');
+    expect(focused().querySelector('dl dd:last-of-type')?.textContent).toBe('The agent you run, on your own install.');
+    expect(focused().querySelector('.wu-int-faint')).toBeNull();
+    expect(keyWords()).toEqual(['Choose', 'How to set it up ↗', 'Back']);
+    key(focused(), 'Delete');
+    await settle();
+    expect(calls).toHaveLength(1);
+    key(focused(), 'Enter');
+    expect(opened).toHaveBeenCalledWith('https://github.com/twinkling-reality/exulanica/blob/main/docs/capabilities/outside-agents.md#on-your-own-install', '_blank', 'noopener');
+  });
+
+  it('leaves out a provider this server cannot use and a runner it does not run', async () => {
+    await openAsGuest({ models: [model('nebius_token_factory', 'Nemotron 3 Super'), model('ollama_local', 'Qwen3 4B Instruct', 'provider_not_running')] });
+    expect(rows().map(row => row.querySelector('.wu-int-name')?.textContent)).toEqual(['Nebius Token Factory', 'A game', 'An AI agent you build']);
+    vi.unstubAllGlobals(); document.body.replaceChildren();
+    await openAsGuest({ models: [model('nebius_token_factory', 'Nemotron 3 Super', 'provider_credential_absent')] });
+    expect(rows().map(row => row.querySelector('.wu-int-name')?.textContent)).toEqual(['A game', 'An AI agent you build']);
   });
 });
