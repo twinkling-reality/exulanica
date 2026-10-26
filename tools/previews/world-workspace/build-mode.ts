@@ -41,6 +41,8 @@ const TOWN_TAG_ABOVE_PX = 28;
 const RING_MARGIN = 1.18;
 /** How far below the eye a point grabbed on a thing is carried at most, in metres, so the pointer's ray still comes down to it. */
 const GRAB_BELOW_EYE_M = 0.25;
+/** How far before a wall the pointer's ray meets a new thing is held, beyond half its footprint, in metres. */
+const BEFORE_WALL_M = 0.5;
 /** How far ahead of the eye a chosen thing's footprint is cut where it reaches behind the camera, in metres. */
 const MARK_NEAR_M = 0.05;
 /**
@@ -426,7 +428,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     const held = placing;
     void kindBox(tile.kind).then(box => { held.box = box; if (placing === held && groupShows()) layHeldRing(); });
     const pointed = pointer ?? { x: innerWidth / 2, y: innerHeight / 2 };
-    const ground = at ?? groundAt(pointed.x, pointed.y);
+    const ground = at ?? aimedGround(pointed.x, pointed.y);
     // Held at a point the page names (a creature made at its stand): stood there exactly and drawn solid in its own
     // look; the half-metre snap and the light copy start once the person moves or turns it.
     held.solid = at !== null;
@@ -728,6 +730,30 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
     const ray = pointerRay(b, x, y); if (!ray) return null;
     const origin = lift > 0 ? [ray.origin[0], ray.origin[1] - lift, ray.origin[2]] : ray.origin;
     return b.authoredSociety?.groundPoint(origin, ray.direction) ?? null;
+  }
+  /**
+   * Where a new thing is held under the pointer: the ground its ray comes down to, or, where a wall of the world's plan
+   * stands in the ray first, the ground just before that wall (half the thing's footprint and BEFORE_WALL_M back toward
+   * the eye). A thing aimed at a door is held at the door, never on the ground beyond the building, out of sight.
+   */
+  function aimedGround(x, y) {
+    const ray = pointerRay(b, x, y); if (!ray) return null;
+    const society = b.authoredSociety, ground = society?.groundPoint(ray.origin, ray.direction) ?? null;
+    const wall = state.worldSight?.reach(ray.origin, ray.direction) ?? Number.POSITIVE_INFINITY;
+    if (!Number.isFinite(wall) || !society?.root) return ground;
+    const [dx, dy, dz] = ray.direction, length = Math.hypot(dx, dy, dz), flat = Math.hypot(dx, dz);
+    if (ground !== null) {
+      const gx = ground.xMm / 1000, gz = ground.zMm / 1000;
+      const met = society.root.getWorldTransform().transformPoint(point.clone().set(gx, society.groundHeightAt?.(gx, gz) ?? 0, gz));
+      if (Math.hypot(met.x - ray.origin[0], met.y - ray.origin[1], met.z - ray.origin[2]) <= wall) return ground;
+    }
+    const box = placing?.box, back = BEFORE_WALL_M + (box ? Math.max(box.width, box.depth) / 2000 : 0);
+    const along = wall / length;
+    return society.groundPoint([
+      ray.origin[0] + dx * along - dx / flat * back,
+      Math.max(ray.origin[1], ray.origin[1] + dy * along),
+      ray.origin[2] + dz * along - dz / flat * back,
+    ], [0, -1, 0]);
   }
   /**
    * How high above its foot (`footMm`, the region's up) a press met a thing, in metres, from the pick's distance along
@@ -1234,7 +1260,7 @@ export function mountBuildMode({ b, root, state, entry, read, send, binding, can
         townHovered = hovered === null && pointer && !inspecting() && moving === null && placing === null ? townThingAt(pointer.x, pointer.y) : null;
         canvas.style.cursor = moving?.grip != null ? 'grabbing' : placing !== null ? 'crosshair' : hovered !== null ? (hovered === selected ? 'grab' : 'pointer') : townHovered !== null ? 'pointer' : '';
         // A new thing's copy follows the pointer over the ground, until a click lets it go.
-        if (placing !== null && !placing.letGo && pointer && !inspecting()) { const ground = groundAt(pointer.x, pointer.y); if (ground !== null) placeTo(ground, pointer.free); }
+        if (placing !== null && !placing.letGo && pointer && !inspecting()) { const ground = aimedGround(pointer.x, pointer.y); if (ground !== null) placeTo(ground, pointer.free); }
       }
       const layer = things()?.layer;
       // The name of what the pointer is on, above it; the held group names what is chosen instead.

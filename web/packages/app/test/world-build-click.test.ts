@@ -79,7 +79,7 @@ const post = {
  */
 /** A ground ring that keeps where it was laid, for a test of the held thing's ring. */
 interface Ring { place(at: { x: number; y: number; z: number }, radius: number): void; hide(): void; dispose(): void }
-async function mount(picked: { readonly direction: readonly number[]; readonly distance: number } | null = null, view: View | null = null, ring: Ring | null = null, peopleLive = false, town: { readonly direction: readonly number[]; readonly record: unknown } | null = null) {
+async function mount(picked: { readonly direction: readonly number[]; readonly distance: number } | null = null, view: View | null = null, ring: Ring | null = null, peopleLive = false, town: { readonly direction: readonly number[]; readonly record: unknown } | null = null, sight: { reach(origin: Vec, direction: Vec): number } | null = null) {
   const writes: Write[] = [], waiting: Array<(body: unknown) => void> = [];
   const root = document.createElement('div'), canvas = document.createElement('canvas');
   document.body.append(root, canvas);
@@ -109,7 +109,8 @@ async function mount(picked: { readonly direction: readonly number[]; readonly d
   const layer = { figureOf: (id: string) => (view !== null && id === 'bench:1' ? post : null), drawn: [{ placedId: 'bench:1' }], setGhost: () => {}, setBoxGhost: () => {}, setKindGhost: async () => false,
     // With a ring, a kind's box (1.5 m across and 0.5 m deep) for the ring under a held copy.
     ...(ring === null ? {} : { maker: { library: { list: { kinds: [] }, kindDocument: async () => ({ body: { box_mm: { width: 1500, depth: 500 } } }) } } }) };
-  const authoredSociety = { root: { getPosition: () => new Point(0, 0, 0) }, groundPoint };
+  // The society's root at the world's origin: a point of its frame is the same point of the world.
+  const authoredSociety = { root: { getPosition: () => new Point(0, 0, 0), getWorldTransform: () => ({ transformPoint: (p: Point, out = new Point()) => out.set(p.x, p.y, p.z) }) }, groundPoint };
   const pick = (_: unknown, direction: unknown) => picked !== null && direction === picked.direction
     ? { thing: { pick: { placedId: 'bench:1' }, distance: picked.distance } } : null;
   // The generated region's root at the world's origin: a point of the region is the same point of the world.
@@ -121,7 +122,8 @@ async function mount(picked: { readonly direction: readonly number[]; readonly d
   } } };
   const b = { camera, regionRoots, authoredSociety, worldKind, __workspaceThings: () => (view === null ? null : { layer }), __workspacePick: pick };
   const { mountBuildMode } = await build();
-  mounted = mountBuildMode({ b, root, state: { activeWorldEntry: entry }, entry, read, send, binding: () => saved, canvas, corners, inspecting: () => false, groundRing: ring });
+  // With `sight`, the world's plan: how far a ray runs before one of its walls stands in it.
+  mounted = mountBuildMode({ b, root, state: { activeWorldEntry: entry, worldSight: sight }, entry, read, send, binding: () => saved, canvas, corners, inspecting: () => false, groundRing: ring });
   /** The oldest preview still waiting is answered. */
   const answer = async (body: unknown = { availability: 'ready', landing: { checked: true } }): Promise<void> => {
     await vi.waitFor(() => expect(waiting.length).toBeGreaterThan(0));
@@ -498,6 +500,35 @@ describe('a new thing held from the tray faces the person placing it (W13 T5)', 
     expect(press(mode, 'Enter')).toBe(true);
     await vi.waitFor(() => expect(placed(writes)).toHaveLength(1));
     expect(placed(writes)[0]!.body.pose).toMatchObject({ yaw_microradians: 0 });
+  });
+});
+
+describe('a new thing aimed through a wall stands before it (REHEARSAL run 7)', () => {
+  /** Pip taken from the Creatures tab, held where the middle of the picture aims, placed by Enter: its pose. */
+  async function placedFromTheTray(sight: { reach(origin: Vec, direction: Vec): number } | null): Promise<unknown> {
+    mounted?.dispose(); mounted = null; document.body.replaceChildren();
+    // The middle of the picture aims at the ground 70 m ahead.
+    rays.set(`${innerWidth / 2},${innerHeight / 2}`, towards(0, 0, -70).ray);
+    const { mode, writes, answer } = await mount(null, null, null, false, null, sight);
+    expect(press(mode, 'KeyB')).toBe(true);
+    await vi.waitFor(() => expect(document.querySelectorAll('.wu-tray-tab').length).toBe(2));
+    [...document.querySelectorAll<HTMLButtonElement>('.wu-tray-tab')].find((tab) => tab.textContent === 'Creatures')!.click();
+    await vi.waitFor(() => expect([...document.querySelectorAll('.wu-tile')].some((tile) => tile.textContent === 'Pip')).toBe(true));
+    [...document.querySelectorAll<HTMLButtonElement>('.wu-tile')].find((tile) => tile.textContent === 'Pip')!.click();
+    await answer();
+    expect(press(mode, 'Enter')).toBe(true);
+    await vi.waitFor(() => expect(placed(writes)).toHaveLength(1));
+    return placed(writes)[0]!.body.pose;
+  }
+
+  it('stands where the aim meets the ground with no wall before it: a positive control', async () => {
+    expect(await placedFromTheTray(null)).toMatchObject({ x_mm: 0, z_mm: -70_000 });
+    expect(await placedFromTheTray({ reach: () => 80 })).toMatchObject({ x_mm: 0, z_mm: -70_000 });
+  });
+
+  it('stands on the ground half a metre before a wall the aim meets 10 m ahead, never 70 m beyond it', async () => {
+    // The wall stands 9.997 m ahead on the ground's plan; half a metre back, on the half-metre step.
+    expect(await placedFromTheTray({ reach: () => 10 })).toMatchObject({ x_mm: 0, z_mm: -9_500 });
   });
 });
 
