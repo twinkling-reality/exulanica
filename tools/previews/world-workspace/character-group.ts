@@ -136,7 +136,7 @@ export function characterGroup({ scale, onAction }: { readonly scale: () => numb
     hold(edge) {
       if (last === null || shown === null) { root.hidden = true; return; }
       root.hidden = false;
-      draw(groupHeld({ last, edge, size: { width: group.offsetWidth, height: group.offsetHeight }, scale: scale() }));
+      draw(groupHeld({ last, edge, size: { width: group.offsetWidth, height: group.offsetHeight }, viewport: { width: innerWidth, height: innerHeight }, scale: scale() }));
     },
     remove() { root.remove(); },
   };

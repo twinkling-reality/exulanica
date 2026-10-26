@@ -12,9 +12,10 @@ import { worldTime } from './world-clock.mjs';
  * the person's on-screen edge to the group's words, the leader's elbow and end before the words, the name
  * line's middle below the group's top, the inset the group keeps from the screen's sides, and the bands it
  * keeps clear of at the top and bottom, where the world screen's pills and keys sit (32 in, 40 tall, then
- * the shade's own 24 and a gap of 16).
+ * the shade's own 24 and a gap of 16); and the least room it leaves under itself where it is taller than the room
+ * between those bands (a short window): its whole height then shows that far above the bottom.
  */
-export const GROUP_LAYOUT = Object.freeze({ gap: 100, elbow: 56, end: 36, nameMiddle: 24, inset: 32, top: 112, bottom: 112 });
+export const GROUP_LAYOUT = Object.freeze({ gap: 100, elbow: 56, end: 36, nameMiddle: 24, inset: 32, top: 112, bottom: 112, least: 24 });
 
 /**
  * How many said events a page of the events read holds, how many pages back the last line is looked for, and
@@ -171,7 +172,8 @@ export function groupPlace({ head, bounds, size, viewport, scale = 1, layout = G
   const wanted = side === 'right' ? bounds.right + gap : bounds.left - gap - size.width;
   const x = Math.max(inset, Math.min(viewport.width - inset - size.width, wanted));
   const top = layout.top * scale, bottom = layout.bottom * scale;
-  const y = Math.max(top, Math.min(viewport.height - bottom - size.height, head.y - size.height / 2));
+  const banded = Math.max(top, Math.min(viewport.height - bottom - size.height, head.y - size.height / 2));
+  const y = withinHeight(banded, size, viewport, scale, layout);
   const towards = side === 'right' ? 1 : -1;
   const edge = side === 'right' ? x : x + size.width;
   const nameY = y + layout.nameMiddle * scale;
@@ -186,19 +188,30 @@ export function groupPlace({ head, bounds, size, viewport, scale = 1, layout = G
 /**
  * Where a group that holds its model list or Run question stands while its person is out of view (P7): where it last
  * stood (`last`, a groupPlace answer, with the group's `size`), its leader from `edge`, the point at the view's edge
- * the person left by, to the side of the group that faces it, at the name line, as groupPlace draws it.
+ * the person left by, to the side of the group that faces it, at the name line, as groupPlace draws it. Given the
+ * `viewport` as it is now, a window made smaller since keeps the group whole inside it.
  */
-export function groupHeld({ last, edge, size, scale = 1, layout = GROUP_LAYOUT }) {
-  const side = edge.x <= last.x + size.width / 2 ? 'right' : 'left';
+export function groupHeld({ last, edge, size, viewport = null, scale = 1, layout = GROUP_LAYOUT }) {
+  const inset = layout.inset * scale;
+  const at = viewport === null ? last : {
+    x: Math.max(inset, Math.min(viewport.width - inset - size.width, last.x)),
+    y: withinHeight(last.y, size, viewport, scale, layout),
+  };
+  const side = edge.x <= at.x + size.width / 2 ? 'right' : 'left';
   const towards = side === 'right' ? 1 : -1;
-  const facing = side === 'right' ? last.x : last.x + size.width;
-  const nameY = last.y + layout.nameMiddle * scale;
+  const facing = side === 'right' ? at.x : at.x + size.width;
+  const nameY = at.y + layout.nameMiddle * scale;
   const leader = Object.freeze({
     from: Object.freeze({ x: edge.x, y: edge.y }),
     elbow: Object.freeze({ x: facing - towards * layout.elbow * scale, y: nameY }),
     to: Object.freeze({ x: facing - towards * layout.end * scale, y: nameY }),
   });
-  return Object.freeze({ x: last.x, y: last.y, side, leader });
+  return Object.freeze({ x: at.x, y: at.y, side, leader });
+}
+
+/** A group's top `y` moved up as far as shows its whole height `least` above the window's bottom, never above its top. */
+function withinHeight(y, size, viewport, scale, layout) {
+  return Math.max(0, Math.min(viewport.height - layout.least * scale - size.height, y));
 }
 
 /** Whether `model` is the one `current` names (both null: their routine). */

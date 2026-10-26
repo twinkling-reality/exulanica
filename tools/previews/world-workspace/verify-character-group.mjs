@@ -263,6 +263,16 @@ assert.equal(groupPlace({ head, bounds, size, viewport, prefer: 'left' }).side, 
 assert.equal(groupPlace({ head, bounds, size, viewport, prefer: 'left' }).x, 905 - 100 - 420);
 assert.equal(groupPlace({ head: { x: 200, y: 500 }, bounds: { left: 160, right: 240 }, size, viewport, prefer: 'left' }).side, 'right', 'no room on the left: the right');
 assert.equal(groupPlace({ head: { x: 1700, y: 500 }, bounds: { left: 1660, right: 1740 }, size, viewport, prefer: 'right' }).side, 'left', 'no room on the right: the left');
+// A card taller than the room between the bands (a short window, DESIGN's short-window review): it comes up until its
+// whole height shows 24 px above the bottom, its leader following to its name line.
+const short = { width: 1744, height: 567 }, tall = { width: 420, height: 452 };
+const upped = groupPlace({ head: { x: 992, y: 300 }, bounds, size: tall, viewport: short });
+assert.equal(upped.y, 567 - 24 - 452, 'its whole height shows 24 px above the bottom');
+assert.equal(upped.leader.elbow.y, upped.y + 24);
+// Held while its person is out of view, in a window made smaller since: fitted to the window as it is now.
+const heldShort = groupHeld({ last: { x: 1500, y: 410 }, edge: { x: 0, y: 283 }, size: tall, viewport: short });
+assert.deepEqual([heldShort.x, heldShort.y], [1744 - 32 - 420, 567 - 24 - 452], 'held whole inside the smaller window');
+assert.equal(heldShort.leader.to.y, heldShort.y + 24);
 // P7: its person walked out of view with the list open. It stays where it stood; the leader runs from the edge they
 // left by to the side of the group facing it, at the name line, as groupPlace draws one.
 const offLeft = groupHeld({ last: right, edge: { x: 0, y: 540 }, size });
