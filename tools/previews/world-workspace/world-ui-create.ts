@@ -3,7 +3,7 @@
 // quiet command and the key row, the steps and the made note. They only draw; what a press does is
 // the caller's, and which key does what is create-steps.mjs's createKey. Their look lives in
 // world-ui-create.css, from world-ui.css's tokens and front-door.css's materials.
-import { orb, stepList, type Step } from './world-ui.ts';
+import { breath, orb, workingWords, type Step } from './world-ui.ts';
 import { CREATE_WORDS, NOTES_WORDS, aspectLabel, countWords } from './create-words.mjs';
 import './front-door.css';
 import './world-ui-create.css';
@@ -13,6 +13,13 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', 
   if (className) made.className = className;
   if (text) made.textContent = text;
   return made;
+}
+
+/** `part`, arriving as words do (world-motion.css), `order` places after the first of those arriving with it. */
+function arriving<T extends HTMLElement>(part: T, order: number): T {
+  part.classList.add('wu-arrive-words');
+  part.style.setProperty('--motion-order', String(order));
+  return part;
 }
 
 let serial = 0;
@@ -295,22 +302,68 @@ export interface LightSteps {
   set(steps: readonly Step[]): void;
 }
 
+/** One step's row, kept across redraws, and what it shows now. */
+interface StepRow { readonly item: HTMLLIElement; readonly dot: HTMLElement; readonly words: HTMLElement; readonly sub: HTMLElement; readonly time: HTMLElement; drawn: Step | null }
+
+function stepRow(): StepRow {
+  const item = element('li', 'wu-step');
+  const dot = element('span', 'wu-step-dot'); dot.setAttribute('aria-hidden', 'true');
+  const words = element('div', 'wu-step-words'), sub = element('div', 'wu-step-sub'), time = element('span', 'wu-step-time');
+  const column = element('div');
+  column.append(words, sub);
+  item.append(dot, column, time);
+  return { item, dot, words, sub, time, drawn: null };
+}
+
+/** Draws `step` in its row, changing only what changed: a running step's words shimmer and its dot breathes with them. */
+function drawRow(row: StepRow, step: Step): void {
+  const was = row.drawn;
+  row.drawn = step;
+  if (was?.state !== step.state) {
+    row.item.dataset.state = step.state;
+    if (step.state === 'now') row.item.setAttribute('aria-current', 'step'); else row.item.removeAttribute('aria-current');
+  }
+  if (was?.words !== step.words || (was.state === 'now') !== (step.state === 'now')) {
+    // The shimmer and the breath start together, and stop at once when the step ends.
+    if (step.state === 'now') { row.words.replaceChildren(workingWords(step.words)); row.dot.replaceChildren(breath()); }
+    else { row.words.textContent = step.words; row.dot.replaceChildren(); }
+  }
+  if (was?.sub !== step.sub) { row.sub.textContent = step.sub ?? ''; row.sub.hidden = !step.sub; }
+  // A time's digits change with no motion.
+  if (was?.time !== step.time) row.time.textContent = step.time ?? '';
+}
+
 /**
  * The steps on the light plane (5.17's step part in light colours, N17): the running step has
- * aria-current="step" and its dot pulses; a polite live line says each new running step (N20).
+ * aria-current="step" and its words shimmer while its dot breathes; a polite live line says each new running step
+ * (N20). Each step keeps its row across redraws (by its key, else its words), so only a new row arrives and only a
+ * changed state moves (the motion catalog's rule 7); rows arriving together arrive in turn.
  */
 export function lightSteps(steps: readonly Step[] = []): LightSteps {
   const root = element('div', 'wu-light-steps');
   const spoken = element('div', 'wu-hidden-words');
   spoken.setAttribute('aria-live', 'polite');
-  let list = stepList([]);
+  const list = element('ol', 'wu-steps');
   root.append(spoken, list);
+  const rows = new Map<string, StepRow>();
   const shown: LightSteps = {
     root,
     set(next) {
-      const fresh = stepList(next);
-      list.replaceWith(fresh);
-      list = fresh;
+      const ids = next.map((step) => step.key ?? step.words);
+      // Rows that went go first, so no row that stays is moved: a row taken out and put back would arrive again.
+      for (const [id, row] of rows) if (!ids.includes(id)) { row.item.remove(); rows.delete(id); }
+      let newRows = 0;
+      next.forEach((step, place) => {
+        const id = ids[place]!;
+        let row = rows.get(id);
+        if (row === undefined) {
+          row = stepRow();
+          arriving(row.item, Math.min(newRows++, 5));
+          rows.set(id, row);
+        }
+        drawRow(row, step);
+        if (list.children[place] !== row.item) list.insertBefore(row.item, list.children[place] ?? null);
+      });
       const running = next.find((step) => step.state === 'now')?.words ?? '';
       if (spoken.textContent !== running) spoken.textContent = running;
     },
@@ -393,17 +446,18 @@ export function notesPanel(): NotesPanel {
   return {
     root,
     notes(notes, foot) {
+      // "From the web" arrives, then each note in turn (six at most, the rest with the sixth), then the line under them.
       const list = element('ul', 'wu-notes-list');
-      for (const note of notes) {
-        const item = element('li');
+      notes.forEach((note, order) => {
+        const item = arriving(element('li'), 1 + Math.min(order, 5));
         item.append(element('span', 'wu-notes-aspect', `${aspectLabel(note.aspect)} · `), note.text);
         list.append(item);
-      }
-      root.replaceChildren(label, list, element('p', 'wu-notes-foot', foot));
+      });
+      root.replaceChildren(arriving(label, 0), list, arriving(element('p', 'wu-notes-foot', foot), 1 + Math.min(notes.length, 6)));
       root.hidden = false;
     },
     instead(line) {
-      root.replaceChildren(label, element('p', 'wu-notes-instead', line));
+      root.replaceChildren(arriving(label, 0), arriving(element('p', 'wu-notes-instead', line), 1));
       root.hidden = false;
     },
   };

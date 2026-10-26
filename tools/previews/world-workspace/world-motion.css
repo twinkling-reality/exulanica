@@ -1,0 +1,111 @@
+/* How the workspace moves (DESIGN's motion catalog of 26 October 2026): the one shared sheet of motion tokens and
+   named motions that every page reads, Your worlds and Create as well as the in-world screens. A page names a motion
+   by these tokens; it does not write its own durations or curves.
+   Words arrive once and then hold still; the one picture keeps moving; arrivals come out of blur on the settling
+   curve, and leaving is quicker, without blur. Only a line naming work that runs now carries the working shimmer, and
+   the dot or line head beside it breathes on the same cycle. Where a page is busy (the opening, while the world loads
+   on the main thread), its motions run on transform, opacity and filter only.
+   Distances use --u where a page sets it (world-ui.css), else CSS pixels. */
+
+:root {
+  --ease-quiet: cubic-bezier(.25, .46, .45, .94);
+  --ease-settle: cubic-bezier(.16, 1, .3, 1);
+  --ease-glide: cubic-bezier(.65, 0, .35, 1);
+  --ease-leave: cubic-bezier(.4, 0, 1, 1);
+  --ease-drift: cubic-bezier(.61, 1, .88, 1);
+  --motion-hover: 160ms;
+  --motion-answer: 200ms;
+  --motion-leave: 240ms;
+  --motion-arrive: 420ms;
+  --motion-travel: 600ms;
+  --motion-stagger: 60ms;
+  --motion-breath: 1.6s;
+  --motion-shimmer: 2.4s;
+  --motion-drift: 30s;
+  --motion-creep: 120s;
+  --motion-instant: 120ms;
+  /* Reduced motion's arrivals and leavings are plain fades; these carry each motion's movement and blur. */
+  --motion-rise: 1;
+  --motion-blur: 1;
+}
+
+/* Arrive: a fade, a short rise and blur to sharp, on the settling curve. Words rise 6u and blur 4 px; titles 10u and
+   10 px. Things arriving together stagger in reading order by their --motion-order, counted from 0; at most six
+   steps of one kind, the rest arriving with the sixth, which the page counts. */
+.wu-arrive-words, .wu-arrive-title {
+  animation: wu-arrive var(--motion-arrive) var(--ease-settle) both;
+  animation-delay: calc(var(--motion-order, 0) * var(--motion-stagger));
+}
+.wu-arrive-words { --arrive-rise: calc(6 * var(--u, 1px)); --arrive-blur: 4px; }
+.wu-arrive-title { --arrive-rise: calc(10 * var(--u, 1px)); --arrive-blur: 10px; }
+@keyframes wu-arrive {
+  from { opacity: 0; transform: translateY(calc(var(--arrive-rise) * var(--motion-rise))); filter: blur(calc(var(--arrive-blur) * var(--motion-blur))); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+/* Leaving words fade and rise 4u, quicker than they came; a leaving surface only fades. */
+@keyframes wu-leave-words { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(calc(-4 * var(--u, 1px) * var(--motion-rise))); } }
+@keyframes wu-leave { from { opacity: 1; } to { opacity: 0; } }
+
+/* Working shimmer: a soft band of light about a third of the line's width passes over it once a cycle, still at each
+   end. The band is a window that travels while the lit copy inside it travels back by as much, so the words stay put
+   and only transform animates. The lit copy is drawn from the line's own words (data-words) and read by no one. */
+.wu-working { position: relative; display: inline-block; max-width: 100%; vertical-align: top; }
+.wu-working-band {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 33.333%; overflow: hidden; pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 40%, #000 60%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 40%, #000 60%, transparent);
+  transform: translateX(-100%);
+  animation: wu-working-band var(--motion-shimmer) var(--ease-glide) infinite;
+  animation-delay: var(--working-delay, 0ms);
+}
+.wu-working-lit {
+  position: absolute; top: 0; left: 0; width: 300%; color: var(--working-lit, #fff);
+  transform: translateX(33.333%);
+  animation: wu-working-lit var(--motion-shimmer) var(--ease-glide) infinite;
+  animation-delay: var(--working-delay, 0ms);
+}
+.wu-working-lit::before { content: attr(data-words); }
+/* Its shape is the app's thinking shimmer's: still to 16 %, the sweep, still from 84 %. */
+@keyframes wu-working-band { 0%, 16% { transform: translateX(-100%); } 84%, 100% { transform: translateX(300%); } }
+@keyframes wu-working-lit { 0%, 16% { transform: translateX(33.333%); } 84%, 100% { transform: translateX(-100%); } }
+
+/* Breath: a soft glow on its own layer behind a dot or a line's head. Beside a working line it takes the shimmer's
+   cycle and delay, its peak at the sweep's middle; a lasting state's dot takes --motion-breath. */
+.wu-breath {
+  position: absolute; pointer-events: none; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(191, 233, 240, .95), rgba(191, 233, 240, 0));
+  animation: wu-breath-glow var(--motion-shimmer) var(--ease-glide) infinite;
+  animation-delay: var(--working-delay, 0ms);
+}
+@keyframes wu-breath-glow { 0%, 100% { transform: scale(1); opacity: .55; } 50% { transform: scale(1.35); opacity: 1; } }
+
+/* Drift: a still world picture full screen pushes in from 1.00 to 1.12, 1.5 % left and 0.75 % up, fastest at the start
+   so it is seen moving from the first second; then it creeps on to 1.20, 2.5 % left and 1.25 % up, and holds. It starts
+   at 1.00, so its first frame matches the picture it continues. */
+.wu-drift {
+  transform-origin: 50% 50%; will-change: transform;
+  animation: wu-drift-push var(--motion-drift) var(--ease-drift) both, wu-drift-creep var(--motion-creep) linear var(--motion-drift) forwards;
+}
+@keyframes wu-drift-push { from { transform: none; } to { transform: translate(-1.5%, -.75%) scale(1.12); } }
+@keyframes wu-drift-creep { from { transform: translate(-1.5%, -.75%) scale(1.12); } to { transform: translate(-2.5%, -1.25%) scale(1.2); } }
+
+/* A page change within the workspace: where the front door showed its live background, Open crosses into the opening
+   by a crossfade (front-door.ts skips it where the page shows a still picture, which the opening continues). */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--motion-travel); animation-timing-function: var(--ease-glide); }
+
+/* Reduced motion: no movement, no blur, no drift, no shimmer, no breath; fades of at most 120 ms. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-answer: var(--motion-instant);
+    --motion-leave: var(--motion-instant);
+    --motion-arrive: var(--motion-instant);
+    --motion-travel: var(--motion-instant);
+    --motion-stagger: 0ms;
+    --motion-rise: 0;
+    --motion-blur: 0;
+  }
+  .wu-working-band, .wu-breath { display: none; }
+  .wu-drift { animation: none; }
+  @view-transition { navigation: none; }
+}

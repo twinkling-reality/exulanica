@@ -148,12 +148,19 @@
 .wu-light-hint:hover { background: none; }
 
 /* ---------- Steps on the light plane (5.17's geometry, N17; light colours from frame 21) ---------- */
-.wu-light-steps .wu-step-dot { border: 0; box-shadow: 0 0 0 1.2px rgba(52, 71, 80, .35) inset; }
+/* A running step's words shimmer (muted ink, deepening to ink in the band) and its dot breathes with them; when it
+   ends its words settle to ink, its dot fills and its check grows in, and the next step's words brighten. */
+.wu-light-steps .wu-step-dot { border: 0; box-shadow: 0 0 0 1.2px rgba(52, 71, 80, .35) inset; transition: background-color var(--motion-answer) var(--ease-quiet), box-shadow var(--motion-answer) var(--ease-quiet); }
+.wu-light-steps .wu-step-dot .wu-breath { left: 50%; top: 50%; width: calc(30 * var(--u)); height: calc(30 * var(--u)); margin: calc(-15 * var(--u)) 0 0 calc(-15 * var(--u)); background: radial-gradient(closest-side, rgba(100, 150, 166, .55), rgba(100, 150, 166, 0)); }
+.wu-light-steps .wu-step[data-state="now"] .wu-step-dot::after { animation: none; }
+.wu-light-steps .wu-step[data-state="done"] .wu-step-dot::after { animation: wu-check-in var(--motion-leave) var(--ease-settle) both; }
+@keyframes wu-check-in { from { opacity: 0; scale: .6; } to { opacity: 1; scale: 1; } }
 .wu-light-steps .wu-step[data-state="done"] .wu-step-dot { background: #344750; box-shadow: none; }
 .wu-light-steps .wu-step[data-state="done"] .wu-step-dot::after { border-color: #ffffff; border-width: 0 1.8px 1.8px 0; }
 .wu-light-steps .wu-step[data-state="now"] .wu-step-dot { border: 0; box-shadow: 0 0 0 1.5px #344750 inset; }
 .wu-light-steps .wu-step[data-state="now"] .wu-step-dot::after { background: var(--l-focus); box-shadow: 0 0 8px rgba(100, 150, 166, .9); }
-.wu-light-steps .wu-step-words { color: var(--l-ink); }
+.wu-light-steps .wu-step-words { color: var(--l-ink); transition: color var(--motion-answer) var(--ease-quiet); }
+.wu-light-steps .wu-step[data-state="now"] .wu-step-words { color: var(--l-muted); --working-lit: var(--l-ink); transition: color var(--motion-arrive) var(--ease-glide); }
 .wu-light-steps .wu-step[data-state="next"] .wu-step-words, .wu-light-steps .wu-step-sub { color: var(--l-faint); }
 /* Step times in the muted ink: the faint one measured under 4.5:1 there (N22). */
 .wu-light-steps .wu-step-time { color: var(--l-muted); }
@@ -171,8 +178,13 @@
 /* Values wrap within their column (N13). */
 .wu-made-value { margin: 0; max-width: calc(380 * var(--u)); font: 400 calc(18 * var(--u))/1.3 var(--font-sans); color: var(--ink); }
 
+/* The world is made: the making frame leaves and the opening takes over (front-door.ts). */
+.wu-create-host[data-leaving="true"] { animation: wu-leave var(--motion-leave) var(--ease-leave) both; pointer-events: none; }
+
 @media (prefers-reduced-motion: reduce) {
   .wu-film-card { transition: none; }
+  .wu-light-steps .wu-step[data-state="now"] .wu-step-words { color: var(--l-ink); }
+  .wu-light-steps .wu-step[data-state="done"] .wu-step-dot::after { animation-name: wu-fade; }
   .wu-film-strip { scroll-behavior: auto; }
   .wu-made-note, .wu-made-note[data-leaving="true"] { animation-duration: 120ms; }
   .wu-made-note { animation-name: wu-fade; }

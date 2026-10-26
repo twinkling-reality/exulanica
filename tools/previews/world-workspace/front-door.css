@@ -93,17 +93,17 @@ body.ux-review #shell .ux-world-entry :is(.your-worlds-status,.your-worlds-recon
 @media(max-width:420px) { body.ux-review #shell .ux-world-entry .your-worlds-actions { padding-right:58px; gap:4px; } body.ux-review #shell .ux-world-entry :is(.your-worlds-status,.your-worlds-reconcile) { padding-right:58px; } body.ux-review #shell .ux-world-entry .ux-entry-orb { right:8px; bottom:-14px; width:62px; height:62px; min-height:62px; } }
 
 /* Selection motion follows the reference's quiet fade, blur and filmstrip resize. */
-body.ux-review #shell .ux-world-entry .your-worlds-card { flex-shrink:0; transition:width 500ms cubic-bezier(.25,.46,.45,.94); }
+body.ux-review #shell .ux-world-entry .your-worlds-card { flex-shrink:0; transition:width 500ms var(--ease-quiet); }
 body.ux-review #shell .ux-world-entry .your-worlds-strip { scroll-behavior:smooth; }
-body.ux-review #shell .ux-world-entry .entry-command,body.ux-review #shell .ux-entry-arrows button { transition:color 160ms cubic-bezier(.25,.46,.45,.94),opacity 160ms cubic-bezier(.25,.46,.45,.94),transform 160ms cubic-bezier(.25,.46,.45,.94); }
-body.ux-review #shell .ux-world-entry .entry-command::before { transition:background 160ms cubic-bezier(.25,.46,.45,.94); }
+body.ux-review #shell .ux-world-entry .entry-command,body.ux-review #shell .ux-entry-arrows button { transition:color var(--motion-hover) var(--ease-quiet),opacity var(--motion-hover) var(--ease-quiet),transform var(--motion-hover) var(--ease-quiet); }
+body.ux-review #shell .ux-world-entry .entry-command::before { transition:background var(--motion-hover) var(--ease-quiet); }
 body.ux-review #shell .ux-world-entry .ux-entry-image { overflow:hidden; }
-.ux-entry-still,.ux-entry-live { position:absolute; inset:0; background-position:center; background-size:cover; transition:opacity 600ms cubic-bezier(.25,.46,.45,.94); }
+.ux-entry-still,.ux-entry-live { position:absolute; inset:0; background-position:center; background-size:cover; transition:opacity var(--motion-travel) var(--ease-quiet); }
 .ux-entry-live { border:0; width:max(100%,1100px); height:max(100%,800px); left:50%; transform:translateX(-50%); pointer-events:none; }
 .ux-entry-arrows { align-items:center; }
 body.ux-review #shell .ux-world-entry .ux-entry-arrows .your-worlds-create-row { margin-left:12px; }
 /* Saved facts are a reading surface; changing a world happens inside it. */
-.ux-entry-details { --entry-ink:#18242a; --entry-muted:#576970; box-sizing:border-box; width:min(460px,calc(100vw - 32px)); max-height:calc(100dvh - 48px); padding:0; border:1px solid rgb(125 166 179 / 35%); border-radius:20px; color:var(--entry-ink); background:rgb(250 252 251 / 97%); box-shadow:0 18px 80px rgb(18 40 44 / 14%); font:400 14px/1.5 var(--ui-font-brand); overflow:hidden; animation:ux-detail-enter 240ms cubic-bezier(.25,.46,.45,.94); }
+.ux-entry-details { --entry-ink:#18242a; --entry-muted:#576970; box-sizing:border-box; width:min(460px,calc(100vw - 32px)); max-height:calc(100dvh - 48px); padding:0; border:1px solid rgb(125 166 179 / 35%); border-radius:20px; color:var(--entry-ink); background:rgb(250 252 251 / 97%); box-shadow:0 18px 80px rgb(18 40 44 / 14%); font:400 14px/1.5 var(--ui-font-brand); overflow:hidden; animation:ux-detail-enter 240ms var(--ease-quiet); }
 .ux-entry-details::backdrop { background:rgb(20 36 40 / 14%); }
 .ux-entry-details [hidden] { display:none!important; }
 .ux-entry-details[open] { display:flex; flex-direction:column; }
@@ -125,6 +125,11 @@ body.ux-review #shell .ux-world-entry .ux-entry-arrows .your-worlds-create-row {
 .ux-details-action::after { content:''; position:absolute; inset:6px 0; padding:1px; border-radius:9px; pointer-events:none; background:var(--nav-edge); mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0); mask-composite:exclude; }
 @keyframes ux-detail-enter { from { opacity:0; transform:translateY(6px); filter:blur(2px); } to { opacity:1; transform:translateY(0); filter:blur(0); } }
 html[data-ui-scheme="dark"] .ux-entry-details { --entry-ink:#edf1f3; --entry-muted:#bcc7cc; background:rgb(24 31 34 / 97%); }
+/* Open: the page's words, controls and the wash under them leave (world-motion.css), so only the world's picture remains
+   when the opening takes over. */
+body.ux-review #shell .ux-world-entry[data-leaving="true"] > :not(.ux-entry-image),body.ux-review #shell .ux-world-entry[data-leaving="true"]::before { animation:wu-leave var(--motion-leave) var(--ease-leave) both; pointer-events:none; }
+/* Its ground is the opening's from then on, so the frame where the page lets its picture go is never white (rule 9). */
+body.ux-review #shell .your-worlds.ux-world-entry[data-leaving="true"] { background:#0c1216; }
 @media(prefers-reduced-motion:reduce) {
   body.ux-review #shell .ux-world-entry .your-worlds-card,.ux-entry-still,.ux-entry-live,body.ux-review #shell .ux-world-entry .entry-command,body.ux-review #shell .ux-entry-arrows button { transition:none; }
   body.ux-review #shell .ux-world-entry .your-worlds-strip { scroll-behavior:auto; }

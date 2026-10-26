@@ -33,7 +33,26 @@
           : 'layered';
         document.documentElement.style.colorScheme = 'light';
       } catch {}
+      // A world's own address (not a scene preview) opens on the opening's dark ground from its first frame, with the
+      // picture the front door handed over where there is one, never a white page or words of its own, until the
+      // workspace's opening (world-opening.ts) takes the screen and clears this.
+      try {
+        const address = new URLSearchParams(location.search);
+        const entry = address.get('entry');
+        if (entry && address.get('capture') !== '1' && address.get('livePreview') !== '1') {
+          document.documentElement.dataset.opening = '';
+          const handoff = JSON.parse(sessionStorage.getItem('exulanica.opening.v1') || 'null');
+          if (handoff && handoff.entryId === entry && typeof handoff.picture === 'string' && handoff.picture.startsWith('data:image/')) {
+            document.documentElement.style.backgroundImage = `url(${JSON.stringify(handoff.picture)})`;
+          }
+        }
+      } catch {}
     </script>
+    <style>
+      html[data-opening] { background: #0c1216 center / cover no-repeat fixed; }
+      html[data-opening] body { visibility: hidden; }
+      html[data-opening] .gate { visibility: visible; }
+    </style>
   </head>
   <body>
     <!--

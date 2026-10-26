@@ -194,6 +194,22 @@ describe('the steps', () => {
     expect(shown.root.querySelector('[aria-current="step"] .wu-step-time')!.textContent).toBe('12 s');
   });
 
+  it('keep each step\'s row across reads, so only a new row arrives and only the running step shimmers (motion catalog)', async () => {
+    const create = await parts();
+    const shown = create.lightSteps([{ words: 'Worked out what to make', state: 'done', time: '1 s' }, { words: 'Planning the place', state: 'now', time: '6 s' }]);
+    document.body.append(shown.root);
+    const [made, planning] = [...shown.root.querySelectorAll('.wu-step')];
+    const working = (): string[] => [...shown.root.querySelectorAll('.wu-working')].map((line) => line.closest('.wu-step')!.querySelector('.wu-step-words')!.textContent ?? '');
+    expect(working()).toEqual(['Planning the place']);
+    shown.set([{ words: 'Worked out what to make', state: 'done', time: '1 s' }, { words: 'Planning the place', state: 'done', time: '9 s' }, { words: 'Building it', state: 'now', time: '12 s' }]);
+    const rows = [...shown.root.querySelectorAll('.wu-step')];
+    // The same rows, not redrawn ones: identity, not likeness.
+    expect(rows[0]).toBe(made);
+    expect(rows[1]).toBe(planning);
+    expect(working()).toEqual(['Building it']);
+    expect(rows.map((row) => (row as HTMLElement).style.getPropertyValue('--motion-order'))).toEqual(['0', '1', '0']);
+  });
+
   it('says a refusal in the light refusal ink as a status', async () => {
     const { lightLine } = await parts();
     const line = lightLine('These words don’t describe a place, so no world could be made from them. Try a place and what is in it.', { tone: 'refused', live: true });

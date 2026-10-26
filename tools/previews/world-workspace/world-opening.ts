@@ -5,12 +5,18 @@
 import { BAKING_STAGE, OPENING_EVENT, OPENING_HANDOFF_KEY, OPENING_STAGES, STEP_EASE, easedShare, openingProgress, readHandoff } from './opening-steps.mjs';
 import { isScenePreview } from './front-door-routes.mjs';
 import { OPENING_WORDS } from './world-words.mjs';
-import { keyWord, mountUiScale, promptRow } from './world-ui.ts';
+import { breath, keyWord, mountUiScale, promptRow, workingWords } from './world-ui.ts';
 
 /** The key this browser keeps a world's picture under (world-pictures.ts). */
 const KEPT_PICTURE = 'exulanica.world-picture.v1.';
 
 let shown: { readonly root: HTMLElement; readonly lifetime: AbortController } | null = null;
+
+/** Clears the mark that paints a world's address on the opening's ground from its first frame (index.html). */
+function clearFirstFrame(): void {
+  delete document.documentElement.dataset.opening;
+  document.documentElement.style.removeProperty('background-image');
+}
 
 const div = (className: string, text = ''): HTMLDivElement => {
   const made = document.createElement('div'); made.className = className;
@@ -40,18 +46,28 @@ export function mountOpening(): void {
   root.setAttribute('role', 'status');
   root.setAttribute('aria-live', 'polite');
   const picture = handoff?.picture ?? keptPicture(entryId);
-  const world = div('wu-opening-world');
+  // The picture shows at once, as the front door handed it over, and drifts from its first frame (world-motion.css).
+  const world = div('wu-opening-world wu-drift');
   if (picture) world.style.backgroundImage = `url(${JSON.stringify(picture)})`;
   const words = div('wu-opening-words');
   const name = document.createElement('h1'); name.className = 'wu-opening-name'; name.textContent = handoff?.title ?? '';
-  const line = div('wu-opening-line'), fill = div('wu-opening-fill'), end = div('wu-opening-end');
-  line.append(fill, end);
+  const line = div('wu-opening-line'), fill = div('wu-opening-fill'), head = div('wu-opening-head');
+  head.append(breath(), div('wu-opening-end'));
+  line.append(fill, head);
   const step = div('wu-opening-step');
-  words.append(div('wu-opening-over', OPENING_WORDS.opening), name, line, step);
+  const over = div('wu-opening-over', OPENING_WORDS.opening);
+  words.append(over, name, line, step);
   const tip = div('wu-opening-tip');
   tip.append(div('wu-opening-over', OPENING_WORDS.tip), promptRow(OPENING_WORDS.tipKeys.map((one: { keys: string[]; word: string }) => keyWord(one))));
+  // "Opening", the name, the line, the stage words and the tip arrive in reading order; the name as a title.
+  [over, name, line, step, tip].forEach((part, order) => {
+    part.classList.add(part === name ? 'wu-arrive-title' : 'wu-arrive-words');
+    part.style.setProperty('--motion-order', String(order));
+  });
   root.append(world, div('wu-opening-fade'), words, tip);
   document.body.append(root);
+  // The page's first frame was the opening's ground (index.html); the opening holds the screen from here.
+  clearFirstFrame();
   mountUiScale(root, lifetime.signal);
   const reports: string[] = [];
   // A town still baking opens with its bake (C3): from the first frame where the front door's handoff
@@ -68,14 +84,42 @@ export function mountOpening(): void {
     if (still || ticker !== 0 || !(reach > share)) return;
     ticker = window.setInterval(() => {
       share = Math.max(share, easedShare(from, reach, performance.now() - since));
-      draw();
+      draw(true);
     }, STEP_EASE.tickMs);
   };
-  const draw = (): void => {
+  // The stage words on show; a report's new words take their place as they leave (the catalog's words swap).
+  let said: string | null = null;
+  const say = (words: string): void => {
+    const first = said === null;
+    said = words;
+    for (const old of step.querySelectorAll<HTMLElement>(':scope > :not([data-leaving])')) {
+      // Words newer ones replace before they have arrived were never seen whole: they go at once, never shown to leave.
+      if (Number.parseFloat(getComputedStyle(old).opacity) < 1) { old.remove(); continue; }
+      old.dataset.leaving = 'true'; old.setAttribute('aria-hidden', 'true');
+      old.addEventListener('animationend', (event) => { if (event.target === old) old.remove(); });
+      // Where animation is off or never ends, the old words go after their leave all the same.
+      window.setTimeout(() => old.remove(), 1000);
+    }
+    const shown = div('');
+    if (words) shown.append(workingWords(words));
+    if (!first) {
+      // They arrive once the old words have gone (world-ui.css), never together with them.
+      shown.dataset.swap = 'true';
+      shown.className = 'wu-arrive-words';
+      // The head's breath starts again with the new words' shimmer.
+      const glow = breath(); glow.dataset.swap = 'true';
+      head.firstElementChild?.replaceWith(glow);
+    }
+    step.append(shown);
+  };
+  // `tick` is an eased step within a running bake (C3c), whose ticks join without stepping; any other change glides.
+  const draw = (tick = false): void => {
     const now = openingProgress(reports, stages, share);
-    fill.style.width = `${(now.fraction * 100).toFixed(1)}%`;
-    end.style.left = `${(now.fraction * 100).toFixed(1)}%`;
-    step.textContent = now.words ?? '';
+    if (tick) line.dataset.moving = 'tick'; else delete line.dataset.moving;
+    const fraction = now.fraction.toFixed(4);
+    fill.style.transform = `scaleX(${fraction})`;
+    head.style.transform = `translateX(${(now.fraction * 100).toFixed(2)}%)`;
+    if ((now.words ?? '') !== said) say(now.words ?? '');
   };
   window.addEventListener(OPENING_EVENT, (event) => {
     const detail = (event as CustomEvent<{ readonly report?: string; readonly title?: string; readonly baking?: number; readonly reach?: number }>).detail;
@@ -104,13 +148,28 @@ export function mountOpening(): void {
 
 /** Ends the opening: it fades over the world (or the front door) and goes. Says whether one was showing. */
 export function endOpening(): boolean {
+  // Whatever shows next shows on its own ground, the opening's first frame given up even where it never mounted.
+  clearFirstFrame();
   if (shown === null) return false;
   const { root, lifetime } = shown;
   shown = null;
   lifetime.abort();
   try { sessionStorage.removeItem(OPENING_HANDOFF_KEY); } catch { /* Nothing kept. */ }
   root.dataset.leaving = 'true';
-  root.addEventListener('animationend', () => root.remove(), { once: true });
+  // While it fades, its picture returns to its first framing, so it lands on the live world without a double image.
+  const picture = root.querySelector<HTMLElement>('.wu-opening-world');
+  const framing = picture ? getComputedStyle(picture).transform : '';
+  if (picture && framing && framing !== 'none' && typeof picture.animate === 'function') {
+    const tokens = getComputedStyle(root);
+    picture.animate([{ transform: framing }, { transform: 'none' }], {
+      delay: Number.parseFloat(tokens.getPropertyValue('--motion-leave')) || 0,
+      duration: Number.parseFloat(tokens.getPropertyValue('--motion-travel')) || 0,
+      easing: tokens.getPropertyValue('--ease-glide').trim() || 'ease',
+      fill: 'both',
+    });
+  }
+  // Its words leave first; it goes when its own fade ends, not theirs.
+  root.addEventListener('animationend', (event) => { if (event.target === root) root.remove(); });
   // Where animation is off, it goes at once.
   if (getComputedStyle(root).animationName === 'none') root.remove();
   return true;

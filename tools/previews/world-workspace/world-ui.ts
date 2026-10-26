@@ -2,6 +2,7 @@
 // DOM builders over world-ui.css. They only draw; what a part does when pressed is the caller's.
 // Every in-world screen builds from these; a part's look lives in world-ui.css alone.
 import { ANCHOR_INSET, BESIDE, clampToView, noteDuration, placeBeside, uiScale } from './world-ui-layout.mjs';
+import './world-motion.css';
 import './world-ui.css';
 
 type Keys = readonly string[] | 'mouse' | 'mouse-click';
@@ -572,8 +573,33 @@ export function page({ form }: { readonly form: PageForm }): Page {
   };
 }
 
+/**
+ * A line naming work that runs now, under the working shimmer (world-motion.css): its words, and a band of light that
+ * passes over them carrying a lit copy of them that no one reads.
+ */
+export function workingWords(words: string): HTMLSpanElement {
+  const line = element('span', 'wu-working', words);
+  const band = element('span', 'wu-working-band'); band.setAttribute('aria-hidden', 'true');
+  const lit = element('span', 'wu-working-lit'); lit.dataset.words = words;
+  band.append(lit); line.append(band);
+  return line;
+}
+
+/** The glow that breathes behind a dot or a line's head (world-motion.css); its place and size are its host's. */
+export function breath(): HTMLSpanElement {
+  const glow = element('span', 'wu-breath'); glow.setAttribute('aria-hidden', 'true');
+  return glow;
+}
+
 export type StepState = 'done' | 'now' | 'next';
-export interface Step { readonly words: string; readonly state: StepState; readonly sub?: string; readonly time?: string }
+export interface Step {
+  readonly words: string;
+  readonly state: StepState;
+  readonly sub?: string;
+  readonly time?: string;
+  /** Which step it is across redraws, where its words alone may not say (lightSteps keeps its row by it). */
+  readonly key?: string;
+}
 
 /** Steps with their state, words and time (5.17); the caller redraws it as steps change. */
 export function stepList(steps: readonly Step[]): HTMLOListElement {

@@ -1,3 +1,4 @@
+import './world-motion.css';
 import './front-door.css';
 import captures from 'virtual:front-door-captures';
 import { createScenePreview, scenePreviewPage } from './front-door-preview.ts';
@@ -38,11 +39,34 @@ const stillBaking = (entry: SavedWorldEntry): boolean => entry.generatedGround?.
 /** The saved worlds the front door shows, for Open to hand a world's name and picture to its opening. */
 let shownEntries: readonly SavedWorldEntry[] = [];
 
+/** The front door on show, for Open to let its words and controls leave. */
+let shownRoot: HTMLElement | null = null;
+/** Whether this page's change into a world crosses by a crossfade: only from the live background (world-motion.css). */
+let crossing = false;
+
+/**
+ * Open's words, controls and the wash under them leave before the page changes, so only the world's picture remains
+ * (front-door.css), and Create's making frame with them where a world was made (world-ui-create.css). Settles when
+ * they have gone.
+ */
+async function leaveForTheOpening(): Promise<void> {
+  const root = shownRoot;
+  if (!root?.isConnected) return;
+  const making = document.querySelector<HTMLElement>('.wu-create-host');
+  crossing = root.dataset.nativePreview === 'ready';
+  root.dataset.leaving = 'true';
+  if (making) making.dataset.leaving = 'true';
+  // Back to this page restores it as it was left: shown again.
+  window.addEventListener('pageshow', () => { delete root.dataset.leaving; if (making) delete making.dataset.leaving; crossing = false; }, { once: true });
+  const leave = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--motion-leave')) || 0;
+  await new Promise(resolve => window.setTimeout(resolve, leave));
+}
+
 /** Open: the workspace's world view of `entryId`. Settles as this page goes, so Open stays busy until then. */
 export async function openFromFrontDoor(entryId: string): Promise<void> {
   history.replaceState({ ...history.state, [CHOSEN]: entryId }, '', location.href);
   const entry = shownEntries.find(one => one.entryId === entryId);
-  if (entry) await handOverOpening(entryId, entry.title, backdropPicture(entry), stillBaking(entry));
+  await Promise.all([entry ? handOverOpening(entryId, entry.title, backdropPicture(entry), stillBaking(entry)) : null, leaveForTheOpening()]);
   location.assign(worldAddress(entryId, location.origin));
   return new Promise(resolve => window.addEventListener('pagehide', () => resolve(), { once: true }));
 }
@@ -57,7 +81,7 @@ export const chosenWorldPicture = (): string | null => chosenPicture;
  */
 export async function openMadeWorld(entry: SavedWorldEntry): Promise<void> {
   history.replaceState({ ...history.state, [CHOSEN]: entry.entryId }, '', location.href);
-  await handOverOpening(entry.entryId, entry.title, backdropPicture(entry), stillBaking(entry));
+  await Promise.all([handOverOpening(entry.entryId, entry.title, backdropPicture(entry), stillBaking(entry)), leaveForTheOpening()]);
   location.assign(worldAddress(entry.entryId, location.origin));
   return new Promise(resolve => window.addEventListener('pagehide', () => resolve(), { once: true }));
 }
@@ -91,6 +115,11 @@ export function mountFrontDoor({ root, entries, credentials }: { root: HTMLEleme
   // A world that did not open lands here: its opening gives way to the front door.
   endOpening();
   shownEntries = entries;
+  shownRoot = root;
+  // A page change from here crosses by a crossfade only where Open left the live background; elsewhere it cuts.
+  window.addEventListener('pageswap', (event) => {
+    if (!crossing) (event as Event & { readonly viewTransition?: { skipTransition(): void } | null }).viewTransition?.skipTransition();
+  });
   document.body.classList.add('ux-review');
   root.classList.add('ux-world-entry', 'ux-noveuis');
   const brand = document.createElement('p'); brand.className = 'ux-entry-brand'; brand.textContent = 'exulanica';
