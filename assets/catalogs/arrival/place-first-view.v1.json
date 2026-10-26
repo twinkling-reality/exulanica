@@ -1,0 +1,97 @@
+{
+ "profile": "exulanica.place-first-view/v1",
+ "note": "How the first view of a place (a world made from a world kind) is chosen, beside the towns' figures it reads from town-first-view.v7.json: the centre floor across the middle third, the near walls and posts, the frame, a seafront view's water, and the steps back and along. These are the place's own: where and which ways its views are tried, what of the place a view of its water holds, and how land rising above the eye is read.",
+ "entries": [
+  {
+   "key": "way_step_degrees",
+   "value": 5,
+   "unit": "degree",
+   "class": "chosen_default",
+   "reason": "The ways a place's first view may look are tried every 5 degrees round. A frame 102 degrees wide holds about twenty of them, so no clear view of the place or its water lies between two tried, and a place 200 m across is judged in a moment."
+  },
+  {
+   "key": "edge_spots_most",
+   "value": 96,
+   "unit": "count",
+   "class": "chosen_default",
+   "reason": "Spots round a place's edge stand two steps along a footway apart (3 m) on a small place and no more than 96 in all on a large one, so a place 200 m across is tried every 8.4 m and still opens without delay."
+  },
+  {
+   "key": "structures_least",
+   "value": 2,
+   "unit": "count",
+   "class": "chosen_default",
+   "reason": "A view of a place's water holds at least two of the place's own structures (every structure of a place with fewer, shown whole), so the water is seen with the place in it and never with the place behind the camera."
+  },
+  {
+   "key": "structure_lines_least",
+   "value": 4,
+   "unit": "count",
+   "class": "chosen_default",
+   "reason": "A structure is in a view where at least four of the view's sight lines, 1 degree apart, meet it before anything else inside the frame's middle 80 percent, as a town's seafront view counts a building's front: a roof or a corner at the frame's edge does not count, and a place of one building must show that building whole."
+  },
+  {
+   "key": "structure_line_step_degrees",
+   "value": 1,
+   "unit": "degree",
+   "class": "chosen_default",
+   "reason": "The sight lines a structure is counted by stand 1 degree apart across the frame, as a town's seafront view counts fronts."
+  },
+  {
+   "key": "structure_reach_mm",
+   "value": 60000,
+   "unit": "millimetre",
+   "class": "chosen_default",
+   "reason": "A structure counts in a view of the water only within 60 m, as far as a town's life counts in its first view at all: farther, it stands small against the horizon."
+  },
+  {
+   "key": "structure_frame_thousandths",
+   "value": 800,
+   "unit": "thousandth",
+   "class": "chosen_default",
+   "reason": "A structure's sight lines are counted only inside the middle 80 percent of the frame's width, so a building squeezed against the frame's edge is not taken for the place in view."
+  },
+  {
+   "key": "structures_most_counted",
+   "value": 3,
+   "unit": "count",
+   "class": "chosen_default",
+   "reason": "Of the views that show the place's water, the one with the most of the place's structures in view is taken, up to three, then the one showing the most water, as a town's seafront view counts fronts up to three."
+  },
+  {
+   "key": "wall_near_mm",
+   "value": 15000,
+   "unit": "millimetre",
+   "class": "chosen_default",
+   "reason": "A place's buildings have no windows, so a blank wall stands near in a view out to 15 m, where a town's facades with their windows and doors stand near only within 4 m."
+  },
+  {
+   "key": "wall_share_most_thousandths",
+   "value": 200,
+   "unit": "thousandth",
+   "class": "chosen_default",
+   "reason": "Within 15 m a place's walls may cover at most a fifth of the frame's width in all, so a view between two blank walls a few metres either side is passed over."
+  },
+  {
+   "key": "across_off_most_degrees",
+   "value": 25,
+   "unit": "degree",
+   "class": "chosen_default",
+   "reason": "A view across a place keeps the place's middle within 25 degrees of the frame's middle, about the middle half of a 102 degree frame, so the place fills the picture rather than its edge."
+  },
+  {
+   "key": "land_column_degrees",
+   "value": 2,
+   "unit": "degree",
+   "class": "chosen_default",
+   "reason": "Land rising above the eye (a bank, the side of a graded cut) is read in columns 2 degrees apart across the frame, fine enough to find a bank 4 m away that fills a tenth of its width."
+  },
+  {
+   "key": "land_step_mm",
+   "value": 250,
+   "unit": "millimetre",
+   "class": "chosen_default",
+   "reason": "Each column's land is read every 250 mm along it, a quarter of the land's 1 m cell, so the foot of a bank is not stepped over."
+  }
+ ]
+}

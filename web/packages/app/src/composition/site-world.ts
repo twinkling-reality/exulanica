@@ -62,6 +62,8 @@ import { GENERATED_WORLD_WAITING_ATTRIBUTE } from './generated-world-ready.js';
 import type { SightBlocker } from './arrival-view.js';
 import type { AppEnvironment } from './session-state.js';
 import { siteSightRings } from './sight.js';
+import { placeFirstView } from './place-first-view.js';
+import { TOWN_FIRST_VIEW } from '../town-first-view.js';
 import { WORLD_LOOK_ATTRIBUTE, swappableDrawing, type WorldLookState } from './world-look-redraw.js';
 import { rememberSiteSeats } from './site-furniture.js';
 
@@ -362,12 +364,70 @@ async function siteInLook(
     mount = siteMount(drawing, { ...measure, ...terrainOptions, ...landOptions, seated, servedBytes, materials, roofForms, furnitureForms, scenery, interior, renderBudget });
   }
   return {
-    mount: leasedMount(mount, terrainLease),
+    mount: leasedMount(firstViewed(mount, seenThrough), terrainLease),
     seeThrough: seenThrough,
     look: { pack: choice.packId, source: choice.source, drawn: reason === null && choice.packId !== null, reason },
     async relook(asked) {
       const next = await resolved(asked);
-      return { mount: leasedMount(await mounted(next), terrainLease), look: { pack: next.packId, source: next.source, drawn: next.packId !== null, reason: null } };
+      return { mount: leasedMount(firstViewed(await mounted(next), seenThrough), terrainLease), look: { pack: next.packId, source: next.source, drawn: next.packId !== null, reason: null } };
+    },
+  };
+}
+
+/**
+ * A place on land or on level ground opens on its first view (`./place-first-view.ts`) rather than at
+ * its served arrival as it faces; a terrain drawing, and a place on a volume's top or on a support
+ * network, open as served. What the eye sees through (glass) stands in no view's way.
+ */
+function firstViewed(mount: GeneratedSiteMount, seenThrough: (lookRole: string) => boolean): GeneratedSiteMount {
+  const drawing = mount.drawing;
+  if (isTerrainSiteDrawing(drawing) || drawing.top !== undefined || drawing.support !== undefined) return mount;
+  const eyeMm = mount.navigationWorld.eyeHeight * 1000;
+  const land = mount.land;
+  const groundMm = land?.groundMm;
+  // A building's own slot and every piece of it (its walls, doors and roof) name it; nothing else does.
+  const buildingOf = (slot: (typeof drawing.slots)[number]): string | undefined => slot.structure ?? (slot.family === 'structure' ? slot.identity : undefined);
+  const ringsOf = (slots: typeof drawing.slots): SightBlocker[] => siteSightRings({ slots }, eyeMm, groundMm, seenThrough);
+  const pieces = new Map<string, (typeof drawing.slots)[number][]>();
+  for (const slot of drawing.slots) {
+    const building = buildingOf(slot);
+    if (building !== undefined) pieces.set(building, [...(pieces.get(building) ?? []), slot]);
+  }
+  const [east, north] = drawing.arrival.positionMm;
+  const [facingEast, facingNorth] = drawing.arrival.facingMm;
+  const facing = Math.hypot(facingEast, facingNorth);
+  if (facing === 0) return mount;
+  const kept = [...drawing.walk.blockersMm, ...drawing.walk.keepOutMm];
+  const surface = mount.navigationWorld.surface;
+  const sea = drawing.land?.water.find((body) => body.kind === 'sea');
+  // A spot is stood at where the walk has ground, out of every building and keep-out, and on land above the water.
+  const standable = (eastMm: number, southMm: number): boolean => surface.sample(eastMm / 1000, southMm / 1000) !== null
+    && !kept.some(([x0, y0, x1, y1]) => eastMm >= Math.min(x0, x1) && eastMm <= Math.max(x0, x1) && -southMm >= Math.min(y0, y1) && -southMm <= Math.max(y0, y1))
+    && (land === undefined || land.dryAt(eastMm, -southMm));
+  const view = placeFirstView({
+    arrivalMm: [east, -north],
+    facing: [facingEast / facing, -facingNorth / facing],
+    widthMm: drawing.extent.widthMm,
+    depthMm: drawing.extent.depthMm,
+    buildings: [...pieces.values()].map(ringsOf).filter((rings) => rings.length > 0),
+    posts: ringsOf(drawing.slots.filter((slot) => buildingOf(slot) === undefined)),
+    standable,
+    ...(groundMm === undefined ? {} : { ground: { groundMm: (eastMm: number, southMm: number) => groundMm(eastMm, -southMm), eyeMm } }),
+    ...(sea === undefined || groundMm === undefined ? {} : {
+      sea: { groundMm: (eastMm: number, southMm: number) => groundMm(eastMm, -southMm), levelMm: sea.levelMm, eyeMm },
+    }),
+  }, TOWN_FIRST_VIEW);
+  if (view.chosen === 'served') return mount;
+  const at = view.moved ? surface.sample(view.eastMm / 1000, view.southMm / 1000) : null;
+  return {
+    ...mount,
+    start: {
+      ...mount.start,
+      x: view.eastMm / 1000,
+      y: at === null ? mount.start.y : at.height + mount.navigationWorld.eyeHeight,
+      z: view.southMm / 1000,
+      yaw: view.yaw,
+      pitch: 0,
     },
   };
 }

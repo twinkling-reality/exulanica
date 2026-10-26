@@ -241,7 +241,27 @@ to 6 of that catalog (by openness alone;
 by life with no least distance; with one; with the figures of the view of placed things; without the frame's edges;
 without the low things) stay beside
 it and are read by the same reader, with those figures at the values version 4 states, so a town
-opens as it did under them. A world
+opens as it did under them.
+
+A place made from a world kind is served one arrival, on its first path just inside its south edge and
+facing north into it, whatever its land, so a coast's sea lies behind it and a lane between the place's
+first two buildings can fill its frame. It opens on its own first view instead
+(`composition/place-first-view.ts`), judged by the same catalog's figures and the place's own, each a chosen
+default stated with its reason in `assets/catalogs/arrival/place-first-view.v1.json`: a view is clear where nothing at
+eye height stands across its middle third nearer than 10 m, the place's buildings nearer than 4 m show
+across at most a tenth of the frame's width and, their walls having no windows, nearer than 15 m across at
+most a fifth, and nothing else at eye height stands nearer than 4 m anywhere in it. On land a bank or the side of a cut that rises above the eye counts as a wall, so a path graded
+between two raised yards is a lane walled on both sides. Where the place's land holds a sea, a clear view
+showing open water as a town's seafront view must,
+with at least two of the place's buildings each met first by four of its sight lines within 60 m inside the
+frame's middle 80 percent (a place of one building shows it whole), is taken: the water with the place in it,
+never with the place behind. Of those it takes the one with the most of the place's buildings in view, up to
+three, then the most water. Otherwise it takes the clear view
+looking across the place toward its middle. The spots tried are the arrival, steps back from it out to
+12 m and spots round the place's edge a step inside it (the walk has no ground beyond a place), nearest
+the arrival first, each where a person can stand (on the walk's ground, out of every building and above
+the water), and the ways every 5 degrees. Where no view is clear the place opens at its arrival as served, and a place on a floating
+island's top, on a support network or on terrain always does. A world
 with people in it that opens paused keeps "The world is paused. Press Play to let it
 run." in the status place until it plays or closes, and once a browser has seen the world play the line is
 not said for it again; the world never plays by itself. Where nothing is placed in it and none of its
