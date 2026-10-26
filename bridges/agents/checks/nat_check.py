@@ -1,17 +1,20 @@
 """Run the NeMo Agent Toolkit example against a stand-in door and a stand-in mind.
 
     python3 bridges/agents/checks/nat_check.py --nat <a nat command> --facade-python <a Python
-        with exulanica-agent[mcp]> [--live]
+        with exulanica-agent[mcp]> [--live] [--turns N]
 
-It serves the stand-in door of ``mcp_stdio.py`` (one open turn) and, unless ``--live``, a stand-in
-mind speaking the OpenAI chat-completions API, which calls the toolkit's tools in a fixed order:
-wait for a turn, answer it with the first action offered, then finish. It writes a copy of
-``examples/nemo-agent-toolkit.yml`` that starts the facade with the given Python (instead of uvx)
-and points the mind at the stand-in, runs ``nat run`` on it, and checks that the answer reached the
-door as one offered action. With ``--live`` the mind is the example's own, Nemotron on Nebius Token
-Factory: a local relay forwards each of the toolkit's requests there with the key from this
-process's ``NEBIUS_API_KEY`` and counts calls and tokens, and the toolkit itself only ever holds a
-stand-in key. Prints one JSON report; exits 0 only when every check holds. No key reaches it.
+It serves the stand-in door of ``mcp_stdio.py`` (one open turn; with ``--turns`` that many, each
+asked once the one before is answered) and, unless ``--live``, a stand-in mind speaking the OpenAI
+chat-completions API, which calls the toolkit's tools in a fixed order: wait for a turn, answer it
+with the first action offered, then finish. With several turns the report counts how many of them
+one ``nat run`` answered, which is what keeps an agent deciding between runs of its loop. It writes
+a copy of ``examples/nemo-agent-toolkit.yml`` that starts the facade with the given Python (instead
+of uvx) and points the mind at the stand-in, runs ``nat run`` on it, and checks that each answer
+reached the door as one offered action. With ``--live`` the mind is the example's own, Nemotron on
+Nebius Token Factory: a local relay forwards each of the toolkit's requests there with the key from
+this process's ``NEBIUS_API_KEY`` and counts calls and tokens, and the toolkit itself only ever
+holds a stand-in key. Prints one JSON report; exits 0 only when every check holds. No key reaches
+it.
 """
 
 from __future__ import annotations
@@ -30,11 +33,47 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from mcp_stdio import AGENTS_ROOT, KEY, REQUEST_ID, _Door, _serve
+from mcp_stdio import AGENTS_ROOT, KEY, REQUEST_ID, _asked, _Door, _serve
 
 EXAMPLE = AGENTS_ROOT / "examples" / "nemo-agent-toolkit.yml"
 _TURN = re.compile(r"Turn ([0-9a-f-]{36})")
 _OPTION = re.compile(r"^- (.+)$", re.MULTILINE)
+
+
+class _Turns(_Door):
+    """The stand-in door with ``count`` turns in a row: each is asked once the one before is
+    answered, under its own request and minute, as a person's next turn comes. Once the last is
+    answered the permission ends, as a world's owner ends it, so a run stops by itself."""
+
+    def __init__(self, count: int) -> None:
+        super().__init__()
+        self.count = count
+        self.asked: list[str] = []
+        self.ended = False
+
+    def handle(self, method: str, path: str, body: Any, keyed: bool) -> tuple[int, dict]:
+        if keyed and (method, path) == ("GET", "/door/channel/frames"):
+            with self.lock:
+                if self.ended:
+                    return 410, {"code": "grant_ended", "detail": "this grant was revoked"}
+                due = len(self.asked) < self.count and len(self.answers) >= len(self.asked)
+                frames = []
+                if len(self.answers) >= self.count:
+                    self.ended = True
+                    ended = {"kind": "grant_ended", "grant_id": "g", "grant_seq": 2}
+                    frames = [{**ended, "reason": "revoked"}]
+                elif due:
+                    frame = _asked()
+                    at = len(self.asked)
+                    frame["request_id"] = REQUEST_ID if at == 0 else f"{REQUEST_ID[:-4]}{at:04d}"
+                    frame["ask_seq"] = at + 1
+                    frame["minute"] = 41 + at
+                    self.asked.append(frame["request_id"])
+                    frames = [frame]
+            if not frames:
+                threading.Event().wait(0.2)
+            return 200, {"profile": "exulanica.door-frame/v1", "frames": frames, "cursor": "c1"}
+        return super().handle(method, path, body, keyed)
 
 
 class _Mind:
@@ -50,7 +89,7 @@ class _Mind:
         wait = next((name for name in self.tool_names if name.endswith("wait_for_turn")), None)
         act = next((name for name in self.tool_names if name.endswith("__act")), None)
         messages = request.get("messages") or []
-        # A ReAct agent hands a tool's result back as the newest message, whatever its role.
+        # The toolkit hands a tool's result back as the newest message, whatever its role.
         last = str(messages[-1].get("content")) if messages else ""
         if not self.calls or (self.calls[-1] == wait and not _TURN.search(last)):
             return self._call(wait, {"wait_seconds": 10})
@@ -231,8 +270,11 @@ def main() -> int:
     parser.add_argument("--nat", required=True, help="the toolkit's nat command")
     parser.add_argument("--facade-python", required=True)
     parser.add_argument("--live", action="store_true", help="the example's own mind on Nebius")
+    parser.add_argument(
+        "--turns", type=int, default=1, help="turns the stand-in door asks in a row"
+    )
     arguments = parser.parse_args()
-    door = _Door()
+    door = _Door() if arguments.turns == 1 else _Turns(arguments.turns)
     door_server, door_url = _serve(door)
     mind = _Relay() if arguments.live else _Mind()
     mind_server, mind_url = _serve_mind(mind)
@@ -250,7 +292,14 @@ def main() -> int:
         env["EXULANICA_AGENT_KEY_FILE"] = str(key_file)
         config = _config(arguments.facade_python, mind_url, Path(folder))
         run = subprocess.run(
-            [arguments.nat, "run", "--config_file", str(config), "--input", "Take one turn."],
+            [
+                arguments.nat,
+                "run",
+                "--config_file",
+                str(config),
+                "--input",
+                "Take one turn." if arguments.turns == 1 else "Take your turns in this world.",
+            ],
             env=env,
             capture_output=True,
             text=True,
@@ -267,14 +316,15 @@ def main() -> int:
         "tools_called": mind.calls,
         "mind_tokens": [getattr(mind, "prompt_tokens", 0), getattr(mind, "completion_tokens", 0)],
         "door_answers": [answer["label"] for answer in door.answers],
-        "door_answered_turn": [answer["request_id"] for answer in door.answers] == [REQUEST_ID],
+        "door_answered_turn": [answer["request_id"] for answer in door.answers][:1] == [REQUEST_ID],
+        "turns_answered": f"{len(door.answers)} of {arguments.turns}",
         "output_names_a_key": KEY in output or (bool(secret) and secret in output),
         "output_tail": output.strip().splitlines()[-4:],
     }
     holds = {
         "nat run succeeds": run.returncode == 0,
-        "the answer reached the door as one offered action": report["door_answers"]
-        in (["go to the bench"], ["wait a minute"])
+        "each answer reached the door as one offered action": bool(door.answers)
+        and all(label in ("go to the bench", "wait a minute") for label in report["door_answers"])
         and report["door_answered_turn"],
         "no key in the output": not report["output_names_a_key"],
     }

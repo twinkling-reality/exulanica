@@ -99,7 +99,7 @@ earlier revisions:
 | `world_rules` | The world's rules for the agent, in words |
 
 With NVIDIA NeMo Agent Toolkit, [`examples/nemo-agent-toolkit.yml`](../../bridges/agents/examples/nemo-agent-toolkit.yml)
-is an agent with no Python of its own: a ReAct workflow whose mind is Nemotron 3.5 Lightning on
+is an agent with no Python of its own: a tool calling agent whose mind is Nemotron 3.5 Lightning on
 Nebius Token Factory and whose tools are the facade. A toolkit run is a task: it takes the turns
 that come and ends at its model's first plain-text reply, which a reasoning model can give after a
 refusal or a quiet spell, so an agent that stays is started again whenever it ends (the

@@ -101,7 +101,7 @@ version that holds a society of things; another version refuses it by name.
 ## With NVIDIA NeMo Agent Toolkit
 
 [`examples/nemo-agent-toolkit.yml`](examples/nemo-agent-toolkit.yml) is an agent with no Python of
-its own: a NeMo Agent Toolkit ReAct workflow whose mind is NVIDIA Nemotron 3.5 Lightning
+its own: a NeMo Agent Toolkit tool calling agent whose mind is NVIDIA Nemotron 3.5 Lightning
 (`nvidia/Nemotron-3_5-Lightning`) on Nebius Token Factory and whose tools are the MCP facade over
 stdio.
 

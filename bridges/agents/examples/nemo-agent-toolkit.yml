@@ -13,6 +13,10 @@
 # A run is a task: it takes the turns that come and ends at the model's first plain-text reply,
 # so the loop starts it again; the pause keeps it within the door's six hellos a minute. The
 # toolkit starts the facade with uvx; the facade's environment is only what is listed here.
+#
+# The workflow is the toolkit's tool calling agent, which hands each call and its result back to
+# the model as messages, so the model answers turn after turn. Its ReAct agent hands earlier calls
+# back as text, which a model copies in place of a call, ending the run after a turn or none.
 
 function_groups:
   world:
@@ -41,11 +45,10 @@ llms:
     temperature: 0.3
 
 workflow:
-  _type: react_agent
+  _type: tool_calling_agent
   llm_name: nemotron
   tool_names: [world]
-  use_native_tool_calling: true
-  max_tool_calls: 60
+  max_iterations: 60
   additional_instructions: >-
     You live in an Exulanica world as an outside agent named Scout. Call world__world_rules once.
     Then, again and again: call world__wait_for_turn; read the situation it returns; answer with
