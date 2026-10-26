@@ -85,7 +85,7 @@ def test_finished_web_notes_reach_creature_and_persist_only_identity(served, sta
         }
         held = ThingStore(connection, workspace, None).kind_by_digest(draft.kind_sha256)
         assert reference.bundle_sha256 in held.document["origin"]["lineage"]["ingredients"]
-        assert held.document["origin"]["by"]["prompt_version"] == "creature-drafting-4"
+        assert held.document["origin"]["by"]["prompt_version"] == "creature-drafting-5"
         assert _payload(connection, queued) == {"draft_id": str(queued.draft_id)}
         row = connection.execute(
             "select row_to_json(d)::text as document from creature_draft d where draft_id=%s",

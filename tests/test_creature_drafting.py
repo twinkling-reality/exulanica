@@ -154,11 +154,13 @@ def test_reference_notes_are_separate_untrusted_input_and_exact_lineage():
     assert messages[1]["content"] == f'The description:\n"""{DESCRIPTION}"""\n\n{block}'
     for document in (outcome.creature.plan_document, outcome.creature.kind.document):
         origin = document["origin"]
-        assert origin["by"]["prompt_version"] == "creature-drafting-4"
+        assert origin["by"]["prompt_version"] == "creature-drafting-5"
         assert origin["by"]["words_sha256"] == hashlib.sha256(DESCRIPTION.encode()).hexdigest()
         assert "c" * 64 in origin["lineage"]["ingredients"]
         assert block not in json.dumps(dict(document))
-    assert "explicit requested changes take precedence" in messages[0]["content"]
+    assert "explicit requested changes also take precedence" in messages[0]["content"]
+    # The person's own words, colours among them, come ahead of the notes (a teal "yellow" duck).
+    assert "The person's own words win over the notes" in messages[0]["content"]
     # The scripted form is not evidence that the model inferred its colour or dimensions.
 
 

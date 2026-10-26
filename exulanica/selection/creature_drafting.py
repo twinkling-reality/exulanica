@@ -25,8 +25,10 @@ a sketch look and a thing kind, each held to its own reader, which decide:
     version, the SHA-256 of the instructions sent and of the words sent, never the words.
 
 The words the model is asked with are data (``creature-drafting.v3.json`` beside this module, and
-``creature-drafting.v4.json`` when reference notes come with the words; versions 1 and 2, which
-allowed a label of 40 letters, are kept as the words earlier drafts were asked with).
+``creature-drafting.v5.json`` when reference notes come with the words, which keeps the colours,
+materials, sizes and parts the person's words name ahead of any note; versions 1 and 2, which
+allowed a label of 40 letters, and version 4, the notes' words before that rule, are kept as the
+words earlier drafts were asked with).
 Pure apart from the model client: nothing is read from a connection and nothing is written.
 """
 
@@ -82,7 +84,7 @@ __all__ = [
 ]
 
 PROMPT_PATH: Final = Path(__file__).with_name("creature-drafting.v3.json")
-_REFERENCE_PROMPT_PATH: Final = Path(__file__).with_name("creature-drafting.v4.json")
+_REFERENCE_PROMPT_PATH: Final = Path(__file__).with_name("creature-drafting.v5.json")
 #: The manifest role a creature is drafted under, bound to the models the drafter's pre-registered
 #: measurement chose (docs/evaluation/2026-10-07-creature-drafter-timings.json).
 DRAFTER_ROLE: Final = Role.CREATURE_DRAFTER

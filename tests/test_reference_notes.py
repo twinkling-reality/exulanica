@@ -54,6 +54,28 @@ def test_a_note_sharing_six_running_words_with_a_source_is_dropped_and_five_are_
     assert dict(screened.dropped) == {"copied_run": 1}
 
 
+def test_a_note_the_bound_stopped_inside_a_word_is_dropped_and_a_whole_one_is_kept() -> None:
+    # A reader's structured answer stops a longer note at the bound, wherever it falls: these two
+    # are run 2's live notes of 26 October, 80 characters each, the first ending inside "IMU".
+    cut = "Duck-shaped biped with articulated beak, 15 motors, camera, depth sensor, two IM"
+    dangling = "Head has clear dome, beak can open and close; body compact, limbs mechanical and"
+    whole = "Duck-shaped biped with an articulated beak and fifteen small motors in two legs."
+    assert len(cut) == len(dangling) == len(whole) == 80
+    screened = keep_notes(
+        [
+            DraftedNote("anatomy", cut),
+            DraftedNote("anatomy", dangling),
+            DraftedNote("anatomy", whole),
+            DraftedNote("anatomy", "A round body with short wings"),
+        ],
+        sources=[],
+        # The things vocabulary, where anatomy is an aspect, as a creature's notes are read.
+        catalogs=load_reference_catalogs(aspect_version=2),
+    )
+    assert [note.text for note in screened.kept] == [whole, "A round body with short wings"]
+    assert dict(screened.dropped) == {"cut_word": 2}
+
+
 def test_notes_are_dropped_by_reason_and_never_quoted() -> None:
     drafted = [
         DraftedNote("buildings", "x" * 81),

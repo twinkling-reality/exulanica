@@ -900,10 +900,14 @@ purpose `things`. The worker takes web notes through the existing
 a separately declared, current creature-role consent. Unknown, foreign, unfinished or
 wrong-purpose requests retain their visible `not_used` fallback. A selected-picture request whose
 authority ended fails closed, including before its first dispatch. No-reference requests retain their response shape and
-`creature-drafting-3` prompt. Consumed notes select `creature-drafting-4`, are quoted as untrusted
+`creature-drafting-3` prompt. Consumed notes select `creature-drafting-5`, are quoted as untrusted
 descriptions after the person's words, and cannot override the body's supported bounds or actions.
-Explicit requested changes take priority in the prompt; the use record does not establish that a
-model followed a particular change or that a reference caused an output field.
+The prompt puts the person's own words ahead of the notes: every colour, material, size and part
+the description names is kept as named, the creature is named for what the words say, and the notes
+fill only what the words leave open; explicit requested changes also take priority. Drafts asked
+with `creature-drafting-4`, the notes' words before that rule, keep it in their records. The use
+record does not establish that a model followed a particular change or that a reference caused an
+output field.
 
 Reference-bearing drafts expose `references` with the request ID and a state. `pending` means no
 attempt has been recorded; `not_attempted` means the draft ended before that point. `used` means an

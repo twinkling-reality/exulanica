@@ -110,7 +110,7 @@ withdrawn; the database holds each of these.
 | --- | --- |
 | plan | Once the source is known to be configured, one call of the `reference_drafting` role writes at most three search subjects; skipped by a picture search, whose one subject is the person's words, about anatomy |
 | search | Each subject passes the boundary; each search is admitted against the source's spending, sent, and recorded in `reference_lookup`; a picture search's pictures are held for its requester and the step states only how many (`pictures`) |
-| read | One call of the `reference_drafting` role writes at most twelve notes from what the searches found; a note sharing six consecutive words with anything it was shown, or failing the screen, is dropped |
+| read | One call of the `reference_drafting` role writes at most twelve notes from what the searches found; a note sharing six consecutive words with anything it was shown, failing the screen, or stopped by the 80-character bound inside a word (a note shows whole or not at all), is dropped |
 | read_picture | Before the searches, once for each picture the request names: the picture is read and its notes checked (section 10); the step names the picture's capture id |
 | bundle | The kept notes become a reference bundle (v1 for existing/world requests, v2 for web-only things, v3 for selected things pictures), complete or partial with the steps it missed |
 

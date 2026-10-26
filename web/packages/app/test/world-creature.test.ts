@@ -394,6 +394,27 @@ describe('making a creature where it will stand', () => {
   });
 });
 
+describe('the making group beside the stand', () => {
+  it('takes the left half of the view beside a stand right of the middle, and stays right otherwise', async () => {
+    const { openCreatureScreen } = await screen();
+    // happy-dom's window is 1024 wide: a stand at 700 is right of the middle, one at 512 is not.
+    for (const [x, left] of [[700, true], [512, false]] as const) {
+      const { deps, root } = world({ at: { x, y: 500 }, reads: [{ ...queued, status: 'running' }, kept] });
+      let groupLeft: boolean | null = null;
+      const client = { ...deps.client, draft: async () => { groupLeft ??= root.querySelector('.wu-creature-group')?.classList.contains('wu-creature-left') ?? null; return deps.client.draft(); } };
+      const opened = await openCreatureScreen({ ...deps, client });
+      const field = root.querySelector('textarea')!;
+      field.value = 'a round yellow body';
+      field.dispatchEvent(new Event('input'));
+      opened.key(press('Enter'));
+      await settle();
+      expect(groupLeft).toBe(left);
+      expect(root.querySelector('.wu-creature-made')!.classList.contains('wu-creature-left')).toBe(left);
+      document.body.replaceChildren();
+    }
+  });
+});
+
 describe('web notes before a creature is made', () => {
   const notesOffer: CreatureOffer = Object.freeze({ ...offer, priceUsdAtMost: '0.10000000', notes: { offered: true, code: null, searchesAtMost: 3, maximumUsd: '0.02000000' } });
   const step = (name: string, state: string) => ({ step: name, state, reason: null, facts: {} });

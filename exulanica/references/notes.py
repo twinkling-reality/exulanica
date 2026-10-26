@@ -1,11 +1,12 @@
 """Which drafted notes may be kept: a model's own words, never a source's, and nothing personal.
 
 A reader model drafts notes from a source's excerpts and picture descriptions, which are not ours to
-keep. A note is kept only if it is one short line about one aspect of the reference catalogs, shares
-no run of :data:`COPY_RUN_WORDS` consecutive words with any of those texts, and passes the outgoing
-screen (:func:`exulanica.references.boundary.screen_text`): no link, email address, long number,
-screened word or withheld word. Everything else is dropped and counted by reason; a dropped note is
-never quoted, since it may be a source's words.
+keep. A note is kept only if it is one short line about one aspect of the reference catalogs, whole
+(a note the length bound stopped inside a word, :func:`cut_at_bound`, is not: a note shows whole or
+not at all), shares no run of :data:`COPY_RUN_WORDS` consecutive words with any of those texts, and
+passes the outgoing screen (:func:`exulanica.references.boundary.screen_text`): no link, email
+address, long number, screened word or withheld word. Everything else is dropped and counted by
+reason; a dropped note is never quoted, since it may be a source's words.
 
 Saved names are not judged here: a note reaches a hosted model only inside a drafter's request,
 which the workspace's request policy judges like every other.
@@ -28,6 +29,7 @@ __all__ = [
     "NOTE_DROPS",
     "DraftedNote",
     "NoteScreen",
+    "cut_at_bound",
     "keep_notes",
 ]
 
@@ -36,6 +38,7 @@ MAX_NOTE_CHARACTERS: Final = 80
 COPY_RUN_WORDS: Final = 6
 NOTE_DROPS: Final = (
     "note_shape",
+    "cut_word",
     "aspect_unknown",
     "copied_run",
     "duplicate",
@@ -59,6 +62,12 @@ class NoteScreen:
     kept: tuple[DraftedNote, ...]
     #: How many notes each reason dropped. Counts only: a dropped note is never kept or quoted.
     dropped: Mapping[str, int]
+
+
+def cut_at_bound(text: str) -> bool:
+    """Whether a note reached the length bound ending inside a word: a reader's structured answer
+    stops a longer note at the bound, wherever it falls, so such a note was cut there."""
+    return len(text) >= MAX_NOTE_CHARACTERS and text[-1:].isalnum()
 
 
 def _runs(text: str) -> set[tuple[str, ...]]:
@@ -98,6 +107,9 @@ def keep_notes(
             or any(not character.isprintable() for character in text)
         ):
             dropped["note_shape"] += 1
+            continue
+        if cut_at_bound(text):
+            dropped["cut_word"] += 1
             continue
         if note.aspect not in catalogs.aspects:
             dropped["aspect_unknown"] += 1

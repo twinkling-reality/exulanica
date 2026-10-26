@@ -40,7 +40,13 @@ from exulanica.models.messages import image_part, text_part
 from exulanica.models.results import ChatResult
 from exulanica.references.catalogs import ReferenceCatalogs, load_reference_catalogs
 from exulanica.references.drafting import ReferencePrompts, reference_prompts
-from exulanica.references.notes import MAX_NOTE_CHARACTERS, DraftedNote, NoteScreen, keep_notes
+from exulanica.references.notes import (
+    MAX_NOTE_CHARACTERS,
+    DraftedNote,
+    NoteScreen,
+    cut_at_bound,
+    keep_notes,
+)
 
 __all__ = [
     "PICTURE_DROPS",
@@ -194,11 +200,6 @@ def _lettering(text: str) -> bool:
     return False
 
 
-def _cut(text: str) -> bool:
-    """A note that reached the length bound ending inside a word was cut there."""
-    return len(text) >= MAX_NOTE_CHARACTERS and text[-1:].isalnum()
-
-
 def screen_picture_notes(
     drafted: Sequence[DraftedNote],
     *,
@@ -220,7 +221,7 @@ def screen_picture_notes(
             dropped["person_word"] += 1
         elif _lettering(text):
             dropped["lettering"] += 1
-        elif _cut(text):
+        elif cut_at_bound(text):
             dropped["cut_word"] += 1
         elif names and recognised_spans(text, names):
             dropped["saved_name"] += 1

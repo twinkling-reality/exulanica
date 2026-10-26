@@ -92,6 +92,8 @@
 .wu-creature-notes { display: grid; gap: calc(6 * var(--u)); }
 /* A making group with web notes stands where the field stood, above the hints, and grows upward with its notes. */
 .wu-creature-group.wu-creature-noted { top: auto; bottom: calc(136 * var(--u)); }
+/* Beside a stand right of the middle, the group takes the left half of the view, mirrored (DESIGN, 26 October). */
+.wu-creature-group.wu-creature-left { left: calc(280 * var(--u)); }
 .wu-creature-notes-over { margin: 0; font: 500 max(11px, calc(12 * var(--u)))/1.4 var(--font-mono); letter-spacing: .04em; color: var(--ink-2); }
 .wu-creature-notes-list { margin: 0; padding: 0; list-style: none; display: grid; gap: calc(4 * var(--u)); font: 400 max(13px, calc(15 * var(--u)))/1.45 var(--font-sans); }
 .wu-creature-notes-aspect { color: var(--ink-3); }

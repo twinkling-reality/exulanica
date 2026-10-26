@@ -207,7 +207,15 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     if (head === null || card === null) { pointer.hide(); return; }
     if (!pointer.root.isConnected) layer.prepend(pointer.root);
     const box = card.getBoundingClientRect(), title = card.querySelector('.wu-creature-title')?.getBoundingClientRect();
-    pointer.draw(head, { x: box.left, y: title ? title.top + title.height / 2 : box.top });
+    // To the card's near edge: its left beside a creature on its left, its right where the card stands on the left.
+    pointer.draw(head, { x: box.right <= head.x ? box.right : box.left, y: title ? title.top + title.height / 2 : box.top });
+  }
+  /**
+   * The making group and the made card take the half of the view the stand is not in (DESIGN, 26 October): beside a
+   * stand right of the middle they stand on the left, so neither covers the stand or the creature made on it.
+   */
+  function besideStand(group: HTMLElement): void {
+    group.classList.toggle('wu-creature-left', standAt !== null && standAt.x > innerWidth / 2);
   }
   field.input.addEventListener('input', () => { words = field.input.value; field.count(words.length, WORDS_MAXIMUM); });
   field.count(0, WORDS_MAXIMUM);
@@ -219,6 +227,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     const making = makingGroup({ words, priceUsdAtMost: mostUsd() });
     // With web notes asked for, the group grows by the notes: it stands on the field's line and grows upward.
     making.root.classList.toggle('wu-creature-noted', withNotes && notesOffered() !== null);
+    besideStand(making.root);
     label.remove();
     layer.append(making.root);
     if (standAt !== null) layer.prepend(light);
@@ -300,6 +309,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
         // Until its made look is made, the creature wears its sketch (M15).
         sketch: current.lookStatus !== 'made', placeable: stand !== null,
       });
+      besideStand(card);
       layer.append(card);
       if (stand !== null) {
         // It stands where it was made, held to be placed (B8): build mode draws it there and its own keys place it or
