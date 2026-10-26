@@ -22,6 +22,7 @@ from exulanica.canonical import sha256_of_canonical
 from exulanica.world import showcase_worlds as catalog
 from exulanica.world.generated_worlds import generation_receipt
 from exulanica.world.saved_entries import SavedWorldEntryRepository
+from exulanica.world.society_control_repository import open_session_receipt
 
 from personal_world_support import STRANGER_TOKEN
 from test_society_made_world import made as imported_made  # noqa: F401
@@ -156,6 +157,8 @@ def test_a_visitor_s_copy_is_the_made_world_brought_to_life_once(made, tmp_path,
                     "where workspace_id=%s and society_id=%s",
                     (stranger, society["society_id"]),
                 ).fetchone()["mode"],
+                # A copy plays the routine alone: no living session asks the cast's models.
+                "session": open_session_receipt(connection, stranger, society["society_id"]),
                 "paintings": connection.execute(
                     "select sha256, view, camera from world_painting "
                     "where workspace_id=%s and world_id=%s",
@@ -171,7 +174,7 @@ def test_a_visitor_s_copy_is_the_made_world_brought_to_life_once(made, tmp_path,
     assert [row["document"]["decider"]["model_id"] for row in first["chosen"]] == [
         CAST_MODEL["model_id"]
     ]
-    assert first["mode"] == "playing"
+    assert first["mode"] == "playing" and first["session"] is None
     assert [(row["sha256"], row["view"]) for row in first["paintings"]] == [
         (painting["sha256"], painting["view"])
     ]

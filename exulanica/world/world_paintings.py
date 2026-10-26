@@ -6,7 +6,10 @@ opens the world at, or a heading from there), has an open picture model on a GPU
 from the words written for the world (its sentence and, where it has them, its notes), measures how
 much of the structure's edges the painting kept, and keeps what passes here
 (:meth:`WorldPaintingRepository.keep`). Every reader of the world reads them (:meth:`paintings`,
-:meth:`picture`); no route writes one. The server holds a painting to what it can check:
+:meth:`picture`). The one route that writes one is a showcase world's copy
+(``POST /worlds/showcase/{showcase}``): it keeps the card paintings its document names, painted by
+that run, for the copy's world (:func:`exulanica.world.showcase_worlds.make_showcase_world`). The
+server holds a painting to what it can check:
 
 - what it is: a JPEG or WebP walked whole, of a saved world's card picture's bounds
   (:func:`exulanica.world.saved_entry_pictures.checked_picture`), its digest the server's own;
@@ -117,7 +120,8 @@ def _object(name: str, value: Any) -> str:
 
 
 class WorldPaintingRepository:
-    """A workspace's world paintings: kept by the operator's run, read by the world's readers."""
+    """A workspace's world paintings: kept by the operator's run and by a showcase world's copy,
+    read by the world's readers."""
 
     def __init__(self, connection: psycopg.Connection, workspace_id: uuid.UUID) -> None:
         self.connection = connection

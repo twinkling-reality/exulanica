@@ -9,8 +9,9 @@ names the bytes, so a browser keeps them as long as it likes.
 
 They need ``world.read``: a painting is how the world looks, for everyone who may see the world.
 Nothing here writes one; the operator's painting run keeps them
-(:mod:`exulanica.world.world_paintings`). Another workspace's world and an id nobody registered
-are one refusal (404 ``unknown_reference``).
+(:mod:`exulanica.world.world_paintings`), and a showcase world's copy keeps its catalog's card
+paintings (``POST /worlds/showcase/{showcase}``). Another workspace's world and an id nobody
+registered are one refusal (404 ``unknown_reference``).
 """
 
 from __future__ import annotations
