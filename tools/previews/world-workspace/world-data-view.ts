@@ -39,6 +39,11 @@ const BUILT_DENSITY = 4;
 const TOWN_POINTS = 1_500_000;
 /** Ground beyond this many metres from the eye when the view opens gets no points: it is beyond what a tag reaches. */
 const GROUND_REACH = 240;
+/**
+ * Where on the slider the boxes come in: once the town has mostly gone dark. The overlay draws a box at the style's one
+ * opacity, so a box shown near the world end would stand over the town as it still looks.
+ */
+const BOXES_FROM = 0.35;
 /** How long the slider glides between the world and its data when X is pressed, ms (none with reduced motion). */
 const GLIDE_MS = 1400;
 /** How far a tag is shown, metres from the eye: a thing's middle, a person's head, a street's middle line. */
@@ -344,7 +349,7 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
       const subject = thingSubject(thing);
       return {
         subject,
-        resolved: { subjectId: subject.subjectId, renderedWeight: 1 - mix, pointWeight: 0, pointLabel: null, blend: 'none' as const, boxes: mix > 0, labels: false, ids: false, data: true, binary: false, colourKey: thing.kind, geometryVisible: true, reasons: [] },
+        resolved: { subjectId: subject.subjectId, renderedWeight: 1 - mix, pointWeight: 0, pointLabel: null, blend: 'none' as const, boxes: mix >= BOXES_FROM, labels: false, ids: false, data: true, binary: false, colourKey: thing.kind, geometryVisible: true, reasons: [] },
         allocatedPoints: 0, plannedPoints: 0,
       };
     })];
