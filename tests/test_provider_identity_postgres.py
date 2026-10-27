@@ -64,33 +64,39 @@ def test_creature_identity_refuses_before_keep_and_cold_read_contains_no_words(s
         assert ThingStore(connection, workspace, None).kind("echoed_creature", 1) is None
 
 
-@pytest.mark.parametrize("tool", ["town", "place"])
-def test_whole_world_cold_outcome_and_calls_do_not_restore_erased_identity_words(drafts, tool):
+@pytest.mark.parametrize("route", ["town", "place", "refused"])
+def test_whole_world_cold_outcome_and_calls_do_not_restore_erased_identity_words(drafts, route):
     factory, transport = drafts
-    responses = [
-        _tool(tool, "a quiet town"),
-        _json(_town_form(storey_band_high=5)) if tool == "town" else _brief(_farm()),
-    ]
-    if tool == "town":
-        responses += _plain()
+    # The place tool's drafter takes no answer from a model nobody admitted, so the town tool
+    # makes the words instead; where the town's drafter then fails too, the draft is refused.
+    town = [_json(_town_form(storey_band_high=5)), *_plain()]
+    responses = [_tool("town", "a quiet town"), *town]
+    if route != "town":
+        responses = [_tool("place", "a quiet town"), _brief(_farm())]
+        responses += town if route == "place" else []
     transport.responses.extend(echoed(response) for response in responses)
+    if route == "refused":
+        transport.responses.extend([HttpResponse(status_code=500, text="the provider failed")] * 4)
     # A world made from the person's words keeps them with the world (0222); nothing else may
     # carry them, and a refused draft keeps nothing.
-    kept = "a quiet town " + ECHO if tool == "town" else ""
+    kept = "" if route == "refused" else "a quiet town " + ECHO
     with factory() as client:
         started = _start(client, "a quiet town " + ECHO)
         assert started.status_code == 202, started.text
         ident = started.json()["draft_id"]
         ended = _ended(client, ident)
-        assert ended["state"] == ("ready" if tool == "town" else "refused"), ended
+        assert ended["state"] == ("refused" if route == "refused" else "ready"), ended
         assert ended["description"] == kept and ended["model_name"] is None
         assert ECHO not in json.dumps({**ended, "description": ""})
-        assert len(ended["execution"]["calls"]) == (4 if tool == "town" else 2)
-        for call in ended["execution"]["calls"]:
-            assert (
-                call["served_model"] is None
-                and call["served_model_unavailable"] == "reported_model_not_admitted"
-            )
+        if route != "town":
+            assert ended["tool"] == {"key": "town", "chosen_by": "fallback"}
+        calls = ended["execution"]["calls"]
+        echoed_calls = {"town": 4, "place": 5, "refused": 2}[route]
+        if route != "refused":
+            assert len(calls) == echoed_calls
+        assert all(call["served_model"] is None for call in calls)
+        for call in calls[:echoed_calls]:
+            assert call["served_model_unavailable"] == "reported_model_not_admitted"
         with client.app.state.services.database.session(_workspace()) as connection:
             assert (
                 connection.execute(
@@ -102,13 +108,14 @@ def test_whole_world_cold_outcome_and_calls_do_not_restore_erased_identity_words
                 "select document from world_draft_outcome where draft_id=%s", (uuid.UUID(ident),)
             ).fetchone()["document"]
             assert outcome["model_id"] is None and ECHO not in json.dumps(outcome)
-            if tool == "place":
+            if route != "town":
                 assert (
                     connection.execute("select count(*) as n from world_kind_version").fetchone()[
                         "n"
                     ]
                     == 0
                 )
+            if route == "refused":
                 assert ended["entry"] is None
     # A new metadata-only API cannot get this answer from the original process holder.
     with factory(model=False) as reader:
