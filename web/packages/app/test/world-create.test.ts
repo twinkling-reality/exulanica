@@ -660,6 +660,46 @@ describe('Create a world as a page', () => {
     expect(JSON.parse(sessionStorage.getItem('exulanica.made.v1')!)).toMatchObject({ entryId: 'starter', build: true });
   });
 
+  it('reads a sheet held past the server\'s 60 s again before the start, and starts with the fresh one (fake clock)', async () => {
+    let clock = Date.now();
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    try {
+      const offers = [offerOf(), offerOf({ operation: { ...offerOf().operation, maximum_usd: '1.3' } })];
+      let reads = 0;
+      vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+        const body = address.endsWith('/worlds/drafts') ? offers[Math.min(reads++, offers.length - 1)] : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+        return { ok: true, status: 200, json: async () => body };
+      }));
+      await mount();
+      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour at night');
+      clock += 61_000;
+      key(document.querySelector('.wu-light-field')!, 'Enter');
+      await settle(); await settle();
+      expect(reads).toBe(2);
+      expect(starts.map((one) => one.most)).toEqual(['1.3']);
+    } finally { now.mockRestore(); }
+  });
+
+  it('starts with the sheet it holds where it was read under 45 s before: a control', async () => {
+    let clock = Date.now();
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    try {
+      let reads = 0;
+      vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+        if (address.endsWith('/worlds/drafts')) reads += 1;
+        const body = address.endsWith('/worlds/drafts') ? offerOf() : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+        return { ok: true, status: 200, json: async () => body };
+      }));
+      await mount();
+      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour at night');
+      clock += 30_000;
+      key(document.querySelector('.wu-light-field')!, 'Enter');
+      await settle(); await settle();
+      expect(reads).toBe(1);
+      expect(starts.map((one) => one.most)).toEqual(['1.4227']);
+    } finally { now.mockRestore(); }
+  });
+
   describe('a start refused for its price (N32)', () => {
     const quoted = (maximum: string) => offerOf({ operation: { ...offerOf().operation, maximum_usd: maximum } });
     /** The offer first at $1.43, then at `next` once the start is refused for an expired quote. */
@@ -767,10 +807,12 @@ describe('Create a world with web notes', () => {
     searches: [search, search, search],
   });
   const asked: { method: string; path: string; body: unknown }[] = [];
-  afterEach(() => { vi.unstubAllGlobals(); starts.length = 0; asked.length = 0; opened.length = 0; sessionStorage.clear(); });
+  afterEach(() => { vi.unstubAllGlobals(); starts.length = 0; asked.length = 0; opened.length = 0; sessionStorage.clear(); startAnswer = async () => ({ draftId: 'd-1', state: 'queued', refusal: null }); });
 
-  /** The offer with notes, the notes request's answers in turn (or a refusal), then the draft's reads. */
-  function serveNotes(answers: unknown[] | 'refused', reads: Record<string, unknown>[]): void {
+  /** The offer with notes (or as `offers` give it, one per read and the last again), the notes request's answers in turn
+   * (or a refusal), then the draft's reads. */
+  function serveNotes(answers: unknown[] | 'refused', reads: Record<string, unknown>[], offers: Record<string, unknown>[] | null = null): void {
+    let offerReads = 0;
     vi.stubGlobal('fetch', vi.fn(async (address: string, init?: RequestInit) => {
       const path = new URL(address).pathname, method = init?.method ?? 'GET';
       asked.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : null });
@@ -779,7 +821,7 @@ describe('Create a world with web notes', () => {
         return answers === 'refused' ? answer(409, { code: 'references_not_run_here', detail: 'no' }) : answer(202, answers.shift());
       }
       if (path.startsWith('/worlds/references/')) return answer(200, (answers as unknown[]).shift());
-      if (path === '/worlds/drafts') return answer(200, offerOf({ own_key: true, notes: NOTES_OFFER }));
+      if (path === '/worlds/drafts') return answer(200, offers === null ? offerOf({ own_key: true, notes: NOTES_OFFER }) : offers[Math.min(offerReads++, offers.length - 1)]);
       return answer(200, reads.shift() ?? { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 });
     }));
   }
@@ -832,6 +874,80 @@ describe('Create a world with web notes', () => {
     await settle(); await settle();
     expect(starts.map((one) => one.reference)).toEqual([null]);
     expect(document.querySelector('.wu-notes-panel')!.textContent).toContain('The web notes could not be made, so it is made from your words alone.');
+  });
+
+  describe('the start after the notes (the judges\' server, 27 October: a quote expired while the notes ran)', () => {
+    const priced = (maximum: string) => offerOf({ own_key: true, notes: NOTES_OFFER, operation: { ...offerOf().operation, maximum_usd: maximum } });
+    const refusedFor = (code: string) => Object.assign(new Error('refused'), { code });
+    const offerReads = () => asked.filter((one) => one.method === 'GET' && one.path === '/worlds/drafts').length;
+    /** Ticks the box, types, presses Enter in the field and lets the notes and the start answer. */
+    const pressedWithNotes = async (): Promise<void> => {
+      await mountNotes();
+      document.querySelector<HTMLInputElement>('.wu-notes-box')!.click();
+      const field = document.querySelector<HTMLTextAreaElement>('.wu-light-field')!;
+      type(field, 'a cozy little town by the sea at dusk');
+      field.focus();
+      key(field, 'Enter');
+      await settle(); await settle(); await settle();
+    };
+
+    it('reads the sheet again after the notes, and after a start refused for its price reads again and starts once', async () => {
+      serveNotes([KEPT], [{ state: 'making', elapsed_seconds: 1, poll_after_seconds: 30 }]);
+      let answers = 0;
+      startAnswer = async () => { if (answers++ === 0) throw refusedFor('world_draft_price_expired'); return { draftId: 'd-2', state: 'queued', refusal: null }; };
+      await pressedWithNotes();
+      // Read when Create opened, again after the notes, and again after the refusal.
+      expect(offerReads()).toBe(3);
+      expect(starts.map((one) => one.reference)).toEqual(['r-1', 'r-1']);
+      // Following the draft on frame 21, never left on the notes' last step.
+      expect([...document.querySelectorAll('.wu-step-words')].map((one) => one.textContent)).toContain('Building it');
+      expect(document.body.textContent).not.toMatch(/price changed|price went up/u);
+    });
+
+    it('stops at a higher price and says the new figure where the price was, waiting for Create', async () => {
+      serveNotes([KEPT], [], [priced('1.4227'), priced('1.4227'), priced('1.6')]);
+      startAnswer = async () => { throw refusedFor('world_draft_price_expired'); };
+      await pressedWithNotes();
+      expect(starts).toHaveLength(1);
+      expect(document.body.textContent).toContain('The price went up before it started. It can now spend at most $1.60.');
+      expect(document.querySelector('.wu-light-steps')).toBeNull();
+      expect(document.querySelector('.wu-notes-panel')).toBeNull();
+      expect(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!.value).toBe('a cozy little town by the sea at dusk');
+    });
+
+    it('stops at a higher price read after the notes before any start is sent', async () => {
+      serveNotes([KEPT], [], [priced('1.4227'), priced('1.6')]);
+      await pressedWithNotes();
+      expect(starts).toEqual([]);
+      expect(document.body.textContent).toContain('The price went up before it started. It can now spend at most $1.60.');
+      expect(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!.value).toBe('a cozy little town by the sea at dusk');
+    });
+
+    it('does not loop on a second refusal for its price: it says the price changed, with the new most, and waits', async () => {
+      serveNotes([KEPT], []);
+      startAnswer = async () => { throw refusedFor('world_draft_price_expired'); };
+      await pressedWithNotes();
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      await settle();
+      expect(starts.map((one) => one.reference)).toEqual(['r-1', 'r-1']);
+      expect(document.body.textContent).toContain('The price changed before it started. Here is the new most it can spend.');
+      // The notes were this draft's own: the box is unticked again, and the price is the draft's.
+      expect(document.body.textContent).toContain('at most $1.43, and you see what it really spent.');
+      expect(document.querySelector<HTMLInputElement>('.wu-notes-box')!.checked).toBe(false);
+      expect(document.querySelector('.wu-light-steps')).toBeNull();
+    });
+
+    it('leaves frame 21 for any other refusal, its sentence said and the words kept', async () => {
+      serveNotes([KEPT], []);
+      startAnswer = async () => { throw refusedFor('kind_draft_busy'); };
+      await pressedWithNotes();
+      expect(starts).toHaveLength(1);
+      expect(document.body.textContent).toContain('A world is being made already. It waits in Your worlds when it\u2019s done.');
+      expect(document.querySelector('.wu-light-steps')).toBeNull();
+      expect(document.querySelector('.wu-notes-panel')).toBeNull();
+      expect(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!.value).toBe('a cozy little town by the sea at dusk');
+      expect(document.activeElement).toBe(document.querySelector('.wu-light-field'));
+    });
   });
 
   it('asks the web for nothing where the box is not ticked: a control', async () => {
