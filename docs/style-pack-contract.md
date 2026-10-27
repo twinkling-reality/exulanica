@@ -1036,7 +1036,13 @@ measurement, whose record holds the primary's own calls
 past the timeout leaves the town drawn as its look states, with no error. Thirty descriptions by
 one author over eleven parts do not establish how well the step reads other words. The parts name
 no rain, no falling snow and no season, so words that ask for those are answered with the nearest
-listed part or none. The answer states one list of copied words for all its parts, so code holds
+listed part or none: rain is overcast. Version 2 of the step's words
+(`exulanica/selection/setting-choosing.v2.json`) also takes the one setting a kind of place stands
+in, as a person would picture it, where its words name no ground: a fishing village, a harbour, a
+port, a quay, a pier, a lighthouse, a beach or an island stands by the sea, a ski or winter
+village in snow, an oasis or dunes in desert sand. The timing record above measured version 1;
+version 2 was tried on one author's 23 sentences through the page, one try each, which shows what
+it did with those words and no more. The answer states one list of copied words for all its parts, so code holds
 that the words are the person's and that some stand behind some part, not that each part has
 words of its own: an offer may carry a part no word asked for, which is why the page shows an
 offer and never takes it for the person.

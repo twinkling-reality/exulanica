@@ -521,7 +521,7 @@ def test_a_setting_the_words_ask_for_is_offered_in_the_persons_own_words(drafts,
     assert offer["parts_version"] == PARTS_FILE["version"]
     # The person's own words, as typed: the saved name written back, never sent.
     assert offer["setting_words"] == ["at dusk", "by the sea near lantern house"]
-    assert offer["prompt_version"] == "setting-choosing-1"
+    assert offer["prompt_version"] == "setting-choosing-2"
     assert [call["role"] for call in offer["execution"]["calls"]] == [str(SETTING_ROLE)]
     # The draft's and the look offer's executions list their own calls alone.
     assert [call["role"] for call in body["execution"]["calls"]] == [str(DRAFTER_ROLE)]
