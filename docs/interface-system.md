@@ -422,6 +422,14 @@ reads "24 people now live here, invented for this world" for a minute, and with 
 offers Build in its place. The line counts people: a creature placed from Creatures (a being of a kind
 its workspace made) lives among them and is seen by its own tag, never in the count.
 
+In a made town, X opens the data view (`tools/previews/world-workspace/world-data-view.ts`), listed on the keys
+card only where it works: a small card with one slider from World to Data. As it moves, the town's surfaces go
+dark where they stand and glowing points sampled from them take their place, each coloured by the kind of record
+it stands on; each thing the town's own tile records name gets a thin box and a tag in the shipped catalogs' words
+(a premises by its use, a street tree by its species, street furniture by its class, a street by its name), and
+each person a tag with their name and, under it, the model that decides for them where one does. X or Esc puts
+the town back as it was; the data view keeps nothing and is never a pick target.
+
 When the playback control says open models are not asked for the people here now (its
 `model_minds_code`, `spending_cap_reached` when the allowance for this visit is used up), People says
 so in one calm status line under the play controls and Who decides says the same in place of its
