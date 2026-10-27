@@ -2,7 +2,7 @@
 // of record a point stands on, where a tag hangs and which tags show. Run: node verify-data-view-things.mjs
 import assert from 'node:assert/strict';
 import { SPLIT, neededDensity, surfaceIndex, surfaceSamples, takenCount, trianglesNear } from './data-view-samples.mjs';
-import { bigEnough, boxOfExtent, creatureWords, keepStep, kindMaker, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, thingWords, townThings, walkerBoxes } from './data-view-things.mjs';
+import { bigEnough, boxOfExtent, easedAlbedoChunk, creatureWords, keepStep, kindMaker, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, thingWords, townThings, walkerBoxes } from './data-view-things.mjs';
 
 const extent = (x0, y0, z0, x1, y1, z1) => ({ min_x_mm: x0, min_y_mm: y0, min_z_mm: z0, max_x_mm: x1, max_y_mm: y1, max_z_mm: z1 });
 const record = (kind, identity, fields, membership = 'owned') => ({ kind, identity, membership, fields: { identity, ...fields } });
@@ -211,6 +211,22 @@ assert.deepEqual(made({ name: null, kindLabel: () => null }), { name: 'creature'
   assert.ok(need({ distance: 5 }) > need({}) && need({ facing: 1 }) > need({}) && need({ slack: 3 }) > need({}));
   // Nothing nearer than `nearest` is asked denser than there.
   assert.equal(need({ distance: 0.5, facing: 1 }), need({ distance: 2, facing: 1 }));
+}
+
+// A colour chunk of a material's own, eased whole in its dark copy: its one colour function renamed and called first,
+// then all it made eased by the data view's uniform, so a band of colour it mixes in (the land's rock on a slope) goes
+// dark with the rest; a chunk with no one colour function is left as it is.
+{
+  const land = 'uniform vec3 material_diffuse;\nvoid exuLandBase() {\n\tdAlbedo = material_diffuse.rgb;\n}\nvoid getAlbedo() {\n\texuLandBase();\n\tdAlbedo = mix(dAlbedo, vec3(0.42, 0.3, 0.2), slope);\n}\n';
+  const eased = easedAlbedoChunk(land);
+  assert.ok(eased.startsWith('uniform vec3 material_diffuse;'));
+  assert.equal(eased.split('void getAlbedo() {').length, 2);
+  assert.ok(eased.includes('void exuDataViewAlbedo() {\n\texuLandBase();\n\tdAlbedo = mix(dAlbedo, vec3(0.42, 0.3, 0.2), slope);'));
+  assert.ok(eased.trimEnd().endsWith('void getAlbedo() {\n\texuDataViewAlbedo();\n\tdAlbedo *= uDataViewAlbedo;\n}'));
+  assert.ok(eased.indexOf('uniform float uDataViewAlbedo;') > eased.indexOf('void exuDataViewAlbedo() {'));
+  assert.equal(easedAlbedoChunk('void main() {}'), null);
+  assert.equal(easedAlbedoChunk(land + land), null);
+  assert.equal(easedAlbedoChunk(undefined), null);
 }
 
 console.log('data-view-things: all checks pass');

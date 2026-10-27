@@ -30,7 +30,7 @@ import type { LoadedGeneratedTile } from '../../../web/packages/atlas-react/src/
 import type { staticMeshRepresentation } from '../../../web/packages/atlas-react/src/playcanvas/representation-binding.ts';
 import type { RepresentationPointAllocation, RepresentationReport } from '../../../web/packages/atlas-react/src/playcanvas/representation-runtime.ts';
 import { SPLIT, surfaceIndex, surfaceSamples, trianglesNear } from './data-view-samples.mjs';
-import { bigEnough, keepStep, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, townThings, walkerBoxes } from './data-view-things.mjs';
+import { bigEnough, easedAlbedoChunk, keepStep, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, townThings, walkerBoxes } from './data-view-things.mjs';
 import { sceneHit, sceneSight } from './scene-sight.ts';
 import { DATA_WORDS } from './world-words.mjs';
 import './world-data-view.css';
@@ -101,12 +101,17 @@ interface Colour { r: number; g: number; b: number; set(r: number, g: number, b:
 interface Darkenable {
   clone(): Darkenable; update(): void; destroy(): void; diffuse: Colour; emissive: Colour; specular?: Colour; specularityFactor?: number;
   reflectivity?: number; useMetalness?: boolean; useMetalnessSpecularColor?: boolean;
+  getShaderChunks?(language: string): { get(name: string): unknown; set(name: string, code: string): void };
+  setParameter?(name: string, value: number): void;
 }
 /** A material's dark copy and the colours, shine and reflection it is darkened from. */
 interface Dark {
   readonly copy: Darkenable; readonly diffuse: Vec; readonly emissive: Vec; readonly specular: Vec | null; readonly specularity: number | null;
   readonly reflectivity: number | null; shaped: boolean;
+  /** Whether its colour chunk is eased whole (easedAlbedoChunk) rather than its colour alone. */
+  readonly wrapped: boolean;
 }
+
 /** A standard material's own colour and value fields and its parameters, which easing writes without a new shader. */
 interface Uniforms {
   _diffuse: Colour; _emissive: Colour; _specular?: Colour; _specularityFactor?: number; _reflectivity?: number;
@@ -303,31 +308,43 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     // copy takes that shine as a white specular colour it can ease out (the same look until it is eased).
     const shine = material.useMetalness === true && material.useMetalnessSpecularColor !== true && copy.specular !== undefined;
     if (shine) copy.useMetalnessSpecularColor = true;
+    // A colour chunk of the material's own (the engine copies a material's chunks for its clone) is eased whole: its
+    // copy keeps its colour, and the chunk's result goes dark instead. GLSL alone, as the land's bands are.
+    const chunks = copy.getShaderChunks?.('glsl');
+    const eased = easedAlbedoChunk(chunks?.get('diffusePS'));
+    const wrapped = eased !== null;
+    if (wrapped) {
+      chunks!.set('diffusePS', eased);
+      copy.setParameter?.('uDataViewAlbedo', 1);
+    }
     const dark: Dark = {
       copy, diffuse: rgb(material.diffuse), emissive: rgb(material.emissive),
       specular: shine ? [1, 1, 1] : material.specular ? rgb(material.specular) : null,
       specularity: shine ? 1 : typeof material.specularityFactor === 'number' ? material.specularityFactor : null,
-      reflectivity: typeof material.reflectivity === 'number' ? material.reflectivity : null, shaped: false,
+      reflectivity: typeof material.reflectivity === 'number' ? material.reflectivity : null, shaped: false, wrapped,
     };
     darks.set(material, dark);
     return { dark, made: true };
   }
 
   /**
-   * Eases one dark copy toward the ground: its own colour, shine and reflection out by `weight`, the ground's colour
-   * in. The engine takes reading a material's colour as a change to its shader, so this is done only as the slider
+   * Eases one dark copy toward the ground: its own colour (or all its colour chunk made), shine and reflection out by
+   * `weight`, the ground's colour in. The engine takes reading a material's colour as a change to its shader, so this is done only as the slider
    * moves, and once for a copy made since.
    */
   function tone(dark: Dark, weight: number): void {
     const keep = 1 - weight;
-    const diffuse: Vec = [dark.diffuse[0] * keep, dark.diffuse[1] * keep, dark.diffuse[2] * keep];
+    // A copy whose colour chunk is eased whole keeps its own colour: the chunk's result is eased once, not twice.
+    const tint = dark.wrapped ? 1 : keep;
+    const diffuse: Vec = [dark.diffuse[0] * tint, dark.diffuse[1] * tint, dark.diffuse[2] * tint];
     const emissive: Vec = [dark.emissive[0] * keep + ground[0] * weight, dark.emissive[1] * keep + ground[1] * weight, dark.emissive[2] * keep + ground[2] * weight];
     const specular: Vec | null = dark.specular === null ? null : [dark.specular[0] * keep, dark.specular[1] * keep, dark.specular[2] * keep];
     if (!dark.shaped) {
       // The first easing goes through the engine, from a hair past the world end, so the copy's shader is the one every
       // later easing needs (a shine and a reflection that can be eased); the copy is worn only past the world end.
-      const shape = Math.max(weight, 0.001), held = 1 - shape;
-      dark.copy.diffuse.set(dark.diffuse[0] * held, dark.diffuse[1] * held, dark.diffuse[2] * held);
+      const shape = Math.max(weight, 0.001), held = 1 - shape, shade = dark.wrapped ? 1 : held;
+      dark.copy.diffuse.set(dark.diffuse[0] * shade, dark.diffuse[1] * shade, dark.diffuse[2] * shade);
+      if (dark.wrapped) dark.copy.setParameter?.('uDataViewAlbedo', held);
       dark.copy.emissive.set(emissive[0], emissive[1], emissive[2]);
       if (dark.specular !== null && dark.copy.specular) dark.copy.specular.set(dark.specular[0] * held, dark.specular[1] * held, dark.specular[2] * held);
       if (dark.specularity !== null) dark.copy.specularityFactor = dark.specularity * held;
@@ -349,6 +366,7 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     }
     if (dark.specularity !== null) { own._specularityFactor = dark.specularity * keep; own.setParameter('material_specularityFactor', dark.specularity * keep); }
     if (dark.reflectivity !== null) { own._reflectivity = dark.reflectivity * keep; own.setParameter('material_reflectivity', dark.reflectivity * keep); }
+    if (dark.wrapped) own.setParameter('uDataViewAlbedo', keep);
   }
 
   /**

@@ -329,3 +329,21 @@ export function creatureWords({ kind, name, maker, models, kindLabel }) {
   const model = maker ? (models ?? []).find((one) => one.modelId === maker.modelId && (maker.provider === null || one.provider === maker.provider))?.name : null;
   return typeof model === 'string' && model && typeof name === 'string' && name ? { name, model } : { name: thingName({ kind }, kindLabel), model: null };
 }
+
+/**
+ * A dark copy's colour chunk eased whole, or null where the chunk has no one colour function: where a material's own
+ * colour chunk mixes colours of its own over its colour (the land's bands of sand, planting and rock on its slopes,
+ * land-slope.ts), darkening its colour leaves those colours standing. The chunk's colour function is renamed and
+ * called first, and whatever it made is then eased toward none by `uDataViewAlbedo`, which the data view sets.
+ */
+export function easedAlbedoChunk(chunk) {
+  const colour = 'void getAlbedo() {';
+  if (typeof chunk !== 'string' || chunk.split(colour).length !== 2) return null;
+  return `${chunk.replace(colour, 'void exuDataViewAlbedo() {')}
+uniform float uDataViewAlbedo;
+void getAlbedo() {
+\texuDataViewAlbedo();
+\tdAlbedo *= uDataViewAlbedo;
+}
+`;
+}
