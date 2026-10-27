@@ -216,7 +216,7 @@ model allowance. A guest whose grant has no search left, or who holds none, is r
 | `EXULANICA_REFERENCE_WORKSPACES` | A JSON array of the workspace ids that may ask for web notes; none when absent. A malformed list stops startup |
 | `EXULANICA_REFERENCE_PICTURES` | Off unless `on`, `1`, `true` or `yes`: listed workspaces may also name their own pictures. Any other value stops startup |
 | `EXULANICA_REFERENCE_WEB_PICTURES` | Off unless `on`, `1`, `true` or `yes`: listed workspaces may also ask for picture searches. Any other value stops startup |
-| `EXULANICA_NOTES_AND_CREATURES` | `listed` (the default) or `everyone`: web notes and creatures from words are offered to the workspaces their lists name, or to every workspace here, guests included and on a `public` installation too, each paid from that workspace's own allowance. It offers web notes only: a person's own pictures and picture searches keep their own settings and stay off on a `public` installation. Any other value stops startup |
+| `EXULANICA_NOTES_AND_CREATURES` | `listed` (the default) or `everyone`: web notes and creatures from words are offered to the workspaces their lists name, or to every workspace here, guests included and on a `public` installation too, each paid from that workspace's own allowance; the reference and creature workers then look for jobs in every workspace the draft workers do, every five seconds. It offers web notes only: a person's own pictures and picture searches keep their own settings and stay off on a `public` installation. Any other value stops startup |
 | `TAVILY_API_KEY` | The source's credential, named by its catalog entry |
 | `EXULANICA_EGRESS_ALLOWLIST` | Must include `https://api.tavily.com` for web notes |
 

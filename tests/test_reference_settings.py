@@ -344,3 +344,13 @@ def test_a_guest_holds_the_search_permission_only_where_notes_are_offered_to_eve
     for withheld in (Permission.INTAKE_WRITE, Permission.DOOR_GRANT, Permission.CONSENT_WRITE):
         assert withheld not in browser_permissions(everyone, "guest")
     assert browser_permissions(everyone, "owner") == ACCOUNT_OWNER_PERMISSIONS
+
+
+def test_offered_to_everyone_the_workers_look_every_few_seconds(tmp_path) -> None:
+    """Over every workspace the draft workers look in, a pass is a few statements a workspace, so
+    the reference and creature workers wait longer between passes that found nothing."""
+    from exulanica.api.services import EVERYONE_POLL_SECONDS
+
+    assert _services(tmp_path).notes_and_creatures_poll_seconds() == 1.0
+    everyone = _services(tmp_path, notes_and_creatures_for_everyone=True)
+    assert everyone.notes_and_creatures_poll_seconds() == EVERYONE_POLL_SECONDS == 5.0

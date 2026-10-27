@@ -247,6 +247,12 @@ def held_closed(refusals: SpendingRefusals) -> bool:
 #: a route's refusal and every model ask's check, and the account role answers at most this often.
 WATCHED_READ_SECONDS: Final = 5.0
 
+#: How long the reference and creature workers wait after a pass that found nothing, where web
+#: notes and creatures are offered to everyone: each pass then looks in every workspace the draft
+#: workers do, a few statements each, so they look every few seconds rather than every second, and
+#: a request waits at most this much longer to start.
+EVERYONE_POLL_SECONDS: Final = 5.0
+
 #: How long the last good read is still used while reads fail, in seconds; after it, none is
 #: watched, so a stalled account database never keeps a departed visitor's models asked.
 WATCHED_STALE_SECONDS: Final = 60.0
@@ -814,6 +820,12 @@ class Services(ServiceRefusals, WorkerFactories):
             return frozenset(listed)
         tokens = frozenset() if self.tokens is None else self.tokens.workspaces
         return frozenset(listed) | tokens | self.watched_workspaces()
+
+    def notes_and_creatures_poll_seconds(self) -> float:
+        """How long the reference and creature workers wait after a pass that found nothing: a
+        second over the listed workspaces, :data:`EVERYONE_POLL_SECONDS` where they look in every
+        workspace the draft workers do."""
+        return EVERYONE_POLL_SECONDS if self.notes_and_creatures_for_everyone else 1.0
 
     def serves_references_to(self, workspace_id: uuid.UUID) -> bool:
         """Whether a worker here takes this workspace's reference jobs: references are played here,

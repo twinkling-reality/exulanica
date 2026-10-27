@@ -394,7 +394,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     reference_worker = services.build_reference_worker() if services.runs_reference_worker else None
     reference_thread = (
         threading.Thread(
-            target=reference_worker.run, args=(society_stop,), name="references", daemon=True
+            target=reference_worker.run,
+            args=(society_stop,),
+            kwargs={"poll_seconds": services.notes_and_creatures_poll_seconds()},
+            name="references",
+            daemon=True,
         )
         if reference_worker is not None
         else None
@@ -432,7 +436,11 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     creature_worker = services.build_creature_worker()
     creature_thread = (
         threading.Thread(
-            target=creature_worker.run, args=(society_stop,), name="creatures", daemon=True
+            target=creature_worker.run,
+            args=(society_stop,),
+            kwargs={"poll_seconds": services.notes_and_creatures_poll_seconds()},
+            name="creatures",
+            daemon=True,
         )
         if creature_worker is not None
         else None
