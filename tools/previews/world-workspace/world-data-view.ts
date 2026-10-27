@@ -45,7 +45,7 @@ const GLIDE_MS = 1400;
 const REACH = Object.freeze({ thing: 70, person: 45, street: 60 });
 /** How often a tag's sight line is asked again, ms, and how many are asked in one frame. */
 const SIGHT_MS = 250;
-const SIGHTS_PER_FRAME = 24;
+const SIGHTS_PER_FRAME = 12;
 /** How far short of its anchor a sight line stops, metres: a face's own wall, a person's own body. */
 const OWN = Object.freeze({ face: 0.8, top: 0.6, person: 0.5, line: 0.5 });
 /** How often a person's name and model are read again for their tag, ms: a model can change while the view shows. */
@@ -377,6 +377,9 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     return words;
   }
 
+  /** Each tag's size as last measured, for its words and the page's scale then. */
+  const sizes = new WeakMap<HTMLDivElement, { text: string; scale: number; width: number; height: number }>();
+
   /** One tag's element, by key, drawn once with its lines and the kind's colour at its edge. */
   function tagOf(key: string, lines: readonly string[], colour: DataViewHex, person: boolean): HTMLDivElement {
     let tag = tags.get(key);
@@ -396,7 +399,7 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
         return made;
       }));
     }
-    tag.style.setProperty('--data-kind', colour);
+    if (tag.style.getPropertyValue('--data-kind') !== colour) tag.style.setProperty('--data-kind', colour);
     return tag;
   }
 
@@ -404,7 +407,7 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
   function drawTags(now: number): void {
     const camera = binding.camera.camera;
     if (mix <= 0.02 || camera === null) {
-      for (const tag of tags.values()) tag.hidden = true;
+      for (const tag of tags.values()) show(tag, false);
       return;
     }
     const from = eye();
@@ -445,23 +448,38 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
       if (screen === null || !inSight(`person:${one.id}`, 'person', at, from, now, asked)) continue;
       wanted.push({ key: `person:${one.id}`, lines: personLines(wordsOf(one.id, now)), colour: style.boxes.selectedColour, person: true, x: screen.x, y: screen.y, distance });
     }
-    // Measured on their own elements, then placed: each sits just over its anchor, centred on it.
+    // Measured on their own elements once for their words and the page's scale, then placed: each sits just over its
+    // anchor, centred on it. Nothing is written to a tag that has not changed, so a still view lays out nothing.
+    const scale = Number.parseFloat(host.style.getPropertyValue('--ui-scale')) || 1;
     const measured = wanted.map((one) => {
       const tag = tagOf(one.key, one.lines, one.colour, one.person);
-      tag.hidden = false;
-      return { ...one, tag, width: tag.offsetWidth, height: tag.offsetHeight };
+      show(tag, true);
+      let size = sizes.get(tag);
+      if (size === undefined || size.text !== tag.dataset.text || size.scale !== scale) {
+        size = { text: tag.dataset.text ?? '', scale, width: tag.offsetWidth, height: tag.offsetHeight };
+        sizes.set(tag, size);
+      }
+      return { ...one, tag, width: size.width, height: size.height };
     });
-    const lift = 6 * (Number.parseFloat(host.style.getPropertyValue('--ui-scale')) || 1);
+    const lift = 6 * scale;
     const kept = new Set(placeTags(measured.map((one) => ({ ...one, x: one.x - one.width / 2, y: one.y - one.height - lift })), {
       width: innerWidth, height: innerHeight, most: style.tags.maxCount,
     }).map((one: { readonly key: string }) => one.key));
     const opacity = String(smooth((mix - 0.15) / 0.5));
+    const placed = new Set<HTMLDivElement>();
     for (const one of measured) {
-      if (!kept.has(one.key)) { one.tag.hidden = true; continue; }
-      one.tag.style.transform = `translate(${Math.round(one.x - one.width / 2)}px, ${Math.round(one.y - one.height - lift)}px)`;
-      one.tag.style.opacity = opacity;
+      if (!kept.has(one.key)) continue;
+      placed.add(one.tag);
+      const transform = `translate(${Math.round(one.x - one.width / 2)}px, ${Math.round(one.y - one.height - lift)}px)`;
+      if (one.tag.style.transform !== transform) one.tag.style.transform = transform;
+      if (one.tag.style.opacity !== opacity) one.tag.style.opacity = opacity;
     }
-    for (const [key, tag] of tags) if (!measured.some((one) => one.key === key)) tag.hidden = true;
+    for (const tag of tags.values()) show(tag, placed.has(tag));
+  }
+
+  /** Shows or hides a tag, writing only a change. */
+  function show(tag: HTMLDivElement, on: boolean): void {
+    if (tag.hidden === on) tag.hidden = !on;
   }
 
   function setMix(next: number): void {
