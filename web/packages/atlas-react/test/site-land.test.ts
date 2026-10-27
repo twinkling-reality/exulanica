@@ -358,8 +358,8 @@ describe('the land round a town on its land', () => {
       const { diffuse } = round.drawn.ground[0]!.material as pc.StandardMaterial;
       return [diffuse.r, diffuse.g, diffuse.b].map((value) => Math.round(value * 1000) / 1000);
     };
-    // A desert setting's sand, as a look's open ground is handed over: linear RGB.
-    const sand = [0.686, 0.468, 0.216] as const;
+    // A desert setting's sand [216, 182, 128], as a material's diffuse takes it: sRGB, 0 to 1.
+    const sand = [0.847, 0.714, 0.502] as const;
     const given = attachLandRound({ app, camera, environmentRoot }, land, (x, y) => x === 0 && y === 0, SURFACES, sand);
     expect(worn(given)).toEqual([...sand]);
     given.dispose();

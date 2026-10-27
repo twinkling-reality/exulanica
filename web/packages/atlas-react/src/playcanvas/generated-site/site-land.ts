@@ -856,8 +856,9 @@ export function drawSiteLand(
 
 /**
  * Draw the land round a town made on its land, under the host's environment root: every near chunk
- * its tiles do not cover (`covered` names those they do) in `ground` (linear RGB: the open ground
- * the town's look draws, or the land's plain ground) with its surfaces over it, the backdrop
+ * its tiles do not cover (`covered` names those they do) in `ground` (sRGB, each channel 0 to 1, as a
+ * material's diffuse takes it: the open ground the town's look draws, or the land's plain ground)
+ * with its surfaces over it, the backdrop
  * coloured over the same ground, and the water, with the camera seeing as far as the backdrop
  * reaches. Disposing takes it all away and gives the camera back its far plane.
  */

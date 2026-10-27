@@ -197,7 +197,7 @@ describe("a town on its land's land, read", () => {
     drawnRound.scenery.length = 0;
     // A shipped look's grass: the site scenery catalog's trees for grass, past the town's chunk and
     // never on it, on dry land only (all of this land, which stands 6 m and more above its sea).
-    const grass = town.draw(scene, covered, { linear: [0.25, 0.37, 0.12], swatch: 'grass' });
+    const grass = town.draw(scene, covered, { rgb: [136 / 255, 165 / 255, 96 / 255], swatch: 'grass' });
     expect(drawnRound.scenery).toHaveLength(1);
     const [trees] = drawnRound.scenery;
     expect(trees!.key).toBe('tree');
@@ -210,7 +210,7 @@ describe("a town on its land's land, read", () => {
     grass.dispose();
     expect(trees!.destroyed).toBe(true);
     // A setting's own sand, and the land's own plain ground, stand nothing.
-    town.draw(scene, covered, { linear: [0.69, 0.47, 0.22], swatch: 'setting_surface_0' }).dispose();
+    town.draw(scene, covered, { rgb: [216 / 255, 182 / 255, 128 / 255], swatch: 'setting_surface_0' }).dispose();
     town.draw(scene, covered).dispose();
     expect(drawnRound.scenery).toHaveLength(1);
   });
@@ -308,7 +308,7 @@ describe("a town on its land's land, drawn", () => {
     drawn.dispose();
     expect(order).toEqual(['tiles drawn', 'land drawn', 'land taken away', 'tiles taken away']);
     // In the open ground of the look the tiles are drawn in, where it is handed one; else the land's own.
-    const sand = { linear: [0.686, 0.468, 0.216], swatch: 'setting_surface_0' } as const;
+    const sand = { rgb: [216 / 255, 182 / 255, 128 / 255], swatch: 'setting_surface_0' } as const;
     withTownLand(tile, town, [{ tileX: 0, tileY: 0 }], sand).attach({} as GeneratedTileHost).dispose();
     expect(worn).toEqual([null, sand]);
   });

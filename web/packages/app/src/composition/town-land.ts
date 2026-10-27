@@ -49,8 +49,8 @@ export const LAND_WAIT_MS = 300_000;
 /** What the land round a town wears: one material for every near chunk, with its surfaces over it. */
 type LandGround = DrawnSiteLand['ground'][number]['material'];
 
-/** A colour in linear RGB, as the land is drawn in. */
-type LinearRgb = readonly [number, number, number];
+/** A colour as a material's diffuse takes it: sRGB, each channel 0 to 1. */
+type Rgb = readonly [number, number, number];
 
 /** The look role a town's open ground is drawn in, which the land round it wears too. */
 export const OPEN_GROUND_ROLE = 'ground.default';
@@ -78,13 +78,13 @@ export function openGroundColour(pack: Pick<ResolvedStylePack, 'swatches' | 'sur
 }
 
 /**
- * The open ground of the look a town is drawn in, as its land wears it: the colour, linear, and
+ * The open ground of the look a town is drawn in, as its land wears it: the colour, sRGB 0 to 1, and
  * the swatch it is named by, which names the scenery the site scenery catalog stands on such ground
  * (trees on grass). A setting's own swatch names none, so a town in its setting's sand or snow
  * stands on that ground alone.
  */
 export interface OpenGround {
-  readonly linear: LinearRgb;
+  readonly rgb: Rgb;
   readonly swatch: string;
 }
 
@@ -181,7 +181,7 @@ export async function loadTownLand(access: Credentials, entry: SavedWorldEntry, 
   return Object.freeze({
     land,
     draw: (host: GeneratedTileHost, covered: (chunkX: number, chunkY: number) => boolean, open: OpenGround | null = null) => {
-      const round = attachLandRound(host, land, covered, LAND_SURFACES, open?.linear);
+      const round = attachLandRound(host, land, covered, LAND_SURFACES, open?.rgb);
       // What stands on the land past the town, as a place stands its scenery beyond it: the site
       // scenery catalog's entry for the town's open ground, on dry land only and never on the sand
       // by the sea, from the town's rectangle (the chunks under its tiles) outward.

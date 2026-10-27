@@ -383,7 +383,7 @@ export async function loadGeneratedWorld(
     if (town === null) return tile;
     const colour = look === null ? null : openGroundColour(look.pack);
     const swatch = look === null ? null : openGroundSwatch(look.pack);
-    return withTownLand(tile, town, ground.tiles, colour === null || swatch === null ? null : { linear: look!.style.linearRgb(colour), swatch });
+    return withTownLand(tile, town, ground.tiles, colour === null || swatch === null ? null : { rgb: [colour[0] / 255, colour[1] / 255, colour[2] / 255], swatch });
   };
   const edged = <Look extends object>(look: Look): Look => (town === null ? look : withoutEdge(look));
   const [first, ...rest] = containers;
