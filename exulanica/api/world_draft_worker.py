@@ -53,6 +53,7 @@ FIELDS = (
     "stage",
     "tool",
     "tool_chosen",
+    "tool_fallback",
     "entry_id",
     "made",
     "left_out",

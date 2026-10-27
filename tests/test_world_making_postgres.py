@@ -48,7 +48,14 @@ from fastapi.testclient import TestClient
 from model_fakes import FakeTransport, chat_body
 from spending_support import bench as bench
 from test_companion_saved_names import named as saved_named  # noqa: F401
-from test_kind_drafts_postgres import NEIGHBOUR_TOKEN, NO_MODEL_TOKEN, OTHER_TOKEN, TOKEN, _farm
+from test_kind_drafts_postgres import (
+    DRAFTER,
+    NEIGHBOUR_TOKEN,
+    NO_MODEL_TOKEN,
+    OTHER_TOKEN,
+    TOKEN,
+    _farm,
+)
 from test_kind_drafts_postgres import _reply as _brief
 from test_kind_drafts_postgres import _start as _start_kind
 from test_kind_drafts_postgres import drafts as imported_drafts  # noqa: F401
@@ -797,22 +804,129 @@ def test_on_land_a_town_no_candidate_of_which_fits_its_land_is_made_level_and_sa
         assert "land" not in receipt
 
 
-def test_a_draft_no_brief_makes_a_place_of_is_refused_by_name_and_writes_nothing(drafts):
+HARBOUR_WORDS = "A harbour with fishing boats, a market on the quay and a lighthouse"
+
+
+def _town_instead(ended: dict[str, Any], client: TestClient, *drafter_calls: str) -> None:
+    """A draft the place tool's drafter could not make, made by the town tool instead: a small
+    town, the tool said as taken so, every call of both tools shown, and no kind kept."""
+    assert ended["state"] == "ready", ended
+    assert ended["tool"] == {"key": "town", "chosen_by": "fallback"}
+    entry = ended["entry"]
+    assert entry["generated_site"] is None
+    assert entry["generated_ground"]["recipe_key"] == "small_town"
+    stated = [part["key"] for part in town_adapter().document["parts"]]
+    assert [made["key"] for made in ended["made"]] == stated
+    roles = [call["role"] for call in ended["execution"]["calls"]]
+    assert roles == [
+        "world_tool_chooser",
+        *drafter_calls,
+        "specification_drafter",
+        "look_chooser",
+        "setting_chooser",
+    ]
+    assert _count(client, "world_kind_version") == 0
+
+
+def test_a_draft_no_brief_makes_a_place_of_is_made_a_town_instead(drafts, fixed_identities):
+    """The kind drafter refused every brief: the same words go to the town tool, so the person
+    still gets a world, titled from their words as any town is, and what the town could not make
+    is left out."""
     app, transport = drafts
     broken = _farm()
     broken["zones"] = []
-    transport.responses.extend([_tool("place", "a small farm")] + [_brief(broken)] * 3)
+    left_out = ["a duck pond"]
+    transport.responses.extend(
+        [
+            _tool("place", "a small farm"),
+            *[_brief(broken)] * 3,
+            _json(_town_form(fit="part", not_supported=left_out)),
+            *_plain(),
+        ]
+    )
+    with app() as client:
+        ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
+        _town_instead(ended, client, *["kind_drafter"] * 3)
+        assert ended["entry"]["title"] == "A small farm with a farmhouse"
+        assert ended["left_out"] == left_out
+
+
+def test_a_place_whose_drafter_ran_on_is_made_a_town_with_the_place_s_parts_left_out(
+    drafts, fixed_identities
+):
+    """The kind drafter's answer ran on past its ceiling, which it is not asked again at: the
+    town tool makes the words instead, and every part of the place it could not make is said as
+    left out, the one whose words chose the setting too: sea beyond a town is no harbour."""
+    app, transport = drafts
+    cut = chat_body(json.dumps(_farm())[:600], finish_reason="length", model=DRAFTER)
+    left_out = ["A harbour", "fishing boats", "the quay", "a lighthouse"]
+    transport.responses.extend(
+        [
+            _tool("place", "A harbour"),
+            HttpResponse(status_code=200, text=json.dumps(cut)),
+            _json(_town_form(fit="part", not_supported=left_out)),
+            _look(None),
+            _setting("A harbour", ground="sea"),
+        ]
+    )
+    with app() as client:
+        ended = _ended(client, _start(client, HARBOUR_WORDS).json()["draft_id"])
+        _town_instead(ended, client, "kind_drafter")
+        assert ended["entry"]["title"] == "A harbour with fishing boats"
+        assert ended["setting"]["words"] == ["A harbour"]
+        assert ended["left_out"] == left_out
+
+
+@pytest.mark.parametrize(
+    ("phrases", "left_out"), [(["a duck pond"], ["a duck pond"]), ([], [FARM_WORDS])]
+)
+def test_a_place_the_town_drafter_finds_no_town_in_is_made_the_first_town_all_the_same(
+    drafts, fixed_identities, phrases, left_out
+):
+    """No town in the words either, says the town's drafter: the draft does not end there, since
+    the words named a place the place tool could not make. The first town the served document
+    lists stands, whatever preset the refusing form named, and every phrase the drafter named is
+    left out, or the whole description where it named none."""
+    app, transport = drafts
+    broken = _farm()
+    broken["zones"] = []
+    transport.responses.extend(
+        [
+            _tool("place", "a small farm"),
+            *[_brief(broken)] * 3,
+            _json(_town_form(preset="market_town", fit="none", not_supported=phrases)),
+            *_plain(),
+        ]
+    )
+    with app() as client:
+        ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
+        _town_instead(ended, client, *["kind_drafter"] * 3)
+        assert ended["left_out"] == left_out
+
+
+def test_a_place_whose_town_drafter_fails_too_is_refused_by_the_town_s_name(drafts):
+    app, transport = drafts
+    broken = _farm()
+    broken["zones"] = []
+    transport.responses.extend(
+        [
+            _tool("place", "a small farm"),
+            *[_brief(broken)] * 3,
+            *[HttpResponse(status_code=500, text="the provider failed")] * 4,
+        ]
+    )
     with app() as client:
         before = _count(client, "world_identity")
         ended = _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
-        assert ended["state"] == "refused", ended
-        assert ended["refusal"]["code"] == "kind_not_drafted"
+        assert (ended["state"], ended["refusal"]["code"]) == ("refused", "world_draft_model_failed")
         assert ended["refusal"]["code"] in {code["code"] for code in ended["refusals"]}
+        assert ended["tool"] == {"key": "town", "chosen_by": "fallback"}
         assert ended["entry"] is None and ended["made"] == []
         # A draft that made no world keeps no sentence: it is forgotten as before (0222).
         assert ended["description"] == "" and _count(client, "world_made_from") == 0
-        # Every call it made is still shown: the chooser's and each of the drafter's attempts.
-        assert len(ended["execution"]["calls"]) == 4
+        # Every call it made is still shown: the chooser's and each of the kind drafter's.
+        roles = [call["role"] for call in ended["execution"]["calls"]]
+        assert roles[:4] == ["world_tool_chooser", *["kind_drafter"] * 3]
         assert _count(client, "world_identity") == before
         assert _count(client, "world_kind_version") == 0
 
@@ -1567,9 +1681,23 @@ def test_the_page_s_fixture_is_what_the_draft_routes_answer(drafts, fixed_identi
         served["ready_town"] = _as_served(
             _ended(client, _start(client, TOWN_WORDS).json()["draft_id"])
         )
+        # No brief makes the place, so the town tool makes the words: once a town, and once
+        # refused, where the town's drafter fails too.
         broken = _farm()
         broken["zones"] = []
-        transport.responses.extend([_tool("place", "a small farm")] + [_brief(broken)] * 3)
+        transport.responses.extend(
+            [_tool("place", "a small farm"), *[_brief(broken)] * 3, _json(_town_form()), *_plain()]
+        )
+        served["ready_fallback"] = _as_served(
+            _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
+        )
+        transport.responses.extend(
+            [
+                _tool("place", "a small farm"),
+                *[_brief(broken)] * 3,
+                *[HttpResponse(status_code=500, text="the provider failed")] * 4,
+            ]
+        )
         served["refused"] = _as_served(
             _ended(client, _start(client, FARM_WORDS).json()["draft_id"])
         )

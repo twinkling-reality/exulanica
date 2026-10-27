@@ -34479,7 +34479,8 @@
       "type": "string",
       "enum": [
        "model",
-       "unsure"
+       "unsure",
+       "fallback"
       ],
       "title": "Chosen By"
      }

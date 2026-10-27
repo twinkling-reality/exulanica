@@ -62,8 +62,8 @@ export interface WorldMakingDraft {
   readonly elapsedSeconds: number;
   /** When to ask again while it runs; null once it ended. */
   readonly pollAfterSeconds: number | null;
-  /** The tool that drafts and makes the world, and whether a model chose it. */
-  readonly tool: { readonly key: string; readonly chosenBy: 'model' | 'unsure' } | null;
+  /** The tool that drafts and makes the world, and who chose it: a model, the catalog for an unsure choice, or the fallback to the town where the place tool's drafter could not make the words. */
+  readonly tool: { readonly key: string; readonly chosenBy: 'model' | 'unsure' | 'fallback' } | null;
   readonly entry: SavedWorldEntry | null;
   readonly made: readonly MadePart[];
   /** What the words asked for that the made world does not say, each the person's own words. */
@@ -297,7 +297,7 @@ export function parseWorldMakingDraft(raw: unknown): WorldMakingDraft {
   if (!STATES.includes(state)) fail('draft state');
   const tool = held['tool'] === null || held['tool'] === undefined ? null : object(held['tool'], 'draft tool');
   const chosenBy = tool?.['chosen_by'];
-  if (tool !== null && chosenBy !== 'model' && chosenBy !== 'unsure') fail('draft tool');
+  if (tool !== null && chosenBy !== 'model' && chosenBy !== 'unsure' && chosenBy !== 'fallback') fail('draft tool');
   const refusal = held['refusal'] === null || held['refusal'] === undefined ? null : object(held['refusal'], 'draft refusal');
   const entry = held['entry'] === null || held['entry'] === undefined ? null : parseEntry(held['entry']);
   if (state === 'ready' && entry === null) fail('made world');
@@ -314,7 +314,7 @@ export function parseWorldMakingDraft(raw: unknown): WorldMakingDraft {
     description: text(held['description'], 'draft description'),
     elapsedSeconds: whole(held['elapsed_seconds'], 'draft elapsed seconds'),
     pollAfterSeconds: poll === null || poll === undefined ? null : whole(poll, 'draft poll interval'),
-    tool: tool === null ? null : Object.freeze({ key: text(tool['key'], 'tool key'), chosenBy: chosenBy as 'model' | 'unsure' }),
+    tool: tool === null ? null : Object.freeze({ key: text(tool['key'], 'tool key'), chosenBy: chosenBy as 'model' | 'unsure' | 'fallback' }),
     entry,
     made: Object.freeze(list(held['made'], 'made parts').map((one): MadePart => {
       const part = object(one, 'made part');

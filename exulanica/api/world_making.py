@@ -10,7 +10,12 @@ waits on a model. The job does, in order, saying which it is at:
     fails, and the draft records whether a model chose.
 *   **drafting**: that tool's drafter writes what its composer takes: the kind drafter a whole
     kind document, held to both stages of the kind checks, or the specification drafter a town's
-    preset and values, held to the gate every town passes.
+    preset and values, held to the gate every town passes. Where the kind drafter could not make
+    the words (:data:`TOWN_ANSWERS`), the town tool drafts them instead, so a person still gets a
+    world: a town titled from the words as any town is, with every part of the place it could not
+    make left out, and the draft says the town was taken so. Where the town's drafter finds no town
+    in the words either, the first town the served document lists stands, with every phrase it
+    named, or the whole description where it named none, left out.
 *   **making**: the world is composed and its entry saved, as ``POST /worlds/kinds/{kind}/worlds``
     and ``POST /worlds/generated`` make one. The person meets no card, preset or value. Where the
     server makes places on land (``EXULANICA_WORLDS_ON_LAND``), a place stands on the land its
@@ -70,6 +75,7 @@ from exulanica.selection.setting_choosing import (
 from exulanica.selection.tool_choosing import choose_tool
 from exulanica.selection.world_drafting import (
     SentDescription,
+    WorldDraft,
     draft_world_specification,
     notes_prompt,
     specification_view,
@@ -133,6 +139,14 @@ _FAILED: Final = {
     "code": "world_draft_failed",
     "detail": "The draft stopped before a world was made. Say it again.",
 }
+#: The kind drafter's refusals the town tool answers instead, from the same words: its answer ran
+#: on, no kind it drafted passed the checks, it did not answer in time, or its provider failed. A
+#: spent allowance and the server's own faults end the draft as they would have. Every call of
+#: both tools is admitted inside the one bound the person accepted, so the fallback never spends
+#: past the figure they were shown: a call that would is refused before it is sent.
+TOWN_ANSWERS: Final = frozenset(
+    {"kind_draft_ran_on", "kind_not_drafted", "kind_draft_unanswered", "kind_draft_model_failed"}
+)
 #: How long a draft's making waits for a place on land: no request waits on a draft's job, and
 #: grading a layout on land takes longer than on level ground (6 to 11 s a world on the
 #: development machine's copy, one over the route's 15 s once under heavy load, 14 October 2026),
@@ -669,7 +683,7 @@ def make_world(
 
     try:
         if tool.drafter == "kind":
-            _make_place(
+            held = _make_place(
                 draft,
                 drafts,
                 log,
@@ -681,6 +695,28 @@ def make_world(
                 guest,
                 fixed_world_id,
                 on_land,
+            )
+            if held is None:
+                return
+            if drafts.closing:
+                # The server is stopping: no town is started, and the place's refusal stands.
+                refused(held)
+                return
+            town = next(one for one in world_tools() if one.drafter == "specification")
+            drafts.advance(draft, tool=town.key, tool_chosen=chosen, tool_fallback=True)
+            _make_town(
+                draft,
+                drafts,
+                log,
+                client,
+                opened,
+                actor,
+                sent,
+                store,
+                guest,
+                fixed_world_id,
+                on_land,
+                fallback=True,
             )
         else:
             _make_town(
@@ -730,6 +766,31 @@ def _saved(
     return None
 
 
+class _HeldForTown:
+    """What the place tool hands its kind drafter in place of ``drafts``: it ends the draft as
+    ``drafts`` does, but holds a refusal the town tool answers instead (:data:`TOWN_ANSWERS`), so
+    the draft goes on to the town rather than ending refused."""
+
+    def __init__(self, drafts: KindDrafts) -> None:
+        self.drafts = drafts
+        self.refusal: dict[str, Any] | None = None
+
+    @property
+    def closing(self) -> bool:
+        return self.drafts.closing
+
+    def finish(self, draft: KindDraft, **fields: Any) -> None:
+        refusal = fields.get("refusal")
+        if (
+            fields.get("state") == "refused"
+            and isinstance(refusal, Mapping)
+            and refusal.get("code") in TOWN_ANSWERS
+        ):
+            self.refusal = dict(refusal)
+            return
+        self.drafts.finish(draft, **fields)
+
+
 def _make_place(
     draft: KindDraft,
     drafts: KindDrafts,
@@ -742,10 +803,13 @@ def _make_place(
     guest: bool,
     fixed_world_id: str | None,
     on_land: bool,
-) -> None:
+) -> dict[str, Any] | None:
+    """Draft and make a place from ``sent``: None once the draft has ended, ready or refused, or
+    the kind drafter's refusal the town tool answers instead, with the draft not ended."""
+    held = _HeldForTown(drafts)
     outcome = drafted_kind(
         draft,
-        drafts,
+        held,
         client=client,
         text=sent.text,
         placeholders=sent.placeholders,
@@ -754,7 +818,7 @@ def _make_place(
         key_for=None,
     )
     if outcome is None or outcome.kind is None:
-        return
+        return held.refusal
     kind = outcome.kind
     taken = _take(client, sent, log)
     if drafts.closing:
@@ -895,7 +959,14 @@ def _make_town(
     fixed_world_id: str | None,
     on_land: bool,
     notes: DraftNotes | None = None,
+    *,
+    fallback: bool = False,
 ) -> None:
+    """Draft and make a town from ``sent``. With ``fallback`` (the place tool's drafter could not
+    make the words) the drafter's own refusal makes the first town instead, and a phrase that
+    chose the setting does not say a part the town left out, as for a place: sea beyond the town
+    is no harbour, and the harbour is said as left out."""
+
     def refused(refusal: Mapping[str, Any]) -> None:
         drafts.finish(draft, state="refused", refusal=dict(refusal), calls=log.calls)
 
@@ -921,6 +992,21 @@ def _make_town(
         refused(_model_refusal(failed))
         return
     town = outcome.draft
+    not_supported_at = outcome.not_supported_at
+    if town is None and fallback:
+        # The words named a place the place tool could not make, so the town drafter's own
+        # refusal (no town in them, or no form it could fill) does not end the draft either: the
+        # first town the served document lists stands, and every phrase the drafter named, or the
+        # whole description where it named none, is said as left out.
+        first = view.presets[0]
+        town = WorldDraft(
+            preset=first.key,
+            values=dict(first.values),
+            set_by_words=(),
+            fit="part",
+            not_supported=outcome.not_supported,
+        )
+        not_supported_at = not_supported_at or ((0, len(sent.text)),)
     if town is None:
         stated = outcome.refusal
         not_a_place = stated is not None and stated.code.value == "description_not_supported"
@@ -996,14 +1082,14 @@ def _make_town(
     # that land, as for a place.
     omitted = tuple(
         span
-        for span in outcome.not_supported_at
+        for span in not_supported_at
         if land is None or fell_back or not said_by_land(sent.text[span[0] : span[1]], land.recipe)
     )
     drafts.made(
         draft,
         entry_id=created.entry_id,
         made=made,
-        left_out=_left_out(sent, omitted, taken.spans),
+        left_out=_left_out(sent, omitted, () if fallback else taken.spans),
         look=worn.look,
         setting=worn.setting,
         land=None if land is None else _land_taken(sent, land, fell_back=fell_back),

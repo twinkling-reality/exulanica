@@ -156,8 +156,9 @@ class DraftToolView(BaseModel):
     #: The world tool catalog's key of the tool that drafts and makes the world.
     key: str
     #: ``model`` where the chooser named it; ``unsure`` where it answered none, was refused or
-    #: failed and the catalog's tool for an unsure choice was taken.
-    chosen_by: Literal["model", "unsure"]
+    #: failed and the catalog's tool for an unsure choice was taken; ``fallback`` where the place
+    #: tool's drafter could not make the words and the town tool made them instead.
+    chosen_by: Literal["model", "unsure", "fallback"]
 
 
 class TakenLookView(BaseModel):
@@ -459,7 +460,14 @@ def _draft_view(
         ),
         tool=None
         if draft.tool is None
-        else DraftToolView(key=draft.tool, chosen_by="model" if draft.tool_chosen else "unsure"),
+        else DraftToolView(
+            key=draft.tool,
+            chosen_by="fallback"
+            if draft.tool_fallback
+            else "model"
+            if draft.tool_chosen
+            else "unsure",
+        ),
         entry=entry,
         made=[MadePartView(**part) for part in draft.made],
         left_out=list(draft.left_out),
@@ -495,6 +503,7 @@ def _durable_view(row: dict[str, Any], connection: Any, services: Services) -> M
         "stage",
         "tool",
         "tool_chosen",
+        "tool_fallback",
         "made",
         "left_out",
         "look",

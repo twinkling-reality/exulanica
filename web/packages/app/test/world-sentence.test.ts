@@ -24,7 +24,7 @@ import {
 // tests/test_world_making_postgres.py (the page's fixture is the server's own answer). The
 // scenarios below are built by hand over the same members, which a test holds to this file.
 const SERVED = JSON.parse(readFileSync('../tests/snapshots/world-drafts.served.json', 'utf8')) as Record<
-  'offer' | 'started' | 'offer_while_mine_runs' | 'ready_place' | 'ready_town' | 'refused', Record<string, unknown>>;
+  'offer' | 'started' | 'offer_while_mine_runs' | 'ready_place' | 'ready_town' | 'ready_fallback' | 'refused', Record<string, unknown>>;
 const members = (value: unknown): string[] => Object.keys(value as object).sort();
 
 const DRAFT = '77777777-7777-4777-8777-777777777777';
@@ -161,6 +161,9 @@ describe('what the server\u2019s draft routes answer', () => {
     expect([town.state, town.tool?.key, town.entry?.generatedGround === null]).toEqual(['ready', 'town', false]);
     expect(town.leftOut).toEqual(['two cafes']);
     expect(town.made.every((part) => part.boxMm === null && part.drawn === null)).toBe(true);
+    // A place no brief made, made as a town by the town tool instead, titled from the words as any town is.
+    const fallback = parseWorldMakingDraft(SERVED.ready_fallback);
+    expect([fallback.state, fallback.tool, fallback.entry?.title]).toEqual(['ready', { key: 'town', chosenBy: 'fallback' }, 'A small farm with a farmhouse']);
     const refused = parseWorldMakingDraft(SERVED.refused);
     expect([refused.state, refused.entry, refused.description]).toEqual(['refused', null, '']);
     // Every code a draft or an offer names is one its own list has words for.
@@ -174,7 +177,7 @@ describe('what the server\u2019s draft routes answer', () => {
     // The offer's notes as the client reads them (web notes in Create).
     expect(parseWorldDraftOffer(SERVED.offer).notes).toEqual({ offered: false, code: 'references_operator_only', searchesAtMost: 3, maximumUsd: null });
     expect(members(offerWire().starts)).toEqual(members(SERVED.offer['starts']));
-    for (const answer of [SERVED.started, SERVED.ready_place, SERVED.ready_town, SERVED.refused]) {
+    for (const answer of [SERVED.started, SERVED.ready_place, SERVED.ready_town, SERVED.ready_fallback, SERVED.refused]) {
       expect(members(wire('choosing'))).toEqual(members(answer));
     }
     expect(members(BOAT)).toEqual(members((SERVED.ready_place['made'] as unknown[])[0]));
@@ -200,6 +203,8 @@ describe('a draft of a world, as the server answers it', () => {
     // A town's parts state no slot count and no box.
     const town = parseWorldMakingDraft({ ...ready, made: [{ key: 'street', label: 'street', form: 'path', look: 'ground.street', drawn: null, box_mm: null }] });
     expect(town.made[0]).toMatchObject({ drawn: null, boxMm: null });
+    // A town made because the place tool's drafter could not make the words says it was taken so.
+    expect(parseWorldMakingDraft({ ...ready, tool: { key: 'town', chosen_by: 'fallback' } }).tool).toEqual({ key: 'town', chosenBy: 'fallback' });
   });
 
   it('refuses an answer that is not one the contract lists', () => {

@@ -137,7 +137,10 @@ hour's starts left and any named refusal. The ceiling is distinct from expected 
 readback records reported charges and unknown liability separately. `POST /worlds/drafts` takes the words and a job chooses the tool that can make the place (the
 town's for a town, a village or a city of streets in any setting, the site grammar's for a farm
 or a farming village and any other place, by the words of the [world tool catalog](../../assets/catalogs/world-tools/world-tool.v1.json)),
-drafts with it and makes the world; the box
+drafts with it and makes the world, and where the site grammar's drafter cannot make the words
+(it ran on, nothing it drafted passed the checks, or it did not answer), makes them as a town
+instead, inside the same ceiling, with every part of the place it could not make said as left
+out; the box
 follows it step by step and lists what was made, what was taken from the words for its look and
 its setting (an hour and sky, a ground and what lies beyond, snow) beside the words that chose it,
 and what the words asked for that was left out

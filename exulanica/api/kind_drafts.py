@@ -276,6 +276,9 @@ class KindDraft:
     stage: str | None = None
     tool: str | None = None
     tool_chosen: bool | None = None
+    #: For a world: whether the tool taken is the town because the place tool's drafter could not
+    #: make the words (:data:`exulanica.api.world_making.TOWN_ANSWERS`).
+    tool_fallback: bool = False
     entry_id: uuid.UUID | None = None
     made: tuple[Mapping[str, Any], ...] = ()
     left_out: tuple[str, ...] = ()
@@ -566,6 +569,7 @@ class KindDrafts:
         draft.kind = draft.version = draft.entry_id = None
         draft.refusal = draft.model_id = None
         draft.stage = draft.tool = draft.tool_chosen = None
+        draft.tool_fallback = False
         draft.calls = draft.made = draft.left_out = ()
         draft.look = draft.setting = draft.land = None
 
