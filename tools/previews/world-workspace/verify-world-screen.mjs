@@ -21,6 +21,9 @@ const words = (list) => list.map((row) => row.word);
 assert.deepEqual(words(keysCardRows({ build: true, history: true, clock: true })), ['Move', 'Sprint', 'Look', 'Inspect', 'Fly', 'Build', 'History', 'Play', 'Follow', 'Your worlds']);
 assert.deepEqual(words(keysCardRows({ build: false, history: true, clock: false })), ['Move', 'Sprint', 'Look', 'Inspect', 'Fly', 'History', 'Follow', 'Your worlds']);
 assert.equal(keysCardRows({}).find((row) => row.word === 'Look').keys, 'mouse-click');
+// X Data where the data view works (a made town), after the world's own keys and before Follow.
+assert.deepEqual(words(keysCardRows({ build: true, history: true, clock: true, data: true })), ['Move', 'Sprint', 'Look', 'Inspect', 'Fly', 'Build', 'History', 'Play', 'Data', 'Follow', 'Your worlds']);
+assert.deepEqual(keysCardRows({ data: true }).find((row) => row.word === 'Data').keys, ['X']);
 
 assert.equal(clockText('06:55', 1), '06:55 · Day 1');
 // The clock says its state in words (F2): the time alone while playing, "Paused" after it otherwise.

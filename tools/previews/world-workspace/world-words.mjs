@@ -12,6 +12,14 @@ export const SCREEN_WORDS = Object.freeze({
   firstHint: 'W A S D to walk, drag to look, click someone to choose them', keys: 'Keys', playing: 'Playing', paused: 'Paused', drag: 'Look', follow: 'Follow', clock: 'The world\'s clock', rail: 'The world',
 });
 
+/**
+ * The data view's words (world-data-view.ts): its row on the keys card and its card's title, the slider's two ends
+ * and the slider's name for a screen reader.
+ */
+export const DATA_WORDS = Object.freeze({
+  key: 'Data', title: 'Data', world: 'World', data: 'Data', range: 'From the world to its data',
+});
+
 /** The opening's words (frame 01): its label, the tip's label and its one tip. */
 export const OPENING_WORDS = Object.freeze({
   opening: 'Opening', tip: 'Tip',

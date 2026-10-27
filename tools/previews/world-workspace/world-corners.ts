@@ -123,7 +123,7 @@ const CLOCK_READ_MS = 250;
 
 export function mountCorners({
   host, people, onLeave, title = '', worldId = '', readOnly = false, canBringIn = false, onBuild = null, onHistory = null, onFly = null,
-  pose = () => null, flySpeed = () => NaN, timing = WORLD_UI_TIMING, screen = SCREEN_TIMING,
+  data = false, pose = () => null, flySpeed = () => NaN, timing = WORLD_UI_TIMING, screen = SCREEN_TIMING,
 }: {
   readonly host: HTMLElement;
   readonly people: CornerPeople | null;
@@ -142,6 +142,8 @@ export function mountCorners({
   readonly onHistory?: (() => void) | null;
   /** Starts or stops flying, as F does; null where there is no flying. */
   readonly onFly?: (() => void) | null;
+  /** Whether X opens the data view here (world-data-view.ts): the keys card lists it only where it does. */
+  readonly data?: boolean;
   /** Where the person stands and looks now, or null before the world is drawn. */
   readonly pose?: () => CornerPose | null;
   /** The flying speed in metres a second, for the speed scale beside the Speed hint. */
@@ -304,7 +306,7 @@ export function mountCorners({
   keysButton.addEventListener('click', () => (keysCard.hidden ? openKeys() : closeKeys()));
   let handedKeys: readonly KeysRow[] | null = null;
   function openKeys(): void {
-    const rows: readonly KeysRow[] = handedKeys ?? keysCardRows({ build: onBuild !== null, history: onHistory !== null, clock: present });
+    const rows: readonly KeysRow[] = handedKeys ?? keysCardRows({ build: onBuild !== null, history: onHistory !== null, clock: present, data });
     keysCard.replaceChildren(...rows.flatMap((row) => {
       const caps = span('wu-caps');
       if (row.keys === 'mouse-click' || row.keys === 'mouse') {

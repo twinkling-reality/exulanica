@@ -1,7 +1,7 @@
 // The world screen as r02 draws it (DESIGN's R-WORLD-BUILD-SHEET, APPROVALS item 12), as data in and
 // data out: the rail's buttons, the keys card's rows, the clock's one line and when the first-minute
 // hint leaves. Pure, so verify-world-screen.mjs checks it in Node; world-corners.ts draws it.
-import { CORNER_WORDS, SCREEN_WORDS } from './world-words.mjs';
+import { CORNER_WORDS, DATA_WORDS, SCREEN_WORDS } from './world-words.mjs';
 
 /**
  * How the screen behaves, each figure a field a world or look could want different: a rail button's
@@ -39,8 +39,9 @@ export function railButtonOf(code) {
 /**
  * The keys card's rows (the sheet's section 8, WORDS.md's key table for the world view): each
  * { keys, word }, keys a list of key names or 'mouse-click'. A key is listed only where it works here
- * (ruling K6): Build, History and Play where `state` says so. No new key; E Inspect is the one place a
- * person learns how to choose someone once the hint row is gone.
+ * (ruling K6): Build, History, Play and Data where `state` says so. E Inspect is the one place a
+ * person learns how to choose someone once the hint row is gone; X Data is the one place a person
+ * finds the data view.
  */
 export function keysCardRows(state) {
   const w = CORNER_WORDS;
@@ -55,6 +56,7 @@ export function keysCardRows(state) {
   if (state.build) rows.push({ keys: ['B'], word: w.build });
   if (state.history) rows.push({ keys: ['H'], word: w.history });
   if (state.clock) rows.push({ keys: ['P'], word: w.play });
+  if (state.data) rows.push({ keys: ['X'], word: DATA_WORDS.key });
   rows.push({ keys: ['V'], word: SCREEN_WORDS.follow }, { keys: ['Esc'], word: w.yourWorlds });
   return rows;
 }

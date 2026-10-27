@@ -62,6 +62,11 @@ assert.equal(worldKey(key('KeyH'), remembered), 'history');
 assert.equal(worldKey(key('KeyH', { repeat: true }), remembered), 'silence');
 assert.equal(worldKey(key('KeyH', { metaKey: true }), remembered), 'quiet');
 assert.equal(worldKey(key('KeyH'), { ...ground, history: false }), 'silence');
+// X opens and closes the data view where it works (a made town), and is silent elsewhere.
+assert.equal(worldKey(key('KeyX'), { ...ground, data: true }), 'data');
+assert.equal(worldKey(key('KeyX', { repeat: true }), { ...ground, data: true }), 'silence');
+assert.equal(worldKey(key('KeyX', { metaKey: true }), { ...ground, data: true }), 'quiet');
+assert.equal(worldKey(key('KeyX'), ground), 'silence', 'no data view here, no X');
 // The old shell's keys never reach it: silenced, or for a combination stopped with the browser's own
 // shortcut kept (K8).
 for (const code of ['KeyH', 'KeyK', 'KeyI', 'KeyM', 'KeyO', 'KeyR', 'KeyG', 'Backspace', 'Slash']) assert.equal(worldKey(key(code), ground), 'silence', code);

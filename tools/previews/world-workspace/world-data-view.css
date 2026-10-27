@@ -1,0 +1,31 @@
+/* The data view (world-data-view.ts): its card where the keys card shows, over the keys button, and its tags over the
+   world. The tags' colours are the data view style's, handed in as --data-text and --data-ground; each tag's edge is
+   the colour of the kind of record it names (--data-kind). */
+.wu-data-card { position: absolute; right: var(--edge-inset); bottom: calc(var(--edge-inset) + var(--pill-height) + var(--space-8));
+  display: grid; gap: var(--space-16); min-width: calc(280 * var(--u)); padding: var(--space-16); border-radius: calc(16 * var(--u));
+  font: 400 var(--pill-text-small)/1 var(--font-sans); color: var(--ink); pointer-events: auto; animation: wu-fade var(--t-reveal) var(--ease) both; }
+.wu-data-head { display: flex; align-items: center; gap: var(--space-8); }
+.wu-data-head .wu-key { color: rgba(255, 255, 255, .85); }
+.wu-data-range { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-8); color: var(--ink-2); }
+.wu-data-range input { width: 100%; height: calc(24 * var(--u)); margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.wu-data-range input::-webkit-slider-runnable-track { height: 2px; border-radius: 1px;
+  background: linear-gradient(to right, var(--ink) var(--fill, 0%), rgba(255, 255, 255, .28) var(--fill, 0%)); }
+.wu-data-range input::-webkit-slider-thumb { width: calc(16 * var(--u)); height: calc(16 * var(--u)); margin-top: calc(1px - 8 * var(--u));
+  border-radius: 50%; background: var(--ink); box-shadow: 0 1px 4px rgba(0, 0, 0, .4); -webkit-appearance: none; appearance: none; }
+.wu-data-range input::-moz-range-track { height: 2px; border-radius: 1px; background: rgba(255, 255, 255, .28); }
+.wu-data-range input::-moz-range-progress { height: 2px; border-radius: 1px; background: var(--ink); }
+.wu-data-range input::-moz-range-thumb { width: calc(16 * var(--u)); height: calc(16 * var(--u)); border: 0; border-radius: 50%; background: var(--ink); }
+.wu-data-range input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 4px; }
+
+.wu-data-tags { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.wu-data-tag { position: absolute; left: 0; top: 0; display: grid; gap: calc(3 * var(--u)); padding: calc(5 * var(--u)) calc(8 * var(--u)) calc(5 * var(--u)) calc(11 * var(--u));
+  border-radius: calc(4 * var(--u)); background: var(--data-ground); color: var(--data-text); box-shadow: inset calc(3 * var(--u)) 0 0 var(--data-kind);
+  font: 500 max(12px, calc(15 * var(--u)))/1.15 var(--font-mono); white-space: nowrap; will-change: transform, opacity; }
+.wu-data-under { font-size: max(11px, calc(13 * var(--u))); opacity: .8; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wu-data-card { animation-duration: 120ms; }
+}
+@media (prefers-contrast: more) {
+  .wu-data-card { background: rgba(13, 20, 27, .94); }
+}
