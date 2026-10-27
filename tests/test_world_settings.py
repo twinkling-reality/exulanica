@@ -12,6 +12,7 @@ their committed files, never through the code under test.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -446,6 +447,106 @@ def test_version_3_still_reads_and_keeps_a_looks_own_haze(tmp_path: Path) -> Non
     hazed = _hazed(_case_pack("town"))
     composed = ws.compose_setting({"sky": "thick_fog"}, hazed, _case_context(), parts)
     assert "haze" not in composed["light"]["changes"]
+
+
+#: The grounds whose version 5 colours a town's walls; the snow cover colours them as snowfields do.
+WALLED_GROUNDS = ("sand", "sea", "snowfield")
+
+
+def _current_looks() -> list[tuple[str, ws.ResolvedPack]]:
+    """Every look of the library at its current version, by its folder, resolved on its whole chain
+    as the library holds it."""
+    library = load_style_pack_library()
+    found = []
+    for folder in sorted((STYLE_PACKS / "packs").iterdir()):
+        text = (folder / "manifest.json").read_bytes()
+        chain = library.chain(hashlib.sha256(text[:-1]).hexdigest())
+        assert chain is not None, f"the library does not hold {folder.name} as committed"
+        found.append((folder.name, ws.resolve_chain(chain)))
+    return found
+
+
+def _parts_of(tmp_path: Path, version: int) -> ws.SettingParts:
+    (tmp_path / "settings").mkdir(exist_ok=True)
+    (tmp_path / "settings" / ws.PARTS_FILE).write_text(
+        (STYLE_PACKS / "settings" / f"setting-parts.v{version}.json").read_text("utf-8"), "utf-8"
+    )
+    return ws.load_setting_parts(tmp_path / "settings", RULES)
+
+
+def _walls(composed: dict[str, Any]) -> dict[str, Any]:
+    surfaces = composed["surfaces"]
+    return {role: colour for role, colour in surfaces.items() if role.startswith("wall.")}
+
+
+def test_version_4_still_reads_and_colours_no_wall(tmp_path: Path) -> None:
+    """Version 4, unread by the host, stays as it was: its grounds and its snow colour no wall, so a
+    town under them is built of its look's own walls."""
+    parts = _parts_of(tmp_path, 4)
+    assert parts.version == 4 and parts.parts.keys() == PARTS.parts.keys()
+    for name, pack in _current_looks():
+        for chosen in [{"ground": ground} for ground in WALLED_GROUNDS] + [{"cover": "snow"}]:
+            assert _walls(ws.compose_setting(chosen, pack, CONTEXT, parts)) == {}, name
+
+
+def test_version_5_changes_nothing_but_the_walls_under_three_grounds(tmp_path: Path) -> None:
+    """Every part alone, one of each axis together and none, composes over every current look as
+    version 4 composed it, but for the wall colours the sand, sea and snowfield grounds and the snow
+    add: a world under any other part, and every part's light, swatches, upward faces, ground and
+    edge, are as they were."""
+    earlier = _parts_of(tmp_path, 4)
+    assert PARTS.version == 5
+    keys: dict[str, list[str | None]] = {axis: [None] for axis, _title in PARTS.axes}
+    for axis, key in PARTS.parts:
+        keys[axis].append(key)
+    for name, pack in _current_looks():
+        for sky in keys["sky"]:
+            for ground in keys["ground"]:
+                for cover in keys["cover"]:
+                    chosen = {
+                        axis: key
+                        for axis, key in (("sky", sky), ("ground", ground), ("cover", cover))
+                        if key is not None
+                    }
+                    now = ws.compose_setting(chosen, pack, CONTEXT, PARTS)
+                    was = ws.compose_setting(chosen, pack, CONTEXT, earlier)
+                    assert {**now, "surfaces": was["surfaces"]} == was, (name, chosen)
+                    added = {k: v for k, v in now["surfaces"].items() if k not in was["surfaces"]}
+                    assert {k: now["surfaces"][k] for k in was["surfaces"]} == was["surfaces"]
+                    if ground in WALLED_GROUNDS or cover == "snow":
+                        assert added and added == _walls(now), (name, chosen)
+                        ws.apply_setting(pack, ws.read_setting(now, RULES), CONTEXT, RULES)
+                    else:
+                        assert added == {}, (name, chosen)
+
+
+def test_a_grounds_walls_are_the_roles_a_towns_walls_take_and_nothing_else() -> None:
+    """A ground colours only roles a town's own wall texture sets take
+    (``town-look-roles.v1.json``), the same four for each, never the walls' fallback, which a
+    place's walls take; it restates no swatch, so no piece changes; and every current look dresses
+    each role, so the colour replaces what the look draws there, a texture set included. The snow
+    colours them as the snowfields do, so snow over any ground builds the same town."""
+    roles = json.loads((STYLE_PACKS / "town-look-roles.v1.json").read_text("utf-8"))
+    town_walls = {role for role in roles["sets"].values() if role.startswith("wall.")}
+    stated: dict[str, set[str]] = {}
+    for (_axis, key), part in PARTS.parts.items():
+        walls = {role for role in part["surfaces"] if role.startswith("wall.")}
+        assert part["swatches"] == {} or key == "night", key
+        if walls:
+            stated[key] = walls
+    assert set(stated) == {*WALLED_GROUNDS, "snow"}
+    assert stated["sand"] | {"wall.cast_concrete"} == stated["sea"] == stated["snowfield"]
+    snowfield, snow = PARTS.parts[("ground", "snowfield")], PARTS.parts[("cover", "snow")]
+    assert {role: snow["surfaces"][role] for role in stated["snow"]} == {
+        role: snowfield["surfaces"][role] for role in stated["snowfield"]
+    }
+    for walls in stated.values():
+        assert walls <= town_walls and "wall.default" not in walls
+    for name, pack in _current_looks():
+        for axis, key in [("ground", ground) for ground in WALLED_GROUNDS] + [("cover", "snow")]:
+            composed = ws.compose_setting({axis: key}, pack, CONTEXT, PARTS)
+            assert composed["swatches"] == {} and set(_walls(composed)) == stated[key]
+            assert stated[key] <= set(pack.surfaces), (name, key)
 
 
 def test_a_parts_figures_for_a_computed_sky_name_a_model_and_values_a_setting_may_change(

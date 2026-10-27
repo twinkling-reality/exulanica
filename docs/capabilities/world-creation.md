@@ -118,7 +118,9 @@ noon, dusk, overcast, thick fog or night), the ground and what lies beyond the l
 sea, desert sand, snowfields or wheat fields) and snow. A person chooses each in the Look sheet,
 "As the look has it" or a named part, and the open world is drawn in it at once; a town may be made
 already in one (`style_pack.setting_parts` on `POST /worlds/generated`). A town on its land wears
-its setting's ground on the land round it, sand for a desert and snow for snowfields. A setting changes how a
+its setting's ground on the land round it, sand for a desert and snow for snowfields, and in a look that
+colours its walls it is built of that ground's colours: earth and sand in a desert, whitewash and pastels by the
+sea, timber and stone in snowfields or under snow. A setting changes how a
 world is drawn and nothing a person walks on or traffic drives
 ([a world's setting](../style-pack-contract.md#12-a-worlds-setting)); a society of things made in it
 starts its clock at the hour its sky shows, a world made at dusk at its dusk

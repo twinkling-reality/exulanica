@@ -1,7 +1,7 @@
 {
  "profile": "exulanica.world-setting-composed/v1",
  "about": "Each named part of a world's setting composed for every look of the library at its current version, and one part of every axis together: what exulanica.world.world_settings.compose_setting returns, written by scripts/style_packs/composed_settings.py and held to it by tests/test_world_settings.py. The page's tests draw these.",
- "parts_version": 4,
+ "parts_version": 5,
  "composed": [
   {
    "pack_id": "exulanica.cozy-town",
@@ -550,6 +550,34 @@
        208,
        164
       ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       152,
+       178,
+       223
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       143,
+       191,
+       152
+      ]
      }
     },
     "up": {},
@@ -597,6 +625,27 @@
        182,
        128
       ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       204,
+       170,
+       134
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       216,
+       202,
+       164
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       150,
+       126,
+       98
+      ]
      }
     },
     "up": {},
@@ -643,6 +692,34 @@
        236,
        240,
        246
+      ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       75,
+       59,
+       45
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       150,
+       146,
+       138
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       107,
+       97,
+       88
       ]
      }
     },
@@ -725,20 +802,6 @@
     ],
     "light": null,
     "surfaces": {
-     "roof.default": {
-      "srgb8": [
-       240,
-       244,
-       250
-      ]
-     },
-     "path.footway_paving": {
-      "srgb8": [
-       228,
-       232,
-       240
-      ]
-     },
      "ground.default": {
       "srgb8": [
        238,
@@ -751,6 +814,48 @@
        238,
        242,
        248
+      ]
+     },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     },
+     "roof.default": {
+      "srgb8": [
+       240,
+       244,
+       250
+      ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       75,
+       59,
+       45
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       150,
+       146,
+       138
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       107,
+       97,
+       88
       ]
      }
     },
@@ -938,6 +1043,13 @@
        248
       ]
      },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     },
      "roof.default": {
       "srgb8": [
        240,
@@ -945,11 +1057,32 @@
        250
       ]
      },
-     "path.footway_paving": {
+     "wall.brick_running_bond": {
       "srgb8": [
-       228,
+       75,
+       59,
+       45
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       150,
+       146,
+       138
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
        232,
-       240
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       107,
+       97,
+       88
       ]
      }
     },
@@ -1559,6 +1692,34 @@
        208,
        164
       ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       152,
+       178,
+       223
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       143,
+       191,
+       152
+      ]
      }
     },
     "up": {},
@@ -1606,6 +1767,27 @@
        182,
        128
       ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       204,
+       170,
+       134
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       216,
+       202,
+       164
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       150,
+       126,
+       98
+      ]
      }
     },
     "up": {},
@@ -1652,6 +1834,34 @@
        236,
        240,
        246
+      ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       75,
+       59,
+       45
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       150,
+       146,
+       138
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       107,
+       97,
+       88
       ]
      }
     },
@@ -1734,20 +1944,6 @@
     ],
     "light": null,
     "surfaces": {
-     "roof.default": {
-      "srgb8": [
-       240,
-       244,
-       250
-      ]
-     },
-     "path.footway_paving": {
-      "srgb8": [
-       228,
-       232,
-       240
-      ]
-     },
      "ground.default": {
       "srgb8": [
        238,
@@ -1760,6 +1956,48 @@
        238,
        242,
        248
+      ]
+     },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     },
+     "roof.default": {
+      "srgb8": [
+       240,
+       244,
+       250
+      ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       75,
+       59,
+       45
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       150,
+       146,
+       138
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       107,
+       97,
+       88
       ]
      }
     },
@@ -1947,6 +2185,13 @@
        248
       ]
      },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     },
      "roof.default": {
       "srgb8": [
        240,
@@ -1954,11 +2199,32 @@
        250
       ]
      },
-     "path.footway_paving": {
+     "wall.brick_running_bond": {
       "srgb8": [
-       228,
+       75,
+       59,
+       45
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       150,
+       146,
+       138
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
        232,
-       240
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       107,
+       97,
+       88
       ]
      }
     },
@@ -2568,6 +2834,34 @@
        208,
        164
       ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       152,
+       178,
+       223
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       143,
+       191,
+       152
+      ]
      }
     },
     "up": {},
@@ -2615,6 +2909,27 @@
        182,
        128
       ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       204,
+       170,
+       134
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       216,
+       202,
+       164
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       150,
+       126,
+       98
+      ]
      }
     },
     "up": {},
@@ -2661,6 +2976,34 @@
        236,
        240,
        246
+      ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       75,
+       59,
+       45
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       150,
+       146,
+       138
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       107,
+       97,
+       88
       ]
      }
     },
@@ -2743,20 +3086,6 @@
     ],
     "light": null,
     "surfaces": {
-     "roof.default": {
-      "srgb8": [
-       240,
-       244,
-       250
-      ]
-     },
-     "path.footway_paving": {
-      "srgb8": [
-       228,
-       232,
-       240
-      ]
-     },
      "ground.default": {
       "srgb8": [
        238,
@@ -2769,6 +3098,48 @@
        238,
        242,
        248
+      ]
+     },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     },
+     "roof.default": {
+      "srgb8": [
+       240,
+       244,
+       250
+      ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       75,
+       59,
+       45
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       150,
+       146,
+       138
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       107,
+       97,
+       88
       ]
      }
     },
@@ -2956,6 +3327,13 @@
        248
       ]
      },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     },
      "roof.default": {
       "srgb8": [
        240,
@@ -2963,11 +3341,32 @@
        250
       ]
      },
-     "path.footway_paving": {
+     "wall.brick_running_bond": {
       "srgb8": [
-       228,
+       75,
+       59,
+       45
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       150,
+       146,
+       138
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
        232,
-       240
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       107,
+       97,
+       88
       ]
      }
     },
@@ -3577,6 +3976,34 @@
        208,
        164
       ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       152,
+       178,
+       223
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       143,
+       191,
+       152
+      ]
      }
     },
     "up": {},
@@ -3624,6 +4051,27 @@
        182,
        128
       ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       204,
+       170,
+       134
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       216,
+       202,
+       164
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       150,
+       126,
+       98
+      ]
      }
     },
     "up": {},
@@ -3670,6 +4118,34 @@
        236,
        240,
        246
+      ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       75,
+       59,
+       45
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       150,
+       146,
+       138
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       107,
+       97,
+       88
       ]
      }
     },
@@ -3752,20 +4228,6 @@
     ],
     "light": null,
     "surfaces": {
-     "roof.default": {
-      "srgb8": [
-       240,
-       244,
-       250
-      ]
-     },
-     "path.footway_paving": {
-      "srgb8": [
-       228,
-       232,
-       240
-      ]
-     },
      "ground.default": {
       "srgb8": [
        238,
@@ -3778,6 +4240,48 @@
        238,
        242,
        248
+      ]
+     },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     },
+     "roof.default": {
+      "srgb8": [
+       240,
+       244,
+       250
+      ]
+     },
+     "wall.brick_running_bond": {
+      "srgb8": [
+       75,
+       59,
+       45
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       150,
+       146,
+       138
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
+       232,
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       107,
+       97,
+       88
       ]
      }
     },
@@ -3965,6 +4469,13 @@
        248
       ]
      },
+     "path.footway_paving": {
+      "srgb8": [
+       228,
+       232,
+       240
+      ]
+     },
      "roof.default": {
       "srgb8": [
        240,
@@ -3972,11 +4483,32 @@
        250
       ]
      },
-     "path.footway_paving": {
+     "wall.brick_running_bond": {
       "srgb8": [
-       228,
+       75,
+       59,
+       45
+      ]
+     },
+     "wall.cast_concrete": {
+      "srgb8": [
+       150,
+       146,
+       138
+      ]
+     },
+     "wall.painted_render": {
+      "srgb8": [
+       236,
        232,
-       240
+       220
+      ]
+     },
+     "wall.painted_timber": {
+      "srgb8": [
+       107,
+       97,
+       88
       ]
      }
     },
