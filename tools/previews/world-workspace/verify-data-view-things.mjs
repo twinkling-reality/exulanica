@@ -23,8 +23,8 @@ assert.equal(thingWords(record('city.facade', 'a', {})), null);
 assert.deepEqual(boxOfExtent(extent(101337, 74400, 13458, 107181, 86403, 20212)), { min: [101.337, 13.458, -86.403], max: [107.181, 20.212, -74.4] });
 assert.equal(boxOfExtent({ min_x_mm: 1 }), null);
 
-// Things: owned records only, once each across tiles; a drawn range's own extent where one draws it, else the
-// extent the record states (a street, drawn as its segments).
+// Things: owned records, and the streets every tile carries as halo, once each across tiles; a drawn range's own
+// extent where one draws it, else the extent the record states (a street, drawn as its segments).
 const home = record('city.premises', '11111111-1111-5111-8111-111111111111', { use_class: 'residential', extent: extent(0, 0, 0, 10000, 10000, 9000) });
 const halo = record('city.street_tree', '22222222-2222-5222-8222-222222222222', { species: 'fraxinus_pennsylvanica', extent: extent(0, 0, 0, 1, 1, 1) }, 'halo');
 const street = record('city.street', '33333333-3333-5333-8333-333333333333', { name_text: 'Granary Way', extent: extent(0, 53000, 7894, 256000, 74750, 8503) });
@@ -34,6 +34,8 @@ const things = townThings([{ records: [home, halo, street, facade], ranges }, { 
 assert.deepEqual(things.map((thing) => [thing.words, thing.hang]), [['home', 'face'], ['street · Granary Way', 'line']]);
 assert.deepEqual([things[0].min, things[0].max], [[1, 0, -9], [9, 8, -2]]);
 assert.equal(things[0].id, 'city.premises:11111111-1111-5111-8111-111111111111');
+const haloStreet = record('city.street', '66666666-6666-5666-8666-666666666666', { name_text: 'Kiln Place', extent: extent(74600, 8000, 7800, 91400, 120000, 8400) }, 'halo');
+assert.deepEqual(townThings([{ records: [halo, haloStreet], ranges: [] }, { records: [haloStreet], ranges: [] }]).map((thing) => thing.words), ['street · Kiln Place']);
 
 // The boxes a point may stand in: a drawn range's own extent, a record no range draws by the extent it states, halo
 // records and kinds no point stands on left out.

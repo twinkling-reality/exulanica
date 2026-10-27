@@ -58,7 +58,9 @@ export const TAG_HANG = Object.freeze({ 'city.premises': 'face', 'city.street': 
 /**
  * Every thing of a town's tiles the data view boxes and tags, once each: `tiles` is each tile's header
  * records and drawn ranges ({ records, ranges }); a drawn range gives its record's own drawn extent, a
- * record no range draws (a street, drawn as its segments) the extent it states. Each thing is
+ * record no range draws (a street, drawn as its segments) the extent it states. A tile's halo records are
+ * its neighbours' and are left to them, except a street: no tile owns a street, every tile its segments
+ * cross carries it as halo, and its segments are what is drawn. Each thing is
  * { id, kind, words, min, max, hang }, `id` the record's kind and identity.
  * @returns {Array<{ id: string, kind: string, words: string, min: number[], max: number[], hang: string }>}
  */
@@ -68,7 +70,7 @@ export function townThings(tiles) {
     const drawn = new Map();
     for (const range of ranges) if (range?.state === 'drawn') drawn.set(range.record, range);
     records.forEach((record, index) => {
-      if (record?.membership === 'halo') return;
+      if (record?.membership === 'halo' && record?.kind !== 'city.street') return;
       const words = thingWords(record);
       const identity = record?.fields?.identity ?? record?.identity;
       if (words === null || typeof identity !== 'string') return;
