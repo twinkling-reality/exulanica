@@ -35,6 +35,7 @@ import { createKindLabels, madeBeingName, placedLine } from './build-words.mjs';
 import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
 import { areaBanner, keysToWorld, mountUiScale } from './world-ui.ts';
 import { mountCorners } from './world-corners.ts';
+import { mountDataView } from './world-data-view.ts';
 import { endOpening } from './world-opening.ts';
 import { MADE_HANDOFF_KEY, readMade } from './create-steps.mjs';
 import { CREATE_WORDS } from './create-words.mjs';
@@ -142,7 +143,12 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   // nobody lives yet, a page that may change the world offers to bring people in from the clock's
   // corner, and with nowhere for them to go, build mode (K13), as B opens it.
   const writable = Boolean(send && binding) && import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY !== '1';
-  const corners = mountCorners({ host: root, people: selection.people ?? null, onLeave: () => { if (held) release(); else leaveWorld(); },
+  // The data view (X where it works, a made town): its people are the ones the tags name, in the tags' own words.
+  const dataView = mountDataView({ host: root, binding: b, onOpen: () => corners.closeKeys(), people: {
+    everyone: () => rows.flatMap(row => { if (row.scene?.type !== 'being') return []; const head = targetPoint(row, true); return head ? [{ id: row.scene.id, head: { x: head.x, y: head.y, z: head.z } }] : []; }),
+    words: (id) => { const row = beingRow(id); return { name: whoOf(id).start, model: row ? subjectView(row).chip ?? null : null }; },
+  } });
+  const corners = mountCorners({ host: root, people: selection.people ?? null, onLeave: () => { if (held) release(); else leaveWorld(); }, data: dataView.works,
     readOnly: import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1', flySpeed: () => b.controls.flyingSpeed,
     canBringIn: writable, onBuild: writable ? () => { build?.key(new KeyboardEvent('keydown', { code: 'KeyB', key: 'b' })); } : null,
     // The world screen (r02): the pill's name, the rail's History and Fly as H and F do, and where the
@@ -1253,11 +1259,12 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       if (event.code === 'KeyV' && being) { event.preventDefault(); if (!event.repeat) act('follow'); event.stopImmediatePropagation(); return; }
       if (event.code === 'KeyM' && being && groupActions.has('model')) { event.preventDefault(); if (!event.repeat) act('model'); event.stopImmediatePropagation(); return; }
     }
-    const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock(), history: historyHere, bringIn: corners.offersBringIn(), scene: root.dataset.scene === 'talking' }, Boolean((event.target as Element | null)?.closest?.('.cw-beside button,.wu-prompt')));
+    const fate = worldKey(event, { flying: Boolean(b.controls.flying), clock: corners.hasClock(), history: historyHere, bringIn: corners.offersBringIn(), scene: root.dataset.scene === 'talking', data: dataView.works }, Boolean((event.target as Element | null)?.closest?.('.cw-beside button,.wu-prompt')));
     if (fate === 'move' || fate === 'pass') return;
     if (fate !== 'quiet') event.preventDefault();
     if (fate === 'inspect') void choose(target ?? (lookedAt && performance.now() < lookedAt.until ? rows.find(item => item.key === lookedAt.key) : undefined));
-    else if (fate === 'leave') { if (!corners.closeKeys()) leaveWorld(); }
+    else if (fate === 'leave') { if (!dataView.close() && !corners.closeKeys()) leaveWorld(); }
+    else if (fate === 'data') dataView.toggle();
     else if (fate === 'play') corners.togglePlay();
     else if (fate === 'bring-in') corners.bringIn();
     else if (fate === 'history') openHistory();
@@ -1287,7 +1294,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const targetFrame = target && screenFrame(target);
     const distance = targetFrame ? reachDistance(target) : Infinity;
     targetReachable = Boolean(target && inspectionReach(distance, targetReachable));
-    corners.keysTaken(Boolean(held && asking)); corners.frame(now);
+    corners.keysTaken(Boolean(held && asking)); corners.frame(now); dataView.frame(now);
     // The Back corner says Back while something is chosen, the Run question included (r08):
     // they are the group's own states, and Esc goes back from them.
     if (!build?.active()) corners.back(held ? CORNER_WORDS.back : CORNER_WORDS.yourWorlds); // build mode keeps its own
@@ -1444,6 +1451,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     groundRing.dispose();
     runWatch.dispose();
     corners.dispose();
+    dataView.dispose();
     if (pageView) { pageView.page.close(); pageView.decision?.page.close(); pageView.comparison?.page.close(); pageView = null; }
     otherPage?.dispose(); otherPage = null;
     lifetime.abort(); cancelAnimationFrame(frameId); ++serial; root.remove(); canvas.inert = false;
