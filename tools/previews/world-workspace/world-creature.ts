@@ -19,6 +19,12 @@ export const STAND_RING_M = 1.0;
 const WORDS_MAXIMUM = 400;
 /** How long the page follows a notes request before it makes the creature from the words alone and stops the request. */
 const NOTES_FOLLOW_MS = 120_000;
+/**
+ * How long one read of a draft may take before it counts as missed, and how many missed in a row end the making: a
+ * read refused, or one that never answers (a request held back by the server), must not leave the page on its step.
+ */
+const READ_MISSED_MS = 15_000;
+const READS_MISSED = 3;
 
 /** The sum of two dollar amounts as the server writes them (whole units of a hundred-millionth), with no float. */
 export function addUsd(a: string, b: string): string {
@@ -290,20 +296,39 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     return null;
   }
 
+  /** One read of the draft, or null where it is refused or has not answered in READ_MISSED_MS. */
+  function readDraft(draftId: string): Promise<CreatureDraft | null> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => { resolve(null); }, READ_MISSED_MS);
+      deps.client.draft(draftId).then((read) => { clearTimeout(timer); resolve(read); }, () => { clearTimeout(timer); resolve(null); });
+    });
+  }
+
   async function follow(draft: CreatureDraft, making: MakingGroup = startMaking()): Promise<void> {
     const started = Date.now();
     const timeout = offer?.timing.timeoutSeconds ?? 50;
     const deadline = started + (2 * timeout + 10) * 1000;
-    let current = draft;
-    while (!ended && !draftEnded(current) && Date.now() < deadline) {
+    let current = draft, missed = 0;
+    while (!ended && !draftEnded(current) && Date.now() < deadline && missed < READS_MISSED) {
       const seconds = Math.floor((Date.now() - started) / 1000);
       making.step(current.status === 'queued' ? CREATURE_WORDS.waiting : CREATURE_WORDS.drafting, false, clock(seconds * 1000));
       await wait(1000);
       if (ended) return;
-      current = await deps.client.draft(current.draftId);
+      const read = await readDraft(current.draftId);
+      if (ended) return;
+      missed = read === null ? missed + 1 : 0;
+      if (read !== null) current = read;
     }
     if (ended) return;
     light.remove();
+    if (missed >= READS_MISSED) {
+      // The draft can no longer be read: how it went is not known here, so the page says so, where a made creature
+      // would be, and offers Try again (a draft still being made is then followed rather than asked twice).
+      state = 'ended';
+      retryable = true;
+      making.ended(CREATURE_WORDS.cantTell, tryAgain, null);
+      return;
+    }
     if (current.status === 'kept' && current.kind !== null) {
       state = 'made';
       making.root.remove();

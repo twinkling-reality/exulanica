@@ -311,6 +311,42 @@ describe('making a creature where it will stand', () => {
     }
   });
 
+  it('ends the making in its own words, with Try again, where the draft can no longer be read: a read refused, or one that never answers', async () => {
+    const { openCreatureScreen } = await screen();
+    vi.useFakeTimers();
+    try {
+      for (const read of [
+        // The read throws, as the transport does for a refused read or an answer the page cannot parse.
+        () => Promise.reject(new TypeError('The server returned an invalid creature notes spend.')),
+        // The read never answers, as one held back forever does.
+        () => new Promise<CreatureDraft>(() => {}),
+      ]) {
+        const { deps, calls, root } = world();
+        const reads = [{ ...queued, status: 'running' } as CreatureDraft];
+        const opened = await openCreatureScreen({ ...deps, client: { ...deps.client, draft: async () => reads.shift() ?? read() } });
+        const field = root.querySelector('textarea')!;
+        field.value = 'a round yellow body';
+        field.dispatchEvent(new Event('input'));
+        opened.key(press('Enter'));
+        await vi.advanceTimersByTimeAsync(60_000);
+        // Not left on its making step: it says it cannot tell how the making went, where a made creature would be,
+        // and offers Try again (Esc goes back to building, as from any step).
+        expect(root.querySelector('.wu-creature-step.wu-refused')?.textContent)
+          .toBe('This page can\'t tell how the making went. If the creature was made, it waits in Creatures.');
+        expect(root.textContent).not.toContain('Making the creature');
+        expect(root.querySelector('.wu-creature-group [aria-keyshortcuts="Enter"]')?.textContent).toBe('Try again');
+        expect(opened.key(press('Enter'))).toBe(true);
+        expect(root.querySelector('textarea')?.value).toBe('a round yellow body');
+        expect(calls.ask).toEqual(['a round yellow body']);
+        expect(opened.key(press('Escape'))).toBe(true);
+        expect(calls.closed).toBe(1);
+        document.body.replaceChildren();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('tries again from the Try again key as from Enter, and says what was spent before it stopped', async () => {
     const { openCreatureScreen } = await screen();
     const { deps, calls, root } = world({ reads: [{ ...queued, status: 'failed', failure: 'drafter_unavailable', spentUsd: '0.00020000' }, kept] });

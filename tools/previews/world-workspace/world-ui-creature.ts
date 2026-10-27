@@ -46,6 +46,8 @@ export const CREATURE_WORDS = Object.freeze({
   hourLimit: 'You\'ve made as many creatures as you can this hour. Try again later.',
   wentWrong: 'Something went wrong while making it, so nothing was made. Try again.',
   takingLonger: 'This is taking longer than usual. The creature waits in Creatures when it\'s done.',
+  /** The draft could no longer be read (refused, or no answer): how it went is not known here. */
+  cantTell: 'This page can\'t tell how the making went. If the creature was made, it waits in Creatures.',
   placingNow: 'Placing…',
   /** The made card where no stand was found ahead (rehearsal run 7): where the creature is and how to place it. */
   nowhereToStand: 'There is no open ground ahead to stand it on, so it waits in Creatures. Pick it there to place it.',
