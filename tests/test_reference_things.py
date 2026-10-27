@@ -29,6 +29,8 @@ from exulanica.references.render import render_reference_notes
 from exulanica.references.worker import ReferenceWorker
 from exulanica.selection import creature_drafts
 from exulanica.world.thing_store import ThingStore
+from psycopg import sql
+from psycopg.rows import tuple_row
 
 from creature_support import form_of
 from model_fakes import FakeTransport, RecordingPolicy
@@ -197,7 +199,36 @@ def test_reference_worker_v2_reaches_creature_consumer_and_keeps_explicit_edits(
         assert ref.bundle_sha256 in held.document["origin"]["lineage"]["ingredients"]
 
 
+@pytest.fixture
+def bundle_check_restored(repository):
+    """The bundle check as the migrated schema holds it, put back after the test. The test rewinds
+    it and replays an older migration on the shared test database, whose connections autocommit
+    and whose migration file commits itself, so without this a later test in the same worker
+    would meet that older check and have its v3 bundles refused."""
+    connection = repository.connection
+    found = (
+        connection.cursor(row_factory=tuple_row)
+        .execute(
+            "select pg_get_constraintdef(oid) from pg_constraint "
+            "where conname = 'reference_request_bundle_check' "
+            "and conrelid = 'reference_request'::regclass"
+        )
+        .fetchone()
+    )
+    assert found is not None
+    yield
+    connection.execute(
+        "alter table reference_request drop constraint if exists reference_request_bundle_check"
+    )
+    connection.execute(
+        sql.SQL(
+            "alter table reference_request add constraint reference_request_bundle_check {}"
+        ).format(sql.SQL(found[0]))
+    )
+
+
 @pytest.mark.postgres
+@pytest.mark.usefixtures("bundle_check_restored")
 def test_populated_upgrade_preserves_v1_and_constrains_v2(repository):
     connection, workspace = repository.connection, repository.workspace_id
     old = scripted_bundle(workspace, purpose="things")
