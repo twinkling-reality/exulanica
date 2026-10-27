@@ -237,6 +237,14 @@ assert.match(page, /\.wu-strip-card\[aria-current="true"\] \{ width: 200px; \}/u
 assert.doesNotMatch(page, /var\(--u\)/u, 'the mock\'s pixels, never the --u scale');
 for (const [, ms] of page.matchAll(/(\d+)ms/gu)) assert.ok(['160', '500'].includes(ms), `a ${ms} ms motion`);
 assert.doesNotMatch(page, /\btitle=|text-transform/u);
+// L5 on the composer page too: no words, chips, counts or lines under 12 px (the mock's 10.5 px mono labels among
+// them, ROOT 27 October); only a key cap's glyph may be smaller, down to 9 px.
+for (const [, selector, body] of page.matchAll(/([^{}]+)\{([^{}]*)\}/gu)) {
+  for (const [, size] of body.matchAll(/(?:font:\s*\d+\s+|font-size:\s*)(\d+(?:\.\d+)?)px/gu)) {
+    const floor = /wu-composer-key|wu-qcmd-key/u.test(selector) ? 9 : 12;
+    assert.ok(Number(size) >= floor, `${selector.trim()}: ${size} px is under the ${floor} px floor (L5)`);
+  }
+}
 
 // With WORDS_MD naming DESIGN's word list (kept outside the repository), each phrase here is in it.
 const words = process.env.WORDS_MD;
