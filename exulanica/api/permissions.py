@@ -192,7 +192,8 @@ class Permission(StrEnum):
     TILES_MATERIALISE = "tiles.materialise"
     #: Asking a web source for reference notes, which spends the operator's source credits and binds
     #: the person asking to the source's acceptable use policy. Held by an account owner and by a
-    #: token whose grant names it; never by a guest.
+    #: token whose grant names it; by a guest only where the installation offers web notes to
+    #: everyone (``EXULANICA_NOTES_AND_CREATURES=everyone``).
     REFERENCES_REQUEST = "references.request"
     #: Letting an outside program into a world: issuing, opening and revoking a door grant. It
     #: always sits beside ``world.write``, and is isolated by name because a grant hands some of

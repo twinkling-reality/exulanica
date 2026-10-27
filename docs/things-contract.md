@@ -885,7 +885,8 @@ never spent past its ceiling. Where the catalog names no envelope for the drafte
 at an estimate that counts prompt characters at a fixed rate, which is no bound and which the price
 does not use. With no model client the price is null. Where a draft is offered, the offer's `notes`
 says whether this person may ask for web notes with it (`offered`, and `code`: a code of the
-references read, `references_not_permitted` without `references.request`, which a guest never holds,
+references read, `references_not_permitted` without `references.request`, which a guest holds only
+where the installation offers web notes to everyone (`EXULANICA_NOTES_AND_CREATURES=everyone`),
 or `references_price_unavailable` where no current rate prices their model calls), the most searches
 one notes request sends (`searches_at_most`, the planner's limit for things) and the most its two
 model calls may add at current rates (`maximum_usd`, null where not offered), so a page says the

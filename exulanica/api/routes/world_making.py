@@ -285,8 +285,9 @@ class NotesOfferView(BaseModel):
     """Whether this person may ask for web notes with a draft here, and what they add.
 
     ``offered`` where the references read offers web notes to this workspace and this person may
-    ask for them (a guest never holds ``references.request``); else ``code`` names why, as the
-    references read names it, or ``references_not_permitted``. ``searches_at_most`` is the
+    ask for them (a guest holds ``references.request`` only where web notes are offered to
+    everyone); else ``code`` names why, as the references read names it, or
+    ``references_not_permitted``. ``searches_at_most`` is the
     planner's limit, the most searches one request sends; ``maximum_usd`` the most its two model
     calls may add at current rates (``world_draft_offer.NOTES_PATHS``), or null where no current
     rate prices them, when notes are not offered either.

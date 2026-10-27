@@ -217,12 +217,13 @@ def notes_offer(
 ) -> dict[str, Any]:
     """Web notes a draft of ``purpose`` may be asked with here, as this person would meet them now.
 
-    ``offered`` where this workspace may ask for web notes here and this person may (a guest never
-    holds ``references.request``); else ``code`` names why, as the references read names it,
-    ``references_not_permitted``, or :data:`NOTES_PRICE_UNAVAILABLE` where no current rate prices
-    their model calls. ``searches_at_most`` is the planner's limit in the words a new request of
-    ``purpose`` is planned with; ``maximum_usd`` the most their two model calls may add at current
-    rates (:func:`exulanica.api.world_draft_offer.notes_maximum_usd`), null where not offered.
+    ``offered`` where this workspace may ask for web notes here and this person may (a guest holds
+    ``references.request`` only where web notes are offered to everyone); else ``code`` names why,
+    as the references read names it, ``references_not_permitted``, or
+    :data:`NOTES_PRICE_UNAVAILABLE` where no current rate prices their model calls.
+    ``searches_at_most`` is the planner's limit in the words a new request of ``purpose`` is
+    planned with; ``maximum_usd`` the most their two model calls may add at current rates
+    (:func:`exulanica.api.world_draft_offer.notes_maximum_usd`), null where not offered.
     """
     searches = prompts_for_request(purpose).subjects_maximum
     if Permission.REFERENCES_REQUEST not in held:

@@ -199,7 +199,8 @@ nothing twice; its bundle is then partial. An operator issues that authority wit
 nominal for this provider). The planner and reader calls are charged to Nebius Token Factory under
 the workspace's grant like every model call. Without durable spending, web notes are not offered.
 
-Where web notes are offered to every workspace, guests included, the only bound on them is money.
+Where web notes are offered to every workspace, guests included, they are bounded by money and by
+the per-requester limits of section 8 (two requests unfinished and twenty in an hour).
 A guest is granted an allowance for the source at entry, as for the model's provider, by the
 guest policy the operator sets under the source's authority (`public.sh guest-policy` with
 `EXULANICA_GUEST_PROVIDER=tavily_search`): its calls are the searches that guest may send. The

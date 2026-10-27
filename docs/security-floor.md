@@ -69,7 +69,9 @@ browser session holds `ACCOUNT_OWNER_PERMISSIONS`: `admission.read`, `admission.
 `world.enter`, `world.read`, `world.write`, `being.act`, `model.invoke`, `library.read`, `library.write` and
 `deletion.write`, the journey of making a world, choosing its models, playing one of its beings,
 comparing, asking the Companion and deleting what one made, and nothing else: no intake, consent,
-admission, operations or tiles. That grant is keyed on the membership role, not assumed: a browser session exists only
+admission, operations or tiles. Where the installation offers web notes to everyone
+(`EXULANICA_NOTES_AND_CREATURES=everyone`), a guest also holds `references.request`
+([reference notes](reference-notes-contract.md#8-routes-and-refusals)). That grant is keyed on the membership role, not assumed: a browser session exists only
 for an account membership, the migrations allow the roles `owner` and `guest`, and
 `AccountRepository.session` requires one of them. `tests/test_route_permissions.py` reads the
 latest check and fails when a role appears without a grant of its own. Withholding `tiles.materialise` from a browser session is an
