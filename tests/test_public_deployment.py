@@ -281,7 +281,7 @@ def _script(directory: pathlib.Path, *arguments: str, **env: str) -> subprocess.
     environment = {
         key: value
         for key, value in os.environ.items()
-        if not key.startswith("EXULANICA_") and key != "NEBIUS_API_KEY"
+        if not key.startswith("EXULANICA_") and key not in ("NEBIUS_API_KEY", "TAVILY_API_KEY")
     }
     environment.update(EXULANICA_DEPLOY_DIR=str(directory / "deploy"), **env)
     return subprocess.run(
@@ -933,10 +933,12 @@ case " $* " in
   *" inspect "*)
     echo "PATH=/usr/bin"
     [ -n "${WATCH_HELD_KEY:-}" ] && printf 'NEBIUS_API_KEY=%s\\n' "$WATCH_HELD_KEY"
+    [ -n "${WATCH_HELD_SOURCE_KEY:-}" ] && printf 'TAVILY_API_KEY=%s\\n' "$WATCH_HELD_SOURCE_KEY"
     echo "EXULANICA_SPENDING=durable" ;;
   *" up "*)
     echo "up $*" >>"$WATCH_ACTIONS"
-    printf '%s' "${NEBIUS_API_KEY:-}" >"$WATCH_ACTIONS.key" ;;
+    printf '%s' "${NEBIUS_API_KEY:-}" >"$WATCH_ACTIONS.key"
+    printf '%s' "${TAVILY_API_KEY:-}" >"$WATCH_ACTIONS.source-key" ;;
   *" ps "*) : ;;
   *) echo "unexpected docker $*" >>"$WATCH_ACTIONS"; exit 1 ;;
 esac
@@ -945,9 +947,12 @@ esac
 }
 
 
-def _up(tmp_path: pathlib.Path, **extra: str) -> tuple[subprocess.CompletedProcess, list[str], str]:
-    """`up` on an initialised server with its fuse stated, against the stand-ins: the result, the
-    docker commands that started anything, and the model credential that command held."""
+def _up(
+    tmp_path: pathlib.Path, *, stated: str = "", **extra: str
+) -> tuple[subprocess.CompletedProcess, list[str], str]:
+    """`up` on an initialised server with its fuse stated, and the lines ``stated`` adds to its
+    settings, against the stand-ins: the result, the docker commands that started anything, and
+    the model credential that command held."""
     stubs = tmp_path / "up-stubs"
     stubs.mkdir()
     for name, body in _UP_STUBS.items():
@@ -955,10 +960,10 @@ def _up(tmp_path: pathlib.Path, **extra: str) -> tuple[subprocess.CompletedProce
         (stubs / name).chmod(0o755)
     assert _script(tmp_path, "init", **_init_env(tmp_path)).returncode == 0
     env_file = tmp_path / "deploy" / "public.env"
-    stated = env_file.read_text(encoding="utf-8")
-    stated = stated.replace("EXULANICA_BUDGET_USD=\n", "EXULANICA_BUDGET_USD=1\n")
-    stated = stated.replace("EXULANICA_BUDGET_MAX_CALLS=\n", "EXULANICA_BUDGET_MAX_CALLS=10\n")
-    env_file.write_text(stated, encoding="utf-8")
+    settings = env_file.read_text(encoding="utf-8")
+    settings = settings.replace("EXULANICA_BUDGET_USD=\n", "EXULANICA_BUDGET_USD=1\n")
+    settings = settings.replace("EXULANICA_BUDGET_MAX_CALLS=\n", "EXULANICA_BUDGET_MAX_CALLS=10\n")
+    env_file.write_text(settings + stated, encoding="utf-8")
     actions = tmp_path / "actions.log"
     actions.write_text("", encoding="utf-8")
     result = _script(
@@ -1155,3 +1160,79 @@ def test_restore_planned_takes_a_backup_set_by_its_name_alone(tmp_path):
     missing = _script(tmp_path, "restore-planned", "20261023T000000Z")
     assert missing.returncode == 2
     assert "no backup set 20261023T000000Z" in missing.stderr
+
+
+#: A web source credential no command, file or printed line may carry.
+SOURCE_PROBE = "source-key-must-not-be-written-anywhere"
+
+
+@needs_shell
+def test_up_hands_on_the_web_source_s_credential_as_it_does_the_model_s(tmp_path):
+    """The web source's key is a credential like the model's: an `up` from a shell that holds
+    neither starts the services with both the replaced API held, and prints, writes and passes on
+    a command line neither; `up` says only that each was kept."""
+    result, actions, held = _up(
+        tmp_path, WATCH_HELD_KEY=CREDENTIAL_PROBE, WATCH_HELD_SOURCE_KEY=SOURCE_PROBE
+    )
+    assert result.returncode == 0, result.stderr
+    assert held == CREDENTIAL_PROBE
+    assert (tmp_path / "actions.log.source-key").read_text(encoding="utf-8") == SOURCE_PROBE
+    assert "TAVILY_API_KEY is kept from the api container this up replaces" in result.stderr
+    assert SOURCE_PROBE not in result.stdout + result.stderr + "\n".join(actions)
+    for path in (tmp_path / "deploy").rglob("*"):
+        if path.is_file():
+            assert SOURCE_PROBE.encode() not in path.read_bytes(), path
+    # A shell that holds one hands that one on, whatever the replaced container held.
+    typed = "typed-source-key-now"
+    again = tmp_path / "again"
+    again.mkdir()
+    result, _, _ = _up(again, WATCH_HELD_SOURCE_KEY=SOURCE_PROBE, TAVILY_API_KEY=typed)
+    assert (again / "actions.log.source-key").read_text(encoding="utf-8") == typed
+    assert "TAVILY_API_KEY is kept from" not in result.stderr
+
+
+@needs_shell
+def test_up_names_a_missing_source_key_only_where_web_notes_are_offered_to_everyone(tmp_path):
+    """No web source key anywhere is said only where the settings offer web notes to everyone,
+    by the variable's name: a server that keeps them to its lists needs none."""
+    result, _, _ = _up(tmp_path)
+    assert "TAVILY_API_KEY" not in result.stderr
+    offered = tmp_path / "offered"
+    offered.mkdir()
+    result, _, _ = _up(offered, stated="EXULANICA_NOTES_AND_CREATURES=everyone\n")
+    assert result.returncode == 0, result.stderr
+    assert "TAVILY_API_KEY is not set" in result.stderr
+
+
+def test_a_web_source_authority_is_kept_beside_the_model_s_and_named_by_its_provider():
+    """The model's authority stays in authority.json, as every server has it; another provider's,
+    the web source's search credits, in authority-<provider>.json, issued and given a guest
+    policy by naming the provider; a provider is a plain name, never a path."""
+    script = SCRIPT.read_text(encoding="utf-8")
+    files = script.split("\nauthority_file_of() {\n", 1)[1].split("\n}\n", 1)[0]
+    assert "nebius_token_factory) printf '%s' \"$authority_file\"" in files
+    assert "*) printf '%s' \"$deploy_dir/authority-$1.json\"" in files
+    assert '"" | *[!a-z0-9_]*) refuse' in files
+    issue = script.split("\n  issue-authority)\n", 1)[1].split("\n    ;;\n", 1)[0]
+    assert 'provider="${EXULANICA_AUTHORITY_PROVIDER:-nebius_token_factory}"' in issue
+    assert '--provider "$provider"' in issue and 'file="$(authority_file_of "$provider")"' in issue
+    for step in ("guest-policy", "guest-policy-withdraw"):
+        body = script.split(f"\n  {step})\n", 1)[1].split("\n    ;;\n", 1)[0]
+        assert 'provider="${EXULANICA_GUEST_PROVIDER:-nebius_token_factory}"' in body
+        assert '"$file")"' in body and '"$authority_file")"' not in body
+
+
+@needs_shell
+def test_an_authority_for_a_provider_that_is_not_a_plain_name_is_refused(tmp_path):
+    assert _script(tmp_path, "init", **_init_env(tmp_path)).returncode == 0
+    refused = _script(
+        tmp_path,
+        "issue-authority",
+        EXULANICA_AUTHORITY_PROVIDER="../tavily",
+        EXULANICA_AUTHORITY_USD="1",
+        EXULANICA_AUTHORITY_CALLS="10",
+        EXULANICA_AUTHORITY_VALID_UNTIL="2026-12-15T00:00:00Z",
+    )
+    assert refused.returncode == 2
+    assert "a provider is lower-case letters, digits and underscores" in refused.stderr
+    assert not list((tmp_path / "deploy").glob("authority*"))

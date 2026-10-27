@@ -314,6 +314,8 @@ def _references_check(request: Request, services: Services) -> dict[str, Any]:
         "configured": True,
         "running": running,
         "listed_workspaces": len(services.reference_workspaces),
+        # Whether web notes and creatures from words are offered to every workspace here.
+        "everyone": services.notes_and_creatures_for_everyone,
         "proves": "whether the reference worker's thread is alive; not that a source answers",
     }
 

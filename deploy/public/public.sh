@@ -15,9 +15,13 @@
 #   up                start the server; the first run installs, migrates and publishes the catalogs
 #   prepare-towns     make the arrival worlds once in the operator's workspace, so their tiles bake,
 #                     and dress each with the scene the arrival list names
-#   issue-authority   issue the server's spending authority from the EXULANICA_AUTHORITY_* values
-#   guest-policy      set what each guest is granted under it, from the EXULANICA_GUEST_* values
-#   guest-policy-withdraw  end the guest policy: no guest is granted anything until another is set
+#   issue-authority   issue the server's spending authority from the EXULANICA_AUTHORITY_* values:
+#                     the model's, or with EXULANICA_AUTHORITY_PROVIDER=tavily_search the web
+#                     source's, whose calls are the search credits this server may spend
+#   guest-policy      set what each guest is granted under an authority, from the EXULANICA_GUEST_*
+#                     values (EXULANICA_GUEST_PROVIDER names the web source's)
+#   guest-policy-withdraw  end a guest policy: no guest is granted anything under it until another
+#                     is set
 #   grant <label>     grant a rehearsal visitor's workspace an allowance under the authority
 #   spending          the authority's state, as the operator command prints it
 #   backup-now        one maintenance pass now: export, backup set and verification when due
@@ -41,7 +45,8 @@
 #
 # SECRETS. Database passwords and tokens live in files created mode 0600 inside a directory
 # created mode 0700. The model credential is never written to a file: `up` passes NEBIUS_API_KEY
-# through from the calling shell, and without it every route that asks a model says so.
+# through from the calling shell, and without it every route that asks a model says so. The web
+# source's credential, TAVILY_API_KEY, is passed the same way, and only web notes need it.
 #
 # The server never builds or pulls: `up` runs images loaded by name and refuses when one is
 # missing, so what serves is what was built, pulled and checked on the build host.
@@ -177,23 +182,39 @@ compose() {
   docker compose -p "$project" --project-directory "$root" --env-file "$env_file" \
     -f "$root/compose.yaml" -f "$here/public.yaml" --profile tiles "$@"
 }
-# The model credential lives only in the environment `up` gave the API's container: it is never
-# written to a file. A command that starts an API again from a shell holding none (a timer's
-# `watch`, an `up` for a redeploy or a changed setting) would start it without one, and every model
-# mind would stop until somebody typed it again. So the container being replaced hands its own on:
-# read here into this process's environment alone, for the compose command that follows. It is
-# never printed, logged, put on a command line or written to a file. A shell that holds a
-# credential always wins, which is how an operator replaces it.
+# The credentials, the model's NEBIUS_API_KEY and the web source's TAVILY_API_KEY, live only in the
+# environment `up` gave the API's container: neither is ever written to a file. A command that
+# starts an API again from a shell holding none (a timer's `watch`, an `up` for a redeploy or a
+# changed setting) would start it without them, and every model mind and web note would stop until
+# somebody typed them again. So the container being replaced hands its own on: each read here into
+# this process's environment alone, for the compose command that follows. Neither is printed,
+# logged, put on a command line or written to a file. A shell that holds a credential always wins,
+# which is how an operator replaces it.
 keep_model_credential() {
-  [ -z "${NEBIUS_API_KEY:-}" ] || return 0
-  local replaced
+  [ -z "${NEBIUS_API_KEY:-}" ] || [ -z "${TAVILY_API_KEY:-}" ] || return 0
+  local replaced name value
   replaced="$(compose ps -a -q api 2>/dev/null | head -n 1 || true)"
   [ -n "$replaced" ] || return 0
-  NEBIUS_API_KEY="$(
-    docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$replaced" 2>/dev/null \
-      | sed -n 's/^NEBIUS_API_KEY=//p' | head -n 1 || true
-  )"
-  export NEBIUS_API_KEY
+  for name in NEBIUS_API_KEY TAVILY_API_KEY; do
+    [ -z "${!name:-}" ] || continue
+    value="$(
+      docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$replaced" 2>/dev/null \
+        | sed -n "s/^$name=//p" | head -n 1 || true
+    )"
+    [ -n "$value" ] || continue
+    printf -v "$name" '%s' "$value"
+    export "${name?}"
+  done
+}
+
+# The file an authority's record is kept in, by its provider: the model's in authority.json, as
+# every server has had it, and any other's in authority-<provider>.json beside it.
+authority_file_of() {
+  case "$1" in
+    nebius_token_factory) printf '%s' "$authority_file" ;;
+    "" | *[!a-z0-9_]*) refuse "a provider is lower-case letters, digits and underscores, not $1" ;;
+    *) printf '%s' "$deploy_dir/authority-$1.json" ;;
+  esac
 }
 
 # A restore needs every writer of the database stopped: only postgres may run. A listing that fails
@@ -467,14 +488,23 @@ services = json.load(sys.stdin)["services"]
 print(" ".join(name for name in ("api", "client") if services.get(name, {}).get("ports")))
 ')"
     [ -z "$published" ] || refuse "these services publish a port, which only the edge may: $published"
-    # A redeploy or a changed setting is an `up` from a shell that usually holds no model
-    # credential: the API it replaces hands its own on. A shell that holds one always wins.
-    if [ -z "${NEBIUS_API_KEY:-}" ]; then
-      keep_model_credential
+    # A redeploy or a changed setting is an `up` from a shell that usually holds no credential:
+    # the API it replaces hands its own on. A shell that holds one always wins.
+    model_typed="${NEBIUS_API_KEY:-}"
+    source_typed="${TAVILY_API_KEY:-}"
+    keep_model_credential
+    if [ -z "$model_typed" ]; then
       if [ -n "${NEBIUS_API_KEY:-}" ]; then
         echo "NEBIUS_API_KEY is kept from the api container this up replaces" >&2
       else
         echo "NEBIUS_API_KEY is not set: every route that asks a model will say no credential is configured" >&2
+      fi
+    fi
+    if [ -z "$source_typed" ]; then
+      if [ -n "${TAVILY_API_KEY:-}" ]; then
+        echo "TAVILY_API_KEY is kept from the api container this up replaces" >&2
+      elif [ "$(env_value EXULANICA_NOTES_AND_CREATURES)" = everyone ]; then
+        echo "TAVILY_API_KEY is not set: web notes will answer that their source is not configured" >&2
       fi
     fi
     # What the installation facts name as its identity: the images this server runs.
@@ -511,18 +541,25 @@ print(" ".join(name for name in ("api", "client") if services.get(name, {}).get(
 
   issue-authority)
     need_env_file
-    [ -e "$authority_file" ] && refuse "$authority_file exists: this server has its authority; adjust it with the spending command"
-    : "${EXULANICA_AUTHORITY_USD:?set EXULANICA_AUTHORITY_USD to the model allowance of this server in USD}"
+    # The model's authority unless EXULANICA_AUTHORITY_PROVIDER names another. The web source's
+    # (tavily_search) is admitted at USD 0 a search, so its calls are the search credits this
+    # server may spend and its USD ceiling, which must be positive, is nominal.
+    provider="${EXULANICA_AUTHORITY_PROVIDER:-nebius_token_factory}"
+    file="$(authority_file_of "$provider")"
+    [ -e "$file" ] && refuse "$file exists: this server has its $provider authority; adjust it with the spending command"
+    : "${EXULANICA_AUTHORITY_USD:?set EXULANICA_AUTHORITY_USD to the allowance of this server in USD}"
     : "${EXULANICA_AUTHORITY_CALLS:?set EXULANICA_AUTHORITY_CALLS to its call limit}"
     : "${EXULANICA_AUTHORITY_VALID_UNTIL:?set EXULANICA_AUTHORITY_VALID_UNTIL, for example 2026-11-15T00:00:00Z}"
+    reason="the public server's allowance"
+    [ "$provider" = nebius_token_factory ] || reason="the public server's allowance for $provider"
     umask 077
-    owner_run python -m exulanica.spending issue --provider nebius_token_factory \
+    owner_run python -m exulanica.spending issue --provider "$provider" \
       --ceiling-usd "$EXULANICA_AUTHORITY_USD" --max-calls "$EXULANICA_AUTHORITY_CALLS" \
       --valid-until "$EXULANICA_AUTHORITY_VALID_UNTIL" --operator public-server \
-      --reason "the public server's allowance" >"$authority_file.answer"
+      --reason "$reason" >"$file.answer"
     # The authority's identifier as the command answered it, with the validity it was issued for,
     # which every grant under it repeats.
-    python3 - "$authority_file.answer" "$EXULANICA_AUTHORITY_VALID_UNTIL" "$authority_file" <<'PY'
+    python3 - "$file.answer" "$EXULANICA_AUTHORITY_VALID_UNTIL" "$file" <<'PY'
 import json, os, sys
 answer = json.loads(open(sys.argv[1], encoding="utf-8").read())
 record = {"authority_id": answer["authority_id"], "valid_until": sys.argv[2], "answer": answer}
@@ -530,8 +567,8 @@ descriptor = os.open(sys.argv[3], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
     json.dump(record, handle, sort_keys=True)
 PY
-    rm -f "$authority_file.answer"
-    cat "$authority_file"
+    rm -f "$file.answer"
+    cat "$file"
     ;;
 
   grant)
@@ -550,10 +587,13 @@ PY
     ;;
 
   guest-policy)
-    # What each guest workspace is granted under the server's authority, once, by the runtime's
-    # guest step (migration 0139). Replaces the policy it had; grants already made stay.
+    # What each guest workspace is granted under one of the server's authorities, once, by the
+    # runtime's guest step (migration 0139): the model's unless EXULANICA_GUEST_PROVIDER names
+    # another. Replaces the policy that authority had; grants already made stay.
     need_env_file
-    [ -f "$authority_file" ] || refuse "no authority yet; run issue-authority first"
+    provider="${EXULANICA_GUEST_PROVIDER:-nebius_token_factory}"
+    file="$(authority_file_of "$provider")"
+    [ -f "$file" ] || refuse "no $provider authority yet; run issue-authority first"
     : "${EXULANICA_GUEST_USD:?set EXULANICA_GUEST_USD to what each guest may spend, in USD}"
     : "${EXULANICA_GUEST_CALLS:?set EXULANICA_GUEST_CALLS to the call limit of each guest}"
     : "${EXULANICA_GUEST_DAYS:?set EXULANICA_GUEST_DAYS to how long the allowance of a guest lasts, 1 to 31}"
@@ -562,7 +602,7 @@ PY
     grants_per_day="${EXULANICA_GUEST_GRANTS_PER_DAY:-$(env_value EXULANICA_GUEST_ENTRIES_PER_DAY)}"
     [ -n "$grants_per_day" ] \
       || refuse "set EXULANICA_GUEST_GRANTS_PER_DAY, or EXULANICA_GUEST_ENTRIES_PER_DAY in $env_file"
-    authority="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["authority_id"])' "$authority_file")"
+    authority="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["authority_id"])' "$file")"
     owner_run python -m exulanica.spending guest-policy --authority "$authority" \
       --ceiling-usd "$EXULANICA_GUEST_USD" --max-calls "$EXULANICA_GUEST_CALLS" \
       --valid-for-days "$EXULANICA_GUEST_DAYS" --grants-per-day "$grants_per_day" \
@@ -571,8 +611,10 @@ PY
 
   guest-policy-withdraw)
     need_env_file
-    [ -f "$authority_file" ] || refuse "no authority yet; run issue-authority first"
-    authority="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["authority_id"])' "$authority_file")"
+    provider="${EXULANICA_GUEST_PROVIDER:-nebius_token_factory}"
+    file="$(authority_file_of "$provider")"
+    [ -f "$file" ] || refuse "no $provider authority yet; run issue-authority first"
+    authority="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["authority_id"])' "$file")"
     owner_run python -m exulanica.spending guest-policy-withdraw --authority "$authority" \
       --operator public-server --reason "${EXULANICA_GUEST_WITHDRAW_REASON:-withdrawn by the operator}"
     ;;

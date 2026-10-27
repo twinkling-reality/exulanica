@@ -147,7 +147,9 @@ def _grant(request: Request, authorization: str | None) -> tuple[Session, frozen
     declaration rather than a default: a browser session exists only for an account membership, the
     migrations allow ``owner`` and ``guest`` (0058, 0139), and ``AccountRepository.session``
     refuses any other. ``tests/test_route_permissions.py`` reads the latest check and fails when a
-    role appears without a grant, so a new role cannot inherit another's by omission.
+    role appears without a grant, so a new role cannot inherit another's by omission. A guest also
+    holds ``references.request`` where the installation offers web notes to everyone
+    (:func:`browser_permissions`).
 
     The scheme is checked before a token is looked up, so a caller sending a basic credential gets
     the same refusal as a caller sending nothing, rather than having their value compared against
@@ -155,6 +157,18 @@ def _grant(request: Request, authorization: str | None) -> tuple[Session, frozen
     """
     session, held, _creator = _resolve(request, authorization)
     return session, held
+
+
+def browser_permissions(services: object, role: str) -> frozenset[Permission]:
+    """What a browser session of a membership role holds on this installation: its role's grant
+    (:data:`~exulanica.api.permissions.MEMBERSHIP_ROLE_PERMISSIONS`), and for a guest also
+    ``references.request`` where web notes are offered to everyone
+    (``EXULANICA_NOTES_AND_CREATURES=everyone``): the operator then offers the source's searches to
+    every visitor, each opted into on its own request and paid from the guest's own allowance."""
+    held = MEMBERSHIP_ROLE_PERMISSIONS[role]
+    if role == "guest" and getattr(services, "notes_and_creatures_for_everyone", False):
+        return held | {Permission.REFERENCES_REQUEST}
+    return held
 
 
 def _resolve(
@@ -168,7 +182,7 @@ def _resolve(
         account = services.accounts.browser_session(request)
         return (
             account.session,
-            MEMBERSHIP_ROLE_PERMISSIONS[account.role],
+            browser_permissions(services, account.role),
             account.creator is True,
         )
     scheme, _, presented = (authorization or "").partition(" ")

@@ -165,6 +165,7 @@ from exulanica.references.adapters import ReferenceAdapter
 from exulanica.references.catalogs import ReferenceSource, web_source
 from exulanica.references.settings import (
     configured_adapter,
+    notes_and_creatures_for_everyone,
     plays_references_here,
     reads_pictures_here,
     reference_workspaces,
@@ -440,6 +441,12 @@ class Services(ServiceRefusals, WorkerFactories):
     #: The workspaces that may ask for web notes (``EXULANICA_REFERENCE_WORKSPACES``); none when
     #: absent. A source offered to the operator only is offered to these alone.
     reference_workspaces: tuple[uuid.UUID, ...] = ()
+    #: Whether web notes and creatures from words are offered to every workspace here, guests
+    #: included and on a ``public`` installation too (``EXULANICA_NOTES_AND_CREATURES=everyone``),
+    #: rather than to the workspaces the two lists above name. Each workspace pays from its own
+    #: allowance; a person's own pictures and picture searches keep their own settings. Off for a
+    #: hand-constructed Services, and off unless set.
+    notes_and_creatures_for_everyone: bool = False
     #: Whether listed workspaces may ask for notes from their own pictures
     #: (``EXULANICA_REFERENCE_PICTURES``); off for a hand-constructed Services, and off unless set.
     reference_pictures: bool = False
@@ -775,20 +782,46 @@ class Services(ServiceRefusals, WorkerFactories):
 
     def references_offered_here(self) -> bool:
         """Whether this installation may offer the web source at all: a source offered to the
-        operator only is offered on no installation whose profile is ``public``."""
+        operator only is offered on no installation whose profile is ``public``, unless its
+        operator offers web notes to everyone here."""
         source = web_source()
         if source is None:
             return False
         profile = self.installation.profile if self.installation is not None else None
-        return source.availability == "everyone" or profile is None or profile.id != "public"
+        return (
+            source.availability == "everyone"
+            or self.notes_and_creatures_for_everyone
+            or profile is None
+            or profile.id != "public"
+        )
+
+    def reference_listed(self, workspace_id: uuid.UUID) -> bool:
+        """Whether web notes are offered to this workspace: every workspace where they are offered
+        to everyone here, else the listed ones."""
+        return self.notes_and_creatures_for_everyone or workspace_id in self.reference_workspaces
+
+    def creature_listed(self, workspace_id: uuid.UUID) -> bool:
+        """Whether creatures from words are offered to this workspace: every workspace where they
+        are offered to everyone here, else the listed ones."""
+        return self.notes_and_creatures_for_everyone or workspace_id in self.creature_workspaces
+
+    def offered_workspaces(self, listed: tuple[uuid.UUID, ...]) -> frozenset[uuid.UUID]:
+        """The workspaces a reference or creature worker here looks in for jobs: the listed ones
+        and, where web notes and creatures are offered to everyone, every workspace the draft
+        workers look in, the tokens' and those account discovery watches (an active owner's, and
+        a guest's seen within the play window)."""
+        if not self.notes_and_creatures_for_everyone:
+            return frozenset(listed)
+        tokens = frozenset() if self.tokens is None else self.tokens.workspaces
+        return frozenset(listed) | tokens | self.watched_workspaces()
 
     def serves_references_to(self, workspace_id: uuid.UUID) -> bool:
         """Whether a worker here takes this workspace's reference jobs: references are played here,
-        this installation may offer the source, and the workspace is listed."""
+        this installation may offer the source, and web notes are offered to the workspace."""
         return (
             self.runs_reference_worker
             and self.references_offered_here()
-            and workspace_id in self.reference_workspaces
+            and self.reference_listed(workspace_id)
         )
 
     def pictures_offered_to(self, workspace_id: uuid.UUID) -> bool:
@@ -831,12 +864,12 @@ class Services(ServiceRefusals, WorkerFactories):
 
     def serves_creatures_to(self, workspace_id: uuid.UUID) -> bool:
         """Whether a worker here drafts this workspace's creatures: drafts are played here, a model
-        client and the looks namespace exist, and the workspace is listed."""
+        client and the looks namespace exist, and creatures are offered to the workspace."""
         return (
             self.runs_creature_worker
             and self.model_client is not None
             and self.content_stores is not None
-            and workspace_id in self.creature_workspaces
+            and self.creature_listed(workspace_id)
         )
 
     def creature_offer_refusal(
@@ -1373,6 +1406,9 @@ def build_services(
         asks_again=_asks_again(env_get("ASK_AGAIN", environ)),
         runs_reference_worker=plays_references_here(env_get("REFERENCE_WORKER", environ)),
         reference_workspaces=reference_workspaces(env_get("REFERENCE_WORKSPACES", environ)),
+        notes_and_creatures_for_everyone=notes_and_creatures_for_everyone(
+            env_get("NOTES_AND_CREATURES", environ)
+        ),
         reference_pictures=reads_pictures_here(env_get("REFERENCE_PICTURES", environ)),
         reference_web_pictures=searches_web_pictures_here(
             env_get("REFERENCE_WEB_PICTURES", environ)

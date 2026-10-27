@@ -19,11 +19,13 @@ from exulanica.references.adapters import ReferenceSourceUnavailable
 from exulanica.references.adapters.tavily import TavilySearch
 from exulanica.references.catalogs import load_reference_catalogs
 from exulanica.references.settings import (
+    NOTES_AND_CREATURES_ENV,
     REFERENCE_PICTURES_ENV,
     REFERENCE_WORKER_ENV,
     REFERENCE_WORKSPACES_ENV,
     ReferenceSettingRefused,
     configured_adapter,
+    notes_and_creatures_for_everyone,
     plays_references_here,
     reads_pictures_here,
     reference_workspaces,
@@ -245,3 +247,100 @@ def test_a_public_installation_s_worker_has_no_picture_source(tmp_path, monkeypa
     public = SimpleNamespace(profile=SimpleNamespace(id="public"))
     worker = _services(tmp_path, reference_pictures=True, installation=public)
     assert worker.build_reference_worker()._picture_source is None
+
+
+# -- web notes and creatures for every workspace (EXULANICA_NOTES_AND_CREATURES) ----------------
+
+
+@pytest.mark.parametrize(
+    ("value", "everyone"),
+    [(None, False), ("", False), ("listed", False), ("everyone", True), (" Everyone ", True)],
+)
+def test_notes_and_creatures_keep_to_the_lists_unless_offered_to_everyone(value, everyone) -> None:
+    assert notes_and_creatures_for_everyone(value) is everyone
+    assert NOTES_AND_CREATURES_ENV == "EXULANICA_NOTES_AND_CREATURES"
+
+
+def test_an_unrecognised_offer_of_notes_and_creatures_is_refused_by_name() -> None:
+    for value in ("on", "guests", "all"):
+        with pytest.raises(ReferenceSettingRefused) as refused:
+            notes_and_creatures_for_everyone(value)
+        assert refused.value.code == "notes_and_creatures_not_recognised"
+
+
+def test_a_server_reads_the_offer_and_keeps_to_the_lists_without_it(monkeypatch, tmp_path) -> None:
+    from types import SimpleNamespace
+
+    from exulanica.api.services import build_services
+
+    monkeypatch.setattr(
+        "exulanica.api.services.load_account_runtime", lambda _: SimpleNamespace(guest=None)
+    )
+    environ = {"EXULANICA_DATABASE_URL": "postgresql://unused", "EXULANICA_DATA_DIR": str(tmp_path)}
+    assert build_services(environ).notes_and_creatures_for_everyone is False
+    offered = build_services({**environ, NOTES_AND_CREATURES_ENV: "everyone"})
+    assert offered.notes_and_creatures_for_everyone is True
+    with pytest.raises(ReferenceSettingRefused):
+        build_services({**environ, NOTES_AND_CREATURES_ENV: "sometimes"})
+
+
+def test_a_public_installation_offers_notes_and_creatures_to_everyone_only_when_set(
+    tmp_path,
+) -> None:
+    """Off by default on a public installation, whatever the lists hold; set, every workspace
+    may ask, guests' among them, and the worker looks in every workspace the draft workers do."""
+    from types import SimpleNamespace
+
+    public = SimpleNamespace(profile=SimpleNamespace(id="public"))
+    stranger = uuid.uuid4()
+    stores = SimpleNamespace(looks=SimpleNamespace(for_workspace=lambda workspace: None))
+    off = _services(
+        tmp_path,
+        installation=public,
+        reference_workspaces=(),
+        runs_creature_worker=True,
+        content_stores=stores,
+    )
+    assert not off.references_offered_here()
+    assert not off.serves_references_to(stranger) and not off.serves_creatures_to(stranger)
+    assert off.build_reference_worker() is None and off.build_creature_worker() is None
+
+    on = dataclasses.replace(off, notes_and_creatures_for_everyone=True)
+    assert on.references_offered_here()
+    assert on.serves_references_to(stranger) and on.serves_creatures_to(stranger)
+    worker = on.build_reference_worker()
+    assert isinstance(worker, ReferenceWorker)
+    # A token's workspace stands in for every one the draft workers look in.
+    found = dataclasses.replace(on, tokens=SimpleNamespace(workspaces=frozenset({stranger})))
+    assert stranger in found.build_reference_worker()._workspaces()
+    assert stranger in found.build_creature_worker()._workspaces()
+    assert stranger not in dataclasses.replace(
+        off, tokens=SimpleNamespace(workspaces=frozenset({stranger}))
+    ).offered_workspaces(())
+    # Only notes: a person's own pictures and picture searches stay off on a public installation.
+    pictured = dataclasses.replace(on, reference_pictures=True, reference_web_pictures=True)
+    assert not pictured.pictures_offered_to(stranger)
+    assert pictured.build_reference_worker()._picture_source is None
+
+
+def test_a_guest_holds_the_search_permission_only_where_notes_are_offered_to_everyone(
+    tmp_path,
+) -> None:
+    from exulanica.api.dependencies import browser_permissions
+    from exulanica.api.permissions import (
+        ACCOUNT_OWNER_PERMISSIONS,
+        GUEST_PERMISSIONS,
+        Permission,
+    )
+
+    listed = _services(tmp_path)
+    assert browser_permissions(listed, "guest") == GUEST_PERMISSIONS
+    assert Permission.REFERENCES_REQUEST not in browser_permissions(listed, "guest")
+    everyone = _services(tmp_path, notes_and_creatures_for_everyone=True)
+    assert browser_permissions(everyone, "guest") == GUEST_PERMISSIONS | {
+        Permission.REFERENCES_REQUEST
+    }
+    # Nothing else a guest is withheld comes with it, and an owner's grant is the same either way.
+    for withheld in (Permission.INTAKE_WRITE, Permission.DOOR_GRANT, Permission.CONSENT_WRITE):
+        assert withheld not in browser_permissions(everyone, "guest")
+    assert browser_permissions(everyone, "owner") == ACCOUNT_OWNER_PERMISSIONS

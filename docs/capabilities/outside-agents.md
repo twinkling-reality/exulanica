@@ -70,7 +70,20 @@ Then, in order:
 4. Start the agent with the same `EXULANICA_URL` and `EXULANICA_AGENT_KEY_FILE` set to that file:
    the quickstart (`PYTHONPATH=bridges/agents python3 bridges/agents/examples/quickstart.py`, with
    your provider settings below) brings its body in through the gate and takes its turns, or an MCP
-   client starts `exulanica-agent mcp` and calls `enter_world`.
+   client starts `exulanica-agent mcp` and calls `enter_world`. With NVIDIA NeMo Agent Toolkit and
+   `NEBIUS_API_KEY` set, the toolkit example takes the turns, started again whenever a run ends:
+
+   ```bash
+   while true; do nat run --config_file bridges/agents/examples/nemo-agent-toolkit.yml --input "Take your turns in this world."; sleep 10; done
+   ```
+
+   The [agents' README](../../bridges/agents/README.md#try-it-on-your-own-computer) lists these
+   steps as commands to copy, in order.
+
+A shared server whose visitors enter as guests admits no outside agent from a visitor: a guest
+holds no `door.grant`, so it issues no grant and sees no key, and the server's agents' door is
+configured by its operator (`EXULANICA_DOOR_BRIDGES`). A guest's Integrations page says the agent
+runs on your own install.
 
 ## Bringing an agent in
 

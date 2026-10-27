@@ -97,20 +97,20 @@ class WorkerFactories:
         )
 
     def build_creature_worker(self) -> CreatureDraftWorker | None:
-        """What drafts the creatures of the listed workspaces, or None where this process has no
-        model client, no looks namespace or no such workspace. Each draft's requests carry the
-        workspace's rules, with no place's name released: a creature is not a use a place-name
-        right offers."""
+        """What drafts the creatures of the workspaces they are offered to, or None where this
+        process has no model client, no looks namespace or no such workspace. Each draft's requests
+        carry the workspace's rules, with no place's name released: a creature is not a use a
+        place-name right offers."""
         if (
             self.model_client is None
             or self.content_stores is None
-            or not self.creature_workspaces
+            or not (self.creature_workspaces or self.notes_and_creatures_for_everyone)
             or not self.runs_creature_worker
         ):
             return None
         readonly = self.readonly_database
         looks = self.content_stores.looks
-        workspaces = self.creature_workspaces
+        listed = self.creature_workspaces
 
         def policy_for(workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
             return self.request_policy(
@@ -126,7 +126,7 @@ class WorkerFactories:
             client=self.model_client,
             policy_for=policy_for,
             looks_for=looks.for_workspace,
-            workspaces=lambda: workspaces,
+            workspaces=lambda: self.offered_workspaces(listed),
             picture_notes_authority=creature_picture_notes_authority(
                 manifest=self.model_client.manifest,
                 offered_to=self.pictures_offered_to,
@@ -134,21 +134,21 @@ class WorkerFactories:
         )
 
     def build_reference_worker(self) -> ReferenceWorker | None:
-        """What plays the reference jobs of the workspaces that may ask for web notes, or None
+        """What plays the reference jobs of the workspaces web notes are offered to, or None
         where this process has no model client, no durable spending, no such workspace or no
         source configuration. Each job's requests carry the workspace's rules, with no place's
         name released: a search is not a use a place-name right offers."""
         if (
             self.model_client is None
             or self.spending is None
-            or not self.reference_workspaces
+            or not (self.reference_workspaces or self.notes_and_creatures_for_everyone)
             or self.reference_adapter_for is None
             or not self.references_offered_here()
         ):
             return None
         database = self.database
         readonly = self.readonly_database
-        workspaces = self.reference_workspaces
+        listed = self.reference_workspaces
 
         def policy_for(workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
             # Saved names and rights are read on the read-only database, as a person's decisions
@@ -165,7 +165,7 @@ class WorkerFactories:
             policy_for=policy_for,
             spending=self.spending,
             adapter_for=self.reference_adapter_for,
-            workspaces=lambda: workspaces,
+            workspaces=lambda: self.offered_workspaces(listed),
             # A person's own pictures are read only where pictures are turned on, from the
             # read-only database as the request policy reads rights.
             picture_source=(

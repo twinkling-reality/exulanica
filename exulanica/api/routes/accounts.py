@@ -177,13 +177,31 @@ def google_callback(request: Request) -> Response:
     return response
 
 
+def _guest_providers(services: Any) -> list[str]:
+    """The providers a guest is granted an allowance on: every provider that bills
+    (``Manifest.billing_providers``; a provider on this computer bills nothing and asks no
+    allowance) and, where web notes are offered to everyone here, the web source, whose searches
+    its own authority's guest policy bounds."""
+    from exulanica.models.manifest import load_manifest
+    from exulanica.references.catalogs import web_source
+
+    providers = list(load_manifest().billing_providers())
+    if getattr(services, "notes_and_creatures_for_everyone", False):
+        source = web_source()
+        if source is not None and source.key not in providers:
+            providers.append(source.key)
+    return providers
+
+
 def _allowance(request: Request, workspace_id: uuid.UUID) -> list[dict[str, Any]]:
     """What a guest may still spend on each provider: the grant's state and what is left of it,
     from the workspace's own spending (never an authority's figure)."""
     from exulanica.spending.status import workspace_status
 
     services = request.app.state.services
-    entries = workspace_status(services.database, workspace_id)["providers"]
+    entries = workspace_status(
+        services.database, workspace_id, providers=_guest_providers(services)
+    )["providers"]
     return [
         {
             "provider": entry["provider"],
@@ -349,20 +367,18 @@ def guest_entry(
 def _grant_guest(
     request: Request, workspace_id: uuid.UUID, *, providers: list[str] | None = None
 ) -> list[dict[str, str]]:
-    """The workspace's allowance from every provider with a guest policy, of the providers that
-    bill (``Manifest.billing_providers``): a provider on this computer bills nothing and asks no
-    allowance. A refusal, or a failure of any kind, leaves the workspace without one on that
-    provider and is answered by provider and code (a failure by its class alone, never its text);
-    the entry stands."""
-    from exulanica.models.manifest import load_manifest
-
-    spending = getattr(request.app.state.services, "spending", None)
+    """The workspace's allowance from every provider with a guest policy, of the providers a guest
+    is granted on (:func:`_guest_providers`). A refusal, or a failure of any kind, leaves the
+    workspace without one on that provider and is answered by provider and code (a failure by its
+    class alone, never its text); the entry stands."""
+    services = request.app.state.services
+    spending = getattr(services, "spending", None)
     if spending is None:
         return []
     problems: list[dict[str, str]] = []
     if providers is None:
         try:
-            providers = list(load_manifest().billing_providers())
+            providers = _guest_providers(services)
         except Exception as exc:
             _LOG.warning("the model manifest could not be read: %s", type(exc).__qualname__)
             return [{"provider": "*", "code": "allowance_failed"}]

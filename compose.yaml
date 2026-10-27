@@ -146,6 +146,11 @@ services:
       EXULANICA_KINDS_FROM_PEOPLE: ${EXULANICA_KINDS_FROM_PEOPLE:-off}
       EXULANICA_SOCIETY_OF_THINGS: ${EXULANICA_SOCIETY_OF_THINGS:-off}
       EXULANICA_CREATURE_WORKSPACES: ${EXULANICA_CREATURE_WORKSPACES:-}
+      # Web notes and creatures from words for every workspace here, guests included, each paid
+      # from its own allowance: `everyone`; empty or `listed` keeps them to the workspaces the
+      # lists name (docs/reference-notes-contract.md). Web notes also need TAVILY_API_KEY below,
+      # https://api.tavily.com in the egress allowlist and an authority for the source.
+      EXULANICA_NOTES_AND_CREATURES: ${EXULANICA_NOTES_AND_CREATURES:-}
       EXULANICA_PROJECTS_DIRECTORY: ${EXULANICA_PROJECTS_DIRECTORY:-}
       # Whether a place made from a sentence stands on land chosen from its words
       # (docs/deployment.md): empty takes the default, on; `off` keeps every new place level.
@@ -167,6 +172,9 @@ services:
       # remains available for a one-process development run, but this composition does not use it.
       EXULANICA_DERIVATIVE_WORKER: "off"
       NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+      # The web source's credential, named by its catalog entry: unset, web notes are not offered
+      # (references_not_configured). Like the model's, passed from the calling shell, never a file.
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
       # No default. Read when a model client is built (NEBIUS_API_KEY set) and when Google sign-in
       # is configured: an unset or malformed allowlist, or one that omits the model endpoint or
       # the three Google sign-in origins, stops startup. See docs/security-floor.md.

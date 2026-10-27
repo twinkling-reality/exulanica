@@ -27,9 +27,11 @@ counts them in the whole spend.
 
 The words are sent with every saved name replaced (:func:`exulanica.selection.world_drafting.
 sendable`) and are kept only in the draft's job until it ends; the draft keeps nothing of them.
-Only the workspaces this installation lists draft creatures (``EXULANICA_CREATURE_WORKSPACES``), at
-most one unfinished draft and a bounded number an hour for one requester; only the requester reads
-a draft. Asking needs ``world.write`` and ``model.invoke``; reading needs ``world.read``.
+Only the workspaces this installation lists draft creatures (``EXULANICA_CREATURE_WORKSPACES``), or
+every workspace where it offers them to everyone (``EXULANICA_NOTES_AND_CREATURES=everyone``),
+guests included, each draft paid from the workspace's own allowance; at most one unfinished draft
+and a bounded number an hour for one requester; only the requester reads a draft. Asking needs
+``world.write`` and ``model.invoke``; reading needs ``world.read``.
 
 ``POST /things/creatures/{kind_sha256}/looks`` asks for a made look of a creature the workspace
 keeps and answers ``202`` at once with its look job (``exulanica.creature-look/v1``), queued, or
@@ -37,7 +39,7 @@ with the one already waiting for that creature; ``GET /things/creatures/looks/{l
 as it goes: ``queued``; ``staged`` by an operator's run; ``made``, naming the look the creature now
 wears by its document's digest (served by :mod:`exulanica.api.routes.thing_store`); ``refused``, by
 the fit's code; ``failed`` or ``cancelled``, by why. Nothing here spends: an operator's run makes
-the look (:mod:`exulanica.world.creature_look_jobs`). Only the workspaces this installation lists
+the look (:mod:`exulanica.world.creature_look_jobs`). Only the workspaces creatures are offered to
 ask, at most a few unfinished jobs and a bounded number an hour for one requester; any member of the
 workspace reads a job, which holds no word, and a creature's erasure takes its jobs with it. The
 same permissions as a draft.
@@ -301,7 +303,8 @@ def draft_creature(
         made = drafts.create_draft(
             connection,
             session.workspace_id,
-            offered_to=services.creature_workspaces,
+            # The one workspace this draft is for, where a worker here drafts its creatures.
+            offered_to=(session.workspace_id,),
             owner_actor_id=session.actor,
             words=body.words,
             sent=sent.text,
@@ -370,7 +373,7 @@ def ask_creature_look(
     # wherever it is asked.
     if not look_jobs.keeps_creature(connection, session.workspace_id, kind_sha256):
         return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
-    if session.workspace_id not in services.creature_workspaces:
+    if not services.creature_listed(session.workspace_id):
         return _refusal(409, "creatures_not_run_here", "creature looks are not made here")
     try:
         asked = look_jobs.ask_look(

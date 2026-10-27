@@ -903,6 +903,11 @@ and it holds no front-door captures.
 - `TAVILY_API_KEY`, `EXULANICA_REFERENCE_WORKER`, `EXULANICA_REFERENCE_WORKSPACES` and
   `EXULANICA_REFERENCE_PICTURES` configure reference notes, owned by the [reference notes contract](reference-notes-contract.md#7-configuration).
   Web notes need `https://api.tavily.com` in `EXULANICA_EGRESS_ALLOWLIST`.
+- `EXULANICA_NOTES_AND_CREATURES` (`listed`, the default, or `everyone`) offers web notes and
+  creatures from words to every workspace, guests included, each paid from its own allowance; the
+  [reference notes contract](reference-notes-contract.md#7-configuration) owns it. `compose.yaml`
+  hands the API it and `TAVILY_API_KEY`, which `public.sh up` passes from the calling shell or keeps
+  from the API it replaces, as it does `NEBIUS_API_KEY`.
 - `EXULANICA_CREATURE_WORKER` and `EXULANICA_CREATURE_WORKSPACES` configure creatures drafted from
   words, owned by the [things contract](things-contract.md#drafting-a-creature-from-words): the
   worker runs in the API process unless set off, for the JSON array of workspace ids listed (none
@@ -1528,7 +1533,7 @@ secrets directory `EXULANICA_DEPLOY_DIR`:
 | `mint <label>`, `revoke <label>` | Add or remove a token for a workspace of its own, minted by the image's `exulanica-seed token` with the reviewer's permissions. The next `up` serves the change and plays those workspaces |
 | `up` | Starts the server from loaded images, never building. It refuses until the fuse is filled in, and refuses when the merged Compose configuration publishes a port for `api` or `client`: only the edge may. The overlay gives the network a fixed range and the edge, the client proxy and the API fixed addresses: the client proxy trusts `X-Forwarded-For` from the edge's address alone and the API trusts forwarded headers from the client proxy's alone, so a process on the host, which reaches every container at its bridge address from the network's gateway, names neither its counted address nor its scheme. The client proxy finds the API by name once, when it starts, so the API keeps one address through every recreation and host restart. A host that already uses that range changes every place `deploy/public/public.yaml` names. `restore-marker`, `migrate` and `catalogs` run to completion on every start |
 | `prepare-towns` | Makes the arrival worlds in the operator's workspace, inside the API's container, and dresses each with the scene the arrival list names (`python -m exulanica.api.arrival_dressing prepare`); prints each tile's state and what each dressing left incomplete, and exits 1 when anything is, except a host that does not offer the scene's engine; run it again to read the tiles once baked |
-| `issue-authority`, `guest-policy`, `guest-policy-withdraw`, `grant <label>`, `spending` | Issue the server's spending authority from `EXULANICA_AUTHORITY_USD`, `EXULANICA_AUTHORITY_CALLS` and `EXULANICA_AUTHORITY_VALID_UNTIL`; grant a minted workspace `EXULANICA_GRANT_USD` and `EXULANICA_GRANT_CALLS` under it; set what each guest is granted under it (`EXULANICA_GUEST_USD`, `EXULANICA_GUEST_CALLS`, `EXULANICA_GUEST_DAYS`) and how many guests it grants in a UTC day (`EXULANICA_GUEST_GRANTS_PER_DAY`, the day's entries unless stated); end that policy so no guest is granted anything until another is set; print the authorities' state and each live guest policy, with whether it must be set again. Each runs `python -m exulanica.spending` as the owner in a one-shot container on the server's network, with the witness volume |
+| `issue-authority`, `guest-policy`, `guest-policy-withdraw`, `grant <label>`, `spending` | Issue the server's spending authority from `EXULANICA_AUTHORITY_USD`, `EXULANICA_AUTHORITY_CALLS` and `EXULANICA_AUTHORITY_VALID_UNTIL`; grant a minted workspace `EXULANICA_GRANT_USD` and `EXULANICA_GRANT_CALLS` under it; set what each guest is granted under it (`EXULANICA_GUEST_USD`, `EXULANICA_GUEST_CALLS`, `EXULANICA_GUEST_DAYS`) and how many guests it grants in a UTC day (`EXULANICA_GUEST_GRANTS_PER_DAY`, the day's entries unless stated); with `EXULANICA_AUTHORITY_PROVIDER` and `EXULANICA_GUEST_PROVIDER` set to `tavily_search`, the web source's authority (its calls are the search credits the server may spend, its USD ceiling nominal) and each guest's searches under it, kept in `authority-tavily_search.json` beside the model's `authority.json`; end that policy so no guest is granted anything until another is set; print the authorities' state and each live guest policy, with whether it must be set again. Each runs `python -m exulanica.spending` as the owner in a one-shot container on the server's network, with the witness volume |
 | `backup-now` | One maintenance pass now (9.3) |
 | `restore-planned <set>` | With the server stopped (`down`; it refuses while any service but the database runs, naming them): a planned restore (9.4) of the backup set named by its directory, the current database kept aside under its own name. The restore job runs from the loaded maintenance image, so nothing is built on the server. An attempt stopped part way is resumed by running it again with the same set: its checkpoint is kept in the secrets directory until it ends |
 | `restore-return` | With the server stopped: abandons a planned restore stopped part way, and the database it set aside serves again (9.4) |
@@ -1619,7 +1624,11 @@ shared folders hide this in a rehearsal on a workstation; a Linux host shows it.
 3. `read -rs NEBIUS_API_KEY && export NEBIUS_API_KEY`, then `up`, then `issue-authority` with the
    allowance the operator approved, then `guest-policy` with each visitor's figures, then
    `prepare-towns`, run again until every tile reads baked: a visitor's arrival world is made only
-   once its tiles are.
+   once its tiles are. To offer web notes and creatures from words to every visitor, add
+   `EXULANICA_NOTES_AND_CREATURES=everyone` and `https://api.tavily.com` to the allowlist in
+   `public.env`, `read -rs TAVILY_API_KEY && export TAVILY_API_KEY` before `up`, and issue the web
+   source's authority and guest policy (`EXULANICA_AUTHORITY_PROVIDER=tavily_search issue-authority`,
+   `EXULANICA_GUEST_PROVIDER=tavily_search guest-policy`).
 4. Install the four units in `deploy/public/` into `/etc/systemd/system`, then
    `systemctl enable --now exulanica-public-watch.timer exulanica-public-preflight.timer`. The watch
    timer runs every minute and the preflight daily; both write to the journal.

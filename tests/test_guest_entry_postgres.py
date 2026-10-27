@@ -75,6 +75,7 @@ def _app(account_role, spine_schema, tmp_path, guest: GuestEntryConfig) -> TestC
     @app.get("/world-read")
     @app.post("/world-write")
     @app.post("/intake-write")
+    @app.post("/references-write")
     def probe(session: Annotated[Session, Depends(current_session)]):
         return {"workspace_id": str(session.workspace_id)}
 
@@ -88,6 +89,9 @@ def _app(account_role, spine_schema, tmp_path, guest: GuestEntryConfig) -> TestC
         ),
         ("POST", "/intake-write"): permissions.Requires(
             frozenset({permissions.Permission.INTAKE_WRITE})
+        ),
+        ("POST", "/references-write"): permissions.Requires(
+            frozenset({permissions.Permission.REFERENCES_REQUEST})
         ),
     }
     patch = pytest.MonkeyPatch()
@@ -523,3 +527,60 @@ def test_a_closed_entry_admits_nobody_new_and_keeps_the_guests_who_entered(
     assert refused.status_code == 503 and refused.json()["code"] == "guest_entry_off"
     session = client.get("/auth/session")
     assert session.status_code == 200 and session.json()["role"] == "guest"
+
+
+def test_a_guest_asks_the_web_source_only_where_web_notes_are_offered_to_everyone(guest_app):
+    """A guest holds no references.request by default: the source's searches are the operator's
+    to offer. Where the operator offers web notes to everyone, a guest holds it too, and nothing
+    else a guest is withheld comes with it."""
+    import dataclasses
+
+    client = guest_app(per_day=1_000_000)
+    csrf = {"Origin": ORIGIN, "X-CSRF-Token": _enter(client).json()["csrf_token"]}
+    assert client.post("/references-write", headers=csrf).status_code == 403
+    client.app.state.services = dataclasses.replace(
+        client.app.state.services, notes_and_creatures_for_everyone=True
+    )
+    assert client.post("/references-write", headers=csrf).status_code == 200
+    assert client.post("/intake-write", headers=csrf).status_code == 403
+
+
+class _RecordingSpending:
+    """Records the providers a guest's entry and session reads ask an allowance on."""
+
+    def __init__(self) -> None:
+        self.providers: list[str] = []
+
+    def grant_guest(self, workspace_id: uuid.UUID, *, provider: str) -> uuid.UUID | None:
+        self.providers.append(provider)
+        return None
+
+
+def test_where_web_notes_are_for_everyone_a_guest_is_granted_the_source_s_allowance(guest_app):
+    """A guest's searches are paid from an allowance of their own under the web source's guest
+    policy, asked at entry beside the model's; a server that keeps notes to its list asks none."""
+    import dataclasses
+
+    from exulanica.models.manifest import load_manifest
+
+    billing = list(load_manifest().billing_providers())
+    listed = guest_app(per_day=1_000_000)
+    spending = _RecordingSpending()
+    listed.app.state.services = dataclasses.replace(listed.app.state.services, spending=spending)
+    entered = _enter(listed)
+    assert entered.status_code == 201, entered.text
+    assert spending.providers == billing
+    assert [entry["provider"] for entry in entered.json()["allowance"]] == billing
+
+    everyone = guest_app(per_day=1_000_000)
+    spending = _RecordingSpending()
+    everyone.app.state.services = dataclasses.replace(
+        everyone.app.state.services, spending=spending, notes_and_creatures_for_everyone=True
+    )
+    entered = _enter(everyone)
+    assert entered.status_code == 201, entered.text
+    assert spending.providers == [*billing, "tavily_search"]
+    assert [entry["provider"] for entry in entered.json()["allowance"]] == [
+        *billing,
+        "tavily_search",
+    ]

@@ -531,3 +531,32 @@ def test_a_draft_says_nothing_of_another_person_s_notes_request(served):
         None,
         None,
     )
+
+
+def test_a_workspace_the_list_does_not_name_asks_only_where_creatures_are_for_everyone(served):
+    """On a public installation the list names nobody. Off by default, a workspace is refused
+    before anything is queued and its offer says why; offered to everyone, it asks as a listed one
+    does, and a caller without the model grant is still refused."""
+    import dataclasses
+    from types import SimpleNamespace
+
+    client, database, workspace_id, _stores = served
+    public = SimpleNamespace(profile=SimpleNamespace(id="public"))
+    listed = client.app.state.services
+    client.app.state.services = dataclasses.replace(
+        listed, creature_workspaces=(), installation=public
+    )
+    refused = _ask(client, "a gentle horse that walks the hills")
+    assert (refused.status_code, refused.json()["code"]) == (409, "creatures_not_run_here")
+    assert _get(client, "/things/creatures/offered").json()["code"] == "creatures_not_run_here"
+    with database.session(workspace_id) as connection:
+        assert connection.execute("select count(*) as n from creature_draft").fetchone()["n"] == 0
+    client.app.state.services = dataclasses.replace(
+        client.app.state.services, notes_and_creatures_for_everyone=True
+    )
+    offer = _get(client, "/things/creatures/offered").json()
+    assert (offer["offered"], offer["code"]) == (True, None)
+    asked = _ask(client, "a gentle horse that walks the hills")
+    assert asked.status_code == 202, asked.text
+    assert _ask(client, "a gentle horse", _READER).status_code == 403
+    assert client.post("/things/creatures", json={"words": "a horse"}).status_code == 401

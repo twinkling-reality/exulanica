@@ -947,7 +947,11 @@ its kind by the digest of the kind's document alone, with no key and no foreign 
 creature (below) is never held up by it; a refused draft keeps a code and a field, never a
 sentence, since a check's own sentence may quote the drafted label, and the table refuses anything
 else in those columns. Only the workspaces an installation lists draft creatures
-(`EXULANICA_CREATURE_WORKSPACES`, the worker set off by `EXULANICA_CREATURE_WORKER`); a requester
+(`EXULANICA_CREATURE_WORKSPACES`, the worker set off by `EXULANICA_CREATURE_WORKER`), or every
+workspace, guests included, where it offers them to everyone
+(`EXULANICA_NOTES_AND_CREATURES=everyone`, [reference notes](reference-notes-contract.md#7-configuration)),
+each draft paid from the workspace's own allowance, whose worker then looks for drafts in every
+workspace the draft workers do (the tokens' and those account discovery watches); a requester
 has one draft open at a time and a bounded number an hour, reads only their own drafts, and needs
 `world.write` and `model.invoke` to ask. A workspace not listed is told `creatures_not_run_here`;
 words that are not one plain line, `words_refused`. A workspace with a draft still queued or
@@ -1320,14 +1324,15 @@ receipts and the containers.
 A job holds ids, digests, codes, times, a cost and who asked, and no word: the request a run writes
 carries the creature's drafted appearance and lives only in the run's folder and its GPU job. At most
 one job waits for a creature, and one requester has at most four unfinished and twelve in an hour;
-only the workspaces the installation lists (`EXULANICA_CREATURE_WORKSPACES`) ask. A creature's
+only the workspaces creatures are offered to (the list, or every workspace where they are
+offered to everyone) ask. A creature's
 erasure deletes its jobs and kind looks with it, and a workspace tombstone every one of its
 workspace's, both as the definer owner; the rows refuse every other delete, and a kind look every
 update.
 
 | Route | Answers |
 | --- | --- |
-| `POST /things/creatures/{kind_sha256}/looks` | Asks for a made look of the creature of that kind, needing `world.write` and `model.invoke`: 202 with its job, `exulanica.creature-look/v1`, queued, or the one already waiting for that creature; 404 `unknown_reference` for a kind the workspace does not keep as a creature; 409 `creatures_not_run_here` for a workspace the installation does not list; 429 `look_limit_reached` |
+| `POST /things/creatures/{kind_sha256}/looks` | Asks for a made look of the creature of that kind, needing `world.write` and `model.invoke`: 202 with its job, `exulanica.creature-look/v1`, queued, or the one already waiting for that creature; 404 `unknown_reference` for a kind the workspace does not keep as a creature; 409 `creatures_not_run_here` for a workspace creatures are not offered to; 429 `look_limit_reached` |
 | `GET /things/creatures/looks/{look_id}` | The job, for any member of the workspace (`world.read`, never cached), as it is the creature's, holds no word and is answered to whoever asks again for that creature while it waits: its status, the kind's digest, the made look's digest, the refusal's code, the failure, its cost and its times; another workspace's or an erased creature's answers 404 `unknown_reference` |
 
 ## Scenes

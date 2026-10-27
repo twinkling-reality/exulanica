@@ -9,7 +9,7 @@ contract; the hosted-request boundary itself belongs to the
 
 | Part | Status |
 | --- | --- |
-| Web notes from one source (Tavily), off by default and offered to listed workspaces only | Implemented |
+| Web notes from one source (Tavily), off by default and offered to listed workspaces only, or to every workspace where the installation offers them to everyone | Implemented |
 | A drafter's notes from a finished request: the quoted block, its bound and its provenance | Implemented |
 | A drafter's prompt carrying the notes | Implemented for the describe-a-town drafter (`POST /worlds/specification/drafts` with `reference_id`, prompt version 3, and a town Create makes from a sentence, `POST /worlds/drafts` with `reference_id`) and creature drafts (`POST /things/creatures`, purpose `things`, web or authorized selected-picture notes and prompt version 2); not built for the kind, look and piece drafters, each of which adds them in a prompt version of its own |
 | Notes read from a person's own pictures: the reading call, its role, the checks on its notes, the job's picture step and the routes | Implemented, off by default (`EXULANICA_REFERENCE_PICTURES`) and never offered on a `public` installation; it stays off until Nebius Token Factory Sales confirms in writing that its terms allow it |
@@ -69,7 +69,8 @@ picks one and keeps it (section 13).
 Each source has exactly one adapter in `exulanica/references/adapters/`, and a test holds the
 catalog and the adapters to the same set. Adding or replacing a source is a catalog entry plus an
 adapter; the web source is the catalog's first leads source. The only source is `tavily_search`: a leads source, offered to the operator only, one
-credit per call at the basic depth, at most five results. Its terms are recorded in
+credit per call at the basic depth, at most five results. Its operator offers it to the workspaces
+they list, or to every workspace of their installation (section 7). Its terms are recorded in
 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) section 3.4.
 
 ## 3. The boundary on every outgoing query
@@ -198,6 +199,15 @@ nothing twice; its bundle is then partial. An operator issues that authority wit
 nominal for this provider). The planner and reader calls are charged to Nebius Token Factory under
 the workspace's grant like every model call. Without durable spending, web notes are not offered.
 
+Where web notes are offered to every workspace, guests included, the only bound on them is money.
+A guest is granted an allowance for the source at entry, as for the model's provider, by the
+guest policy the operator sets under the source's authority (`public.sh guest-policy` with
+`EXULANICA_GUEST_PROVIDER=tavily_search`): its calls are the searches that guest may send. The
+policy's grants in a UTC day bound how many guests the day's searches can come from, and the
+authority's calls bound every workspace's together; the model calls stay within each guest's own
+model allowance. A guest whose grant has no search left, or who holds none, is refused
+`reference_budget_unavailable` before anything is queued.
+
 ## 7. Configuration
 
 | Setting | Meaning |
@@ -206,6 +216,7 @@ the workspace's grant like every model call. Without durable spending, web notes
 | `EXULANICA_REFERENCE_WORKSPACES` | A JSON array of the workspace ids that may ask for web notes; none when absent. A malformed list stops startup |
 | `EXULANICA_REFERENCE_PICTURES` | Off unless `on`, `1`, `true` or `yes`: listed workspaces may also name their own pictures. Any other value stops startup |
 | `EXULANICA_REFERENCE_WEB_PICTURES` | Off unless `on`, `1`, `true` or `yes`: listed workspaces may also ask for picture searches. Any other value stops startup |
+| `EXULANICA_NOTES_AND_CREATURES` | `listed` (the default) or `everyone`: web notes and creatures from words are offered to the workspaces their lists name, or to every workspace here, guests included and on a `public` installation too, each paid from that workspace's own allowance. It offers web notes only: a person's own pictures and picture searches keep their own settings and stay off on a `public` installation. Any other value stops startup |
 | `TAVILY_API_KEY` | The source's credential, named by its catalog entry |
 | `EXULANICA_EGRESS_ALLOWLIST` | Must include `https://api.tavily.com` for web notes |
 
@@ -224,14 +235,17 @@ the workspace's grant like every model call. Without durable spending, web notes
 | `DELETE /worlds/web-pictures/{picture_id}` | `world.write` and `deletion.write` | Erase one kept picture; 204 |
 
 `references.request` is a permission of its own: an account owner holds it, a token holds it when
-its grant names it, and a guest never does, because the source's acceptable use policy binds the
-person asking. Only the requester reads or stops a request: anyone else's answers 404
+its grant names it, and a guest holds it only where the installation offers web notes to everyone
+(`EXULANICA_NOTES_AND_CREATURES=everyone`), because the source's acceptable use policy binds the
+person asking: an operator who offers notes to every visitor answers for their searches, each
+opted into on its own request, under the words the page shows beside the box (the source is named
+and keeps the searches). Only the requester reads or stops a request: anyone else's answers 404
 `unknown_reference`, exactly as an id that does not exist. One requester has at most two requests
 unfinished and twenty in an hour; another is 429 `reference_limit_reached`.
 
 A request web notes are not offered for is refused with 409 and one code before anything is
 queued, and the capability names the same code: `references_operator_only` (the workspace is not
-listed, or the installation's profile is `public`), `references_not_run_here` (no worker, or its
+listed, or the installation's profile is `public`, unless web notes are offered to everyone), `references_not_run_here` (no worker, or its
 thread is not alive here), `reference_budget_unavailable` (no durable spending, or the workspace
 holds no live grant for the source with a call left) or `references_not_configured`. In the job,
 the process's model budget share (half is always left for other work), the source's rate and the

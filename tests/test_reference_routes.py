@@ -637,3 +637,152 @@ def test_things_request_selects_picture_words_only_for_selected_captures(
         (uuid.UUID(response.json()["reference_id"]),),
     ).fetchone()
     assert row["prompts_sha256"] == prompts_for_request("things", pictures=bool(pictures)).sha256
+
+
+# -- every workspace, on a public installation (EXULANICA_NOTES_AND_CREATURES=everyone) ----------
+
+
+def _public_installation():
+    """An installation declared by the repository's own public profile, as the server runs."""
+    from pathlib import Path
+
+    from exulanica.api.installation import Installation, load_profile
+
+    profile = load_profile(Path(__file__).resolve().parents[1] / "deploy/profiles/public.json")
+    assert profile.id == "public"
+    return Installation(profile, None, {}, None)
+
+
+PUBLIC = _public_installation()
+
+
+def test_on_a_public_installation_web_notes_reach_an_unlisted_workspace_only_when_offered(
+    api,
+) -> None:
+    """Off by default: on a public installation a workspace the list does not name is refused
+    before anything is queued. Offered to everyone, the same workspace asks as a listed one does,
+    and still only for notes: pictures and picture searches stay off on a public installation."""
+    client_for, repository = api
+    off = _post(client_for(installation=PUBLIC, reference_workspaces=()))
+    assert (off.status_code, off.json()["code"]) == (409, "references_operator_only")
+    assert _requests(repository) == 0
+    everyone = {
+        "installation": PUBLIC,
+        "reference_workspaces": (),
+        "notes_and_creatures_for_everyone": True,
+    }
+    (capability,) = _get(client_for(**everyone), "/worlds/references").json()["capabilities"]
+    assert capability["code"] is None
+    made = _post(client_for(**everyone))
+    assert made.status_code == 202, made.text
+    assert _requests(repository) == 1
+    listed = _get(
+        client_for(**everyone, reference_pictures=True, reference_web_pictures=True),
+        "/worlds/references",
+    ).json()
+    assert (listed["pictures"]["offered"], listed["web_pictures"]["offered"]) == (False, False)
+    picture_search = _post(
+        client_for(**everyone, reference_web_pictures=True),
+        purpose="things",
+        description="a heron",
+        web_pictures=True,
+    )
+    assert (picture_search.status_code, picture_search.json()["code"]) == (
+        409,
+        "web_pictures_not_offered",
+    )
+
+
+def test_a_stranger_is_refused_where_web_notes_are_offered_to_everyone(api) -> None:
+    """Everyone means every workspace here, each with its own credential: no credential is
+    refused, a credential without the search permission is refused, and another workspace reads
+    and stops nothing of a request it did not make."""
+    client_for, _repository = api
+    client = client_for(
+        installation=PUBLIC, reference_workspaces=(), notes_and_creatures_for_everyone=True
+    )
+    anonymous = client.post(
+        "/worlds/references", json={"purpose": "kind", "description": "a harbour", "web": True}
+    )
+    assert anonymous.status_code == 401
+    assert _post(client, token=NO_REFERENCES_TOKEN).status_code == 403
+    made = _post(client).json()
+    path = f"/worlds/references/{made['reference_id']}"
+    read = _get(client, path, token=STRANGER_TOKEN)
+    stopped = client.post(f"{path}/cancel", headers={"Authorization": f"Bearer {STRANGER_TOKEN}"})
+    for answer in (read, stopped):
+        assert (answer.status_code, answer.json()["code"]) == (404, "unknown_reference")
+
+
+def test_everyone_s_web_notes_are_paid_from_the_workspace_s_own_grant_for_the_source(
+    named, bench, spine_schema, monkeypatch
+) -> None:
+    """The only bound on everyone's notes is money: a workspace with no grant for the source, or
+    one whose grant has no search left, asks nothing; one with a search left asks."""
+    from exulanica.db.migrate import provision_workspace
+    from exulanica.db.session import set_workspace
+    from exulanica.models.spending import SpendingRequest
+
+    repository = named[0]
+    visitor = uuid.uuid4()
+    monkeypatch.setenv(
+        "EXULANICA_API_TOKENS",
+        json.dumps(
+            {
+                TOKEN: {
+                    "workspace_id": str(visitor),
+                    "actor": str(uuid.uuid4()),
+                    "permissions": EVERY_PERMISSION,
+                }
+            }
+        ),
+    )
+    set_workspace(repository.connection, visitor)
+    provision_workspace(repository.connection, visitor)
+    set_workspace(repository.connection, repository.workspace_id)
+    repository.connection.commit()
+    services = Services(
+        database=bench.runtime,
+        readonly_database=bench.runtime,
+        store=named[1],
+        tokens=load_token_directory(),
+        executor_shares_the_write_role=True,
+        model_client=ModelClient(
+            api_key="test-key-not-real",
+            transport=FakeTransport(),
+            budget=BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+        ),
+        runs_reference_worker=True,
+        notes_and_creatures_for_everyone=True,
+        installation=PUBLIC,
+        reference_adapter_for=lambda source: TavilySearch(
+            source, transport=FakeTransport(), credential="tvly-test"
+        ),
+        spending=bench.durable(),
+    )
+    app = create_app(services, verify=False)
+    app.state.reference_thread = _Alive()
+    client = TestClient(app)
+    ungranted = _post(client)
+    assert (ungranted.status_code, ungranted.json()["code"]) == (
+        409,
+        "reference_budget_unavailable",
+    )
+    _grant_tavily(bench, visitor, calls=1)
+    bench.durable().for_workspace(visitor).admit(
+        SpendingRequest(
+            provider="tavily_search",
+            model_id="tavily_search",
+            role="reference_search",
+            usd=Decimal(0),
+            key="reference:spent-before:search:0",
+        )
+    )
+    spent = _post(client)
+    assert (spent.status_code, spent.json()["code"]) == (409, "reference_budget_unavailable")
+    (capability,) = _get(client, "/worlds/references").json()["capabilities"]
+    assert capability["code"] == "reference_budget_unavailable"
+    with bench.runtime.session(visitor) as connection:
+        assert (
+            connection.execute("select count(*) as n from reference_request").fetchone()["n"] == 0
+        )

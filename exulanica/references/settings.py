@@ -14,6 +14,12 @@
   listed workspace may ask for a picture search, whose pictures' addresses are passed to the person
   who asked (:mod:`exulanica.references.held_pictures`). Off by default, because it hands a page
   addresses on websites nobody here chose.
+* ``EXULANICA_NOTES_AND_CREATURES``: ``listed`` (the default) or ``everyone``. Listed, web notes
+  and creatures from words are offered to the workspaces ``EXULANICA_REFERENCE_WORKSPACES`` and
+  ``EXULANICA_CREATURE_WORKSPACES`` name; everyone, to every workspace here, guests included and on
+  a ``public`` installation too, each paid from that workspace's own allowance. It offers web notes
+  only: a person's own pictures and picture searches keep their own settings and stay off on a
+  ``public`` installation.
 * A source is configured when its credential variable is set and the egress allowlist declares its
   origin; :func:`configured_adapter` builds its adapter, or refuses as
   ``references_not_configured`` naming what is missing and never the credential.
@@ -37,12 +43,14 @@ from exulanica.references.adapters import (
 from exulanica.references.catalogs import ReferenceSource
 
 __all__ = [
+    "NOTES_AND_CREATURES_ENV",
     "REFERENCE_PICTURES_ENV",
     "REFERENCE_WEB_PICTURES_ENV",
     "REFERENCE_WORKER_ENV",
     "REFERENCE_WORKSPACES_ENV",
     "ReferenceSettingRefused",
     "configured_adapter",
+    "notes_and_creatures_for_everyone",
     "plays_references_here",
     "reads_pictures_here",
     "reference_workspaces",
@@ -53,6 +61,7 @@ REFERENCE_WORKER_ENV: Final = env_name("REFERENCE_WORKER")
 REFERENCE_WORKSPACES_ENV: Final = env_name("REFERENCE_WORKSPACES")
 REFERENCE_PICTURES_ENV: Final = env_name("REFERENCE_PICTURES")
 REFERENCE_WEB_PICTURES_ENV: Final = env_name("REFERENCE_WEB_PICTURES")
+NOTES_AND_CREATURES_ENV: Final = env_name("NOTES_AND_CREATURES")
 
 
 class ReferenceSettingRefused(ValueError):
@@ -96,6 +105,18 @@ def searches_web_pictures_here(value: str | None) -> bool:
     raise ReferenceSettingRefused(
         "reference_web_pictures_not_recognised", REFERENCE_WEB_PICTURES_ENV
     )
+
+
+def notes_and_creatures_for_everyone(value: str | None) -> bool:
+    """Whether web notes and creatures from words are offered to every workspace here
+    (``EXULANICA_NOTES_AND_CREATURES=everyone``) rather than to the listed ones alone (``listed``,
+    the default when unset or empty)."""
+    normalized = (value or "").strip().lower()
+    if normalized in ("", "listed"):
+        return False
+    if normalized == "everyone":
+        return True
+    raise ReferenceSettingRefused("notes_and_creatures_not_recognised", NOTES_AND_CREATURES_ENV)
 
 
 def reference_workspaces(value: str | None) -> tuple[uuid.UUID, ...]:

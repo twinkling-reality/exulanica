@@ -24,9 +24,43 @@ pip install "exulanica-agent @ git+https://github.com/twinkling-reality/exulanic
 
 Copying the `exulanica_agent` folder next to your program works too.
 
-To try one on Exulanica running on your own computer, the guide's
-[On your own install](../../docs/capabilities/outside-agents.md#on-your-own-install) starts the
-install with the agents' door, places a gate and lets an agent in from the page's address.
+## Try it on your own computer
+
+An agent decides for one of a town's people on Exulanica running on your own computer, with the
+NVIDIA NeMo Agent Toolkit example as its mind. A shared server, such as a hosted demo whose
+visitors enter as guests, lets no visitor in this way: a guest cannot issue a grant, and its
+Integrations page says the agent runs on your own install. From a clone of the repository:
+
+1. Start the install with the agents' door, and keep it running:
+
+   ```bash
+   python3 scripts/acceptance/launch.py up --worktree . --personal --tiles --door-bridges bridges/agents/examples/bridge-entry.json
+   ```
+
+2. On the page it prints, open A small town and press P to bring its people in. Click a person and
+   note the name the page shows.
+3. In a second terminal at the checkout, let the agent in. `<port>` is the page's port and
+   `<address>` the page's address with the town open; the install's own token issues the grant
+   and never shows, and the agent's key goes into the new file `agent.key`, which only you can
+   read:
+
+   ```bash
+   EXULANICA_URL="http://127.0.0.1:<port>/api" EXULANICA_TOKEN="$(cat ~/Exulanica/install/token)" PYTHONPATH=bridges/agents python3 -m exulanica_agent grant --entry "<address>" --person "<the name>" --key-file agent.key
+   ```
+
+4. Start the agent with your own Nebius Token Factory key, and keep it running:
+
+   ```bash
+   pip install "nvidia-nat==1.9.0" "nvidia-nat-mcp==1.9.0" "nvidia-nat-langchain[openai]==1.9.0"
+   read -rs NEBIUS_API_KEY && export NEBIUS_API_KEY
+   export EXULANICA_URL="http://127.0.0.1:<port>/api" EXULANICA_AGENT_KEY_FILE="$PWD/agent.key"
+   while true; do nat run --config_file bridges/agents/examples/nemo-agent-toolkit.yml --input "Take your turns in this world."; sleep 10; done
+   ```
+
+Within a world minute or two, that person's lines and History read "By an outside AI agent". The
+guide's [On your own install](../../docs/capabilities/outside-agents.md#on-your-own-install) has
+the same steps for a body of the agent's own through a gate, and for the Python quickstart in
+place of the toolkit.
 
 ## The quickstart
 

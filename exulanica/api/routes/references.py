@@ -15,9 +15,11 @@ for them.
 
 Web notes are opt-in for every request, and offered only to the workspaces the installation lists
 (``EXULANICA_REFERENCE_WORKSPACES``) while the source is offered to the operator only, and never on
-an installation whose profile is ``public``. The description is sent with every saved name
-replaced (:func:`exulanica.selection.world_drafting.sendable`); an idempotency key answers with the
-request it first made.
+an installation whose profile is ``public``, unless the installation offers them to every workspace
+(``EXULANICA_NOTES_AND_CREATURES=everyone``), guests included, each request paid from the
+workspace's own allowance for the source and for its model calls. The description is sent with
+every saved name replaced (:func:`exulanica.selection.world_drafting.sendable`); an idempotency key
+answers with the request it first made.
 
 A person's own pictures are offered only where ``EXULANICA_REFERENCE_PICTURES`` is on as well, and a
 request names only pictures a privacy screening permits looking at and a current right for the
@@ -166,7 +168,7 @@ def unavailable_because(
     if source is None:
         return "references_not_configured"
     if not services.references_offered_here() or (
-        source.availability == "operator_only" and workspace_id not in services.reference_workspaces
+        source.availability == "operator_only" and not services.reference_listed(workspace_id)
     ):
         return "references_operator_only"
     if not services.runs_reference_worker or services.model_client is None or not running:
@@ -552,7 +554,12 @@ def request_reference(
         made, new = store.create_request(
             connection,
             session.workspace_id,
-            offered_to=services.reference_workspaces,
+            # The one workspace this request is for, where a worker here takes its jobs.
+            offered_to=(
+                (session.workspace_id,)
+                if services.serves_references_to(session.workspace_id)
+                else ()
+            ),
             owner_actor_id=session.actor,
             purpose=body.purpose,
             web=body.web,
