@@ -29,14 +29,17 @@
 .wu-create :focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
 
 /* The current ready world, as Linear's film: out of focus, dark at the sides and the foot; one picture crossfades
-   into the next as the current card moves. */
+   into the next as the current card moves. Under the shade, one even layer of the ground holds the white type at
+   4.5:1 or more whatever the card's picture: measured over the brightest (A small town, Hamlet on a sky island) at
+   1920 by 1080 and 1366 by 768, the price 4.8 at least and the words 7.5 (ROOT, 27 October). */
 .wu-create-media { position: absolute; inset: -40px; z-index: -2; background: center / cover no-repeat; filter: blur(16px) saturate(1.04) brightness(.86);
   opacity: 0; transition: opacity 500ms var(--c-ease); }
 .wu-create-media[data-shown="true"] { opacity: 1; }
 .wu-create-shade { position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background:
     linear-gradient(90deg, rgb(10 13 15 / 94%) 0%, rgb(10 13 15 / 62%) 18%, rgb(10 13 15 / 22%) 40%, rgb(10 13 15 / 18%) 62%, rgb(10 13 15 / 70%) 86%, rgb(10 13 15 / 94%) 100%),
-    linear-gradient(0deg, rgb(10 13 15 / 88%) 0%, rgb(10 13 15 / 30%) 30%, transparent 55%); }
+    linear-gradient(0deg, rgb(10 13 15 / 88%) 0%, rgb(10 13 15 / 30%) 30%, transparent 55%),
+    linear-gradient(rgb(10 13 15 / 55%), rgb(10 13 15 / 55%)); }
 
 .wu-create-mark { position: absolute; top: 38px; left: var(--c-col); margin: 0; font: 500 19px/1 var(--font-sans); letter-spacing: -.02em; color: var(--c-ink); }
 
@@ -87,7 +90,8 @@
    ink. A reason too long for that one line takes a row of its own in the foot, over the toggle and Create. */
 .wu-composer-why { flex: 0 1 auto; min-width: 0; font: 400 13px/1.35 var(--font-sans); color: var(--c-ink-2); text-align: right; text-wrap: pretty; }
 .wu-composer-foot[data-long="true"] .wu-composer-why { order: -1; flex: 1 1 100%; margin: 0 0 2px; text-align: left; }
-.wu-composer-price { flex: none; font: 400 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--c-ink-3); white-space: nowrap; }
+/* The price in the second ink, not the mock's third: at 48% white no dim short of black holds it at 4.5:1. */
+.wu-composer-price { flex: none; font: 400 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--c-ink-2); white-space: nowrap; }
 .wu-composer-why[hidden], .wu-composer-price[hidden] { display: none; }
 /* Linear's one pill: white, its key inside it; dimmed while it cannot start, and still a button that says why. */
 .wu-composer-pill { display: inline-flex; flex: none; align-items: center; gap: 10px; height: 36px; padding: 0 7px 0 16px; border: 0; border-radius: 999px; background: #ffffff;

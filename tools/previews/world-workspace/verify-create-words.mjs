@@ -237,6 +237,10 @@ assert.match(page, /\.wu-strip-card\[aria-current="true"\] \{ width: 200px; \}/u
 assert.doesNotMatch(page, /var\(--u\)/u, 'the mock\'s pixels, never the --u scale');
 for (const [, ms] of page.matchAll(/(\d+)ms/gu)) assert.ok(['160', '500'].includes(ms), `a ${ms} ms motion`);
 assert.doesNotMatch(page, /\btitle=|text-transform/u);
+// The type holds 4.5:1 over any card's picture (ROOT, 27 October): one even layer of the ground under the shade, and the
+// price in the second ink.
+assert.match(page, /\.wu-create-shade \{[^}]*linear-gradient\(rgb\(10 13 15 \/ 55%\), rgb\(10 13 15 \/ 55%\)\); \}/u);
+assert.match(page, /\.wu-composer-price \{[^}]*color: var\(--c-ink-2\)/u);
 // L5 on the composer page too: no words, chips, counts or lines under 12 px (the mock's 10.5 px mono labels among
 // them, ROOT 27 October); only a key cap's glyph may be smaller, down to 9 px.
 for (const [, selector, body] of page.matchAll(/([^{}]+)\{([^{}]*)\}/gu)) {
