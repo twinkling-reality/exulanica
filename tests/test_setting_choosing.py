@@ -88,7 +88,7 @@ def test_the_step_asks_its_own_role_with_the_ceiling_the_role_declares():
     assert binding.max_tokens is not None
     [request] = transport.requests
     assert request["payload"]["model"] == binding.primary.model_id
-    assert request["payload"]["max_tokens"] == binding.max_tokens.value == 1024
+    assert request["payload"]["max_tokens"] == binding.max_tokens.value == 2048
 
 
 def test_the_chooser_sees_only_the_description_and_the_parts():

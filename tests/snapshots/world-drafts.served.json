@@ -172,13 +172,13 @@
    "estimate_is_expected_spend": false,
    "read_at": "2026-01-01T00:00:00Z",
    "expires_at": "2026-01-01T00:01:00Z",
-   "maximum_usd": "0.20766720",
+   "maximum_usd": "0.21135360",
    "step_usd_at_most": "0.03440640",
    "calls_at_most": 16,
    "providers": [
     {
      "provider": "nebius_token_factory",
-     "ceiling_usd": "0.20766720",
+     "ceiling_usd": "0.21135360",
      "max_calls": 16,
      "step_usd_at_most": "0.03440640"
     }
@@ -283,20 +283,20 @@
        "wire_attempts_per_request_at_most": 2,
        "dispatches_at_most": 4,
        "request_bytes_at_most": 16384,
-       "answer_tokens_at_most": 1024,
+       "answer_tokens_at_most": 2048,
        "models": [
         {
          "provider": "nebius_token_factory",
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
-         "reservation_usd": "0.00583680"
+         "reservation_usd": "0.00675840"
         },
         {
          "provider": "nebius_token_factory",
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-         "reservation_usd": "0.00389120"
+         "reservation_usd": "0.00450560"
         }
        ],
-       "ceiling_usd": "0.02334720"
+       "ceiling_usd": "0.02703360"
       }
      ]
     },
@@ -372,20 +372,20 @@
        "wire_attempts_per_request_at_most": 2,
        "dispatches_at_most": 4,
        "request_bytes_at_most": 16384,
-       "answer_tokens_at_most": 1024,
+       "answer_tokens_at_most": 2048,
        "models": [
         {
          "provider": "nebius_token_factory",
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
-         "reservation_usd": "0.00583680"
+         "reservation_usd": "0.00675840"
         },
         {
          "provider": "nebius_token_factory",
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
-         "reservation_usd": "0.00389120"
+         "reservation_usd": "0.00450560"
         }
        ],
-       "ceiling_usd": "0.02334720"
+       "ceiling_usd": "0.02703360"
       }
      ]
     }
@@ -475,17 +475,17 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00583680"
+         "reservation_usd": "0.00675840"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00389120"
+         "reservation_usd": "0.00450560"
         }
        ],
-       "ceiling_usd": "0.02334720",
+       "ceiling_usd": "0.02703360",
        "dispatches_at_most": 4,
-       "answer_tokens_at_most": 1024,
+       "answer_tokens_at_most": 2048,
        "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
@@ -564,17 +564,17 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00583680"
+         "reservation_usd": "0.00675840"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00389120"
+         "reservation_usd": "0.00450560"
         }
        ],
-       "ceiling_usd": "0.02334720",
+       "ceiling_usd": "0.02703360",
        "dispatches_at_most": 4,
-       "answer_tokens_at_most": 1024,
+       "answer_tokens_at_most": 2048,
        "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
@@ -620,19 +620,19 @@
     {
      "provider": "nebius_token_factory",
      "max_calls": 16,
-     "ceiling_usd": "0.20766720",
+     "ceiling_usd": "0.21135360",
      "step_usd_at_most": "0.03440640"
     }
    ],
    "expires_at": "2026-01-01T00:01:00Z",
-   "maximum_usd": "0.20766720",
+   "maximum_usd": "0.21135360",
    "calls_at_most": 16,
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "pipeline_version": 3,
    "step_usd_at_most": "0.03440640",
    "estimate_is_expected_spend": false
   },
-  "funded_usd": "0.20766720",
+  "funded_usd": "0.21135360",
   "recovered": false,
   "accounting": {
    "profile": "exulanica.world-draft-accounting/v1",
@@ -1060,17 +1060,17 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00583680"
+         "reservation_usd": "0.00675840"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00389120"
+         "reservation_usd": "0.00450560"
         }
        ],
-       "ceiling_usd": "0.02334720",
+       "ceiling_usd": "0.02703360",
        "dispatches_at_most": 4,
-       "answer_tokens_at_most": 1024,
+       "answer_tokens_at_most": 2048,
        "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
@@ -1149,17 +1149,17 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00583680"
+         "reservation_usd": "0.00675840"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00389120"
+         "reservation_usd": "0.00450560"
         }
        ],
-       "ceiling_usd": "0.02334720",
+       "ceiling_usd": "0.02703360",
        "dispatches_at_most": 4,
-       "answer_tokens_at_most": 1024,
+       "answer_tokens_at_most": 2048,
        "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
@@ -1205,19 +1205,19 @@
     {
      "provider": "nebius_token_factory",
      "max_calls": 16,
-     "ceiling_usd": "0.20766720",
+     "ceiling_usd": "0.21135360",
      "step_usd_at_most": "0.03440640"
     }
    ],
    "expires_at": "2026-01-01T00:01:00Z",
-   "maximum_usd": "0.20766720",
+   "maximum_usd": "0.21135360",
    "calls_at_most": 16,
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "pipeline_version": 3,
    "step_usd_at_most": "0.03440640",
    "estimate_is_expected_spend": false
   },
-  "funded_usd": "0.20766720",
+  "funded_usd": "0.21135360",
   "recovered": false,
   "accounting": {
    "profile": "exulanica.world-draft-accounting/v1",
@@ -1265,7 +1265,7 @@
      "model_id": "nvidia/nemotron-3-super-120b-a12b",
      "role": "setting_chooser",
      "state": "settled",
-     "reserved_usd": "0.00583680",
+     "reserved_usd": "0.00675840",
      "settled_usd": "0.00021000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -1724,17 +1724,17 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00583680"
+         "reservation_usd": "0.00675840"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00389120"
+         "reservation_usd": "0.00450560"
         }
        ],
-       "ceiling_usd": "0.02334720",
+       "ceiling_usd": "0.02703360",
        "dispatches_at_most": 4,
-       "answer_tokens_at_most": 1024,
+       "answer_tokens_at_most": 2048,
        "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
@@ -1813,17 +1813,17 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00583680"
+         "reservation_usd": "0.00675840"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00389120"
+         "reservation_usd": "0.00450560"
         }
        ],
-       "ceiling_usd": "0.02334720",
+       "ceiling_usd": "0.02703360",
        "dispatches_at_most": 4,
-       "answer_tokens_at_most": 1024,
+       "answer_tokens_at_most": 2048,
        "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
@@ -1869,19 +1869,19 @@
     {
      "provider": "nebius_token_factory",
      "max_calls": 16,
-     "ceiling_usd": "0.20766720",
+     "ceiling_usd": "0.21135360",
      "step_usd_at_most": "0.03440640"
     }
    ],
    "expires_at": "2026-01-01T00:01:00Z",
-   "maximum_usd": "0.20766720",
+   "maximum_usd": "0.21135360",
    "calls_at_most": 16,
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "pipeline_version": 3,
    "step_usd_at_most": "0.03440640",
    "estimate_is_expected_spend": false
   },
-  "funded_usd": "0.20766720",
+  "funded_usd": "0.21135360",
   "recovered": false,
   "accounting": {
    "profile": "exulanica.world-draft-accounting/v1",
@@ -1929,7 +1929,7 @@
      "model_id": "nvidia/nemotron-3-super-120b-a12b",
      "role": "setting_chooser",
      "state": "settled",
-     "reserved_usd": "0.00583680",
+     "reserved_usd": "0.00675840",
      "settled_usd": "0.00021000",
      "cost_basis": "reported",
      "prompt_tokens": 100,
@@ -2341,17 +2341,17 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00583680"
+         "reservation_usd": "0.00675840"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00389120"
+         "reservation_usd": "0.00450560"
         }
        ],
-       "ceiling_usd": "0.02334720",
+       "ceiling_usd": "0.02703360",
        "dispatches_at_most": 4,
-       "answer_tokens_at_most": 1024,
+       "answer_tokens_at_most": 2048,
        "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
@@ -2430,17 +2430,17 @@
         {
          "model_id": "nvidia/nemotron-3-super-120b-a12b",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00583680"
+         "reservation_usd": "0.00675840"
         },
         {
          "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
          "provider": "nebius_token_factory",
-         "reservation_usd": "0.00389120"
+         "reservation_usd": "0.00450560"
         }
        ],
-       "ceiling_usd": "0.02334720",
+       "ceiling_usd": "0.02703360",
        "dispatches_at_most": 4,
-       "answer_tokens_at_most": 1024,
+       "answer_tokens_at_most": 2048,
        "request_bytes_at_most": 16384,
        "schema_attempts_at_most": 2,
        "wire_attempts_per_request_at_most": 2
@@ -2486,19 +2486,19 @@
     {
      "provider": "nebius_token_factory",
      "max_calls": 16,
-     "ceiling_usd": "0.20766720",
+     "ceiling_usd": "0.21135360",
      "step_usd_at_most": "0.03440640"
     }
    ],
    "expires_at": "2026-01-01T00:01:00Z",
-   "maximum_usd": "0.20766720",
+   "maximum_usd": "0.21135360",
    "calls_at_most": 16,
    "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
    "pipeline_version": 3,
    "step_usd_at_most": "0.03440640",
    "estimate_is_expected_spend": false
   },
-  "funded_usd": "0.20766720",
+  "funded_usd": "0.21135360",
   "recovered": false,
   "accounting": {
    "profile": "exulanica.world-draft-accounting/v1",
