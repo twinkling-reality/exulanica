@@ -27,7 +27,10 @@ import {
  * The dark ground is one full-screen triangle at the far plane, depth-tested, drawn first among
  * transparent draws. It therefore lands only where nothing opaque stands and before any fading
  * surface or point, so it darkens the sky and whatever a faded surface shows through, and never
- * a surface that keeps its own appearance. At the rendered end it is switched off entirely.
+ * a surface that keeps its own appearance. At the rendered end it is switched off entirely. Under
+ * a camera that draws through a frame of its own (a look's CameraFrame: the scene drawn linear,
+ * then exposed, tone mapped and encoded), it is written as the linear colour a lit surface of the
+ * ground's colour gives there, so the sky meets every surface the data view has darkened.
  */
 
 export interface DataViewOverlayHost {
@@ -86,6 +89,16 @@ export function dataViewClockSeconds(
   const twinkling = (style.points.twinkle?.depth ?? 0) > 0 && !reducedMotion
     && report.subjects.some(entry => entry.allocatedPoints > 0 && entry.resolved.pointWeight > 0);
   return twinkling ? (nowMs / 1000) % 1024 : null;
+}
+
+/**
+ * The ground's colour as the veil writes it: the style's display colour, or, under a camera drawing through a frame
+ * of its own (`framed`), the linear colour the frame encodes back to it.
+ */
+export function dataViewGroundRgb(style: DataViewStyle, framed: boolean): readonly [number, number, number] {
+  const [r, g, b] = dataViewRgb(style.ground.colour);
+  const linear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return framed ? [linear(r), linear(g), linear(b)] : [r, g, b];
 }
 
 /** Ahead of every real distance and below the draw bucket step, so the veil sorts first. */
@@ -157,7 +170,7 @@ export class DataViewOverlay {
       return;
     }
     const veil = this.#veil ?? this.#createVeil();
-    const [r, g, b] = dataViewRgb(this.#style.ground.colour);
+    const [r, g, b] = dataViewGroundRgb(this.#style, (this.#host.camera.camera?.framePasses.length ?? 0) > 0);
     veil.colour[0] = r; veil.colour[1] = g; veil.colour[2] = b; veil.colour[3] = Math.min(1, weight);
     veil.material.setParameter('uGround', veil.colour);
     veil.entity.enabled = true;

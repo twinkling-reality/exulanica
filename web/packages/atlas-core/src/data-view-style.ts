@@ -97,6 +97,21 @@ export interface DataViewStyle {
       readonly depth: number;
       readonly periodSeconds: number;
     };
+    /**
+     * From version 4, for a surface sampled for the eye: as many points to the square pixel on every
+     * surface, near or far (`density`), each sample drawn once the part of its surface it stands on,
+     * at its distance and its angle to the eye, needs it. A surface seen edge on counts as facing the
+     * eye by at least `facingFloor`, and nothing nearer than `nearestMetres` is drawn denser than there.
+     * The screen spreads a part of a surface by its depth along the view: toward the frame's edge it
+     * spreads further, and is counted so out to `coneDegrees` from the view's middle (beyond it, as there),
+     * which every surface is sampled for whatever way the eye turns.
+     */
+    readonly screen?: {
+      readonly density: number;
+      readonly facingFloor: number;
+      readonly nearestMetres: number;
+      readonly coneDegrees: number;
+    };
   };
   /** The visualization treatment: short vertical dashes with a slow falling band. */
   readonly dashes: {
@@ -260,6 +275,24 @@ export const DATA_VIEW_STYLE_V3 = {
   tags: { ...DATA_VIEW_STYLE_V2.tags, backgroundOpacity: 0.5 },
 } as const;
 
+/**
+ * Version 4, every surface as dense on the screen as the next: the ground at the eye's feet, a near
+ * trunk, the street further out and the far hills each carry about one point to every twenty-five
+ * square pixels, each sample drawn as its surface's distance and angle to the eye ask for it, and always the
+ * same sample from any eye. The ground covers the sky entirely, and the depth fade reaches the far
+ * hills. Everything else is version 3's.
+ */
+export const DATA_VIEW_STYLE_V4 = {
+  ...DATA_VIEW_STYLE_V3,
+  version: 4,
+  ground: { ...DATA_VIEW_STYLE_V3.ground, strength: 1 },
+  points: {
+    ...DATA_VIEW_STYLE_V3.points,
+    depthFade: { startMetres: 400, endMetres: 8000, density: 0.6 },
+    screen: { density: 0.04, facingFloor: 0.15, nearestMetres: 2.5, coneDegrees: 30 },
+  },
+} as const;
+
 const HEX = /^#[0-9a-f]{6}$/;
 
 function fail(path: string, why: string): never {
@@ -303,13 +336,15 @@ function text(value: unknown, path: string, maxLength: number, pattern: RegExp):
 export function dataViewStyle(value: unknown): DataViewStyle {
   const root = record(value, 'style', ['id', 'version', 'ground', 'points', 'dashes', 'palette', 'boxes', 'links', 'tags']);
   if (root['id'] !== 'exulanica.data-view') fail('style.id', 'is not exulanica.data-view');
-  const version = number(root['version'], 'style.version', 1, 3, true);
+  const version = number(root['version'], 'style.version', 1, 4, true);
   const ground = record(root['ground'], 'style.ground', ['colour', 'strength', 'rise']);
   const points = record(root['points'], 'style.points', [
     'sizeMetres', 'minPixels', 'maxPixels', 'densityPerSquareMetre', 'intensity', 'rise', 'pullMetres',
     'selectedGain', 'unselectedGain', 'glow', 'depthFade', 'thinning', ...(version >= 3 ? ['twinkle'] : []),
+    ...(version >= 4 ? ['screen'] : []),
   ]);
   const twinkle = version >= 3 ? record(points['twinkle'], 'style.points.twinkle', ['depth', 'periodSeconds']) : null;
+  const screen = version >= 4 ? record(points['screen'], 'style.points.screen', ['density', 'facingFloor', 'nearestMetres', 'coneDegrees']) : null;
   const glow = record(points['glow'], 'style.points.glow', ['core', 'falloff', 'halo']);
   const fade = record(points['depthFade'], 'style.points.depthFade', ['startMetres', 'endMetres', 'density']);
   const thinning = record(points['thinning'], 'style.points.thinning', ['keepAllWithinMetres', 'maxGain']);
@@ -365,6 +400,14 @@ export function dataViewStyle(value: unknown): DataViewStyle {
         twinkle: {
           depth: number(twinkle['depth'], 'style.points.twinkle.depth', 0, 0.5),
           periodSeconds: number(twinkle['periodSeconds'], 'style.points.twinkle.periodSeconds', 0.5, 60),
+        },
+      }),
+      ...(screen === null ? {} : {
+        screen: {
+          density: number(screen['density'], 'style.points.screen.density', 0.0001, 1),
+          facingFloor: number(screen['facingFloor'], 'style.points.screen.facingFloor', 0.001, 1),
+          nearestMetres: number(screen['nearestMetres'], 'style.points.screen.nearestMetres', 0.1, 100),
+          coneDegrees: number(screen['coneDegrees'], 'style.points.screen.coneDegrees', 0, 60),
         },
       }),
     },
@@ -424,8 +467,8 @@ function deepFreeze<T>(value: T): T {
 /** The descriptor every data view draw uses. Validated once, here. */
 export const DATA_VIEW_STYLE: DataViewStyle = dataViewStyle(DATA_VIEW_STYLE_V2);
 
-/** Version 3, validated once, here: what a town seen from its own street draws (the world workspace). */
-export const DATA_VIEW_STYLE_STREET: DataViewStyle = dataViewStyle(DATA_VIEW_STYLE_V3);
+/** Version 4, validated once, here: what a town seen from its own street draws (the world workspace). */
+export const DATA_VIEW_STYLE_STREET: DataViewStyle = dataViewStyle(DATA_VIEW_STYLE_V4);
 
 /** `id@version`, the form a display record carries. */
 export function dataViewStyleName(style: DataViewStyle): string {

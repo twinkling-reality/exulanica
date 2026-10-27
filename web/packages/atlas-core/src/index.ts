@@ -258,6 +258,7 @@ export {
   DATA_VIEW_STYLE_V1,
   DATA_VIEW_STYLE_V2,
   DATA_VIEW_STYLE_V3,
+  DATA_VIEW_STYLE_V4,
   dataViewKindColour,
   dataViewRgb,
   dataViewStyle,

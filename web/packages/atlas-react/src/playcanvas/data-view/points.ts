@@ -84,6 +84,22 @@ export interface DataViewPointsOptions {
   readonly subjectId: string;
   /** Layers to draw in; the borrowed node's own when it has a render component. */
   readonly layers?: readonly number[];
+  /**
+   * For samples of a surface sampled for the eye (a style with `points.screen`): each sample's surface normal in
+   * the node's frame (three to a point) and the density, in samples to the square metre, at which it is first drawn
+   * (one to a point), and the distances from the eye this draw covers, from the first up to the second metres (the
+   * second may be Infinity). Without them every sample is drawn as before, thinned by distance alone.
+   */
+  readonly samples?: {
+    readonly normals: Float32Array;
+    readonly densities: Float32Array;
+    readonly reach: readonly [number, number];
+  };
+}
+
+/** A sample's first-drawn density, in samples to the square metre, as the shader's log scale reads it. */
+export function dataViewDensityCode(density: number): number {
+  return Math.min(65535, Math.max(0, Math.round(2048 * Math.log2(density) + 32768)));
 }
 
 /**
@@ -94,9 +110,12 @@ export function createDataViewPoints(options: DataViewPointsOptions): Representa
   const { device, node, positions, style, subjectId } = options;
   const pointCount = positions.length / 3;
   if (!Number.isSafeInteger(pointCount) || pointCount < 1) return null;
+  const sampled = options.samples !== undefined && style.points.screen !== undefined ? options.samples : null;
+  if (sampled !== null && (sampled.normals.length !== positions.length || sampled.densities.length !== pointCount)) return null;
   const bytes = new ArrayBuffer(pointCount * DATA_VIEW_VERTEX_BYTES);
   const floats = new Float32Array(bytes);
   const view = new Uint8Array(bytes);
+  const shorts = new Uint16Array(bytes);
   let minX = Infinity; let minY = Infinity; let minZ = Infinity;
   let maxX = -Infinity; let maxY = -Infinity; let maxZ = -Infinity;
   for (let i = 0; i < pointCount; i += 1) {
@@ -104,8 +123,18 @@ export function createDataViewPoints(options: DataViewPointsOptions): Representa
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
     const base = i * DATA_VIEW_VERTEX_BYTES;
     floats[base / 4] = x; floats[base / 4 + 1] = y; floats[base / 4 + 2] = z;
-    // White at full support: the palette uniform decides the colour, and the tags stay zero.
+    // White at full support: the palette uniform decides the colour, and the tags stay zero. A sample of a surface
+    // sampled for the eye carries its normal in the colour channels and its first-drawn density in the second tag.
     view[base + 12] = 255; view[base + 13] = 255; view[base + 14] = 255; view[base + 15] = 255;
+    if (sampled !== null) {
+      const nx = sampled.normals[i * 3]!, ny = sampled.normals[i * 3 + 1]!, nz = sampled.normals[i * 3 + 2]!;
+      const density = sampled.densities[i]!;
+      if (!Number.isFinite(nx) || !Number.isFinite(ny) || !Number.isFinite(nz) || !(density > 0)) return null;
+      view[base + 12] = Math.round(Math.min(1, Math.max(-1, nx)) * 127.5 + 127.5);
+      view[base + 13] = Math.round(Math.min(1, Math.max(-1, ny)) * 127.5 + 127.5);
+      view[base + 14] = Math.round(Math.min(1, Math.max(-1, nz)) * 127.5 + 127.5);
+      shorts[base / 2 + 9] = dataViewDensityCode(density);
+    }
     if (x < minX) minX = x; if (y < minY) minY = y; if (z < minZ) minZ = z;
     if (x > maxX) maxX = x; if (y > maxY) maxY = y; if (z > maxZ) maxZ = z;
   }
@@ -155,6 +184,11 @@ export function createDataViewPoints(options: DataViewPointsOptions): Representa
   ]);
   // A style before version 3 has no twinkle: depth 0 draws every sample at its one brightness.
   material.setParameter('uDataViewLife', [style.points.twinkle?.depth ?? 0, style.points.twinkle?.periodSeconds ?? 1, 0, 0]);
+  // Before version 4, or for samples not taken for the eye, all zero: thinned by distance alone.
+  const screen = sampled !== null ? style.points.screen! : null;
+  material.setParameter('uDataViewScreen', screen === null ? [0, 0, 0, 0]
+    : [screen.density, screen.facingFloor, screen.nearestMetres, Math.cos((screen.coneDegrees * Math.PI) / 180)]);
+  material.setParameter('uDataViewReach', sampled === null ? [0, 0] : [sampled.reach[0], Math.min(1e9, sampled.reach[1])]);
   const palette = new Float32Array(16);
   const dataView = new Float32Array(4);
   const look = new Float32Array(4);

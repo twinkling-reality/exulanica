@@ -4,47 +4,74 @@
 // tag in the catalogs' words, and each person drawn here a tag with their name and, under it, the model that decides
 // for them where one does. Nothing is kept or picked: closing the card puts every surface back as it was.
 // The look is the product's data view style for a town seen from its own street (atlas-core's DATA_VIEW_STYLE_STREET,
-// version 3: fine points that twinkle a little and never move), drawn by the product's own parts: the sampled surface
-// (representation-binding.ts), the point draw (data-view/points.ts), and the dark ground and the boxes
-// (data-view/overlay.ts). A GPU that cannot draw every point at the page's frame rate draws a stable share of them,
-// stepped by its measured frame time, never fewer than the style's version 2 drew. What the town's things are, their words and where a tag goes are
-// data-view-things.mjs's; whether a wall stands between the eye and a tag is scene-sight.ts's.
+// version 4: fine points that twinkle a little and never move, as many to the square pixel on every surface), drawn
+// by the product's own parts: the point draw (data-view/points.ts) and the dark ground and the boxes
+// (data-view/overlay.ts). Every surface goes to data, the land beyond the town as the land and the sky as the dark
+// ground, and the world's fog and haze go into the ground with it. Its samples are taken for the eye
+// (data-view-samples.mjs): near, middle and far sets (SETS), each taken again as the eye walks, a moving thing's all
+// over it, and a surface the world draws later borrowed as it comes. A GPU that cannot draw every point at the page's
+// frame rate draws a stable share of them, stepped by its measured frame time, never fewer than half. What the town's
+// things are, their words and where a tag goes are data-view-things.mjs's; whether a wall stands between the eye and a
+// tag is scene-sight.ts's.
 //
 // A town is seen from its own street, so its surfaces go dark rather than dissolve: each keeps standing where it is,
 // in the ground's colour, and so hides what is behind it, its own points drawn over it (the style's pull brings each
 // point that far toward the eye). Dissolved, as a district seen from above dissolves, every building's points would
 // show through every other's.
 import {
-  DATA_VIEW_STYLE, DATA_VIEW_STYLE_STREET, REPRESENTATION_POINTS_PER_SUBJECT, dataViewKindColour, dataViewRgb,
+  DATA_VIEW_STYLE_STREET, REPRESENTATION_POINTS_PER_SUBJECT, dataViewKindColour, dataViewRgb,
   type DataViewHex, type DataViewStyle, type RepresentationSubject,
 } from '../../../web/packages/atlas-core/src/index.ts';
 import type { AtlasBinding } from '../../../web/packages/atlas-react/src/playcanvas/atlas-binding.ts';
 import { DATA_VIEW_KEEP_UNIFORM, createDataViewPoints } from '../../../web/packages/atlas-react/src/playcanvas/data-view/points.ts';
+import { createDataViewSkinnedGroup, type DataViewSkinnedGroup, type DataViewSkinnedPoints } from '../../../web/packages/atlas-react/src/playcanvas/data-view/skinned-points.ts';
 import { DataViewOverlay } from '../../../web/packages/atlas-react/src/playcanvas/data-view/overlay.ts';
 import type { LoadedGeneratedTile } from '../../../web/packages/atlas-react/src/playcanvas/generated-tile/tile-runtime.ts';
-import { meshSurfaceArea, sampledMeshSurfacePositions, staticMeshRepresentation } from '../../../web/packages/atlas-react/src/playcanvas/representation-binding.ts';
-import {
-  REPRESENTATION_POINTS_PER_UPDATE,
-  type RepresentationPointAllocation, type RepresentationReport,
-} from '../../../web/packages/atlas-react/src/playcanvas/representation-runtime.ts';
-import { keepStep, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, townThings } from './data-view-things.mjs';
+import type { staticMeshRepresentation } from '../../../web/packages/atlas-react/src/playcanvas/representation-binding.ts';
+import type { RepresentationPointAllocation, RepresentationReport } from '../../../web/packages/atlas-react/src/playcanvas/representation-runtime.ts';
+import { SPLIT, surfaceIndex, surfaceSamples, trianglesNear } from './data-view-samples.mjs';
+import { bigEnough, keepStep, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, townThings, walkerBoxes } from './data-view-things.mjs';
 import { sceneHit, sceneSight } from './scene-sight.ts';
 import { DATA_WORDS } from './world-words.mjs';
 import './world-data-view.css';
 
 /**
- * How much denser than the style's density a town's built surfaces are sampled: the style's density is set for a
- * district seen from above, and a town is seen from its own street, where that density leaves a wall as scattered dots.
+ * The sets a town's surfaces are drawn from, by distance from the eye: each from `from` up to `to` metres, taken
+ * again each time the eye has walked `step` metres from where it was taken, for an eye up to `slack` metres nearer
+ * still, so a set holds until the next is ready, `slice` triangles a job (the nearer, the more samples a triangle). Sets are the same samples where they meet (data-view-samples.mjs),
+ * so one hands over to the next, and a set to the one taken after it, without a seam.
  */
-const BUILT_DENSITY = 4;
+const SETS = Object.freeze([
+  Object.freeze({ from: 0, to: 8, step: 0.3, slack: 0.5, slice: 250 }),
+  Object.freeze({ from: 8, to: 32, step: 1.3, slack: 2, slice: 1500 }),
+  Object.freeze({ from: 32, to: Infinity, step: 6, slack: 8, slice: 5000 }),
+]);
+/** A moving thing may come anywhere, so it is sampled all over for an eye this many metres away, by its surface. */
+const MOVER_NEAREST: Readonly<Record<string, number>> = Object.freeze({ vehicle: 6, person: 12, object: 3 });
 /**
- * The most points a town's data view draws: three times the 1,500,000 it drew before version 3 of the style, which stays
- * the least it draws (TODAY_POINTS) when a GPU's frame time steps its share down.
+ * A walker drawn near is drawn by its bones (skinned-points.ts): its body, outfit, shoes and hair, every PERSON_STRIDE-th
+ * vertex a point, a fifth as wide as the town's and never wider than PERSON_MAX_PIXELS.
  */
-const TOWN_POINTS = 4_500_000;
-const TODAY_POINTS = 1_500_000;
-/** Ground beyond this many metres from the eye when the view opens gets no points: it is beyond what a tag reaches. */
-const GROUND_REACH = 240;
+const PERSON_POINTS = /character:(skin|outfit|shoes|hair)\//u;
+const PERSON_STRIDE = 3;
+const PERSON_MAX_PIXELS = 2.5;
+/** How often the world layer is read again for surfaces drawn since the view opened, ms. */
+const LATE_MS = 1000;
+/** The most of a frame the sampling takes, ms: the rest waits for the next frame. */
+const SAMPLE_MS = 5;
+/** How many hidden draws are let go of in a frame. */
+const RETIRE_PER_FRAME = 12;
+/** The least share of the points a GPU's frame time steps them down to. */
+const KEEP_FLOOR = 0.5;
+/**
+ * From here on the slider the borrowed surfaces cast no shadows: darkened past four fifths, no shadow on them shows,
+ * and the shadow passes are most of what the points would otherwise cost a frame. From here on too a walker or a
+ * vehicle is its points alone: its darkened surface is drawn no more, so one beside the eye is a figure of points,
+ * never a dark shape over the town.
+ */
+const SHADOWS_UNTIL = 0.8;
+/** How bright a walker's points are beside the town's: their vertices crowd at the face and hands. */
+const PERSON_GAIN = 0.45;
 /**
  * Where on the slider the boxes come in: once the town has mostly gone dark. The overlay draws a box at the style's one
  * opacity, so a box shown near the world end would stand over the town as it still looks.
@@ -66,16 +93,41 @@ type Vec = readonly [number, number, number];
 /** A drawn mesh instance, as the sampled surface takes it (the engine's own type, named where atlas-react names it). */
 type MeshInstance = Parameters<typeof staticMeshRepresentation>[1];
 type Thing = { readonly id: string; readonly kind: string; readonly words: string; readonly min: Vec; readonly max: Vec; readonly hang: 'face' | 'top' | 'line' };
-type Surface = 'wall' | 'road' | 'path' | 'kerb' | 'plant' | 'furniture' | 'ground' | 'vehicle' | 'backdrop';
+type Surface = 'wall' | 'road' | 'path' | 'kerb' | 'plant' | 'furniture' | 'ground' | 'vehicle' | 'backdrop' | 'sky' | 'person' | 'object';
 type Material = MeshInstance['material'];
 /** A colour as a standard material holds it. */
 interface Colour { r: number; g: number; b: number; set(r: number, g: number, b: number): unknown }
 /** A standard material, as the darkening reads and writes it. */
-interface Darkenable { clone(): Darkenable; update(): void; destroy(): void; diffuse: Colour; emissive: Colour; specular?: Colour; specularityFactor?: number }
-/** A material's dark copy and the colours it is darkened from. */
-interface Dark { readonly copy: Darkenable; readonly diffuse: Vec; readonly emissive: Vec; readonly specular: Vec | null; readonly specularity: number | null }
-interface Held { readonly instance: MeshInstance; readonly original: Material; readonly dark: Dark; readonly allocations: readonly RepresentationPointAllocation[]; readonly points: number }
-interface Planned { readonly instance: MeshInstance; readonly surface: Surface; readonly count: number }
+interface Darkenable {
+  clone(): Darkenable; update(): void; destroy(): void; diffuse: Colour; emissive: Colour; specular?: Colour; specularityFactor?: number;
+  reflectivity?: number; useMetalness?: boolean; useMetalnessSpecularColor?: boolean;
+}
+/** A material's dark copy and the colours, shine and reflection it is darkened from. */
+interface Dark {
+  readonly copy: Darkenable; readonly diffuse: Vec; readonly emissive: Vec; readonly specular: Vec | null; readonly specularity: number | null;
+  readonly reflectivity: number | null; shaped: boolean;
+}
+/** A standard material's own colour and value fields and its parameters, which easing writes without a new shader. */
+interface Uniforms {
+  _diffuse: Colour; _emissive: Colour; _specular?: Colour; _specularityFactor?: number; _reflectivity?: number;
+  setParameter(name: string, value: number | number[]): void;
+}
+/** A surface's triangles as read once: local positions and indices, and its node's world matrix then. */
+interface Shape { readonly positions: Float32Array; readonly indices: Uint32Array; readonly matrix: Float32Array }
+/**
+ * A borrowed surface: its dark copy, its triangles and where they are, and its points, one list of draws for each set
+ * (SETS). A moving thing (`mover`) has one list, its samples all over it, and no index.
+ */
+interface Held {
+  readonly instance: MeshInstance; original: Material; dark: Dark; readonly surface: Surface;
+  readonly key: number; readonly mover: boolean; readonly shape: Shape; readonly index: ReturnType<typeof surfaceIndex> | null;
+  readonly drawn: RepresentationPointAllocation[][]; shown: boolean; readonly castShadow: boolean;
+}
+interface Planned { readonly instance: MeshInstance; readonly surface: Surface; readonly key: number; readonly mover: boolean; readonly away: number; readonly skinned: boolean }
+/** A walker's skinned surface: its dark copy, and its points drawn by its bones where it has any. */
+interface Walker { readonly instance: MeshInstance; readonly original: Material; readonly dark: Dark; readonly points: DataViewSkinnedPoints | null; shown: boolean; readonly castShadow: boolean }
+/** A set on its way: the eye it is taken for, the surfaces it is taken over, and what each has made of it so far. */
+interface Taking { readonly at: Vec; readonly members: readonly Held[]; readonly made: Map<Held, RepresentationPointAllocation[]> }
 
 const darkenable = (material: unknown): material is Darkenable => {
   const one = material as Partial<Darkenable> | null;
@@ -203,14 +255,28 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
 
   // ---------- State: where the slider stands, where it is going, what is drawn ----------
   let mix = 0, shownMix = -1, target = 0, glide: { from: number; to: number; start: number } | null = null;
-  let held: Held[] = [], queue: Planned[] = [], allocated = 0;
-  // The GPU's share of the points (every data view draw's one keep value), the least it may step down to, and the frame
-  // times it is stepped by.
-  let keep = 1, keepFloor = 1, downAt = -Infinity, stepAt = -Infinity, lastFrame: number | null = null;
+  let held: Held[] = [], walkers: Walker[] = [], allocated = 0;
+  // Every walker's points, drawn by one material, and the dark copies walkers and vehicles wear (drawn no more past
+  // SHADOWS_UNTIL).
+  let walkerPoints: DataViewSkinnedGroup | null = null;
+  const figures = new Set<Dark>();
+  // Sampling work, one queue for each set, the nearest first: each job one surface's read or one set of its samples.
+  let queues: (() => void)[][] = SETS.map(() => []);
+  // Draws handed over and hidden, let go of a few a frame.
+  let retired: RepresentationPointAllocation[] = [];
+  // Where the view opened (its triangles are split for there, once), the eye each set was taken for, each set on its
+  // way, every mesh already looked at, and when the world layer was last read again for new ones.
+  let opened: Vec | null = null, lateAt = -Infinity;
+  let takenAt: (Vec | null)[] = SETS.map(() => null), taking: (Taking | null)[] = SETS.map(() => null);
+  const known = new Set<MeshInstance>();
+  // Where the town's own land lies, each chunk's (min x, min z, max x, max z, top): the land's backdrop under it is never seen.
+  let land: [number, number, number, number, number][] = [];
+  // The GPU's share of the points (every data view draw's one keep value) and the frame times it is stepped by.
+  let keep = 1, downAt = -Infinity, stepAt = -Infinity, lastFrame: number | null = null;
   let tried: { keep: number; slow: number } | null = null, heldUntil = -Infinity;
   const intervals: number[] = [];
   const setKeep = (share: number): void => { keep = share; binding.device.scope.resolve(DATA_VIEW_KEEP_UNIFORM).setValue(share); };
-  let things: readonly Thing[] = [], near: readonly Thing[] = [], nearAt = -Infinity;
+  let things: readonly Thing[] = [], near: readonly Thing[] = [], thingsAt = -Infinity;
   let kinds: ReturnType<typeof pointKinds> | null = null;
   let overlay: DataViewOverlay | null = null;
   let sight: { face: ReturnType<typeof sceneSight>; top: ReturnType<typeof sceneSight>; person: ReturnType<typeof sceneSight>; line: ReturnType<typeof sceneSight> } | null = null;
@@ -218,117 +284,343 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
   const tags = new Map<string, HTMLDivElement>();
   const reduced = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const eye = (): Vec => { const at = binding.camera.getPosition(); return [at.x, at.y, at.z]; };
+  const apart = (a: Vec, b: Vec): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
   /** Each borrowed material's dark copy, one for every surface that wears it. */
   const darks = new Map<Material, Dark>();
   const ground = dataViewRgb(style.ground.colour);
+  // The world's haze and its fog, eased into the ground with the slider: what each was, and what each was last given.
+  const linear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const groundLinear = ground.map(linear) as unknown as Vec;
+  let fogFrom: Vec | null = null, fogSet: Vec | null = null, hazeFrom: number | null = null, hazeSet: number | null = null;
 
   /** A material's dark copy, made once: the same material, its colours to be eased toward the ground's. */
-  function darkOf(material: Material): Dark | null {
+  function darkOf(material: Material): { dark: Dark; made: boolean } | null {
     const held = darks.get(material);
-    if (held !== undefined) return held;
+    if (held !== undefined) return { dark: held, made: false };
     if (!darkenable(material)) return null;
     const copy = material.clone();
+    // A surface lit by the metalness workflow keeps a dielectric's own shine whatever its specular colour says; its
+    // copy takes that shine as a white specular colour it can ease out (the same look until it is eased).
+    const shine = material.useMetalness === true && material.useMetalnessSpecularColor !== true && copy.specular !== undefined;
+    if (shine) copy.useMetalnessSpecularColor = true;
     const dark: Dark = {
       copy, diffuse: rgb(material.diffuse), emissive: rgb(material.emissive),
-      specular: material.specular ? rgb(material.specular) : null,
-      specularity: typeof material.specularityFactor === 'number' ? material.specularityFactor : null,
+      specular: shine ? [1, 1, 1] : material.specular ? rgb(material.specular) : null,
+      specularity: shine ? 1 : typeof material.specularityFactor === 'number' ? material.specularityFactor : null,
+      reflectivity: typeof material.reflectivity === 'number' ? material.reflectivity : null, shaped: false,
     };
     darks.set(material, dark);
-    return dark;
+    return { dark, made: true };
   }
 
-  /** Eases every dark copy toward the ground: its own colour and shine out by `weight`, the ground's colour in. */
-  function darken(weight: number): void {
+  /**
+   * Eases one dark copy toward the ground: its own colour, shine and reflection out by `weight`, the ground's colour
+   * in. The engine takes reading a material's colour as a change to its shader, so this is done only as the slider
+   * moves, and once for a copy made since.
+   */
+  function tone(dark: Dark, weight: number): void {
     const keep = 1 - weight;
-    for (const dark of darks.values()) {
-      dark.copy.diffuse.set(dark.diffuse[0] * keep, dark.diffuse[1] * keep, dark.diffuse[2] * keep);
-      dark.copy.emissive.set(dark.emissive[0] * keep + ground[0] * weight, dark.emissive[1] * keep + ground[1] * weight, dark.emissive[2] * keep + ground[2] * weight);
-      if (dark.specular !== null && dark.copy.specular) dark.copy.specular.set(dark.specular[0] * keep, dark.specular[1] * keep, dark.specular[2] * keep);
-      if (dark.specularity !== null) dark.copy.specularityFactor = dark.specularity * keep;
+    const diffuse: Vec = [dark.diffuse[0] * keep, dark.diffuse[1] * keep, dark.diffuse[2] * keep];
+    const emissive: Vec = [dark.emissive[0] * keep + ground[0] * weight, dark.emissive[1] * keep + ground[1] * weight, dark.emissive[2] * keep + ground[2] * weight];
+    const specular: Vec | null = dark.specular === null ? null : [dark.specular[0] * keep, dark.specular[1] * keep, dark.specular[2] * keep];
+    if (!dark.shaped) {
+      // The first easing goes through the engine, from a hair past the world end, so the copy's shader is the one every
+      // later easing needs (a shine and a reflection that can be eased); the copy is worn only past the world end.
+      const shape = Math.max(weight, 0.001), held = 1 - shape;
+      dark.copy.diffuse.set(dark.diffuse[0] * held, dark.diffuse[1] * held, dark.diffuse[2] * held);
+      dark.copy.emissive.set(emissive[0], emissive[1], emissive[2]);
+      if (dark.specular !== null && dark.copy.specular) dark.copy.specular.set(dark.specular[0] * held, dark.specular[1] * held, dark.specular[2] * held);
+      if (dark.specularity !== null) dark.copy.specularityFactor = dark.specularity * held;
+      if (dark.reflectivity !== null) dark.copy.reflectivity = dark.reflectivity * held;
       dark.copy.update();
+      dark.shaped = true;
+      if (shape === weight) return;
     }
-    for (const one of held) one.instance.material = (weight > 0 ? one.dark.copy : one.original) as Material;
+    // Every later easing goes straight into the copy's own fields and its uniforms (linear, as the engine writes them),
+    // so the engine never picks a shader again for the meshes that wear it.
+    const own = dark.copy as unknown as Uniforms;
+    own._diffuse.set(diffuse[0], diffuse[1], diffuse[2]);
+    own._emissive.set(emissive[0], emissive[1], emissive[2]);
+    own.setParameter('material_diffuse', diffuse.map(linear));
+    own.setParameter('material_emissive', emissive.map(linear));
+    if (specular !== null && own._specular) {
+      own._specular.set(specular[0], specular[1], specular[2]);
+      own.setParameter('material_specular', specular.map(linear));
+    }
+    if (dark.specularity !== null) { own._specularityFactor = dark.specularity * keep; own.setParameter('material_specularityFactor', dark.specularity * keep); }
+    if (dark.reflectivity !== null) { own._reflectivity = dark.reflectivity * keep; own.setParameter('material_reflectivity', dark.reflectivity * keep); }
   }
 
-  /** Everything drawn in the world layer the data view can borrow, with how many points each gets. */
+  /**
+   * Eases every dark copy toward the ground by `weight`, and dresses every borrowed surface in its copy, or its own,
+   * casting its shadow only short of SHADOWS_UNTIL.
+   */
+  function darken(weight: number): void {
+    for (const dark of darks.values()) tone(dark, weight);
+    for (const one of [...held, ...walkers]) {
+      one.instance.material = (weight > 0 ? one.dark.copy : one.original) as Material;
+      one.instance.castShadow = one.castShadow && weight < SHADOWS_UNTIL;
+    }
+    for (const dark of figures) vanish(dark, weight >= SHADOWS_UNTIL);
+  }
+
+  /** A walker's or a vehicle's dark copy drawn, or drawn no more (neither colour nor depth): its points alone stand for it. */
+  function vanish(dark: Dark, gone: boolean): void {
+    const copy = dark.copy as Darkenable & { redWrite?: boolean; greenWrite?: boolean; blueWrite?: boolean; alphaWrite?: boolean; depthWrite?: boolean };
+    if (copy.redWrite === !gone) return;
+    copy.redWrite = copy.greenWrite = copy.blueWrite = copy.alphaWrite = !gone;
+    copy.depthWrite = !gone;
+    copy.update();
+  }
+
+  /** Dresses a surface borrowed since the slider last moved: its copy eased as the others are, if it is new. */
+  function dress(instance: MeshInstance, original: Material, dark: Dark, made: boolean, castShadow: boolean): void {
+    const weight = shownMix < 0 ? mix : shownMix;
+    if (made) tone(dark, weight);
+    instance.material = (weight > 0 ? dark.copy : original) as Material;
+    instance.castShadow = castShadow && weight < SHADOWS_UNTIL;
+  }
+
+  /**
+   * Eases the world's air into the ground by `weight`: its fog's colour toward the ground's, and its haze (a town's
+   * aerial haze, aerial-haze.ts) thinned to none, each from whatever the world last gave it.
+   */
+  function air(weight: number): void {
+    const colour = binding.app.scene.fog.color;
+    const now: Vec = [colour.r, colour.g, colour.b];
+    if (fogFrom === null || (fogSet !== null && now.some((value, at) => Math.abs(value - fogSet![at]!) > 1e-6))) fogFrom = now;
+    const from = fogFrom;
+    fogSet = [0, 1, 2].map((at) => from[at]! * (1 - weight) + groundLinear[at]! * weight) as unknown as Vec;
+    colour.set(fogSet[0], fogSet[1], fogSet[2]);
+    const haze = binding.device.scope.resolve('exuHaze');
+    const value = haze.value as number[] | Float32Array | null | undefined;
+    if (value === null || value === undefined || value.length < 4) return;
+    if (hazeFrom === null || (hazeSet !== null && Math.abs(value[3]! - hazeSet) > 1e-6)) hazeFrom = value[3]!;
+    hazeSet = hazeFrom * (1 - weight);
+    haze.setValue([value[0]!, value[1]!, value[2]!, hazeSet]);
+  }
+
+  /** Gives the world its fog and haze back as they were. */
+  function airBack(): void {
+    if (fogFrom !== null) binding.app.scene.fog.color.set(fogFrom[0], fogFrom[1], fogFrom[2]);
+    const haze = binding.device.scope.resolve('exuHaze');
+    const value = haze.value as number[] | Float32Array | null | undefined;
+    if (hazeFrom !== null && value !== null && value !== undefined && value.length >= 4) haze.setValue([value[0]!, value[1]!, value[2]!, hazeFrom]);
+    fogFrom = null; fogSet = null; hazeFrom = null; hazeSet = null;
+  }
+
+  /** The camera's pixels to a radian on the drawing buffer, as the point shader counts them. */
+  const pixels = (): number => 0.5 * binding.device.height * (binding.camera.camera?.projectionMatrix.data[5] ?? 1);
+
+  /** What the world layer draws that the data view has not yet looked at and can borrow, nearest the eye first. */
   function plan(at: Vec): Planned[] {
     const world = binding.app.scene.layers.getLayerByName('World');
-    const found: { instance: MeshInstance; surface: Surface; area: number }[] = [];
-    for (const instance of new Set<MeshInstance>(world?.meshInstances ?? [])) {
-      if (!instance.visible || instance.instancingData || instance.skinInstance || instance.morphInstance) continue;
-      const surface = surfaceOf(instance.material?.name ?? '', instance.node?.name ?? '') as Surface | null;
-      if (surface === null) continue;
-      if (surface === 'ground') {
-        const c = instance.aabb.center;
-        if (Math.hypot(c.x - at[0], c.z - at[2]) - Math.hypot(instance.aabb.halfExtents.x, instance.aabb.halfExtents.z) > GROUND_REACH) continue;
-      }
-      const positions: number[] = [], indices: number[] = [];
-      instance.mesh.getPositions(positions);
-      instance.mesh.getIndices(indices);
-      const area = positions.length >= 9 ? meshSurfaceArea(positions, indices) : 0;
-      if (Number.isFinite(area) && area > 0) found.push({ instance, surface, area });
+    const found: Planned[] = [];
+    for (const instance of world?.meshInstances ?? []) {
+      // The data view's own draws (its points, a walker's points, its ground) are never borrowed.
+      if (known.has(instance) || (instance.node?.name ?? '').startsWith('data-view') || (instance.material?.name ?? '').startsWith('data-view')) continue;
+      const surface = surfaceOf(instance.material?.name ?? '', instance.node?.name ?? '') as Surface;
+      // A walker drawn from afar is shown and hidden as they come and go; anything else is looked at once it is drawn.
+      if (!instance.visible && surface !== 'person') continue;
+      known.add(instance);
+      if (instance.instancingData || !darkenable(instance.material)) continue;
+      const skinned = Boolean(instance.skinInstance);
+      const mover = surface === 'vehicle' || surface === 'person' || surface === 'object';
+      const c = instance.aabb.center, h = instance.aabb.halfExtents;
+      if (surface === 'ground' && (instance.node?.name ?? '').startsWith('site-land:chunk')) land.push([c.x - h.x, c.z - h.z, c.x + h.x, c.z + h.z, c.y + h.y]);
+      found.push({ instance, surface, key: known.size, mover, skinned, away: Math.max(0, Math.hypot(c.x - at[0], c.y - at[1], c.z - at[2]) - Math.hypot(h.x, h.y, h.z)) });
     }
-    // The backdrop, beyond the town, goes dark with it and has no points of its own.
-    const wanted = (one: { surface: Surface; area: number }): number => one.surface === 'backdrop' ? 0
-      : one.area * style.points.densityPerSquareMetre * (one.surface === 'ground' ? 1 : BUILT_DENSITY);
-    const total = found.reduce((sum, one) => sum + wanted(one), 0);
-    const scale = total > TOWN_POINTS ? TOWN_POINTS / total : 1;
-    const planned = found.map((one) => ({ instance: one.instance, surface: one.surface, count: Math.min(REPRESENTATION_POINTS_PER_SUBJECT, Math.round(wanted(one) * scale)) }));
-    // The least share a GPU steps down to: as many points as version 2 of the style drew here, within its own cap.
-    const before = DATA_VIEW_STYLE.points.densityPerSquareMetre / style.points.densityPerSquareMetre;
-    const today = Math.min(TODAY_POINTS, total * before);
-    const drawn = planned.reduce((sum, one) => sum + one.count, 0);
-    keepFloor = drawn > 0 ? Math.min(1, today / drawn) : 1;
-    return planned;
+    return found.sort((a, b) => a.away - b.away);
   }
 
-  /** Borrows one surface: its dark copy, and its points grouped by the kind of record each stands on. */
-  function borrow({ instance, surface, count }: Planned): number {
+  /** Reads one surface and borrows it: its dark copy, its triangles once, and where they are for the sets. */
+  function prepare({ instance, surface, key, mover }: Planned): Held | null {
     const original = instance.material;
-    const dark = darkOf(original);
-    if (dark === null) return 0;
-    const allocations: RepresentationPointAllocation[] = [];
-    let points = 0;
+    const copy = darkOf(original);
+    if (copy === null) return null;
+    const { dark, made } = copy;
     const positions: number[] = [], indices: number[] = [];
     instance.mesh.getPositions(positions);
     instance.mesh.getIndices(indices);
-    const samples = count >= 1 ? sampledMeshSurfacePositions(positions, indices, count) : null;
-    if (samples !== null && kinds !== null) {
-      const m = instance.node.getWorldTransform().data;
-      const byKind = new Map<string, number[]>();
-      for (let at = 0; at + 2 < samples.length; at += 3) {
-        const x = samples[at]!, y = samples[at + 1]!, z = samples[at + 2]!;
-        const kind = kinds.kindAt(surface, m[0]! * x + m[4]! * y + m[8]! * z + m[12]!, m[1]! * x + m[5]! * y + m[9]! * z + m[13]!, m[2]! * x + m[6]! * y + m[10]! * z + m[14]!) ?? 'object';
-        let list = byKind.get(kind);
-        if (list === undefined) { list = []; byKind.set(kind, list); }
-        list.push(x, y, z);
-      }
-      for (const [kind, local] of byKind) {
-        const allocation = createDataViewPoints({ device: binding.device, node: instance.node, positions: new Float32Array(local), style, subjectId: `town:${kind}` });
-        if (allocation === null) continue;
-        allocation.setLook?.({ colour: colourOf(kind), treatment: 'points', gain: 1 });
-        allocation.setWeight(mix);
-        allocations.push(allocation);
-        points += allocation.pointCount;
-      }
-    }
-    held.push({ instance, original, dark, allocations, points });
-    // Its dark copy takes the slider's weight with the others on the next frame.
-    shownMix = -1;
-    return points;
+    const shape: Shape = { positions: new Float32Array(positions), indices: new Uint32Array(indices), matrix: Float32Array.from(instance.node.getWorldTransform().data) };
+    const one: Held = {
+      instance, original, dark, surface, key, mover, shape, index: mover || surface === 'sky' ? null : surfaceIndex(shape),
+      drawn: SETS.map(() => []), shown: true, castShadow: instance.castShadow,
+    };
+    held.push(one);
+    // A walker drawn from afar, or a vehicle: its points alone near full Data.
+    const figure = surface === 'person' || surface === 'vehicle';
+    if (figure) figures.add(dark);
+    dress(instance, original, dark, made, one.castShadow);
+    if (figure) vanish(dark, (shownMix < 0 ? mix : shownMix) >= SHADOWS_UNTIL);
+    return one;
   }
 
-  /** Reads the town and lines up its surfaces; each is borrowed over the frames that follow. */
+  /** Borrows a walker's skinned surface: its dark copy, and its body, outfit, shoes and hair as points. */
+  function prepareWalker({ instance }: Planned): void {
+    const original = instance.material;
+    const copy = darkOf(original);
+    const layer = binding.app.scene.layers.getLayerByName('World');
+    if (copy === null || !layer) return;
+    const { dark, made } = copy;
+    walkerPoints ??= createDataViewSkinnedGroup({
+      app: binding.app, device: binding.device, layer, colour: style.boxes.selectedColour, style, pixels: pixels(),
+      stride: PERSON_STRIDE, sizeMetres: style.points.sizeMetres / 5, maxPixels: PERSON_MAX_PIXELS, gain: PERSON_GAIN,
+    });
+    walkerPoints.setWeight(mix);
+    const points: DataViewSkinnedPoints | null = PERSON_POINTS.test(original?.name ?? '') ? walkerPoints.add(instance) : null;
+    points?.setShown(instance.visible);
+    walkers.push({ instance, original, dark, points, shown: instance.visible, castShadow: instance.castShadow });
+    figures.add(dark);
+    dress(instance, original, dark, made, instance.castShadow);
+    vanish(dark, (shownMix < 0 ? mix : shownMix) >= SHADOWS_UNTIL);
+  }
+
+  /** One surface's samples for an eye: a set's (by its index in SETS), or a moving thing's all over it. */
+  function samplesOf(one: Held, at: Vec, set: number, triangles: readonly number[] | null): Map<string, { positions: number[]; normals: number[]; densities: number[] }> {
+    const screen = style.points.screen;
+    if (screen === undefined || kinds === null || one.surface === 'sky') return new Map();
+    const shared = { at, pixels: pixels(), density: screen.density, facingFloor: screen.facingFloor, cone: Math.cos((screen.coneDegrees * Math.PI) / 180) };
+    const { from, to, slack } = SETS[set]!;
+    const look = one.mover ? { ...shared, slack: 0, nearest: MOVER_NEAREST[one.surface] ?? 3, within: Infinity, fixed: true }
+      : { ...shared, slack, nearest: Math.max(screen.nearestMetres, from), within: to + slack };
+    // A moving thing is read where it stands now.
+    const matrix = one.mover ? one.instance.node.getWorldTransform().data : one.shape.matrix;
+    const table = kinds, under = land;
+    const hidden = one.surface === 'backdrop' && under.length > 0
+      ? (x: number, y: number, z: number) => under.some((chunk) => x > chunk[0] && x < chunk[2] && z > chunk[1] && z < chunk[3] && y < chunk[4]) : null;
+    return surfaceSamples({ ...one.shape, matrix, key: one.key, hidden, kind: (x: number, y: number, z: number) => table.kindAt(one.surface, x, y, z) ?? 'object' },
+      look, { at: opened ?? at, ...SPLIT }, triangles).groups;
+  }
+
+  /** One draw for each kind of record a surface's samples stand on, drawn from `reach[0]` up to `reach[1]` metres. */
+  function allocate(one: Held, groups: ReturnType<typeof samplesOf>, reach: readonly [number, number], weight: number): RepresentationPointAllocation[] {
+    const out: RepresentationPointAllocation[] = [];
+    for (const [kind, group] of groups) {
+      const allocation = createDataViewPoints({
+        device: binding.device, node: one.instance.node, positions: new Float32Array(group.positions), style, subjectId: `town:${kind}`,
+        samples: { normals: new Float32Array(group.normals), densities: new Float32Array(group.densities), reach },
+      });
+      if (allocation === null) continue;
+      allocation.setLook?.({ colour: colourOf(kind), treatment: 'points', gain: 1 });
+      allocation.setWeight(weight);
+      out.push(allocation);
+    }
+    return out;
+  }
+
+  const countOf = (list: readonly RepresentationPointAllocation[]): number => list.reduce((sum, one) => sum + one.pointCount, 0);
+  const reachOf = (set: number): readonly [number, number] => [SETS[set]!.from, SETS[set]!.to];
+
+  /**
+   * Puts `made` in place of a surface's draws of one set, at the weight it shows at; the draws it replaces are hidden
+   * at once and let go of a few a frame after (`retired`), so a set handed over costs no frame its whole teardown.
+   */
+  function replace(one: Held, set: number, made: RepresentationPointAllocation[]): void {
+    allocated += countOf(made) - countOf(one.drawn[set]!);
+    for (const allocation of one.drawn[set]!) { allocation.setWeight(0); retired.push(allocation); }
+    one.drawn[set] = made;
+    for (const allocation of made) allocation.setWeight(one.shown ? mix : 0);
+  }
+
+  /**
+   * Queues one surface's samples for a set as jobs of the set's slice of triangles each (every triangle when `triangles` is null),
+   * and hands them, all taken, to `done`; `live` says whether they are still wanted.
+   */
+  function sliced(one: Held, at: Vec, set: number, triangles: readonly number[] | null, live: () => boolean, done: (groups: ReturnType<typeof samplesOf>) => void): void {
+    const count = triangles?.length ?? Math.floor((one.shape.indices.length > 0 ? one.shape.indices.length : one.shape.positions.length / 3) / 3);
+    const groups: ReturnType<typeof samplesOf> = new Map();
+    const { slice: size } = SETS[set]!;
+    for (let from = 0; from < count; from += size) {
+      const last = from + size >= count;
+      queues[set]!.push(() => {
+        if (!live() || one.instance.mesh === null) return;
+        const slice = triangles === null ? Array.from({ length: Math.min(size, count - from) }, (_, at) => from + at) : triangles.slice(from, from + size);
+        for (const [kind, group] of samplesOf(one, at, set, slice)) {
+          const into = groups.get(kind);
+          if (into === undefined) groups.set(kind, group);
+          else groups.set(kind, { positions: into.positions.concat(group.positions), normals: into.normals.concat(group.normals), densities: into.densities.concat(group.densities) });
+        }
+        if (last) done(groups);
+      });
+    }
+  }
+
+  /**
+   * A set taken for `at`: each surface it reaches jobs of its queue, drawn by none until all are made, then in place
+   * of the set before it at once. A moving thing has no sets; it is sampled once, all over (`sampleMover`).
+   */
+  function takeSet(set: number, at: Vec): void {
+    const { to, slack } = SETS[set]!;
+    const members = held.filter((one) => one.index !== null);
+    const next: Taking = { at, members, made: new Map() };
+    taking[set] = next;
+    for (const one of members) {
+      const triangles = to === Infinity ? null : trianglesNear(one.index!, at, to + slack);
+      if (triangles !== null && triangles.length === 0) continue;
+      sliced(one, at, set, triangles, () => taking[set] === next, (groups) => next.made.set(one, allocate(one, groups, reachOf(set), 0)));
+    }
+    queues[set]!.push(() => {
+      if (taking[set] !== next) return;
+      for (const one of next.members) {
+        if (one.instance.mesh !== null) replace(one, set, next.made.get(one) ?? []);
+        else for (const allocation of next.made.get(one) ?? []) allocation.destroy();
+      }
+      takenAt[set] = at;
+      taking[set] = null;
+      binding.invalidate();
+    });
+  }
+
+  /** A moving thing's one set: samples all over it, drawn at every distance. */
+  function sampleMover(one: Held): void {
+    if (one.instance.mesh === null) return;
+    replace(one, 0, allocate(one, samplesOf(one, eye(), 0, null), [0, Infinity], 0));
+    binding.invalidate();
+  }
+
+  /**
+   * Borrows what the world layer draws that the data view has not yet borrowed: at the view's opening every surface,
+   * those near the eye first; later each surface drawn since, sampled into the sets already taken.
+   */
+  function borrowNew(at: Vec, opening: boolean): void {
+    for (const one of plan(at)) {
+      const near = one.away < SETS[1]!.to + SETS[1]!.slack;
+      queues[near ? 0 : SETS.length - 1]!.push(() => {
+        if (one.skinned) { prepareWalker(one); return; }
+        const made = prepare(one);
+        if (made === null || opening) {
+          if (made !== null && made.mover) queues[SETS.length - 1]!.push(() => sampleMover(made));
+          return;
+        }
+        if (made.mover) { queues[SETS.length - 1]!.push(() => sampleMover(made)); return; }
+        SETS.forEach(({ to, slack }, set) => {
+          const from = takenAt[set] ?? null;
+          if (from === null || made.index === null) return;
+          const triangles = to === Infinity ? null : trianglesNear(made.index, from, to + slack);
+          if (triangles !== null && triangles.length === 0) return;
+          sliced(made, from, set, triangles, () => made.instance.mesh !== null, (groups) => replace(made, set, allocate(made, groups, reachOf(set), 0)));
+        });
+      });
+    }
+  }
+
+  /** Reads the town and lines up its surfaces: those near the eye and the near sets first, then the far set. */
   function begin(): void {
     if (tile === null || overlay !== null) return;
     const at = eye();
+    opened = at; lateAt = performance.now(); land = [];
+    takenAt = SETS.map(() => null); taking = SETS.map(() => null);
     const tiles = townTiles(tile, at);
     things = townThings(tiles) as readonly Thing[];
     kinds = pointKinds(pointBoxes(tiles));
     // What stands in a tag's way is read before any point is drawn, so the points are never in its way.
     const hit = sceneHit(binding.app);
     sight = { face: sceneSight(hit, OWN.face), top: sceneSight(hit, OWN.top), person: sceneSight(hit, OWN.person), line: sceneSight(hit, OWN.line) };
-    queue = plan(at);
+    borrowNew(at, true);
+    // The near sets once the surfaces near the eye are read, the far set once every one is.
+    queues[0]!.push(() => { takeSet(0, at); takeSet(1, at); });
+    queues[SETS.length - 1]!.push(() => takeSet(SETS.length - 1, at));
     setKeep(1); intervals.length = 0; downAt = -Infinity; stepAt = -Infinity; tried = null; heldUntil = -Infinity;
     overlay = new DataViewOverlay({
       device: binding.device, app: binding.app, camera: binding.camera,
@@ -339,15 +631,40 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     }, style);
   }
 
+  /** Does sampling work for at most `ms` of this frame, the nearest set's first. */
+  function work(ms: number): void {
+    for (const allocation of retired.splice(0, RETIRE_PER_FRAME)) allocation.destroy();
+    const until = performance.now() + ms;
+    while (performance.now() < until) {
+      const job = queues.find((queue) => queue.length > 0)?.shift();
+      if (job === undefined) return;
+      job();
+    }
+  }
+
   /** Puts every surface back as it was and lets go of everything drawn. */
   function end(): void {
     for (const one of held) {
       if (one.instance.material === (one.dark.copy as Material)) one.instance.material = one.original;
-      for (const allocation of one.allocations) allocation.destroy();
+      one.instance.castShadow = one.castShadow;
+      for (const list of one.drawn) for (const allocation of list) allocation.destroy();
     }
+    for (const one of walkers) {
+      if (one.instance.material === (one.dark.copy as Material)) one.instance.material = one.original;
+      one.instance.castShadow = one.castShadow;
+    }
+    walkerPoints?.destroy();
+    walkerPoints = null;
+    for (const one of taking) if (one !== null) for (const made of one.made.values()) for (const allocation of made) allocation.destroy();
+    for (const allocation of retired) allocation.destroy();
+    retired = [];
     for (const dark of darks.values()) dark.copy.destroy();
     darks.clear();
-    held = []; queue = []; allocated = 0; things = []; near = []; nearAt = -Infinity; kinds = null; sight = null;
+    figures.clear();
+    airBack();
+    held = []; walkers = []; queues = SETS.map(() => []); allocated = 0; things = []; near = []; thingsAt = -Infinity; kinds = null; sight = null;
+    opened = null; land = []; takenAt = SETS.map(() => null); taking = SETS.map(() => null);
+    known.clear();
     setKeep(1); intervals.length = 0;
     overlay?.destroy(); overlay = null;
     seen.clear();
@@ -375,8 +692,8 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     })];
     return {
       intent: { pointMix: mix, boxes: true, labels: false, ids: false, data: true, binary: 'off', colour: 'kind' },
-      subjects: entries, allocatedPoints: allocated, allocatedBytes: 0, pointBudget: TOWN_POINTS,
-      perSubjectLimit: REPRESENTATION_POINTS_PER_SUBJECT, pendingSubjects: queue.length, selection: null,
+      subjects: entries, allocatedPoints: allocated, allocatedBytes: 0, pointBudget: allocated,
+      perSubjectLimit: REPRESENTATION_POINTS_PER_SUBJECT, pendingSubjects: queues.reduce((sum, queue) => sum + queue.length, 0), selection: null,
       style: { id: style.id, version: style.version },
     };
   }
@@ -431,7 +748,11 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     return tag;
   }
 
-  /** Places the tags of what is near, nearest first, none over another. */
+  /**
+   * Places the tags of what is near: nearest first, none over another or over a walker's face or body but their own,
+   * each at the first of its places clear of them (a building's faces, a street's points along its middle line), and
+   * none for a thing seen smaller than a tag can stand for (bigEnough).
+   */
   function drawTags(now: number): void {
     const camera = binding.camera.camera;
     if (mix <= 0.02 || camera === null) {
@@ -444,65 +765,80 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
       const screen = camera.worldToScreen(point.set(at[0], at[1], at[2]));
       return screen.z > 0 ? { x: screen.x, y: screen.y } : null;
     };
+    // The camera's CSS pixels to a radian, as the tags are laid out.
+    const css = 0.5 * innerHeight * camera.projectionMatrix.data[5]!;
     const asked = { count: 0 };
-    const wanted: { key: string; lines: readonly string[]; colour: DataViewHex; person: boolean; x: number; y: number; distance: number }[] = [];
+    const wanted: { key: string; lines: readonly string[]; colour: DataViewHex; person: boolean; places: { x: number; y: number }[]; distance: number }[] = [];
     for (const thing of near) {
       if (thing.hang === 'line') {
-        let best: { x: number; y: number; distance: number } | null = null;
+        const places: { x: number; y: number; off: number; distance: number }[] = [];
         for (const at of streetLine(thing) as Vec[]) {
           const distance = Math.hypot(at[0] - from[0], at[1] - from[1], at[2] - from[2]);
           if (distance > REACH.street) continue;
           const screen = project(at);
           if (screen === null || screen.y < innerHeight * 0.5 || screen.x < 0 || screen.x > innerWidth) continue;
-          if (best !== null && Math.abs(screen.x - innerWidth / 2) >= Math.abs(best.x - innerWidth / 2)) continue;
-          if (inSight(`${thing.id}:${at.join(',')}`, 'line', at, from, now, asked)) best = { ...screen, distance };
+          if (inSight(`${thing.id}:${at.join(',')}`, 'line', at, from, now, asked)) places.push({ ...screen, off: Math.abs(screen.x - innerWidth / 2), distance });
         }
-        if (best !== null) wanted.push({ key: thing.id, lines: [thing.words], colour: colourOf(thing.kind), person: false, ...best });
+        places.sort((a, b) => a.off - b.off);
+        if (places.length > 0) wanted.push({ key: thing.id, lines: [thing.words], colour: colourOf(thing.kind), person: false, places, distance: places[0]!.distance });
         continue;
       }
+      const size = Math.max(thing.max[0] - thing.min[0], thing.max[1] - thing.min[1], thing.max[2] - thing.min[2]);
+      const places: { x: number; y: number }[] = [];
+      let distance = Infinity;
       for (const at of tagAnchors(thing, from) as Vec[]) {
+        const away = Math.hypot(at[0] - from[0], at[1] - from[1], at[2] - from[2]);
+        if (!bigEnough(size, away, css)) continue;
         const screen = project(at);
         if (screen === null) continue;
         if (!inSight(`${thing.id}:${at.join(',')}`, thing.hang === 'face' ? 'face' : 'top', at, from, now, asked)) continue;
-        wanted.push({ key: thing.id, lines: [thing.words], colour: colourOf(thing.kind), person: false, x: screen.x, y: screen.y, distance: Math.hypot(at[0] - from[0], at[1] - from[1], at[2] - from[2]) });
-        break;
+        places.push(screen);
+        distance = Math.min(distance, away);
       }
+      if (places.length > 0) wanted.push({ key: thing.id, lines: [thing.words], colour: colourOf(thing.kind), person: false, places, distance });
     }
+    // Every walker in view near enough: their tag, and their face and body, which no other tag may cover.
+    const blocked: ReturnType<typeof walkerBoxes> = [];
     for (const one of people?.everyone() ?? []) {
       const at: Vec = [one.head.x, one.head.y, one.head.z];
       const distance = Math.hypot(at[0] - from[0], at[1] - from[1], at[2] - from[2]);
       if (distance > REACH.person) continue;
       const screen = project(at);
-      if (screen === null || !inSight(`person:${one.id}`, 'person', at, from, now, asked)) continue;
-      wanted.push({ key: `person:${one.id}`, lines: personLines(wordsOf(one.id, now)), colour: style.boxes.selectedColour, person: true, x: screen.x, y: screen.y, distance });
+      if (screen === null) continue;
+      const key = `person:${one.id}`;
+      blocked.push(...walkerBoxes({ owner: key, x: screen.x, y: screen.y, distance }, css));
+      if (!inSight(key, 'person', at, from, now, asked)) continue;
+      wanted.push({ key, lines: personLines(wordsOf(one.id, now)), colour: style.boxes.selectedColour, person: true, places: [screen], distance });
     }
     // Measured on their own elements once for their words and the page's scale, then placed: each sits just over its
-    // anchor, centred on it. Nothing is written to a tag that has not changed, so a still view lays out nothing.
+    // place, centred on it. Nothing is written to a tag that has not changed, so a still view lays out nothing.
     const scale = Number.parseFloat(host.style.getPropertyValue('--ui-scale')) || 1;
+    const lift = 6 * scale;
     const measured = wanted.map((one) => {
       const tag = tagOf(one.key, one.lines, one.colour, one.person);
-      show(tag, true);
       let size = sizes.get(tag);
       if (size === undefined || size.text !== tag.dataset.text || size.scale !== scale) {
+        show(tag, true);
         size = { text: tag.dataset.text ?? '', scale, width: tag.offsetWidth, height: tag.offsetHeight };
         sizes.set(tag, size);
       }
-      return { ...one, tag, width: size.width, height: size.height };
+      const corner = (at: { x: number; y: number }) => ({ x: Math.round(at.x - size!.width / 2), y: Math.round(at.y - size!.height - lift) });
+      const [first, ...rest] = one.places.map(corner);
+      return { key: one.key, tag, width: size.width, height: size.height, distance: one.distance, x: first!.x, y: first!.y, also: rest };
     });
-    const lift = 6 * scale;
-    const kept = new Set(placeTags(measured.map((one) => ({ ...one, x: one.x - one.width / 2, y: one.y - one.height - lift })), {
-      width: innerWidth, height: innerHeight, most: style.tags.maxCount,
-    }).map((one: { readonly key: string }) => one.key));
+    const placed = placeTags(measured, { width: innerWidth, height: innerHeight, most: style.tags.maxCount, blocked }) as { key: string; x: number; y: number }[];
     const opacity = String(smooth((mix - 0.15) / 0.5));
-    const placed = new Set<HTMLDivElement>();
-    for (const one of measured) {
-      if (!kept.has(one.key)) continue;
-      placed.add(one.tag);
-      const transform = `translate(${Math.round(one.x - one.width / 2)}px, ${Math.round(one.y - one.height - lift)}px)`;
-      if (one.tag.style.transform !== transform) one.tag.style.transform = transform;
-      if (one.tag.style.opacity !== opacity) one.tag.style.opacity = opacity;
+    const shown = new Set<HTMLDivElement>();
+    const byKey = new Map(measured.map((one) => [one.key, one.tag]));
+    for (const one of placed) {
+      const tag = byKey.get(one.key);
+      if (tag === undefined) continue;
+      shown.add(tag);
+      const transform = `translate(${one.x}px, ${one.y}px)`;
+      if (tag.style.transform !== transform) tag.style.transform = transform;
+      if (tag.style.opacity !== opacity) tag.style.opacity = opacity;
     }
-    for (const tag of tags.values()) show(tag, placed.has(tag));
+    for (const tag of tags.values()) show(tag, shown.has(tag));
   }
 
   /** Shows or hides a tag, writing only a change. */
@@ -554,16 +890,19 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
         setMix(glide.from + (glide.to - glide.from) * smooth(t));
         if (t >= 1) glide = null;
       }
-      // Borrowed a few surfaces a frame, as the product's own data view prepares its points.
-      let budget = REPRESENTATION_POINTS_PER_UPDATE;
-      while (queue.length > 0 && budget > 0 && overlay !== null) {
-        const next = queue.shift()!;
-        const points = borrow(next);
-        allocated += points;
-        budget -= Math.max(1, next.count);
+      // Samples taken a little each frame, the nearest set's first: each set taken again once the eye has walked its
+      // step from where it was taken, and the world layer read again now and then for surfaces drawn since.
+      if (overlay !== null) {
+        const at = eye();
+        SETS.forEach(({ step }, set) => {
+          const from = takenAt[set] ?? null;
+          if (taking[set] === null && from !== null && apart(at, from) >= step) takeSet(set, at);
+        });
+        if (now - lateAt >= LATE_MS) { lateAt = now; borrowNew(at, false); }
+        work(SAMPLE_MS);
       }
-      if (overlay !== null && now - nearAt > 250) {
-        nearAt = now;
+      if (overlay !== null && now - thingsAt > 250) {
+        thingsAt = now;
         const from = eye();
         near = things.filter((thing) => {
           const middle = [0, 1, 2].map((axis) => (thing.min[axis]! + thing.max[axis]!) / 2);
@@ -571,21 +910,60 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
           return Math.hypot(middle[0]! - from[0], middle[1]! - from[1], middle[2]! - from[2]) <= reach;
         });
       }
+      // A walker drawn from afar shows their points only while they are drawn so.
+      for (const one of held) {
+        if (!one.mover || one.instance.visible === one.shown) continue;
+        one.shown = one.instance.visible;
+        for (const list of one.drawn) for (const allocation of list) allocation.setWeight(one.shown ? mix : 0);
+        binding.invalidate();
+      }
+      // A surface the world no longer draws (a walker gone, their points let go of themselves) is let go of; one drawn
+      // again later is borrowed anew.
+      const gone = (one: Walker): boolean => one.instance.mesh === null || (one.points !== null && one.points.gone);
+      if (walkers.some(gone)) walkers = walkers.filter((one) => !gone(one));
+      if (held.some((one) => one.instance.mesh === null)) {
+        held = held.filter((one) => {
+          if (one.instance.mesh !== null) return true;
+          for (const list of one.drawn) { allocated -= countOf(list); for (const allocation of list) allocation.destroy(); }
+          return false;
+        });
+      }
+      for (const one of walkers) {
+        if (one.instance.visible === one.shown) continue;
+        one.shown = one.instance.visible;
+        one.points?.setShown(one.shown);
+      }
+      // A surface the world dresses again while the view shows (a signal's lamp changing colour) has its new dress
+      // borrowed as its first was.
+      if (overlay !== null && shownMix > 0) {
+        for (const one of held) {
+          const now = one.instance.material;
+          if (now === (one.dark.copy as Material) || now === null || one.instance.mesh === null) continue;
+          const copy = darkOf(now);
+          if (copy === null) continue;
+          one.original = now;
+          one.dark = copy.dark;
+          dress(one.instance, now, copy.dark, copy.made, one.castShadow);
+        }
+      }
+      // The world's air follows the slider every frame, in case the world aims it again while the view shows.
+      if (overlay !== null) air(mix);
       if (mix !== shownMix) {
         shownMix = mix;
         darken(mix);
-        for (const one of held) for (const allocation of one.allocations) allocation.setWeight(mix);
+        for (const one of held) for (const list of one.drawn) for (const allocation of list) allocation.setWeight(one.shown ? mix : 0);
+        walkerPoints?.setWeight(mix);
         binding.invalidate();
       }
       drawTags(now);
-      // The GPU's share, stepped by the frame times measured once every surface is drawn and the town is mostly data;
+      // The GPU's share, stepped by the frame times measured once the sets are taken and the town is mostly data;
       // a step down that leaves the frames as slow is taken back (keepStep), so a page slow for other reasons keeps them.
-      if (overlay !== null && queue.length === 0 && mix >= 0.5 && lastFrame !== null) {
+      if (overlay !== null && queues.every((queue) => queue.length === 0) && mix >= 0.5 && lastFrame !== null) {
         intervals.push(now - lastFrame);
         if (intervals.length > 90) intervals.shift();
         if (now - stepAt >= 1000) {
           stepAt = now;
-          const next = keepStep({ keep, floor: keepFloor, intervals, now, downAt, tried, heldUntil });
+          const next = keepStep({ keep, floor: KEEP_FLOOR, intervals, now, downAt, tried, heldUntil });
           downAt = next.downAt; tried = next.tried; heldUntil = next.heldUntil;
           if (next.keep !== keep) { setKeep(next.keep); intervals.length = 0; binding.invalidate(); }
         }

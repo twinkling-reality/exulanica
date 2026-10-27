@@ -68,6 +68,14 @@
  *   uDataViewClock  float seconds for the twinkle, written once per drawn frame by the data view
  *                         (held at 0 under reduced motion)
  *   uDataViewKeep   float share of samples drawn, 0 to 1, one value for every data view draw
+ *   uDataViewScreen vec4  for samples of a surface sampled for the eye (all zero for any other):
+ *                         x points to the square pixel, y the least a surface faces the eye, z the
+ *                         nearest distance drawn denser, w the cosine of the cone a part's depth along
+ *                         the view is counted within. Such a sample's aColor.rgb is its surface's
+ *                         normal (0 to 1 for -1 to 1) and aTags.y the density, in samples to the
+ *                         square metre, at which it is first drawn (2048 to an octave about 32768,
+ *                         one sample to the square metre)
+ *   uDataViewReach  vec2  the distances from the eye such a draw covers, from x up to y metres
  *
  * and reads the engine's own `matrix_projection` and `uScreenSize`, so a sprite keeps its world
  * width through whatever camera draws it. Without the define none of this is compiled, and the
@@ -147,6 +155,8 @@ uniform float uDataViewTime;
 uniform vec4 uDataViewLife;
 uniform float uDataViewClock;
 uniform float uDataViewKeep;
+uniform vec4 uDataViewScreen;
+uniform vec2 uDataViewReach;
 varying float vDataBand;
 varying float vDataGain;
 
@@ -277,33 +287,63 @@ void main(void) {
     // The visualization treatment's falling band, in bands: presentation, never a measurement.
     vDataBand = worldPos.y * uDataViewLook.w + uDataViewTime;
     // Drawn a few centimetres towards the viewer, so a sample on a surface is not hidden by the
-    // very surface it samples while that surface dissolves. The sample's position is unchanged.
+    // very surface it samples while that surface dissolves. The sample's position is unchanged. A
+    // sample of a surface sampled for the eye is drawn a hundredth of its distance nearer at least,
+    // which the depth buffer still tells from its own darkened surface on the far hills.
+    float pull = uDataViewScreen.x > 0.0 ? max(uDataViewGlow.w, 0.01 * viewDist) : uDataViewGlow.w;
     gl_Position = matrix_viewProjection
-        * vec4(worldPos.xyz + normalize(view_position - worldPos.xyz) * uDataViewGlow.w, 1.0);
-    // Far away, a stable subset: a sample is drawn with probability (near / distance) squared, by a
-    // hash of its own index so nothing flickers, and the survivors carry the brightness of the
-    // ones left out. Every drawn point is still a real sample; far points only overlap less.
-    float keep = min(1.0, uDataViewThin.x / max(viewDist, 0.001));
-    keep *= keep;
-    if (dataViewHash(gl_VertexID) >= keep) {
-        gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
-        gl_PointSize = 0.0;
-        vDataGain = 0.0;
-        return;
+        * vec4(worldPos.xyz + normalize(view_position - worldPos.xyz) * pull, 1.0);
+    int self = gl_VertexID;
+    if (uDataViewScreen.x > 0.0) {
+        // A sample of a surface sampled for the eye: drawn once the part of its surface it stands on
+        // needs it, at its distance and its angle to the eye, so every surface near or far carries as
+        // many points to the square pixel; a weaker GPU's share lowers that for all alike. A sample is
+        // its own (its density and place are its surface's, never the eye's), so a buffer sampled for
+        // another eye draws the same samples here, and its twinkle is told by its place, not its index.
+        vec3 normal = mat3(matrix_model) * (aColor.rgb * 2.0 - 1.0);
+        float facing = max(abs(dot(normal, view_position - worldPos.xyz)) / max(length(normal) * viewDist, 0.001), uDataViewScreen.y);
+        // A part spreads over the screen by its depth along the view (clip w), cubed, not its distance:
+        // counted so within the cone, as at the cone's edge beyond it.
+        float near = max(viewDist, uDataViewScreen.z);
+        float depth = max(gl_Position.w, uDataViewScreen.w * near);
+        float want = uDataViewScreen.x * dataScale * dataScale * facing * near / (depth * depth * depth) * uDataViewKeep;
+        float own = exp2((aTags.y - 32768.0) / 2048.0);
+        bool reach = viewDist >= uDataViewReach.x && viewDist < uDataViewReach.y;
+        if (own > want || !reach) {
+            gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+            gl_PointSize = 0.0;
+            vDataGain = 0.0;
+            return;
+        }
+        // Brightening over the last third of its way in, so a sample the eye walks up to never pops.
+        vDataGain = clamp((want - own) / (0.35 * own), 0.0, 1.0);
+        self = int(floatBitsToUint(aPosition.x) ^ (floatBitsToUint(aPosition.y) * 0x9e3779b1u) ^ (floatBitsToUint(aPosition.z) * 0x85ebca6bu));
+    } else {
+        // Far away, a stable subset: a sample is drawn with probability (near / distance) squared, by
+        // a hash of its own index so nothing flickers, and the survivors carry the brightness of the
+        // ones left out. Every drawn point is still a real sample; far points only overlap less.
+        float keep = min(1.0, uDataViewThin.x / max(viewDist, 0.001));
+        keep *= keep;
+        if (dataViewHash(gl_VertexID) >= keep) {
+            gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+            gl_PointSize = 0.0;
+            vDataGain = 0.0;
+            return;
+        }
+        // A weaker GPU's share: a stable subset by a second hash of the same index, so fewer samples
+        // are drawn and never others; 1 draws every one.
+        if (dataViewHash(gl_VertexID ^ 0x5bd1e995) >= uDataViewKeep) {
+            gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+            gl_PointSize = 0.0;
+            vDataGain = 0.0;
+            return;
+        }
+        vDataGain = min(uDataViewThin.y, inversesqrt(max(keep, 0.0001)));
     }
-    // A weaker GPU's share: a stable subset by a second hash of the same index, so fewer samples are
-    // drawn and never others; 1 draws every one.
-    if (dataViewHash(gl_VertexID ^ 0x5bd1e995) >= uDataViewKeep) {
-        gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
-        gl_PointSize = 0.0;
-        vDataGain = 0.0;
-        return;
-    }
-    vDataGain = min(uDataViewThin.y, inversesqrt(max(keep, 0.0001)));
     // The twinkle: brightness only, each sample on its own phase and a period near uDataViewLife.y;
     // the sample never moves. Depth 0, or a clock held at 0, leaves it still.
-    float lifePhase = dataViewHash(gl_VertexID ^ 0x27d4eb2d);
-    float lifePeriod = uDataViewLife.y * (0.75 + 0.5 * dataViewHash(gl_VertexID ^ 0x165667b1));
+    float lifePhase = dataViewHash(self ^ 0x27d4eb2d);
+    float lifePeriod = uDataViewLife.y * (0.75 + 0.5 * dataViewHash(self ^ 0x165667b1));
     vDataGain *= 1.0 + uDataViewLife.x * sin(6.2831853 * (uDataViewClock / max(lifePeriod, 0.001) + lifePhase));
 #endif
 
@@ -314,6 +354,10 @@ void main(void) {
     }
 
     vColor = vec4(aColor.rgb, confidence);
+#ifdef DATA_VIEW
+    // A sample's colour channels carry its surface's normal; its colour is the palette's alone.
+    if (uDataViewScreen.x > 0.0) vColor.rgb = vec3(1.0);
+#endif
     vSemantic = vec4(unconfirmed, state.y, band, uIsland.x);
     vFogAmount = fogAmount;
 }

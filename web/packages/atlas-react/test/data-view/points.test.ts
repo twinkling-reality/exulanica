@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { DATA_VIEW_STYLE, DATA_VIEW_STYLE_STREET, dataViewRgb } from '@exulanica/atlas-core';
 import { dataViewClockSeconds } from '../../src/playcanvas/data-view/overlay.js';
+import { dataViewGroundRgb } from '../../src/playcanvas/data-view/overlay.js';
 import {
-  DATA_VIEW_CLOCK_UNIFORM, DATA_VIEW_KEEP_UNIFORM, DATA_VIEW_VERTEX_BYTES, createDataViewPoints,
+  DATA_VIEW_CLOCK_UNIFORM, DATA_VIEW_KEEP_UNIFORM, DATA_VIEW_VERTEX_BYTES, createDataViewPoints, dataViewDensityCode,
 } from '../../src/playcanvas/data-view/points.js';
+import { createDataViewSkinnedGroup } from '../../src/playcanvas/data-view/skinned-points.js';
 import { POINT_FRAGMENT_GLSL, POINT_VERTEX_GLSL } from '../../src/playcanvas/point-shader.js';
 
 function device() {
@@ -101,6 +103,86 @@ describe('data view point draw', () => {
     const twinkle = data.slice(data.indexOf('lifePhase'), data.indexOf('#endif'));
     expect(twinkle).toContain('vDataGain *=');
     expect(twinkle).not.toMatch(/gl_Position|worldPos|gl_PointSize/);
+  });
+
+  it('carries a sample taken for the eye with its normal and first-drawn density, drawn over its reach', () => {
+    const { app, graphics } = device();
+    const node = new pc.Entity('borrowed');
+    app.root.addChild(node);
+    const made = (samples: Parameters<typeof createDataViewPoints>[0]['samples'], style = DATA_VIEW_STYLE_STREET) => createDataViewPoints({
+      device: graphics, node, positions: new Float32Array([0, 0, 0, 1, 0, 0]), style, subjectId: 's', ...(samples ? { samples } : {}),
+    });
+    const points = made({ normals: new Float32Array([0, 1, 0, 0, -1, 0]), densities: new Float32Array([1, 256]), reach: [8, Infinity] })!;
+    const instance = (node.findByName('data-view-points:s') as pc.Entity).render!.meshInstances[0]!;
+    const bytes = new Uint8Array(instance.mesh.vertexBuffer.lock());
+    const shorts = new Uint16Array(bytes.buffer);
+    // The normal in the colour channels (0 to 1 for -1 to 1), the density on the shader's log scale in the second tag.
+    expect([...bytes.slice(12, 16)]).toEqual([128, 255, 128, 255]);
+    expect([...bytes.slice(32, 36)]).toEqual([128, 0, 128, 255]);
+    expect([shorts[9], shorts[19]]).toEqual([32768, 32768 + 8 * 2048]);
+    expect(dataViewDensityCode(2 ** -40)).toBe(0);
+    const screen = DATA_VIEW_STYLE_STREET.points.screen!;
+    const material = instance.material as pc.ShaderMaterial;
+    expect([...(material.getParameter('uDataViewScreen') as { data: Float32Array }).data].map(Math.fround))
+      .toEqual([screen.density, screen.facingFloor, screen.nearestMetres, Math.cos((screen.coneDegrees * Math.PI) / 180)].map(Math.fround));
+    expect([...(material.getParameter('uDataViewReach') as { data: Float32Array }).data]).toEqual([8, 1e9]);
+    points.destroy();
+    // Samples of the wrong length are refused; a style without a screen density, or no samples, draws as before.
+    expect(made({ normals: new Float32Array(3), densities: new Float32Array(2), reach: [0, 8] })).toBeNull();
+    expect(made({ normals: new Float32Array(6), densities: new Float32Array([1, 0]), reach: [0, 8] })).toBeNull();
+    for (const old of [made(undefined)!, made({ normals: new Float32Array(6), densities: new Float32Array([1, 1]), reach: [0, 8] }, DATA_VIEW_STYLE)!]) {
+      const drawn = (node.findByName('data-view-points:s') as pc.Entity).render!.meshInstances[0]!;
+      expect([...((drawn.material as pc.ShaderMaterial).getParameter('uDataViewScreen') as { data: Float32Array }).data]).toEqual([0, 0, 0, 0]);
+      old.destroy();
+    }
+    app.destroy();
+  });
+
+  it('draws the dark ground as a lit surface of its colour ends up under a camera that draws through a frame', () => {
+    expect(dataViewGroundRgb(DATA_VIEW_STYLE_STREET, false)).toEqual(dataViewRgb(DATA_VIEW_STYLE_STREET.ground.colour));
+    const framed = dataViewGroundRgb(DATA_VIEW_STYLE_STREET, true);
+    dataViewRgb(DATA_VIEW_STYLE_STREET.ground.colour).forEach((value, at) => {
+      expect(framed[at]).toBeCloseTo(value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4, 9);
+      expect(framed[at]).toBeLessThan(value);
+    });
+  });
+
+  it('draws a walker as points by its own bones, and lets go of them the frame its skin is gone', () => {
+    const { app, graphics } = device();
+    const layer = app.scene.layers.getLayerById(pc.LAYERID_WORLD)!;
+    const bone = new pc.Entity('bone');
+    app.root.addChild(bone);
+    const mesh = new pc.Mesh(graphics);
+    mesh.setPositions([0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 2, 0]);
+    mesh.update(pc.PRIMITIVE_TRIANGLES);
+    mesh.skin = new pc.Skin(graphics, [new pc.Mat4()], ['bone']);
+    const source = new pc.MeshInstance(mesh, new pc.StandardMaterial(), bone);
+    const skin = new pc.SkinInstance(mesh.skin);
+    skin.bones = [bone];
+    source.skinInstance = skin;
+    const group = createDataViewSkinnedGroup({ app, device: graphics, layer, colour: '#ffffff', style: DATA_VIEW_STYLE_STREET, pixels: 771, stride: 2 });
+    expect(group.add(new pc.MeshInstance(mesh, new pc.StandardMaterial(), bone))).toBeNull();
+    const points = group.add(source)!;
+    expect(points.pointCount).toBe(3);
+    const drawn = layer.meshInstances.find((one) => one.material?.name === 'data-view-skinned-points')!;
+    expect(drawn.skinInstance).toBe(skin);
+    expect(drawn.mesh.vertexBuffer).toBe(mesh.vertexBuffer);
+    expect(drawn.mesh.primitive[0]!.type).toBe(pc.PRIMITIVE_POINTS);
+    expect(drawn.visible).toBe(false);
+    group.setWeight(1);
+    expect(drawn.visible).toBe(true);
+    points.setShown(false);
+    expect(drawn.visible).toBe(false);
+    // The walker goes: their skin with them. Before the next frame is drawn the points are let go of, and the walker's
+    // own skin and vertices are untouched by it.
+    source.skinInstance = null;
+    app.fire('prerender');
+    expect(points.gone).toBe(true);
+    expect(layer.meshInstances.includes(drawn)).toBe(false);
+    expect(mesh.vertexBuffer).not.toBeNull();
+    expect(skin.boneTexture).not.toBeNull();
+    group.destroy();
+    app.destroy();
   });
 
   it('keeps the point-map program unchanged unless the data view asks for its define', () => {

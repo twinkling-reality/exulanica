@@ -425,13 +425,17 @@ its workspace made) lives among them and is seen by its own tag, never in the co
 In a made town, X opens the data view (`tools/previews/world-workspace/world-data-view.ts`), listed on the keys
 card only where it works: a small card with one slider from World to Data. As it moves, the town's surfaces go
 dark where they stand and fine glowing points sampled from them take their place, each coloured by the kind of
-record it stands on and twinkling faintly in place (held still where the reader asks for reduced motion); a GPU
-that cannot draw them all at its frame rate draws a stable share, never fewer than before;
+record it stands on and twinkling faintly in place (held still where the reader asks for reduced motion). Every
+surface goes to data, as dense on the screen near as far: the ground at the eye's feet, a near trunk, the land
+beyond the town, while the sky and the world's haze go into the dark ground; walkers become points drawn by their
+own bones, so they walk as points, and a walker or a car near the eye is a figure of points, never a dark shape. A
+GPU that cannot draw them all at its frame rate draws a stable share;
 each thing the town's own tile records name gets a thin box and a tag in the shipped catalogs' words
 (a premises by its use, a street tree by its species, street furniture by its class, a street by its name), and
-each person a tag with their name and, under it, the model that decides for them where one does. A creature made
-in Make a creature is tagged from its kind's own record: its name and, under it, the model that made it, or the
-plain words build mode calls it by where the record names no model. X or Esc puts the town back as it was; the
+each person a tag with their name and, under it, the model that decides for them where one does. No tag covers
+another or a walker's face or body: nearer ones are placed first, and a small thing far off has none. A creature
+made in Make a creature is tagged from its kind's own record: its name and, under it, the model that made it, or
+the plain words build mode calls it by where the record names no model. X or Esc puts the town back as it was; the
 data view keeps nothing and is never a pick target.
 
 When the playback control says open models are not asked for the people here now (its

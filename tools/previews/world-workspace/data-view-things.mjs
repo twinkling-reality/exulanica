@@ -101,23 +101,28 @@ export const POINT_KINDS = Object.freeze({
   ground: Object.freeze(['city.parcel', 'city.block', 'city.terrain']),
 });
 
-/** What a point stands on where no box holds it, by its surface. */
+/**
+ * What a point stands on where no box holds it, by its surface: the land beyond the town is the land's, a walker
+ * drawn from afar is a person, and anything the names do not tell is an object.
+ */
 export const POINT_FALLBACK = Object.freeze({
   wall: 'city.massing', road: 'city.lane', path: 'city.street_segment', kerb: 'city.curb_edge',
   plant: 'city.street_tree', furniture: 'city.street_furniture', ground: 'city.terrain', vehicle: 'object',
+  backdrop: 'city.terrain', person: 'person', object: 'object',
 });
 
 /**
- * Which surface a drawn mesh is, from its material's and its entity's names, or null for one the data
- * view leaves as it is (the sky, a person): a style pack names its materials by role
- * ("style-pack:wall.brick_running_bond", "style-pack:road.kerb_stone"), the tile its own sets
- * ("generated-tile:cc0.broadleaf-foliage"). The land's backdrop, beyond the town, goes dark with the
- * rest and has no points of its own.
+ * Which surface a drawn mesh is, from its material's and its entity's names: a style pack names its materials by
+ * role ("style-pack:wall.brick_running_bond", "style-pack:road.kerb_stone"), the tile its own sets
+ * ("generated-tile:cc0.broadleaf-foliage"). Every surface goes to data: the land's backdrop, beyond the town, as
+ * the land; a walker drawn from afar as a person; one the names do not tell as an object; and the sky goes dark
+ * with no points of its own.
  */
 export function surfaceOf(material = '', entity = '') {
   const name = `${entity} ${material}`;
   if (/backdrop/u.test(name)) return 'backdrop';
-  if (/sky/u.test(name)) return null;
+  if (/sky/u.test(name)) return 'sky';
+  if (/far-person|character-far-body|(^|\s)character:/u.test(name)) return 'person';
   if (/style-pack:vehicle\./u.test(name)) return 'vehicle';
   // The ground first: a tree's pit is ground, and the land's own surfaces and its water are.
   if (/town-land|site-land|tree-pit|water/u.test(name)) return 'ground';
@@ -127,7 +132,7 @@ export function surfaceOf(material = '', entity = '') {
   if (/footway|path\./u.test(name)) return 'path';
   if (/(^|\s)(lamp|post)(\s|$)|furniture/u.test(name)) return 'furniture';
   if (/wall\.|roof\.|glazing|storefront|swatch:(frame|glass)/u.test(name)) return 'wall';
-  return null;
+  return 'object';
 }
 
 /**
@@ -160,27 +165,34 @@ export function pointBoxes(tiles) {
  * the point (within `pad` metres) among those its surface can be, else the surface's fallback.
  */
 export function pointKinds(boxes, { cell = 8, pad = 0.15 } = {}) {
+  // Each box holds, for every surface, how particular its kind is there (its place in POINT_KINDS, or none), so a
+  // point asks numbers, not words.
+  const surfaces = Object.keys(POINT_KINDS);
   const grid = new Map();
-  const key = (i, k) => `${i},${k}`;
+  const key = (i, k) => (i + 32768) * 65536 + (k + 32768);
   for (const box of boxes) {
+    const held = { kind: box.kind, min: box.min, max: box.max, rank: surfaces.map((surface) => POINT_KINDS[surface].indexOf(box.kind)) };
     for (let i = Math.floor((box.min[0] - pad) / cell); i <= Math.floor((box.max[0] + pad) / cell); i += 1) {
       for (let k = Math.floor((box.min[2] - pad) / cell); k <= Math.floor((box.max[2] + pad) / cell); k += 1) {
         const at = key(i, k);
         if (!grid.has(at)) grid.set(at, []);
-        grid.get(at).push(box);
+        grid.get(at).push(held);
       }
     }
   }
   return {
     kindAt(surface, x, y, z) {
-      const kinds = POINT_KINDS[surface] ?? [];
-      const near = grid.get(key(Math.floor(x / cell), Math.floor(z / cell))) ?? [];
+      const which = surfaces.indexOf(surface);
+      const near = which < 0 ? undefined : grid.get(key(Math.floor(x / cell), Math.floor(z / cell)));
       let best = null, rank = Infinity;
-      for (const box of near) {
-        const order = kinds.indexOf(box.kind);
-        if (order < 0 || order >= rank) continue;
-        if (x < box.min[0] - pad || x > box.max[0] + pad || y < box.min[1] - pad || y > box.max[1] + pad || z < box.min[2] - pad || z > box.max[2] + pad) continue;
-        best = box.kind; rank = order;
+      if (near !== undefined) {
+        for (const box of near) {
+          const order = box.rank[which];
+          if (order < 0 || order >= rank) continue;
+          if (x < box.min[0] - pad || x > box.max[0] + pad || y < box.min[1] - pad || y > box.max[1] + pad || z < box.min[2] - pad || z > box.max[2] + pad) continue;
+          best = box.kind; rank = order;
+          if (order === 0) break;
+        }
       }
       return best ?? POINT_FALLBACK[surface] ?? null;
     },
@@ -226,20 +238,42 @@ export function streetLine(thing, step = 4) {
 }
 
 /**
- * Which tags show: nearest first, none over another (`gap` pixels apart) and none past the screen's
- * `margin`, at most `most`. `tags`: [{ key, x, y, width, height, distance }], x and y the tag's top left
- * in CSS pixels; the screen is `width` by `height`. Answers the tags kept, nearest first.
+ * Which tags show and where: nearest first, each at the first of its places (its own top left `x` and `y`, then each
+ * of `also`) that lies within the screen's `margin`, over no tag kept before it (`gap` pixels apart) and over none of
+ * the `blocked` boxes (a walker's face and body) but its own (a box's `owner` is the key of the tag it may carry), at
+ * most `most`. `tags`: [{ key, x, y, also?, width, height, distance }] in CSS pixels; the screen is `width` by
+ * `height`. Answers the tags kept, nearest first, each at the place it was kept at.
  */
-export function placeTags(tags, { width, height, margin = 8, gap = 4, most = 48 }) {
+export function placeTags(tags, { width, height, margin = 8, gap = 4, most = 48, blocked = [] }) {
   const kept = [];
+  const over = (a, b, pad) => a.x < b.x + b.width + pad && a.x + a.width + pad > b.x && a.y < b.y + b.height + pad && a.y + a.height + pad > b.y;
   for (const tag of [...tags].sort((a, b) => a.distance - b.distance)) {
     if (kept.length >= most) break;
-    if (tag.x < margin || tag.y < margin || tag.x + tag.width > width - margin || tag.y + tag.height > height - margin) continue;
-    const over = kept.some((other) => tag.x < other.x + other.width + gap && tag.x + tag.width + gap > other.x
-      && tag.y < other.y + other.height + gap && tag.y + tag.height + gap > other.y);
-    if (!over) kept.push(tag);
+    for (const at of [{ x: tag.x, y: tag.y }, ...(tag.also ?? [])]) {
+      const box = { ...tag, x: at.x, y: at.y };
+      if (box.x < margin || box.y < margin || box.x + box.width > width - margin || box.y + box.height > height - margin) continue;
+      if (kept.some((other) => over(box, other, gap)) || blocked.some((one) => one.owner !== tag.key && over(box, one, 0))) continue;
+      kept.push(box);
+      break;
+    }
   }
   return kept;
+}
+
+/**
+ * The boxes no other tag may cover for a walker seen at `head` (the point just over their head, CSS pixels and its
+ * distance in metres) with `pixels` CSS pixels to the radian: their face, and their body down to their feet, each a
+ * walker's width across (`wide` metres) and their height (`tall` metres) seen from where they stand.
+ */
+export function walkerBoxes({ owner, x, y, distance }, pixels, { wide = 0.6, tall = 1.85 } = {}) {
+  const scale = pixels / Math.max(distance, 0.5);
+  const width = wide * scale, height = tall * scale;
+  return [{ owner, x: x - width / 2, y, width, height }];
+}
+
+/** Whether a thing seen `distance` metres away, `size` metres across at most, stands at least `least` CSS pixels across. */
+export function bigEnough(size, distance, pixels, least = 28) {
+  return (size * pixels) / Math.max(distance, 0.5) >= least;
 }
 
 /**

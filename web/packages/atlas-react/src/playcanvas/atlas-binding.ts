@@ -76,7 +76,7 @@ import {
   frameFraction,
   districtRepresentationSubjects,
   validateRepresentationSubject,
-  DEFAULT_FOCUS_CONFIG,
+  DEFAULT_FOCUS_CONFIG, DATA_VIEW_STYLE_STREET,
 } from '@exulanica/atlas-core';
 import { OwnedDistrictRuntime } from './owned-district-runtime.js';
 import { WorldAtmosphere, atmosphereFor, installDisplaySpaceFog, openAtmosphere } from './atmosphere.js';
@@ -529,7 +529,7 @@ export class AtlasBinding {
   private readonly atmosphere: WorldAtmosphere;
   private representationController: RepresentationRuntime | null = null;
   get representation(): RepresentationRuntime {
-    return this.representationController ??= new RepresentationRuntime();
+    return this.representationController ??= new RepresentationRuntime(undefined, undefined, { style: DATA_VIEW_STYLE_STREET });
   }
   /** Boxes, tags, links and the dark ground. Created with the registry; draws only when asked. */
   private representationOverlay: DataViewOverlay | null = null;
