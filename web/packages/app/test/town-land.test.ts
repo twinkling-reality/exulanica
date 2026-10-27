@@ -4,7 +4,8 @@
  * held to its entity tag, its world and the digest its entry names; every chunk and the backdrop it
  * names are held to their digests; land the server is still making is asked for again after the
  * seconds each 503 states, until `LAND_WAIT_MS` is spent; the land is drawn round the town's tiles
- * and never under them, and taken away with them; the look's flat plane beyond the town is not
+ * and never under them, in the open ground of the look they are drawn in (`openGroundColour`), and
+ * taken away with them; the look's flat plane beyond the town is not
  * drawn; and the town's people stand on the ground its tiles walk, and on the land where they walk
  * none. A saved town whose entry names its land is opened with it, in every look it is redrawn in.
  *
@@ -15,7 +16,10 @@ import { createHash } from 'node:crypto';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import { isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generated-world.js';
-import { askForTownLand, furnitureOnLand, LAND_WAIT_MS, loadTownLand, rememberTownLand, townGround, withoutEdge, withTownLand, type TownLand } from '../src/composition/town-land.js';
+import {
+  askForTownLand, furnitureOnLand, LAND_WAIT_MS, loadTownLand, OPEN_GROUND_ROLE, openGroundColour, rememberTownLand, townGround, withoutEdge, withTownLand,
+  type TownLand,
+} from '../src/composition/town-land.js';
 import { townFurniture } from '../src/composition/town-furniture.js';
 import type { GeneratedGround, SavedWorldEntry } from '../src/world-entry-api.js';
 import { levelWalk } from './navigation-walk.js';
@@ -42,11 +46,11 @@ vi.mock('../src/world-look.js', async (importOriginal) => ({
 }));
 // The land is read as the page reads it; what draws it round the tiles is replaced, so a test sees
 // which chunks the tiles cover and when the land is taken away.
-const drawnRound = vi.hoisted(() => ({ calls: [] as { covered: (x: number, y: number) => boolean; disposed: boolean }[] }));
+const drawnRound = vi.hoisted(() => ({ calls: [] as { covered: (x: number, y: number) => boolean; ground: unknown; disposed: boolean }[] }));
 vi.mock('@exulanica/atlas-react/generated-site', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@exulanica/atlas-react/generated-site')>()),
-  attachLandRound: (_host: unknown, _land: unknown, covered: (x: number, y: number) => boolean) => {
-    const call = { covered, disposed: false };
+  attachLandRound: (_host: unknown, _land: unknown, covered: (x: number, y: number) => boolean, _surfaces: unknown, ground?: unknown) => {
+    const call = { covered, ground, disposed: false };
     drawnRound.calls.push(call);
     return { drawn: { ground: [] }, dispose: () => { call.disposed = true; } };
   },
@@ -252,8 +256,10 @@ describe("a town on its land's land, drawn", () => {
   it("is drawn round the town's tiles whenever they are attached, never under them, and taken away first", () => {
     const order: string[] = [];
     let covered: ((x: number, y: number) => boolean) | null = null;
-    const town = { land: {}, draw: (_host: unknown, under: (x: number, y: number) => boolean) => {
+    const worn: unknown[] = [];
+    const town = { land: {}, draw: (_host: unknown, under: (x: number, y: number) => boolean, ground: unknown) => {
       covered = under;
+      worn.push(ground);
       order.push('land drawn');
       return { dispose: () => order.push('land taken away') };
     } } as unknown as TownLand;
@@ -263,6 +269,25 @@ describe("a town on its land's land, drawn", () => {
     expect([covered!(0, 0), covered!(1, 0), covered!(-1, 0), covered!(0, 1)]).toEqual([true, true, false, false]);
     drawn.dispose();
     expect(order).toEqual(['tiles drawn', 'land drawn', 'land taken away', 'tiles taken away']);
+    // In the open ground of the look the tiles are drawn in, where it is handed one; else the land's own.
+    withTownLand(tile, town, [{ tileX: 0, tileY: 0 }], [0.686, 0.468, 0.216]).attach({} as GeneratedTileHost).dispose();
+    expect(worn).toEqual([null, [0.686, 0.468, 0.216]]);
+  });
+
+  it("wears the colour its look draws ground.default in: the setting's own over it, its upward swatch first, none from a texture", () => {
+    const swatches = new Map([
+      ['grass', { key: 'grass', srgb8: [136, 165, 96] }],
+      // A desert setting's sand, as applying a setting adds it under its own key.
+      ['setting_surface_0', { key: 'setting_surface_0', srgb8: [216, 182, 128] }],
+      ['frost', { key: 'frost', srgb8: [240, 244, 250] }],
+    ]);
+    const look = (surface?: object) => ({ swatches, surfaces: surface === undefined ? {} : { [OPEN_GROUND_ROLE]: surface } }) as unknown as Parameters<typeof openGroundColour>[0];
+    expect(openGroundColour(look({ swatch: 'grass', up: null }))).toEqual([136, 165, 96]);
+    expect(openGroundColour(look({ swatch: 'setting_surface_0', up: null }))).toEqual([216, 182, 128]);
+    expect(openGroundColour(look({ swatch: 'grass', up: 'frost' }))).toEqual([240, 244, 250]);
+    expect(openGroundColour(look({ texture_set: 'cc0.tree-pit-soil', up: null }))).toBeNull();
+    expect(openGroundColour(look({ swatch: 'unstated', up: null }))).toBeNull();
+    expect(openGroundColour(look())).toBeNull();
   });
 
   it("dresses the town's own unbuilt ground in what its land wears, and gives the tiles theirs back first", () => {
@@ -366,8 +391,10 @@ describe('a saved town on its land, opened', () => {
       expect(drawnRound.calls[0]!.disposed).toBe(true);
       return [[-1, 0], [0, 0]].map(([x, y]) => drawnRound.calls[0]!.covered(x!, y!));
     };
-    // The town's tile covers chunk (0, 0): the land is drawn round it, never under it.
+    // The town's tile covers chunk (0, 0): the land is drawn round it, never under it, and in the
+    // land's own plain ground, since the tile look states no open ground.
     expect(coveredIn(loaded.tile)).toEqual([false, true]);
+    expect(drawnRound.calls[0]!.ground).toBeUndefined();
     // Redrawn in another look, the same land is drawn round it, and the look draws no flat plane.
     const again = await loaded.relook({ packId: null, manifestSha256: null, source: 'redraw' });
     expect(looks).toEqual([{ ...TILE_LOOK_V1, edge: null }]);

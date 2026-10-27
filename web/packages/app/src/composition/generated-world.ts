@@ -45,7 +45,7 @@ import { entityTagDigest } from '@exulanica/atlas-core';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import type { StreetFurniture } from '@exulanica/atlas-react/playcanvas';
 import { rememberTownFurniture } from './town-furniture.js';
-import { furnitureOnLand, loadTownLand, rememberTownLand, townGround, withTownLand, withoutEdge } from './town-land.js';
+import { furnitureOnLand, loadTownLand, openGroundColour, rememberTownLand, townGround, withTownLand, withoutEdge } from './town-land.js';
 import { toApiError } from '@exulanica/graph-client';
 import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
 import { accessHeaders, type Credentials } from '../config.js';
@@ -374,8 +374,15 @@ export async function loadGeneratedWorld(
     ground.landSha256 === undefined ? null : loadTownLand(access, entry, ground.landSha256),
   ]);
   rememberTownLand(entry.entryId, town);
-  /** The tiles as drawn: on land, with the land round them and no flat plane beyond them. */
-  const onLand = (tile: LoadedGeneratedTile): LoadedGeneratedTile => (town === null ? tile : withTownLand(tile, town, ground.tiles));
+  /**
+   * The tiles as drawn: on land, with the land round them and no flat plane beyond them, the land in
+   * the open ground of the look they are drawn in (its setting's sand or snow too), else its own.
+   */
+  const onLand = (tile: LoadedGeneratedTile, look: import('../world-look.js').PreparedWorldLook | null): LoadedGeneratedTile => {
+    if (town === null) return tile;
+    const open = look === null ? null : openGroundColour(look.pack);
+    return withTownLand(tile, town, ground.tiles, open === null ? null : look!.style.linearRgb(open));
+  };
   const edged = <Look extends object>(look: Look): Look => (town === null ? look : withoutEdge(look));
   const [first, ...rest] = containers;
   const neighbours: readonly { readonly name: string; readonly bytes: Uint8Array }[] = rest;
@@ -499,7 +506,7 @@ export async function loadGeneratedWorld(
   const paintedAt = painted === null ? null : paintedStart(painted);
   const start = paintedAt ?? arrived;
   return {
-    tile: { ...onLand(loaded), start },
+    tile: { ...onLand(loaded, prepared), start },
     ground,
     look: { pack: choice.packId, source: choice.source, drawn: prepared !== null, reason, ...settingOf(prepared) },
     bodies: drawn.bodies,
@@ -512,7 +519,7 @@ export async function loadGeneratedWorld(
       // new pack's light: nothing is fetched, verified or decoded a second time.
       const again = dressedIn(plain.inLook(edged(nextPrepared?.look ?? route.TILE_LOOK_V1)), nextPrepared);
       return {
-        tile: { ...onLand(again.tile), start },
+        tile: { ...onLand(again.tile, nextPrepared), start },
         bodies: again.bodies,
         look: { pack: next.packId, source: next.source, drawn: nextPrepared !== null, reason: null, ...settingOf(nextPrepared) },
       };

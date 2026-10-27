@@ -395,6 +395,11 @@ The page draws a town on land with its land round it
 held to its entity tag, its world and the digest the entry names, and every chunk and the backdrop
 by the digests the section names, and draws the near chunks no tile covers (chunk (x, y) lies under
 tile (x, y)), the backdrop and the water, in place of the look's flat plane beyond the tiles. The
+near land wears, and the backdrop is coloured over, the open ground of the look the town is drawn
+in: the colour it draws `ground.default` in, with the world's setting over it, so a setting's
+desert sand, snowfields or field of grain is the land the town stands on
+(`openGroundColour`); a look that draws that ground from a texture, or a town drawn in no pack,
+leaves the land its own plain green. The
 tiles' own ground, where no street, footway or lot stands, wears what the near land wears, so the
 town's unbuilt land meets its land as one ground; its tree pits, drawn in the same texture set as
 its terrain, wear it too. Land that cannot be read is not stood in for: the world does not open. The town's people stand on the

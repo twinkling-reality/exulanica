@@ -984,7 +984,10 @@ the parts (`settings`: the axes in order and each part's title and description, 
 (`prepareWorldLook` in `web/packages/app/src/world-look.ts`), and the result is a resolved pack, so
 the light, the surfaces, the pieces' swatches and the ground beyond are drawn by the code that draws
 any pack. A setting the pack cannot be drawn in is never stood in for: the world is drawn as its
-pack states, and the shell's `data-world-look` says the setting was not drawn and why. The Look
+pack states, and the shell's `data-world-look` says the setting was not drawn and why. A town on
+its land wears the colour the setting gives `ground.default` on the land round it and on its own
+unbuilt ground, as a place's land wears its base ground, so a desert town stands in sand and a
+snowy one in snow ([towns on land](landform-contract.md#towns-on-land)). The Look
 sheet shows one choice an axis under a look's words, "As the look has it" or a named part, and
 saves a changed setting over the look the world wears or with another look.
 

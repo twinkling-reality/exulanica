@@ -856,8 +856,9 @@ export function drawSiteLand(
 
 /**
  * Draw the land round a town made on its land, under the host's environment root: every near chunk
- * its tiles do not cover (`covered` names those they do) in the land's plain ground with its
- * surfaces over it, the backdrop and the water, with the camera seeing as far as the backdrop
+ * its tiles do not cover (`covered` names those they do) in `ground` (linear RGB: the open ground
+ * the town's look draws, or the land's plain ground) with its surfaces over it, the backdrop
+ * coloured over the same ground, and the water, with the camera seeing as far as the backdrop
  * reaches. Disposing takes it all away and gives the camera back its far plane.
  */
 export function attachLandRound(
@@ -865,12 +866,13 @@ export function attachLandRound(
   land: SiteLand,
   covered: (chunkX: number, chunkY: number) => boolean,
   surfaces: LandSurfaces | null,
+  ground: Rgb = LAND_GROUND_RGB,
 ): { readonly drawn: DrawnSiteLand; dispose(): void } {
   const plain = new pc.StandardMaterial();
   plain.name = 'town-land:ground';
-  plain.diffuse = new pc.Color(...LAND_GROUND_RGB);
+  plain.diffuse = new pc.Color(...ground);
   plain.update();
-  const drawn = drawSiteLand(host.app.graphicsDevice, land, plain, LAND_GROUND_RGB, surfaces, { leaveOut: covered });
+  const drawn = drawSiteLand(host.app.graphicsDevice, land, plain, ground, surfaces, { leaveOut: covered });
   host.environmentRoot.addChild(drawn.root);
   const camera = host.camera.camera;
   const far = camera?.farClip;
