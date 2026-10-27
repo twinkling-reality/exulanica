@@ -18,11 +18,13 @@ and its repair together.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
+import re
 import time
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Final, Literal
@@ -39,17 +41,29 @@ from exulanica.selection.world_drafting import verbatim_bounds
 __all__ = [
     "CHOOSER_ROLE",
     "PROMPT_PATH",
+    "WORDS_PATH",
     "ChooserPrompt",
     "SettingAxis",
     "SettingChoice",
     "SettingOption",
+    "WordRule",
     "choice_schema",
     "choose_setting",
     "chooser_prompt",
+    "parts_by_words",
     "render_request",
+    "setting_word_rules",
 ]
 
 PROMPT_PATH: Final = Path(__file__).with_name("setting-choosing.v2.json")
+#: Words that say outright what a setting holds, taken by code (:func:`parts_by_words`).
+WORDS_PATH: Final = Path(__file__).with_name("setting-words.v1.json")
+_WORDS_PROFILE: Final = "exulanica.setting-words/v1"
+_WORD: Final = re.compile(r"[a-z]+")
+#: The words, one or two before a rule's word, that say the description does not want it, and the
+#: articles that may stand between them and it.
+_NOT_WANTED: Final = (("no",), ("not",), ("without",))
+_ARTICLES: Final = frozenset({"a", "an", "the", "any"})
 _PROMPT_PROFILE: Final = "exulanica.setting-choosing-prompt/v1"
 #: The step answers once and is repaired at most once.
 ATTEMPTS: Final = 2
@@ -267,3 +281,77 @@ def choose_setting(
             break
         messages.append({"role": "user", "content": repair})
     return SettingChoice({}, (), refused, None, log.calls)
+
+
+@dataclass(frozen=True, slots=True)
+class WordRule:
+    """Words that say a setting outright, and the parts they take: an axis's key to a part's key."""
+
+    words: frozenset[str]
+    parts: Mapping[str, str]
+
+
+@functools.cache
+def setting_word_rules(path: Path = WORDS_PATH) -> tuple[WordRule, ...]:
+    """The rules of the words file, read once: each a non-empty list of lowercase words and the
+    parts they take; refused by name when the file is not one."""
+    document = json.loads(path.read_bytes())
+    if document.get("profile") != _WORDS_PROFILE:
+        raise ValueError(f"{path.name} is not a {_WORDS_PROFILE} document")
+    rules = []
+    for index, raw in enumerate(document["rules"]):
+        words, parts = raw["words"], raw["parts"]
+        if not words or any(type(word) is not str or not _WORD.fullmatch(word) for word in words):
+            raise ValueError(f"{path.name} rules[{index}].words is a list of lowercase words")
+        if not parts or any(
+            type(key) is not str or type(part) is not str for key, part in parts.items()
+        ):
+            raise ValueError(f"{path.name} rules[{index}].parts maps an axis to a part")
+        rules.append(WordRule(frozenset(words), dict(parts)))
+    return tuple(rules)
+
+
+def parts_by_words(
+    description: str,
+    parts: Mapping[str, str],
+    listed: Collection[tuple[str, str]],
+    *,
+    names: Sequence[tuple[int, int]] = (),
+    rules: Sequence[WordRule] | None = None,
+) -> tuple[dict[str, str], tuple[tuple[int, int], ...]]:
+    """``parts`` with what the description's own words say outright added on the axes it leaves
+    empty (the words file: snow for "snowy" or "winter"), and where each word that added one is.
+    Whole words, any case; a word right after ``no``, ``not`` or ``without`` (an article between
+    them aside) is not taken, nor anything inside a saved name (``names``, the spans of its
+    placeholders in ``description``). A part the host does not list (``listed``, axis and key
+    pairs) is not added, and a rule none of whose parts the step missed (it took one of them
+    from the same words) adds nothing. No model is asked: the person's word is the reason, so
+    nothing a chooser answered is moved, only an axis it left empty filled."""
+    rules = setting_word_rules() if rules is None else rules
+    tokens = [
+        (match.group(), match.span())
+        for match in _WORD.finditer(description.lower())
+        if not any(start < match.end() and match.start() < end for start, end in names)
+    ]
+    taken = dict(parts)
+    at: list[tuple[int, int]] = []
+    for rule in rules:
+        # A step that took any of the rule's parts read those words itself: the rule stays out.
+        if any(taken.get(axis) == part for axis, part in rule.parts.items()):
+            continue
+        for index, (word, span) in enumerate(tokens):
+            if word not in rule.words:
+                continue
+            before = tuple(token for token, _ in tokens[:index] if token not in _ARTICLES)[-1:]
+            if before in _NOT_WANTED:
+                continue
+            added = {
+                axis: part
+                for axis, part in rule.parts.items()
+                if axis not in taken and (axis, part) in listed
+            }
+            if added:
+                taken.update(added)
+                at.append(span)
+            break
+    return taken, tuple(at)

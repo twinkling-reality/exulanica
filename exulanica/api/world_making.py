@@ -61,7 +61,12 @@ from exulanica.references.bundle import read_bundle
 from exulanica.references.for_drafting import NotesRefused, notes_for_draft
 from exulanica.selection.calls import CallLog
 from exulanica.selection.look_choosing import LookOption, choose_look
-from exulanica.selection.setting_choosing import SettingAxis, SettingOption, choose_setting
+from exulanica.selection.setting_choosing import (
+    SettingAxis,
+    SettingOption,
+    choose_setting,
+    parts_by_words,
+)
 from exulanica.selection.tool_choosing import choose_tool
 from exulanica.selection.world_drafting import (
     SentDescription,
@@ -314,6 +319,14 @@ def _take(client: ModelClient, sent: SentDescription, log: CallLog) -> _Taken:
             _LOG.warning("the setting chooser took nothing: %s", type(failed).__qualname__)
     kept_look, kept_parts = guarded(look, look_at, parts, words_at)
     titles = {(part["axis"], part["key"]): part["title"] for part in listed.listed()}
+    # What the person's own words say outright (setting-words: snow for "snowy" or "winter"),
+    # taken by code on an axis the step left empty, whatever it answered or if it failed.
+    if not kept_parts:
+        words_at = ()
+    kept_parts, said_at = parts_by_words(
+        sent.text, kept_parts, titles, names=[(start, end) for start, end, _, _ in sent.replaced]
+    )
+    words_at = (*words_at, *said_at)
     try:
         # The person's own words, every saved name put back; a phrase that cuts a replaced name
         # cannot be said back, and what it chose is then not taken either.

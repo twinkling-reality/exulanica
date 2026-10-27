@@ -24,8 +24,11 @@ from exulanica.selection.setting_choosing import (
     choice_schema,
     choose_setting,
     chooser_prompt,
+    parts_by_words,
     render_request,
+    setting_word_rules,
 )
+from exulanica.world.world_settings import setting_parts
 
 from conftest import TEST_CEILING_USD, TEST_MAX_CALLS
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
@@ -228,3 +231,64 @@ def test_no_repair_is_asked_once_the_deadline_has_passed():
     assert (dict(choice.parts), choice.words) == ({}, ())
     assert choice.refused is not None and "no time was left" in choice.refused
     assert transport.call_count == 1
+
+
+# The host's named parts as the job lists them: an axis and a key.
+LISTED = {
+    ("sky", "night"),
+    ("ground", "sea"),
+    ("ground", "snowfield"),
+    ("cover", "snow"),
+}
+
+
+def test_snow_said_outright_takes_snow_by_code_on_the_axes_left_empty():
+    description = "A snowy village"
+    taken, at = parts_by_words(description, {}, LISTED)
+    assert taken == {"ground": "snowfield", "cover": "snow"}
+    assert [description[start:end] for start, end in at] == ["snowy"]
+    # Whatever the step answered stays: only an axis it left empty is filled.
+    taken, at = parts_by_words("A fishing village by the sea in winter", {"ground": "sea"}, LISTED)
+    assert taken == {"ground": "sea", "cover": "snow"}
+    assert at == ((32, 38),)
+    # A step that took snow itself read the words: nothing more is added, no phrase twice.
+    assert parts_by_words("A town with snow on the roofs", {"cover": "snow"}, LISTED) == (
+        {"cover": "snow"},
+        (),
+    )
+    assert parts_by_words("A ski village", {"ground": "sea", "cover": "snow"}, LISTED) == (
+        {"ground": "sea", "cover": "snow"},
+        (),
+    )
+
+
+def test_snow_not_wanted_named_or_unlisted_is_not_taken():
+    for description in (
+        "A town with no snow",
+        "A village not snowy at all",
+        "A town without any snow",
+    ):
+        assert parts_by_words(description, {}, LISTED) == ({}, ())
+    # A word inside a saved name is the person's name, not a wish for snow.
+    assert parts_by_words("A town near Snowy Lodge", {}, LISTED, names=[(12, 23)]) == ({}, ())
+    named = "A cafe called Snowdrop"
+    assert parts_by_words(named, {}, LISTED) == ({}, ())
+    # A part the host does not list is not taken.
+    assert parts_by_words("A snowy village", {}, {("cover", "snow")}) == (
+        {"cover": "snow"},
+        ((2, 7),),
+    )
+    # A later word still counts where the first was not wanted.
+    taken, at = parts_by_words("No snow today, but a winter market", {}, LISTED)
+    assert taken == {"ground": "snowfield", "cover": "snow"}
+    assert at == ((21, 27),)
+
+
+def test_the_words_file_names_only_parts_the_host_lists():
+    listed = setting_parts()
+    keys = {(part["axis"], part["key"]) for part in listed.listed()}
+    rules = setting_word_rules()
+    assert rules
+    for rule in rules:
+        assert rule.words
+        assert set(rule.parts.items()) <= keys

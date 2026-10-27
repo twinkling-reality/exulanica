@@ -681,7 +681,12 @@ phrase can carry a part for each; and a look is not taken when every phrase that
 a phrase that chose a kept part of the setting, since words about the hour or the weather ask for
 a sky and not for a look. The rule counts phrases and binds none to an axis, so it bounds an
 invention and does not prove each part. A step that fails, is refused or runs out of allowance
-takes nothing, and the world is made in the default look. A setting the look cannot be drawn in is
+takes nothing, and the world is made in the default look. Words that say a setting outright are
+then taken by code with no model, on an axis the answer left empty, whatever it answered or if it
+failed ([`setting-words.v1.json`](../exulanica/selection/setting-words.v1.json),
+`parts_by_words`): snow, snowy, snowbound, snowfall, winter, wintry, ski or skiing takes snow on
+the ground and the cover, so a snowy village stands in snow, on snowy uplands where its words name
+no other land. A word right after no, not or without is not taken, nor one inside a saved name. A setting the look cannot be drawn in is
 left off. A made world's setting reaches a page through its appearance, whose setting states its
 named parts (`parts`, each an `axis` and a `key`).
 

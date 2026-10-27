@@ -1,0 +1,24 @@
+{
+  "profile": "exulanica.setting-words/v1",
+  "version": 1,
+  "note": "Words that say outright what a world's setting holds, taken by code with no model after the setting chooser has answered, on an axis its answer left empty: a sentence about snow stands in snow. Whole words in any case; a word right after no, not or without (an article between them aside) is not taken, nor one inside a saved name. Each part names a key of the host's named parts (assets/style-packs/settings/setting-parts.v4.json); a part the host does not list is not taken.",
+  "rules": [
+    {
+      "words": [
+        "snow",
+        "snowy",
+        "snowbound",
+        "snowfall",
+        "winter",
+        "wintry",
+        "ski",
+        "skiing"
+      ],
+      "parts": {
+        "ground": "snowfield",
+        "cover": "snow"
+      },
+      "reason": "Snow asked for by name, by its season or by its sport. The setting chooser took no part for \"a snowy village\" on one of two tries on 27 October 2026 (WORLDLOOK), and a snowy village with no snow is the plainest miss a person meets; taking the parts by these words leaves nothing to a model."
+    }
+  ]
+}
