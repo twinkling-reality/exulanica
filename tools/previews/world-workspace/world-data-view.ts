@@ -3,9 +3,11 @@
 // record it stands on, over the data view's dark ground; each thing the town's records name gets a thin box and a
 // tag in the catalogs' words, and each person drawn here a tag with their name and, under it, the model that decides
 // for them where one does. Nothing is kept or picked: closing the card puts every surface back as it was.
-// The look is the product's data view style (atlas-core's DATA_VIEW_STYLE), drawn by the product's own parts: the
-// sampled surface (representation-binding.ts), the point draw (data-view/points.ts), and the dark ground and the
-// boxes (data-view/overlay.ts). What the town's things are, their words and where a tag goes are
+// The look is the product's data view style for a town seen from its own street (atlas-core's DATA_VIEW_STYLE_STREET,
+// version 3: fine points that twinkle a little and never move), drawn by the product's own parts: the sampled surface
+// (representation-binding.ts), the point draw (data-view/points.ts), and the dark ground and the boxes
+// (data-view/overlay.ts). A GPU that cannot draw every point at the page's frame rate draws a stable share of them,
+// stepped by its measured frame time, never fewer than the style's version 2 drew. What the town's things are, their words and where a tag goes are
 // data-view-things.mjs's; whether a wall stands between the eye and a tag is scene-sight.ts's.
 //
 // A town is seen from its own street, so its surfaces go dark rather than dissolve: each keeps standing where it is,
@@ -13,11 +15,11 @@
 // point that far toward the eye). Dissolved, as a district seen from above dissolves, every building's points would
 // show through every other's.
 import {
-  DATA_VIEW_STYLE, REPRESENTATION_POINTS_PER_SUBJECT, dataViewKindColour, dataViewRgb,
+  DATA_VIEW_STYLE, DATA_VIEW_STYLE_STREET, REPRESENTATION_POINTS_PER_SUBJECT, dataViewKindColour, dataViewRgb,
   type DataViewHex, type DataViewStyle, type RepresentationSubject,
 } from '../../../web/packages/atlas-core/src/index.ts';
 import type { AtlasBinding } from '../../../web/packages/atlas-react/src/playcanvas/atlas-binding.ts';
-import { createDataViewPoints } from '../../../web/packages/atlas-react/src/playcanvas/data-view/points.ts';
+import { DATA_VIEW_KEEP_UNIFORM, createDataViewPoints } from '../../../web/packages/atlas-react/src/playcanvas/data-view/points.ts';
 import { DataViewOverlay } from '../../../web/packages/atlas-react/src/playcanvas/data-view/overlay.ts';
 import type { LoadedGeneratedTile } from '../../../web/packages/atlas-react/src/playcanvas/generated-tile/tile-runtime.ts';
 import { meshSurfaceArea, sampledMeshSurfacePositions, staticMeshRepresentation } from '../../../web/packages/atlas-react/src/playcanvas/representation-binding.ts';
@@ -25,7 +27,7 @@ import {
   REPRESENTATION_POINTS_PER_UPDATE,
   type RepresentationPointAllocation, type RepresentationReport,
 } from '../../../web/packages/atlas-react/src/playcanvas/representation-runtime.ts';
-import { personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, townThings } from './data-view-things.mjs';
+import { keepStep, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, townThings } from './data-view-things.mjs';
 import { sceneHit, sceneSight } from './scene-sight.ts';
 import { DATA_WORDS } from './world-words.mjs';
 import './world-data-view.css';
@@ -35,8 +37,12 @@ import './world-data-view.css';
  * district seen from above, and a town is seen from its own street, where that density leaves a wall as scattered dots.
  */
 const BUILT_DENSITY = 4;
-/** The most points a town's data view draws: under the 2,187,735 the data view's frame budget measured (atlas-core). */
-const TOWN_POINTS = 1_500_000;
+/**
+ * The most points a town's data view draws: three times the 1,500,000 it drew before version 3 of the style, which stays
+ * the least it draws (TODAY_POINTS) when a GPU's frame time steps its share down.
+ */
+const TOWN_POINTS = 4_500_000;
+const TODAY_POINTS = 1_500_000;
 /** Ground beyond this many metres from the eye when the view opens gets no points: it is beyond what a tag reaches. */
 const GROUND_REACH = 240;
 /**
@@ -148,7 +154,7 @@ function corners(min: Vec, max: Vec): readonly (readonly [number, number, number
 
 const smooth = (t: number): number => { const k = Math.min(1, Math.max(0, t)); return k * k * (3 - 2 * k); };
 
-export function mountDataView({ host, binding, people = null, onOpen = () => {}, style = DATA_VIEW_STYLE }: {
+export function mountDataView({ host, binding, people = null, onOpen = () => {}, style = DATA_VIEW_STYLE_STREET }: {
   readonly host: HTMLElement;
   readonly binding: AtlasBinding;
   /** Who lives here, or null where nobody does. */
@@ -198,6 +204,12 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
   // ---------- State: where the slider stands, where it is going, what is drawn ----------
   let mix = 0, shownMix = -1, target = 0, glide: { from: number; to: number; start: number } | null = null;
   let held: Held[] = [], queue: Planned[] = [], allocated = 0;
+  // The GPU's share of the points (every data view draw's one keep value), the least it may step down to, and the frame
+  // times it is stepped by.
+  let keep = 1, keepFloor = 1, downAt = -Infinity, stepAt = -Infinity, lastFrame: number | null = null;
+  let tried: { keep: number; slow: number } | null = null, heldUntil = -Infinity;
+  const intervals: number[] = [];
+  const setKeep = (share: number): void => { keep = share; binding.device.scope.resolve(DATA_VIEW_KEEP_UNIFORM).setValue(share); };
   let things: readonly Thing[] = [], near: readonly Thing[] = [], nearAt = -Infinity;
   let kinds: ReturnType<typeof pointKinds> | null = null;
   let overlay: DataViewOverlay | null = null;
@@ -261,7 +273,13 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
       : one.area * style.points.densityPerSquareMetre * (one.surface === 'ground' ? 1 : BUILT_DENSITY);
     const total = found.reduce((sum, one) => sum + wanted(one), 0);
     const scale = total > TOWN_POINTS ? TOWN_POINTS / total : 1;
-    return found.map((one) => ({ instance: one.instance, surface: one.surface, count: Math.min(REPRESENTATION_POINTS_PER_SUBJECT, Math.round(wanted(one) * scale)) }));
+    const planned = found.map((one) => ({ instance: one.instance, surface: one.surface, count: Math.min(REPRESENTATION_POINTS_PER_SUBJECT, Math.round(wanted(one) * scale)) }));
+    // The least share a GPU steps down to: as many points as version 2 of the style drew here, within its own cap.
+    const before = DATA_VIEW_STYLE.points.densityPerSquareMetre / style.points.densityPerSquareMetre;
+    const today = Math.min(TODAY_POINTS, total * before);
+    const drawn = planned.reduce((sum, one) => sum + one.count, 0);
+    keepFloor = drawn > 0 ? Math.min(1, today / drawn) : 1;
+    return planned;
   }
 
   /** Borrows one surface: its dark copy, and its points grouped by the kind of record each stands on. */
@@ -311,6 +329,7 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     const hit = sceneHit(binding.app);
     sight = { face: sceneSight(hit, OWN.face), top: sceneSight(hit, OWN.top), person: sceneSight(hit, OWN.person), line: sceneSight(hit, OWN.line) };
     queue = plan(at);
+    setKeep(1); intervals.length = 0; downAt = -Infinity; stepAt = -Infinity; tried = null; heldUntil = -Infinity;
     overlay = new DataViewOverlay({
       device: binding.device, app: binding.app, camera: binding.camera,
       report: () => report(),
@@ -329,6 +348,7 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     for (const dark of darks.values()) dark.copy.destroy();
     darks.clear();
     held = []; queue = []; allocated = 0; things = []; near = []; nearAt = -Infinity; kinds = null; sight = null;
+    setKeep(1); intervals.length = 0;
     overlay?.destroy(); overlay = null;
     seen.clear();
     said.clear();
@@ -397,7 +417,10 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     }
     if (tag.dataset.text !== text) {
       tag.dataset.text = text;
-      tag.replaceChildren(...lines.map((line, index) => {
+      // The product's own marker before the words (the landing page's upright mark), in the kind's colour.
+      const mark = document.createElement('span');
+      mark.className = 'wu-data-mark';
+      tag.replaceChildren(mark, ...lines.map((line, index) => {
         const made = document.createElement('span');
         made.className = index === 0 ? 'wu-data-line' : 'wu-data-line wu-data-under';
         made.textContent = line;
@@ -555,6 +578,19 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
         binding.invalidate();
       }
       drawTags(now);
+      // The GPU's share, stepped by the frame times measured once every surface is drawn and the town is mostly data;
+      // a step down that leaves the frames as slow is taken back (keepStep), so a page slow for other reasons keeps them.
+      if (overlay !== null && queue.length === 0 && mix >= 0.5 && lastFrame !== null) {
+        intervals.push(now - lastFrame);
+        if (intervals.length > 90) intervals.shift();
+        if (now - stepAt >= 1000) {
+          stepAt = now;
+          const next = keepStep({ keep, floor: keepFloor, intervals, now, downAt, tried, heldUntil });
+          downAt = next.downAt; tried = next.tried; heldUntil = next.heldUntil;
+          if (next.keep !== keep) { setKeep(next.keep); intervals.length = 0; binding.invalidate(); }
+        }
+      } else intervals.length = 0;
+      lastFrame = now;
       // Back at the world with the card closing: everything is put back and let go.
       if (target === 0 && glide === null && mix === 0 && overlay !== null) {
         card.hidden = true;

@@ -6,7 +6,7 @@ import {
   type RepresentationSubject,
 } from '@exulanica/atlas-core';
 import type { RepresentationReport } from '../representation-runtime.js';
-import { DATA_VIEW_TIME_UNIFORM } from './points.js';
+import { DATA_VIEW_CLOCK_UNIFORM, DATA_VIEW_TIME_UNIFORM } from './points.js';
 import {
   BOX_EDGES,
   TOP_CORNERS,
@@ -73,6 +73,21 @@ fn fragmentMain(input : FragmentInput) -> FragmentOutput {
 }
 `;
 
+/**
+ * The twinkle's clock for one drawn frame, in seconds: running while a style that twinkles shows points, and null (the
+ * points held still) under reduced motion, for a style without a twinkle, or while no points show.
+ */
+export function dataViewClockSeconds(
+  style: DataViewStyle,
+  report: Pick<RepresentationReport, 'subjects'>,
+  reducedMotion: boolean,
+  nowMs: number,
+): number | null {
+  const twinkling = (style.points.twinkle?.depth ?? 0) > 0 && !reducedMotion
+    && report.subjects.some(entry => entry.allocatedPoints > 0 && entry.resolved.pointWeight > 0);
+  return twinkling ? (nowMs / 1000) % 1024 : null;
+}
+
 /** Ahead of every real distance and below the draw bucket step, so the veil sorts first. */
 const VEIL_SORT_DISTANCE = 1e8;
 
@@ -116,8 +131,10 @@ export class DataViewOverlay {
     const moving = dashing && this.#style.dashes.bandsPerSecond > 0 && !this.#host.reducedMotion();
     const time = moving ? (performance.now() / 1000) * this.#style.dashes.bandsPerSecond : 0;
     this.#host.device.scope.resolve(DATA_VIEW_TIME_UNIFORM).setValue(time % 1024);
-    // A moving band needs the next frame drawn too; a still view draws only when something changes.
-    if (moving) this.#host.invalidate();
+    const clock = dataViewClockSeconds(this.#style, report, this.#host.reducedMotion(), performance.now());
+    this.#host.device.scope.resolve(DATA_VIEW_CLOCK_UNIFORM).setValue(clock ?? 0);
+    // A moving band or a twinkle needs the next frame drawn too; a still view draws only when something changes.
+    if (moving || clock !== null) this.#host.invalidate();
   }
 
   destroy(): void {

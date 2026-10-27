@@ -64,6 +64,10 @@
  *   uDataViewTime   float band phase in bands, written once per drawn frame by the data view
  *   uDataViewThin   vec4  x distance within which every sample is drawn, y most gain a thinned
  *                         sample may take, zw unused
+ *   uDataViewLife   vec4  x twinkle depth (0 is still), y twinkle period seconds, zw unused
+ *   uDataViewClock  float seconds for the twinkle, written once per drawn frame by the data view
+ *                         (held at 0 under reduced motion)
+ *   uDataViewKeep   float share of samples drawn, 0 to 1, one value for every data view draw
  *
  * and reads the engine's own `matrix_projection` and `uScreenSize`, so a sprite keeps its world
  * width through whatever camera draws it. Without the define none of this is compiled, and the
@@ -140,6 +144,9 @@ uniform vec4 uDataViewGlow;
 uniform vec4 uDataViewLook;
 uniform vec4 uDataViewThin;
 uniform float uDataViewTime;
+uniform vec4 uDataViewLife;
+uniform float uDataViewClock;
+uniform float uDataViewKeep;
 varying float vDataBand;
 varying float vDataGain;
 
@@ -284,7 +291,20 @@ void main(void) {
         vDataGain = 0.0;
         return;
     }
+    // A weaker GPU's share: a stable subset by a second hash of the same index, so fewer samples are
+    // drawn and never others; 1 draws every one.
+    if (dataViewHash(gl_VertexID ^ 0x5bd1e995) >= uDataViewKeep) {
+        gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+        gl_PointSize = 0.0;
+        vDataGain = 0.0;
+        return;
+    }
     vDataGain = min(uDataViewThin.y, inversesqrt(max(keep, 0.0001)));
+    // The twinkle: brightness only, each sample on its own phase and a period near uDataViewLife.y;
+    // the sample never moves. Depth 0, or a clock held at 0, leaves it still.
+    float lifePhase = dataViewHash(gl_VertexID ^ 0x27d4eb2d);
+    float lifePeriod = uDataViewLife.y * (0.75 + 0.5 * dataViewHash(gl_VertexID ^ 0x165667b1));
+    vDataGain *= 1.0 + uDataViewLife.x * sin(6.2831853 * (uDataViewClock / max(lifePeriod, 0.001) + lifePhase));
 #endif
 
     float fogAmount = 0.0;

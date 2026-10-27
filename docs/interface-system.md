@@ -424,8 +424,10 @@ its workspace made) lives among them and is seen by its own tag, never in the co
 
 In a made town, X opens the data view (`tools/previews/world-workspace/world-data-view.ts`), listed on the keys
 card only where it works: a small card with one slider from World to Data. As it moves, the town's surfaces go
-dark where they stand and glowing points sampled from them take their place, each coloured by the kind of record
-it stands on; each thing the town's own tile records name gets a thin box and a tag in the shipped catalogs' words
+dark where they stand and fine glowing points sampled from them take their place, each coloured by the kind of
+record it stands on and twinkling faintly in place (held still where the reader asks for reduced motion); a GPU
+that cannot draw them all at its frame rate draws a stable share, never fewer than before;
+each thing the town's own tile records name gets a thin box and a tag in the shipped catalogs' words
 (a premises by its use, a street tree by its species, street furniture by its class, a street by its name), and
 each person a tag with their name and, under it, the model that decides for them where one does. A creature made
 in Make a creature is tagged from its kind's own record: its name and, under it, the model that made it, or the

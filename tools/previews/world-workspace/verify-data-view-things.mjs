@@ -1,7 +1,7 @@
 // Checks data-view-things.mjs in Node: a made town's things and their words from its tiles' records, which kind
 // of record a point stands on, where a tag hangs and which tags show. Run: node verify-data-view-things.mjs
 import assert from 'node:assert/strict';
-import { boxOfExtent, creatureWords, kindMaker, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, thingWords, townThings } from './data-view-things.mjs';
+import { boxOfExtent, creatureWords, keepStep, kindMaker, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, thingWords, townThings } from './data-view-things.mjs';
 
 const extent = (x0, y0, z0, x1, y1, z1) => ({ min_x_mm: x0, min_y_mm: y0, min_z_mm: z0, max_x_mm: x1, max_y_mm: y1, max_z_mm: z1 });
 const record = (kind, identity, fields, membership = 'owned') => ({ kind, identity, membership, fields: { identity, ...fields } });
@@ -93,6 +93,24 @@ assert.deepEqual(shown.map((one) => one.key), ['near', 'apart']);
 assert.deepEqual(personLines({ name: 'Ines Varga', model: 'Nemotron 3 Super 120B' }), ['Ines Varga', 'Nemotron 3 Super 120B']);
 assert.deepEqual(personLines({ name: 'Ines Varga', model: null }), ['Ines Varga']);
 assert.deepEqual(personLines({ name: '' }), ['someone']);
+
+// The GPU's share of the points, by measured frame time: down a quarter while a frame in four is slow, never below the
+// floor; a step down kept only where the next frames are quicker, else undone and none tried for 30 s; up a seventh once
+// nine in ten are quick and four seconds have passed since the last step down; too few frames change nothing.
+const frames = (ms, count = 60) => Array.from({ length: count }, () => ms);
+const slow = [...frames(16.7, 40), ...frames(33.3, 20)];
+const step = (fields) => keepStep({ keep: 1, floor: 1 / 3, now: 9000, downAt: -Infinity, ...fields });
+assert.deepEqual(step({ intervals: frames(16.7) }), { keep: 1, downAt: -Infinity, tried: null, heldUntil: -Infinity });
+assert.deepEqual(step({ intervals: slow }), { keep: 0.75, downAt: 9000, tried: { keep: 1, slow: 33.3 }, heldUntil: -Infinity });
+assert.deepEqual(step({ keep: 0.75, intervals: frames(16.7), tried: { keep: 1, slow: 33.3 }, downAt: 9000 }), { keep: 0.75, downAt: 9000, tried: null, heldUntil: -Infinity });
+assert.deepEqual(step({ keep: 0.75, intervals: slow, tried: { keep: 1, slow: 33.3 }, downAt: 8000 }), { keep: 1, downAt: 8000, tried: null, heldUntil: 39000 });
+assert.deepEqual(step({ intervals: slow, heldUntil: 39000 }), { keep: 1, downAt: -Infinity, tried: null, heldUntil: 39000 });
+assert.deepEqual(step({ keep: 0.4, intervals: frames(33.3), downAt: 0 }), { keep: 1 / 3, downAt: 9000, tried: { keep: 0.4, slow: 33.3 }, heldUntil: -Infinity });
+assert.deepEqual(step({ keep: 1 / 3, intervals: frames(33.3), downAt: 0 }), { keep: 1 / 3, downAt: 0, tried: null, heldUntil: -Infinity });
+assert.deepEqual(step({ keep: 0.5, intervals: frames(16.7), downAt: 6000 }), { keep: 0.5, downAt: 6000, tried: null, heldUntil: -Infinity });
+assert.deepEqual(step({ keep: 0.5, intervals: frames(16.7), downAt: 4000 }), { keep: 4 / 7, downAt: 4000, tried: null, heldUntil: -Infinity });
+assert.deepEqual(step({ keep: 0.95, intervals: frames(8.3), downAt: 0 }), { keep: 1, downAt: 0, tried: null, heldUntil: -Infinity });
+assert.deepEqual(step({ keep: 0.75, intervals: frames(33.3, 19), downAt: 0 }), { keep: 0.75, downAt: 0, tried: null, heldUntil: -Infinity });
 
 // A creature its workspace made, from its kind's own record: its name over the model the record's origin says made it,
 // as the models read names that model; where the record names no model, or no read names it, the plain words build

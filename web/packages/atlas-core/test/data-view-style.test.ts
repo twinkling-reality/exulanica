@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   DATA_VIEW_STYLE,
+  DATA_VIEW_STYLE_STREET,
   DATA_VIEW_STYLE_V1,
   DATA_VIEW_STYLE_V2,
+  DATA_VIEW_STYLE_V3,
   dataViewKindColour,
   dataViewRgb,
   dataViewStyle,
@@ -47,7 +49,8 @@ describe('data view style descriptor', () => {
       [value => { delete value['palette']['kind']['geometry-group']; }, /geometry-group is missing/],
       [value => { value['palette']['kind']['city.street'] = '#FFFFFF'; }, /city.street is not a lowercase/],
       [value => { for (let i = 0; i < 130; i += 1) value['palette']['kind'][`city.k${i}`] = '#000000'; }, /more than 128 kinds/],
-      [value => { value['version'] = 3; }, /style.version/],
+      [value => { value['version'] = 4; }, /style.version/],
+      [value => { value['version'] = 3; }, /style.points.twinkle is missing/],
     ];
     for (const [change, message] of cases) {
       const value = copyV2();
@@ -57,6 +60,31 @@ describe('data view style descriptor', () => {
     const v1 = copy();
     v1['palette']['kind']['city.street'] = '#ffffff';
     expect(() => dataViewStyle(v1)).toThrow('palette.kind.city.street is not a known key');
+  });
+
+  it('validates version 3, a town from its own street: finer, three times denser points that twinkle, and no twinkle before it', () => {
+    const v3 = (): Record<string, any> => JSON.parse(JSON.stringify(DATA_VIEW_STYLE_V3));
+    expect(dataViewStyle(v3())).toEqual(DATA_VIEW_STYLE_STREET);
+    expect(dataViewStyleName(DATA_VIEW_STYLE_STREET)).toBe('exulanica.data-view@3');
+    expect(DATA_VIEW_STYLE_STREET.points.twinkle).toEqual({ depth: 0.12, periodSeconds: 4 });
+    expect(DATA_VIEW_STYLE_STREET.points.densityPerSquareMetre).toBe(3 * DATA_VIEW_STYLE.points.densityPerSquareMetre);
+    expect(DATA_VIEW_STYLE_STREET.points.maxPixels).toBeLessThan(DATA_VIEW_STYLE.points.maxPixels);
+    expect(DATA_VIEW_STYLE_STREET.palette).toEqual(DATA_VIEW_STYLE.palette);
+    expect(DATA_VIEW_STYLE.points.twinkle).toBeUndefined();
+    const cases: [(value: Record<string, any>) => void, RegExp][] = [
+      [value => { delete value['points']['twinkle']; }, /style.points.twinkle is missing/],
+      [value => { value['points']['twinkle']['depth'] = 0.9; }, /style.points.twinkle.depth is not a number from 0 to 0.5/],
+      [value => { value['points']['twinkle']['periodSeconds'] = 0; }, /style.points.twinkle.periodSeconds/],
+      [value => { value['points']['twinkle']['sweep'] = 1; }, /style.points.twinkle.sweep is not a known key/],
+    ];
+    for (const [change, message] of cases) {
+      const value = v3();
+      change(value);
+      expect(() => dataViewStyle(value)).toThrow(message);
+    }
+    const early = copyV2();
+    early['points']['twinkle'] = { depth: 0.1, periodSeconds: 4 };
+    expect(() => dataViewStyle(early)).toThrow('style.points.twinkle is not a known key');
   });
 
   it('validates version 1 into one frozen, JSON-shaped look with a name for display records', () => {

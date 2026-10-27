@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
-import { DATA_VIEW_STYLE, dataViewRgb } from '@exulanica/atlas-core';
-import { DATA_VIEW_VERTEX_BYTES, createDataViewPoints } from '../../src/playcanvas/data-view/points.js';
+import { DATA_VIEW_STYLE, DATA_VIEW_STYLE_STREET, dataViewRgb } from '@exulanica/atlas-core';
+import { dataViewClockSeconds } from '../../src/playcanvas/data-view/overlay.js';
+import {
+  DATA_VIEW_CLOCK_UNIFORM, DATA_VIEW_KEEP_UNIFORM, DATA_VIEW_VERTEX_BYTES, createDataViewPoints,
+} from '../../src/playcanvas/data-view/points.js';
 import { POINT_FRAGMENT_GLSL, POINT_VERTEX_GLSL } from '../../src/playcanvas/point-shader.js';
 
 function device() {
@@ -60,6 +63,44 @@ describe('data view point draw', () => {
       expect(createDataViewPoints({ device: graphics, node, positions, style: DATA_VIEW_STYLE, subjectId: 's' })).toBeNull();
     }
     app.destroy();
+  });
+
+  it('twinkles as its style says, on one clock and one kept share for every data view draw', () => {
+    const { app, graphics } = device();
+    const node = new pc.Entity('borrowed');
+    app.root.addChild(node);
+    const life = (style: typeof DATA_VIEW_STYLE) => {
+      const points = createDataViewPoints({ device: graphics, node, positions: new Float32Array([0, 0, 0]), style, subjectId: `s${style.version}` })!;
+      const instance = (node.findByName(`data-view-points:s${style.version}`) as pc.Entity).render!.meshInstances[0]!;
+      const value = [...((instance.material as pc.ShaderMaterial).getParameter('uDataViewLife') as { data: Float32Array }).data];
+      points.destroy();
+      return value;
+    };
+    expect(life(DATA_VIEW_STYLE_STREET).map(Math.fround)).toEqual([0.12, 4, 0, 0].map(Math.fround));
+    expect(life(DATA_VIEW_STYLE).map(Math.fround)).toEqual([0, 1, 0, 0]);
+    // Filled once when missing (still, and every sample), never overwritten: the host owns both.
+    expect(graphics.scope.resolve(DATA_VIEW_CLOCK_UNIFORM).value).toBe(0);
+    expect(graphics.scope.resolve(DATA_VIEW_KEEP_UNIFORM).value).toBe(1);
+    graphics.scope.resolve(DATA_VIEW_KEEP_UNIFORM).setValue(0.5);
+    life(DATA_VIEW_STYLE_STREET);
+    expect(graphics.scope.resolve(DATA_VIEW_KEEP_UNIFORM).value).toBe(0.5);
+    // The clock runs only where a twinkling style shows points, and never under reduced motion.
+    const shown = { subjects: [{ allocatedPoints: 10, resolved: { pointWeight: 0.5 } }] } as unknown as Parameters<typeof dataViewClockSeconds>[1];
+    const hidden = { subjects: [{ allocatedPoints: 10, resolved: { pointWeight: 0 } }] } as unknown as Parameters<typeof dataViewClockSeconds>[1];
+    expect(dataViewClockSeconds(DATA_VIEW_STYLE_STREET, shown, false, 2_500)).toBe(2.5);
+    expect(dataViewClockSeconds(DATA_VIEW_STYLE_STREET, shown, false, 1_026_000)).toBe(2);
+    expect(dataViewClockSeconds(DATA_VIEW_STYLE_STREET, shown, true, 2_500)).toBeNull();
+    expect(dataViewClockSeconds(DATA_VIEW_STYLE_STREET, hidden, false, 2_500)).toBeNull();
+    expect(dataViewClockSeconds(DATA_VIEW_STYLE, shown, false, 2_500)).toBeNull();
+    app.destroy();
+  });
+
+  it('draws a stable share of samples and twinkles their brightness alone, never their place', () => {
+    const data = POINT_VERTEX_GLSL.slice(POINT_VERTEX_GLSL.indexOf('if (dataViewHash(gl_VertexID) >= keep)'));
+    expect(data).toContain('>= uDataViewKeep');
+    const twinkle = data.slice(data.indexOf('lifePhase'), data.indexOf('#endif'));
+    expect(twinkle).toContain('vDataGain *=');
+    expect(twinkle).not.toMatch(/gl_Position|worldPos|gl_PointSize/);
   });
 
   it('keeps the point-map program unchanged unless the data view asks for its define', () => {

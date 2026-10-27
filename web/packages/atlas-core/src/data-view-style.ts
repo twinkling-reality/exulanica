@@ -89,6 +89,14 @@ export interface DataViewStyle {
       readonly keepAllWithinMetres: number;
       readonly maxGain: number;
     };
+    /**
+     * From version 3: each point's brightness drifts by up to `depth` of itself, on its own phase and
+     * a period around `periodSeconds`, and never moves. Reduced motion holds every point still.
+     */
+    readonly twinkle?: {
+      readonly depth: number;
+      readonly periodSeconds: number;
+    };
   };
   /** The visualization treatment: short vertical dashes with a slow falling band. */
   readonly dashes: {
@@ -229,6 +237,29 @@ export const DATA_VIEW_STYLE_V2 = {
   },
 } as const;
 
+/**
+ * Version 3, a town seen from its own street (the world workspace's data view). Finer points, three
+ * times as many to the square metre, each a small soft core with a faint halo: about a pixel and a
+ * half across from 50 m out, growing to 4.5 px within 16 m of the eye, where the street at a grazing
+ * angle spreads its samples apart; and a slow faint twinkle. The tags' ground is quieter. Everything
+ * else is version 2's.
+ */
+export const DATA_VIEW_STYLE_V3 = {
+  ...DATA_VIEW_STYLE_V2,
+  version: 3,
+  points: {
+    ...DATA_VIEW_STYLE_V2.points,
+    sizeMetres: 0.08,
+    minPixels: 1,
+    maxPixels: 4.5,
+    densityPerSquareMetre: 12,
+    intensity: 1,
+    glow: { core: 0.2, falloff: 5, halo: 0.4 },
+    twinkle: { depth: 0.12, periodSeconds: 4 },
+  },
+  tags: { ...DATA_VIEW_STYLE_V2.tags, backgroundOpacity: 0.5 },
+} as const;
+
 const HEX = /^#[0-9a-f]{6}$/;
 
 function fail(path: string, why: string): never {
@@ -272,12 +303,13 @@ function text(value: unknown, path: string, maxLength: number, pattern: RegExp):
 export function dataViewStyle(value: unknown): DataViewStyle {
   const root = record(value, 'style', ['id', 'version', 'ground', 'points', 'dashes', 'palette', 'boxes', 'links', 'tags']);
   if (root['id'] !== 'exulanica.data-view') fail('style.id', 'is not exulanica.data-view');
-  const version = number(root['version'], 'style.version', 1, 2, true);
+  const version = number(root['version'], 'style.version', 1, 3, true);
   const ground = record(root['ground'], 'style.ground', ['colour', 'strength', 'rise']);
   const points = record(root['points'], 'style.points', [
     'sizeMetres', 'minPixels', 'maxPixels', 'densityPerSquareMetre', 'intensity', 'rise', 'pullMetres',
-    'selectedGain', 'unselectedGain', 'glow', 'depthFade', 'thinning',
+    'selectedGain', 'unselectedGain', 'glow', 'depthFade', 'thinning', ...(version >= 3 ? ['twinkle'] : []),
   ]);
+  const twinkle = version >= 3 ? record(points['twinkle'], 'style.points.twinkle', ['depth', 'periodSeconds']) : null;
   const glow = record(points['glow'], 'style.points.glow', ['core', 'falloff', 'halo']);
   const fade = record(points['depthFade'], 'style.points.depthFade', ['startMetres', 'endMetres', 'density']);
   const thinning = record(points['thinning'], 'style.points.thinning', ['keepAllWithinMetres', 'maxGain']);
@@ -329,6 +361,12 @@ export function dataViewStyle(value: unknown): DataViewStyle {
         keepAllWithinMetres: number(thinning['keepAllWithinMetres'], 'style.points.thinning.keepAllWithinMetres', 1, 100_000),
         maxGain: number(thinning['maxGain'], 'style.points.thinning.maxGain', 1, 16),
       },
+      ...(twinkle === null ? {} : {
+        twinkle: {
+          depth: number(twinkle['depth'], 'style.points.twinkle.depth', 0, 0.5),
+          periodSeconds: number(twinkle['periodSeconds'], 'style.points.twinkle.periodSeconds', 0.5, 60),
+        },
+      }),
     },
     dashes: {
       halfWidth: number(dashes['halfWidth'], 'style.dashes.halfWidth', 0.01, 1),
@@ -385,6 +423,9 @@ function deepFreeze<T>(value: T): T {
 
 /** The descriptor every data view draw uses. Validated once, here. */
 export const DATA_VIEW_STYLE: DataViewStyle = dataViewStyle(DATA_VIEW_STYLE_V2);
+
+/** Version 3, validated once, here: what a town seen from its own street draws (the world workspace). */
+export const DATA_VIEW_STYLE_STREET: DataViewStyle = dataViewStyle(DATA_VIEW_STYLE_V3);
 
 /** `id@version`, the form a display record carries. */
 export function dataViewStyleName(style: DataViewStyle): string {

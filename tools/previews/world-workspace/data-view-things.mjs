@@ -253,6 +253,28 @@ export function personLines({ name, model = null }) {
 }
 
 /**
+ * The share of a town's points the GPU draws, stepped by its measured frame time (`intervals`: ms between drawn frames
+ * since the last step): down by a quarter while one frame in four takes longer than `slowMs`, never below `floor` (the
+ * share that draws as many points as before version 3 of the style); up by a seventh, never above 1, once nine in ten
+ * come within `fastMs` and `settleMs` have passed since it last stepped down. A step down is a trial (`tried`): where
+ * the next frames are not quicker by a millisecond, the points were not what made them slow, so the share goes back
+ * and no step down is tried again for `holdMs`. Fewer than 20 intervals change nothing.
+ */
+export function keepStep({ keep, floor, intervals, now, downAt, tried = null, heldUntil = -Infinity, slowMs = 18.5, fastMs = 17.2, settleMs = 4000, holdMs = 30000 }) {
+  const same = { keep, downAt, tried, heldUntil };
+  if (intervals.length < 20) return same;
+  const sorted = [...intervals].sort((a, b) => a - b);
+  const share = (q) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
+  if (tried !== null) {
+    if (share(0.75) < tried.slow - 1) return { keep, downAt, tried: null, heldUntil };
+    return { keep: tried.keep, downAt, tried: null, heldUntil: now + holdMs };
+  }
+  if (share(0.75) > slowMs && keep > floor && now >= heldUntil) return { keep: Math.max(floor, keep * 0.75), downAt: now, tried: { keep, slow: share(0.75) }, heldUntil };
+  if (share(0.9) <= fastMs && keep < 1 && now - downAt >= settleMs) return { keep: Math.min(1, keep * 8 / 7), downAt, tried: null, heldUntil };
+  return same;
+}
+
+/**
  * The model a kind's own record says made it: its origin's maker (exulanica.origin/v1's `by`) where a model made the
  * kind and the record names which, by provider and identifier; null where it names none (an older record names its
  * model only through its receipts) or a person or a program made it.

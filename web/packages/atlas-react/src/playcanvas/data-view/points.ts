@@ -69,6 +69,10 @@ const NEUTRAL_SEGMENTS = (() => {
 
 /** The time uniform the data view writes once per drawn frame, shared by every data view draw. */
 export const DATA_VIEW_TIME_UNIFORM = 'uDataViewTime';
+/** The twinkle's clock in seconds, written once per drawn frame by the data view; held at 0 under reduced motion. */
+export const DATA_VIEW_CLOCK_UNIFORM = 'uDataViewClock';
+/** The share of samples every data view draw keeps, 0 to 1: a host steps it down on a GPU that cannot draw them all. */
+export const DATA_VIEW_KEEP_UNIFORM = 'uDataViewKeep';
 
 export interface DataViewPointsOptions {
   readonly device: pc.GraphicsDevice;
@@ -122,6 +126,11 @@ export function createDataViewPoints(options: DataViewPointsOptions): Representa
   // per drawn frame). A material parameter would shadow it, so only a missing value is filled.
   const time = device.scope.resolve(DATA_VIEW_TIME_UNIFORM);
   if (time.value === null || time.value === undefined) time.setValue(0);
+  // The twinkle's clock and the kept share are device-scope values of the same kind: still, and every sample.
+  const clock = device.scope.resolve(DATA_VIEW_CLOCK_UNIFORM);
+  if (clock.value === null || clock.value === undefined) clock.setValue(0);
+  const keep = device.scope.resolve(DATA_VIEW_KEEP_UNIFORM);
+  if (keep.value === null || keep.value === undefined) keep.setValue(1);
   const material = new pc.ShaderMaterial(dataViewShaderDesc() as ConstructorParameters<typeof pc.ShaderMaterial>[0]);
   material.blendType = pc.BLEND_ADDITIVEALPHA;
   material.depthWrite = false;
@@ -144,6 +153,8 @@ export function createDataViewPoints(options: DataViewPointsOptions): Representa
   material.setParameter('uDataViewGlow', [
     style.points.glow.core, style.points.glow.falloff, style.points.glow.halo, style.points.pullMetres,
   ]);
+  // A style before version 3 has no twinkle: depth 0 draws every sample at its one brightness.
+  material.setParameter('uDataViewLife', [style.points.twinkle?.depth ?? 0, style.points.twinkle?.periodSeconds ?? 1, 0, 0]);
   const palette = new Float32Array(16);
   const dataView = new Float32Array(4);
   const look = new Float32Array(4);

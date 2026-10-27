@@ -1,6 +1,8 @@
 /* The data view (world-data-view.ts): its card where the keys card shows, over the keys button, and its tags over the
-   world. The tags' colours are the data view style's, handed in as --data-text and --data-ground; each tag's edge is
-   the colour of the kind of record it names (--data-kind). */
+   world. The tags' colours are the data view style's, handed in as --data-text and --data-ground; before each tag's
+   words stands the product's own marker (the landing page's .nav-control-mark: 5 by 13, square, at .8, 10 apart) in
+   the colour of the kind of record it names (--data-kind). A thing's words are monospace capitals, as Create's data
+   lines are; a person's name is the sans face, with the model that decides for them in monospace capitals under it. */
 .wu-data-card { position: absolute; right: var(--edge-inset); bottom: calc(var(--edge-inset) + var(--pill-height) + var(--space-8));
   display: grid; gap: var(--space-16); min-width: calc(280 * var(--u)); padding: var(--space-16); border-radius: calc(16 * var(--u));
   font: 400 var(--pill-text-small)/1 var(--font-sans); color: var(--ink); pointer-events: auto; animation: wu-fade var(--t-reveal) var(--ease) both; }
@@ -18,10 +20,17 @@
 .wu-data-range input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 4px; }
 
 .wu-data-tags { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.wu-data-tag { position: absolute; left: 0; top: 0; display: grid; gap: calc(3 * var(--u)); padding: calc(5 * var(--u)) calc(8 * var(--u)) calc(5 * var(--u)) calc(11 * var(--u));
-  border-radius: calc(4 * var(--u)); background: var(--data-ground); color: var(--data-text); box-shadow: inset calc(3 * var(--u)) 0 0 var(--data-kind);
-  font: 500 max(12px, calc(15 * var(--u)))/1.15 var(--font-mono); white-space: nowrap; will-change: transform, opacity; }
-.wu-data-under { font-size: max(11px, calc(13 * var(--u))); opacity: .8; }
+.wu-data-tag { position: absolute; left: 0; top: 0; display: grid; grid-template-columns: auto auto; align-items: center;
+  column-gap: max(8px, calc(10 * var(--u))); row-gap: calc(2 * var(--u)); padding: calc(5 * var(--u)) calc(10 * var(--u)) calc(5 * var(--u)) calc(9 * var(--u));
+  border-radius: calc(4 * var(--u)); background: var(--data-ground); color: var(--data-text);
+  font: 450 max(11px, calc(13 * var(--u)))/1.4 var(--font-mono); letter-spacing: .08em; text-transform: uppercase;
+  white-space: nowrap; will-change: transform, opacity; }
+.wu-data-mark { grid-row: 1; grid-column: 1; width: max(4px, calc(5 * var(--u))); height: max(10px, calc(13 * var(--u)));
+  background: var(--data-kind); opacity: .8; }
+.wu-data-line { grid-column: 2; }
+.wu-data-person > .wu-data-line:not(.wu-data-under) { font: 500 max(13px, calc(16 * var(--u)))/1.25 var(--font-sans);
+  letter-spacing: 0; text-transform: none; }
+.wu-data-under { font: 450 max(10px, calc(11 * var(--u)))/1.4 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; opacity: .8; }
 
 @media (prefers-reduced-motion: reduce) {
   .wu-data-card { animation-duration: 120ms; }

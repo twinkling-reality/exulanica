@@ -254,8 +254,10 @@ export {
 export type { DataViewHex, DataViewKindKey, DataViewOriginKey, DataViewStyle } from './data-view-style.js';
 export {
   DATA_VIEW_STYLE,
+  DATA_VIEW_STYLE_STREET,
   DATA_VIEW_STYLE_V1,
   DATA_VIEW_STYLE_V2,
+  DATA_VIEW_STYLE_V3,
   dataViewKindColour,
   dataViewRgb,
   dataViewStyle,
