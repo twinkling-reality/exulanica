@@ -39655,7 +39655,7 @@
      "maximum_usd"
     ],
     "title": "NotesOfferView",
-    "description": "Whether this person may ask for web notes with a draft here, and what they add.\n\n``offered`` where the references read offers web notes to this workspace and this person may\nask for them (a guest never holds ``references.request``); else ``code`` names why, as the\nreferences read names it, or ``references_not_permitted``. ``searches_at_most`` is the\nplanner's limit, the most searches one request sends; ``maximum_usd`` the most its two model\ncalls may add at current rates (``world_draft_offer.NOTES_PATHS``), or null where no current\nrate prices them, when notes are not offered either."
+    "description": "Whether this person may ask for web notes with a draft here, and what they add.\n\n``offered`` where the references read offers web notes to this workspace and this person may\nask for them (a guest holds ``references.request`` only where web notes are offered to\neveryone); else ``code`` names why, as the references read names it, or\n``references_not_permitted``. ``searches_at_most`` is the\nplanner's limit, the most searches one request sends; ``maximum_usd`` the most its two model\ncalls may add at current rates (``world_draft_offer.NOTES_PATHS``), or null where no current\nrate prices them, when notes are not offered either."
    },
    "ObjectActivityView": {
     "properties": {
