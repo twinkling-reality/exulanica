@@ -139,7 +139,7 @@ def test_every_footway_station_edge_climbs_no_more_than_one_step() -> None:
         assert max(abs(b - a) for a, b in pairwise(stations)) <= FIGURES.step_mm, curb.identity
 
 
-@pytest.mark.parametrize("key", ["coast", "valley", "upland", "hillside", "rolling"])
+@pytest.mark.parametrize("key", ["coast", "lakeside", "valley", "upland", "hillside", "rolling"])
 def test_a_small_town_takes_every_land_recipe(key: str) -> None:
     recipe = next(recipe for recipe in land_recipes() if recipe.key == key)
     land = graded(read_land_document(dict(recipe.land)))

@@ -469,7 +469,7 @@ appearance are; that naming is planned, not built (see [Limits](#limits)).
 Where the deployment leaves it on (`EXULANICA_WORLDS_ON_LAND`, on unless set off, [deployment](deployment.md)), a
 place or a town drafted from a person's words (`POST /worlds/drafts`,
 [world kinds](world-kinds-contract.md#a-world-made-from-a-sentence)) stands on one of the land
-recipes in [`landform-recipe.v3.json`](../assets/catalogs/landform/landform-recipe.v3.json), read by
+recipes in [`landform-recipe.v4.json`](../assets/catalogs/landform/landform-recipe.v4.json), read by
 [`recipes.py`](../exulanica/grammar/landform/recipes.py). Each recipe is a whole land document, read
 by the landform reader as the catalog is read, with the words a made world's card says of it, the
 whole words that name it in a sentence, the setting's ground parts that bring it, and a reason:
@@ -477,6 +477,7 @@ whole words that name it in a sentence, the setting's ground parts that bring it
 | Recipe | Named by words such as | Brought by the setting | What it is |
 | --- | --- | --- | --- |
 | `coast` | sea, coast, beach, shore, bay | By the sea | A beach and the sea close below (the shore 25 m from the place), a terraced hill behind, and a cascade stepping down from the place's sea-facing edge, following the land to the waterline and falling into the sea there |
+| `lakeside` | lake, lakeside, lakeshore, loch | | The default's gentle land with a filled lake to the south, 440 m across and 9 m deep, its near shore 25 m from the place |
 | `valley` | valley, dale, glen | | A broad floor between two long ridges, ranges at both ends |
 | `upland` | mountains, peaks, highlands, fells | Snowfields | Rough fells and crags, peaks 1.5 to 2 km away on three sides |
 | `hillside` | hillside, hill, slope | | Rising ground under a terraced hillside, a mountain behind |
@@ -511,6 +512,11 @@ equal course would carry its last pool on to 40 m over the sea between straight 
 the sea then stands by it: measured at 1920 x 1080 from a town's seafront arrival, the shore 70 m out
 leaves no turn of the view with frontages and open water each across a third of the width (the best
 about a quarter each), and 25 m out gives both (frontages 34.8 percent, water 44.7 percent).
+Version 4 adds the lakeside, read after the coast and before the valley, so a lake named beside
+mountains or a valley stands by its lake: the default's land with its low downs to the south made a
+filled basin, its middle 245 m beyond the place's southern edge, so its water begins within 30 m of
+the place and never stands over it. No other recipe changes. A true island is not a recipe: it would
+need a shore on every side, more than the feature catalog's two.
 
 ## Land for a town made from a preset
 

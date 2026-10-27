@@ -38,6 +38,7 @@ SHIPPED = {
     "landform-grading.v2.json": "a42b2ede862b5dd9d12a8257aa08920f87c4301c2abda52d0bfbec798437f21d",
     "landform-recipe.v1.json": "3e1dd36edac2c739367431eb944c92e1971aeefc2b558c00da7cc6795ae61eca",
     "landform-recipe.v2.json": "8e805cc75d229af096aa458d34b4d98e2db2e8e08ee62972dd55eecb483ffb97",
+    "landform-recipe.v4.json": "7105e51b299af62b0d184ef45a037ae952fcd19269094d1bcf8e4f8c0bb5f845",
     "landform-surface.v1.json": "62dd3fd49c16be7c09def1996fc4b3c9ae023cb95bcf44e0019e0dec7e86e706",
     "landform-value.v1.json": "328c2b0f98b5fa7621a048916d774ef5de6b81cd68042bd58d4e0c77aeb9a9e6",
     "landform-value.v2.json": "9898e222ad0b12d8832b6a93da4a4c0146888cfd398e3b6a62ab09ba7b44512b",

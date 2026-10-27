@@ -32,6 +32,7 @@ def test_the_recipes_are_the_catalog_s_with_one_default_and_settings_that_exist(
     recipes = land_recipes()
     assert [recipe.key for recipe in recipes] == [
         "coast",
+        "lakeside",
         "valley",
         "upland",
         "hillside",
@@ -46,7 +47,7 @@ def test_the_recipes_are_the_catalog_s_with_one_default_and_settings_that_exist(
 
 
 def test_recipe_version_2_s_coast_pours_a_cascade_into_the_sea_and_version_1_reads_as_it_was():
-    first, second = land_recipes(1), land_recipes()
+    first, second = land_recipes(1), land_recipes(2)
     assert [recipe.key for recipe in first] == [recipe.key for recipe in second]
     assert [new.key for old, new in zip(first, second, strict=True) if old != new] == ["coast"]
     assert "cascade" not in {feature["kind"] for feature in first[0].land["features"]}
@@ -99,7 +100,29 @@ def test_recipe_version_3_s_coast_meets_the_sea_nearer_and_version_2_reads_as_it
                 assert all(height_at(before, frame, x, y) > 0 for y in over), (frame, pool.id)
 
 
-@pytest.mark.parametrize("key", ["coast", "valley", "upland", "hillside", "rolling"])
+def test_recipe_version_4_adds_a_lakeside_whose_lake_stands_beside_the_place():
+    """Version 4 is version 3 with the lakeside read after the coast: the default's land with its
+    low downs to the south made a filled lake, whose water begins within 45 m of the place's
+    southern edge in a town's frame and a site's, and never stands over the place."""
+    third, fourth = land_recipes(3), land_recipes(4)
+    assert [recipe for recipe in fourth if recipe.key != "lakeside"] == list(third)
+    assert [recipe.key for recipe in fourth][:3] == ["coast", "lakeside", "valley"]
+    lakeside = read_land_document(dict(_recipe("lakeside").land))
+    for width, depth in ((256_000, 128_000), (96_000, 72_000), (16_000, 20_000)):
+        frame = WorldFrame(width_mm=width, depth_mm=depth, seed="c" * 64)
+        [lake] = water_bodies(lakeside, frame)
+        assert lake.kind == "lake"
+        wet = next(
+            d
+            for d in range(0, 300_001, 5_000)
+            if height_at(lakeside, frame, width // 2, -d) <= lake.level_mm
+        )
+        assert 0 < wet <= 45_000, (width, depth, wet)
+        place = [(x, y) for x in (0, width // 2, width) for y in (0, depth // 2, depth)]
+        assert all(height_at(lakeside, frame, x, y) > lake.level_mm for x, y in place)
+
+
+@pytest.mark.parametrize("key", ["coast", "lakeside", "valley", "upland", "hillside", "rolling"])
 def test_every_recipe_takes_a_site_s_layout(key: str) -> None:
     """A recipe is land a place can be laid out on: each fixture kind is made on it."""
     for name in ("farm", "site"):
@@ -121,6 +144,9 @@ def test_every_recipe_takes_a_site_s_layout(key: str) -> None:
         ("a village in a valley under the mountains", None, "valley", "words", ["valley"]),
         ("a Hillside cafe", "sea", "hillside", "words", ["Hillside"]),
         ("a valley farm on the coast", None, "coast", "words", ["coast"]),
+        ("a lakeside town", None, "lakeside", "words", ["lakeside"]),
+        ("a village by a lake in the mountains", None, "lakeside", "words", ["lake"]),
+        ("a mere hamlet", None, "rolling", "default", []),
         ("a garden with no sea in sight", None, "rolling", "default", []),
         ("a farm far from the mountains", None, "rolling", "default", []),
         ("a town without a beach", "snowfield", "upland", "setting", []),
@@ -151,6 +177,9 @@ def test_the_land_answers_only_a_phrase_that_names_it_alone() -> None:
     assert not said_by_land("sea with flying boats", _recipe("coast"))
     assert not said_by_land("in a valley", _recipe("coast"))
     assert not said_by_land("on the", _recipe("coast"))
+    assert said_by_land("lakeside", _recipe("lakeside"))
+    assert said_by_land("by the lake", _recipe("lakeside"))
+    assert not said_by_land("a lake with swans", _recipe("lakeside"))
 
 
 def test_land_is_on_unless_the_installation_says_off_and_other_values_are_refused() -> None:

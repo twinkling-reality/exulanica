@@ -14,7 +14,9 @@ itself, so a later version of a recipe never moves a world already made. The cat
 new version, never by an edit of a shipped one; new worlds read the newest. Version 2's coast pours
 a cascade from the site's sea-facing edge into the sea; version 3's coast brings the sea nearer, its
 shore 25 m from the place rather than 70 m, so a town or a site by the sea stands by it, and its
-cascade ends where the sea now begins. Versions 1 and 2 stay readable.
+cascade ends where the sea now begins. Version 4 adds the lakeside, read after the coast: the
+default's land with a filled lake to the south, its near shore 25 m from the place. Versions 1 to 3
+stay readable.
 """
 
 from __future__ import annotations
@@ -44,8 +46,8 @@ __all__ = [
 
 RECIPE_CATALOG_ID: Final = "exulanica.landform-recipe"
 #: Every version of the recipe catalog this code reads, and the newest, which new worlds read.
-RECIPE_VERSIONS: Final = (1, 2, 3)
-RECIPE_VERSION: Final = 3
+RECIPE_VERSIONS: Final = (1, 2, 3, 4)
+RECIPE_VERSION: Final = 4
 _ENVELOPE: Final = frozenset({"schema_version", "catalog_id", "catalog_version", "entries"})
 _FIELDS: Final = frozenset(
     {"key", "title", "words", "for_ground", "default", "land", "reason", "licence"}
