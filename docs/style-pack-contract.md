@@ -1040,7 +1040,7 @@ listed part or none: rain is overcast. Version 2 of the step's words
 (`exulanica/selection/setting-choosing.v2.json`) also takes the one setting a kind of place stands
 in, as a person would picture it, where its words name no ground: a fishing village, a harbour, a
 port, a quay, a pier, a lighthouse, a beach or an island stands by the sea, a ski or winter
-village in snow, an oasis or dunes in desert sand. The timing record above measured version 1;
+village in snow, an oasis or dunes in desert sand, a farm or a farming village among wheat fields. The timing record above measured version 1;
 version 2 was tried on one author's 23 sentences through the page, one try each, which shows what
 it did with those words and no more. The answer states one list of copied words for all its parts, so code holds
 that the words are the person's and that some stand behind some part, not that each part has
