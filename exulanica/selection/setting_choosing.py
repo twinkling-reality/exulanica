@@ -49,7 +49,7 @@ __all__ = [
     "render_request",
 ]
 
-PROMPT_PATH: Final = Path(__file__).with_name("setting-choosing.v1.json")
+PROMPT_PATH: Final = Path(__file__).with_name("setting-choosing.v2.json")
 _PROMPT_PROFILE: Final = "exulanica.setting-choosing-prompt/v1"
 #: The step answers once and is repaired at most once.
 ATTEMPTS: Final = 2
