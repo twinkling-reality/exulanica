@@ -651,7 +651,7 @@ kind and whole-world starts;
 `description_characters`;
 `running_draft_id`, this person's own draft of a world still running here; and, where the host
 states one (`EXULANICA_HOST_KEEPS_UNTIL`), `host_keeps_until`, the day it keeps what is made on it
-until, which the page says under the field; `notes`, where a draft is offered, whether web notes
+until, which a signed-out browser's session answer states too, for the guest gate to say; `notes`, where a draft is offered, whether web notes
 may be asked for with it, the most searches they send and the most their two model calls may add
 ([reference notes](reference-notes-contract.md#9-notes-for-a-drafter)); and `own_key`, true on a person's own install
 (`EXULANICA_PERSONAL_INSTALL`), whose models run on its owner's key, so the page's price line names

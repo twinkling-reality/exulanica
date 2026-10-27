@@ -487,6 +487,8 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldSentence.offer.connection': 'The creation service could not be reached. Check your connection, then try again.',
   'worldSentence.progress.interrupted': 'Progress could not be checked. The draft may still be running; check its progress again.',
   'worldSentence.placeholder': 'A cozy little town by the sea at dusk',
+  /** Under the guest entry where the host states the day it keeps what is made on it until (A5); {date} as "15 December 2026". */
+  'gate.hostKeepsUntil': 'The worlds you make here and the words you type stay on this server until it is deleted after {date}.',
   'worldSentence.notice':
     'Your words are sent to an AI model to draft the world. A short description of what you asked '
     + 'for is kept with the world.',

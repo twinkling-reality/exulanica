@@ -93,7 +93,12 @@ def _runtime(request: Request) -> AccountRuntime:
     return runtime
 
 
-def _failure(exc: Exception, *, sign_in: dict[str, Any] | None = None) -> JSONResponse:
+def _failure(
+    exc: Exception,
+    *,
+    sign_in: dict[str, Any] | None = None,
+    host_keeps_until: str | None = None,
+) -> JSONResponse:
     unavailable = isinstance(exc, AccountUnavailable)
     content: dict[str, Any] = {
         "code": "account_unavailable" if unavailable else "authentication_failed",
@@ -103,7 +108,18 @@ def _failure(exc: Exception, *, sign_in: dict[str, Any] | None = None) -> JSONRe
     }
     if sign_in is not None:
         content["sign_in"] = sign_in
+    if host_keeps_until is not None:
+        content["host_keeps_until"] = host_keeps_until
     return JSONResponse(status_code=503 if unavailable else 401, content=content, headers=_HEADERS)
+
+
+def _host_keeps_until(request: Request) -> str | None:
+    """The day this host keeps what is made on it until (``EXULANICA_HOST_KEEPS_UNTIL``), written
+    ``YYYY-MM-DD`` as the Create offer states it, for the gate a signed-out browser meets to say
+    before anyone comes in; None where the host states none, and the answer then leaves it out."""
+    services = getattr(request.app.state, "services", None)
+    kept = getattr(services, "host_keeps_until", None)
+    return kept.isoformat() if isinstance(kept, dt.date) else None
 
 
 def _sign_in(request: Request) -> dict[str, Any] | None:
@@ -256,7 +272,10 @@ def account_session(request: Request) -> Response:
     accounts 503 (``account_unavailable``); both answers also carry ``sign_in``, how a browser may
     come in here: ``google`` (true or false) and ``guest`` (``code`` when ``POST /auth/guest``
     takes the entry code, ``open`` when it takes none, ``off`` when it admits nobody new). An
-    answer without ``sign_in`` is one whose server could not read its own configuration.
+    answer without ``sign_in`` is one whose server could not read its own configuration. Where
+    this host states the day it keeps what is made on it until (``EXULANICA_HOST_KEEPS_UNTIL``),
+    both answers carry it as ``host_keeps_until`` (``YYYY-MM-DD``), so the gate says it before a
+    guest comes in; where it states none, they leave it out.
     """
     try:
         account = _runtime(request).browser_session(request)
@@ -265,7 +284,7 @@ def account_session(request: Request) -> Response:
             headers=_HEADERS,
         )
     except (AccountRejected, AccountUnavailable, TokenNotAccepted) as exc:
-        return _failure(exc, sign_in=_sign_in(request))
+        return _failure(exc, sign_in=_sign_in(request), host_keeps_until=_host_keeps_until(request))
 
 
 class GuestEntryBody(BaseModel):

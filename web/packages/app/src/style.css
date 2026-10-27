@@ -393,6 +393,9 @@ body {
 
 .guest-entry > .gate-failure { margin: 0; text-align: left; }
 
+/* How long this host keeps what is made on it (A5): one quiet line under the guest entry, in the gate's note type. */
+.guest-entry > .gate-keeps { width: auto; }
+
 /* A saved-world threshold is a supported-action rail, not a credential gate. It emphasizes the
  * one useful action available in a fresh workspace without implying that review already composes
  * a world. The extra #shell specificity keeps the later redesign layer from turning the embedded

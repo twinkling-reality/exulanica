@@ -1,5 +1,6 @@
 import { ApiError } from '@exulanica/graph-client';
 import { problemSentence } from './words/problems.js';
+import { fill } from './copy.js';
 import type { BrowserAccountState, SignInModes } from '../account-session.js';
 import { el } from './dom.js';
 
@@ -17,6 +18,22 @@ export function guestRefusalWords(error: unknown): string {
     case 'origin_not_permitted': return 'This page is not served by this server, so it cannot let you in. Open the server’s own address.';
     default: return problemSentence(error, {}, { happened: 'You could not be let in.', next: 'Try again in a moment.' });
   }
+}
+
+/** The months, as a host's day is said on the gate ("15 December 2026"). */
+const MONTHS = Object.freeze(['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']);
+
+/**
+ * Where the host states the day it keeps what is made on it until (`YYYY-MM-DD`), the line under the guest entry
+ * (A5), the day kept whole on one line; null where it states none or what it states is not such a day, so there is no
+ * line without a date.
+ */
+export function hostKeepsWords(day: string | null | undefined): string | null {
+  const parts = typeof day === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/u.exec(day) : null;
+  const month = parts ? MONTHS[Number(parts[2]) - 1] : undefined;
+  const date = parts ? Number(parts[3]) : 0;
+  if (parts === null || month === undefined || date < 1 || date > 31) return null;
+  return fill('gate.hostKeepsUntil', { date: `${date}\u00a0${month}\u00a0${parts[1]}` });
 }
 
 /** When to try again, in words, from a count of seconds. */
@@ -39,6 +56,9 @@ function laterWords(seconds: number): string {
  * answers 401 for a signed-out browser on a server with accounts, and 503 where it has none; a
  * failed read is treated as the latter. Without accounts the sign-in route answers 503 too, so a
  * button there is a dead end, and a button that cannot work is worse than no button.
+ *
+ * WHERE THE HOST STATES THE DAY IT KEEPS WHAT IS MADE ON IT UNTIL, the guest entry says it, in one quiet line under
+ * its button, before anyone comes in (A5); a server that states none says nothing.
  */
 export function buildCredentialGate(deps: {
   readonly accounts: Exclude<BrowserAccountState['kind'], 'authenticated'>;
@@ -48,6 +68,8 @@ export function buildCredentialGate(deps: {
   readonly enter: (token: string) => Promise<void>;
   /** Enter as a guest, with the code where one is asked; resolves once the session is set. */
   readonly enterAsGuest?: (code: string | null) => Promise<void>;
+  /** The day this host keeps what is made on it until (`YYYY-MM-DD`), where the server stated one. */
+  readonly hostKeepsUntil?: string | null;
 }): HTMLFormElement {
   const modes = deps.modes ?? null;
   const configured = modes === null ? deps.accounts === 'signed-out' : modes.google;
@@ -101,8 +123,10 @@ export function buildCredentialGate(deps: {
     // Enter here is the guest's, never the developer token's submit.
     if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); enterGuest(); }
   });
+  const kept = hostKeepsWords(deps.hostKeepsUntil);
   const guest = guestMode === 'off' ? null : el('div', { class: 'guest-entry' }, [
     el('div', { class: 'guest-entry-row' }, guestMode === 'code' ? [code, guestEnter] : [guestEnter]),
+    ...(kept === null ? [] : [el('p', { class: 'gate-note gate-keeps', text: kept })]),
     guestFailure,
   ]);
 

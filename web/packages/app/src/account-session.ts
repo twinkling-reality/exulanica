@@ -26,10 +26,14 @@ export interface SignInModes {
   readonly guest: 'code' | 'open' | 'off';
 }
 
+/**
+ * A signed-out answer: how a browser may come in (`signIn`), and the day this host keeps what is made on it until
+ * (`hostKeepsUntil`, `YYYY-MM-DD`), where the server states them.
+ */
 export type BrowserAccountState =
   | { readonly kind: 'authenticated'; readonly session: BrowserAccountSession }
-  | { readonly kind: 'signed-out'; readonly signIn?: SignInModes | null }
-  | { readonly kind: 'unavailable'; readonly signIn?: SignInModes | null };
+  | { readonly kind: 'signed-out'; readonly signIn?: SignInModes | null; readonly hostKeepsUntil?: string | null }
+  | { readonly kind: 'unavailable'; readonly signIn?: SignInModes | null; readonly hostKeepsUntil?: string | null };
 
 const nonempty = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 
@@ -42,9 +46,11 @@ export async function readBrowserAccount(
   });
   if (response.status === 401 || response.status === 503) {
     const kind = response.status === 401 ? 'signed-out' : 'unavailable';
-    // The sign-in modes only where the answer states them.
-    const signIn = await signInModes(response);
-    return signIn === null ? { kind } : { kind, signIn };
+    // The sign-in modes and the host's day only where the answer states them.
+    const body = await answerBody(response);
+    const signIn = signInModes(body);
+    const kept = hostKeepsUntil(body);
+    return { kind, ...(signIn === null ? {} : { signIn }), ...(kept === null ? {} : { hostKeepsUntil: kept }) };
   }
   if (!response.ok) throw await toApiError(response);
   const value = await response.json() as Record<string, unknown>;
@@ -59,18 +65,29 @@ export async function readBrowserAccount(
   }) };
 }
 
-/** The sign-in modes a signed-out answer states, or null where it states none or none that reads. */
-async function signInModes(response: Response): Promise<SignInModes | null> {
+/** A signed-out answer's body, or null where it is not an object that reads. */
+async function answerBody(response: Response): Promise<Readonly<Record<string, unknown>> | null> {
   try {
-    const body = await response.json() as Record<string, unknown>;
-    const modes = body['sign_in'];
-    if (modes === null || typeof modes !== 'object' || Array.isArray(modes)) return null;
-    const { google, guest } = modes as Record<string, unknown>;
-    if (typeof google !== 'boolean' || (guest !== 'code' && guest !== 'open' && guest !== 'off')) return null;
-    return Object.freeze({ google, guest });
+    const body: unknown = await response.json();
+    return body !== null && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : null;
   } catch {
     return null;
   }
+}
+
+/** The sign-in modes a signed-out answer states, or null where it states none or none that reads. */
+function signInModes(body: Readonly<Record<string, unknown>> | null): SignInModes | null {
+  const modes = body?.['sign_in'];
+  if (modes === null || modes === undefined || typeof modes !== 'object' || Array.isArray(modes)) return null;
+  const { google, guest } = modes as Record<string, unknown>;
+  if (typeof google !== 'boolean' || (guest !== 'code' && guest !== 'open' && guest !== 'off')) return null;
+  return Object.freeze({ google, guest });
+}
+
+/** The day a signed-out answer states this host keeps what is made on it until (`YYYY-MM-DD`), or null. */
+function hostKeepsUntil(body: Readonly<Record<string, unknown>> | null): string | null {
+  const day = body?.['host_keeps_until'];
+  return typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(day) ? day : null;
 }
 
 /**

@@ -222,7 +222,7 @@ async function boot(): Promise<void> {
 function askForAccess(account: Exclude<BrowserAccountState, { readonly kind: 'authenticated' }>): void {
   replaceSurface(shell, [buildCredentialGate({
     accounts: account.kind,
-    modes: account.signIn ?? null,
+    modes: account.signIn ?? null, hostKeepsUntil: account.hostKeepsUntil ?? null,
     signIn: () => window.location.assign('/api/auth/google/start'),
     enter: (token) => start(token),
     // The guest route sets the session cookie; the page then starts as any signed-in page does.

@@ -3,7 +3,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@exulanica/graph-client';
 import { enterAsGuest, readBrowserAccount } from '../src/account-session.js';
-import { buildCredentialGate } from '../src/ui/credential-gate.js';
+import { buildCredentialGate, hostKeepsWords } from '../src/ui/credential-gate.js';
+
+interface CreateWords { hostKeepsLine(isoDate: unknown): string | null }
+// A joined path: the test runner finds the workspace's words, and the type checker leaves them out of the program.
+const createWords = async (): Promise<CreateWords> => import('../../../../tools/previews/world-workspace/' + 'create-words.mjs') as Promise<CreateWords>;
 
 /** The gate the page builds from what `GET /api/auth/session` answered. */
 async function gateAfter(response: Response) {
@@ -105,5 +109,51 @@ describe('a guest coming in with a code', () => {
     expect(fetcher).toHaveBeenCalledWith('/api/auth/guest', expect.objectContaining({
       method: 'POST', credentials: 'include', body: JSON.stringify({ code: 'judge-code' }),
     }));
+  });
+});
+
+describe('how long this host keeps what is made on it (A5)', () => {
+  /** The gate after a signed-out answer stating the guest entry and, where given, the host's day. */
+  async function gateWith(body: Record<string, unknown>) {
+    const account = await readBrowserAccount(async () => new Response(JSON.stringify({
+      code: 'authentication_failed', detail: 'Sign-in or session was not accepted', ...body,
+    }), { status: 401 }));
+    if (account.kind === 'authenticated') throw new Error('a signed-in session meets no gate');
+    return buildCredentialGate({
+      accounts: account.kind, modes: account.signIn ?? null, hostKeepsUntil: account.hostKeepsUntil ?? null,
+      signIn: vi.fn(), enter: vi.fn(async () => undefined), enterAsGuest: vi.fn(async () => undefined),
+    });
+  }
+
+  it('says the day in one quiet line under "Enter as a guest", in the words Create said it in', async () => {
+    const gate = await gateWith({ sign_in: { google: false, guest: 'open' }, host_keeps_until: '2026-12-15' });
+    const line = gate.querySelector('.guest-entry .gate-keeps')!;
+    expect(line.textContent).toBe('The worlds you make here and the words you type stay on this server until it is deleted after 15\u00a0December\u00a02026.');
+    expect(line.textContent).toBe((await createWords()).hostKeepsLine('2026-12-15'));
+    expect(line.classList.contains('gate-note')).toBe(true);
+    // Right under the entry's button, before any refusal.
+    expect(line.previousElementSibling?.querySelector('[data-action="gate.guest"]')?.textContent).toBe('Enter as a guest');
+    expect(line.nextElementSibling?.classList.contains('gate-failure')).toBe(true);
+  });
+
+  it('says it under the code entry too', async () => {
+    const gate = await gateWith({ sign_in: { google: false, guest: 'code' }, host_keeps_until: '2027-01-03' });
+    expect(gate.querySelector('.guest-entry .gate-keeps')?.textContent).toBe((await createWords()).hostKeepsLine('2027-01-03'));
+  });
+
+  it('says nothing where the host states no day, or none that reads, or where no guest can come in', async () => {
+    for (const body of [
+      { sign_in: { google: false, guest: 'open' } },
+      { sign_in: { google: false, guest: 'open' }, host_keeps_until: null },
+      { sign_in: { google: false, guest: 'open' }, host_keeps_until: '15/12/2026' },
+      { sign_in: { google: false, guest: 'open' }, host_keeps_until: '2026-13-01' },
+      { sign_in: { google: true, guest: 'off' }, host_keeps_until: '2026-12-15' },
+    ]) {
+      const gate = await gateWith(body);
+      expect(gate.querySelector('.gate-keeps'), JSON.stringify(body)).toBeNull();
+      expect(gate.textContent, JSON.stringify(body)).not.toContain('stay on this server');
+    }
+    expect(hostKeepsWords('2026-12-00')).toBeNull();
+    expect(hostKeepsWords(undefined)).toBeNull();
   });
 });

@@ -128,7 +128,7 @@
      "accounts"
     ],
     "summary": "Account Session",
-    "description": "The browser's session: its account, workspace, role and CSRF token.\n\nA signed-out browser is answered 401 (``authentication_failed``), and a server with no browser\naccounts 503 (``account_unavailable``); both answers also carry ``sign_in``, how a browser may\ncome in here: ``google`` (true or false) and ``guest`` (``code`` when ``POST /auth/guest``\ntakes the entry code, ``open`` when it takes none, ``off`` when it admits nobody new). An\nanswer without ``sign_in`` is one whose server could not read its own configuration.",
+    "description": "The browser's session: its account, workspace, role and CSRF token.\n\nA signed-out browser is answered 401 (``authentication_failed``), and a server with no browser\naccounts 503 (``account_unavailable``); both answers also carry ``sign_in``, how a browser may\ncome in here: ``google`` (true or false) and ``guest`` (``code`` when ``POST /auth/guest``\ntakes the entry code, ``open`` when it takes none, ``off`` when it admits nobody new). An\nanswer without ``sign_in`` is one whose server could not read its own configuration. Where\nthis host states the day it keeps what is made on it until (``EXULANICA_HOST_KEEPS_UNTIL``),\nboth answers carry it as ``host_keeps_until`` (``YYYY-MM-DD``), so the gate says it before a\nguest comes in; where it states none, they leave it out.",
     "operationId": "account_session_auth_session_get",
     "responses": {
      "200": {

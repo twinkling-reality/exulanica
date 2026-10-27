@@ -45,6 +45,13 @@ assert.equal(priceLine('0.20766720', '0.0599'), priceLine('0.20766720', '0.05'))
 assert.equal(priceLine('0.20766720', '0.20766720'), priceLine('0.20766720'));
 assert.equal(priceLine('0.20766720', null), priceLine('0.20766720'));
 assert.equal(hostKeepsLine('2026-12-15'), 'The worlds you make here and the words you type stay on this server until it is deleted after 15\u00a0December\u00a02026.');
+// A5 is said on the guest gate now (ROOT, 27 October), from the app's own words: the same sentence, the day filled in.
+{
+  const app = readFileSync(new URL('../../../web/packages/app/src/ui/copy.ts', import.meta.url), 'utf8');
+  const gate = /'gate\.hostKeepsUntil': '([^']*)'/u.exec(app)?.[1];
+  assert.ok(gate, 'copy.ts says the host\'s day on the gate');
+  assert.equal(gate.replace('{date}', '15\u00a0December\u00a02026'), hostKeepsLine('2026-12-15'));
+}
 assert.equal(hostKeepsLine('2027-01-03'), 'The worlds you make here and the words you type stay on this server until it is deleted after 3\u00a0January\u00a02027.');
 for (const none of [undefined, null, '', '2026-13-01', '15/12/2026', '2026-12-15T00:00', 20261215]) assert.equal(hostKeepsLine(none), null, String(none));
 assert.equal(countWords(86, 1000), '86 of 1000');
