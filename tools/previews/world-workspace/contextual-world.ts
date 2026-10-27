@@ -36,6 +36,7 @@ import { kindDocumentLabel } from '/src/composition/visitor-notices.ts';
 import { areaBanner, keysToWorld, mountUiScale } from './world-ui.ts';
 import { mountCorners } from './world-corners.ts';
 import { mountDataView } from './world-data-view.ts';
+import { creatureWords, kindMaker } from './data-view-things.mjs';
 import { endOpening } from './world-opening.ts';
 import { MADE_HANDOFF_KEY, readMade } from './create-steps.mjs';
 import { CREATE_WORDS } from './create-words.mjs';
@@ -144,10 +145,16 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   // corner, and with nowhere for them to go, build mode (K13), as B opens it.
   const writable = Boolean(send && binding) && import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY !== '1';
   // The data view (X where it works, a made town): its people are the ones the tags name, in the tags' own words; the
-  // one looked at or chosen keeps their own tag or card, so the data view leaves them out.
+  // one looked at or chosen keeps their own tag or card, so the data view leaves them out. A creature its workspace
+  // made is named from its kind's own record, over the model that record says made it (creatureWords).
+  const kindMakers = createKindLabels((path) => read(path), kindMaker);
   const dataView = mountDataView({ host: root, binding: b, onOpen: () => corners.closeKeys(), people: {
     everyone: () => rows.flatMap(row => { if (row.scene?.type !== 'being' || row.key === target?.key || row.key === held?.key) return []; const head = targetPoint(row, true); return head ? [{ id: row.scene.id, head: { x: head.x, y: head.y, z: head.z } }] : []; }),
-    words: (id) => { const row = beingRow(id); return { name: whoOf(id).start, model: row ? subjectView(row).chip ?? null : null }; },
+    words: (id) => {
+      const row = beingRow(id), kind = subjectReads.society?.state?.inhabitants?.find(one => one.id === id)?.kind;
+      return kind?.source === 'workspace' ? creatureWords({ kind, name: madeName(id), maker: kindMakers.label(kind), models: subjectReads.models?.models, kindLabel: kindLabels.label })
+        : { name: whoOf(id).start, model: row ? subjectView(row).chip ?? null : null };
+    },
   } });
   const corners = mountCorners({ host: root, people: selection.people ?? null, onLeave: () => { if (held) release(); else leaveWorld(); }, data: dataView.works,
     readOnly: import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1', flySpeed: () => b.controls.flyingSpeed,

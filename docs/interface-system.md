@@ -427,8 +427,10 @@ card only where it works: a small card with one slider from World to Data. As it
 dark where they stand and glowing points sampled from them take their place, each coloured by the kind of record
 it stands on; each thing the town's own tile records name gets a thin box and a tag in the shipped catalogs' words
 (a premises by its use, a street tree by its species, street furniture by its class, a street by its name), and
-each person a tag with their name and, under it, the model that decides for them where one does. X or Esc puts
-the town back as it was; the data view keeps nothing and is never a pick target.
+each person a tag with their name and, under it, the model that decides for them where one does. A creature made
+in Make a creature is tagged from its kind's own record: its name and, under it, the model that made it, or the
+plain words build mode calls it by where the record names no model. X or Esc puts the town back as it was; the
+data view keeps nothing and is never a pick target.
 
 When the playback control says open models are not asked for the people here now (its
 `model_minds_code`, `spending_cap_reached` when the allowance for this visit is used up), People says

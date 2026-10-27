@@ -1,7 +1,7 @@
 // Checks data-view-things.mjs in Node: a made town's things and their words from its tiles' records, which kind
 // of record a point stands on, where a tag hangs and which tags show. Run: node verify-data-view-things.mjs
 import assert from 'node:assert/strict';
-import { boxOfExtent, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, thingWords, townThings } from './data-view-things.mjs';
+import { boxOfExtent, creatureWords, kindMaker, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, thingWords, townThings } from './data-view-things.mjs';
 
 const extent = (x0, y0, z0, x1, y1, z1) => ({ min_x_mm: x0, min_y_mm: y0, min_z_mm: z0, max_x_mm: x1, max_y_mm: y1, max_z_mm: z1 });
 const record = (kind, identity, fields, membership = 'owned') => ({ kind, identity, membership, fields: { identity, ...fields } });
@@ -93,5 +93,30 @@ assert.deepEqual(shown.map((one) => one.key), ['near', 'apart']);
 assert.deepEqual(personLines({ name: 'Ines Varga', model: 'Nemotron 3 Super 120B' }), ['Ines Varga', 'Nemotron 3 Super 120B']);
 assert.deepEqual(personLines({ name: 'Ines Varga', model: null }), ['Ines Varga']);
 assert.deepEqual(personLines({ name: '' }), ['someone']);
+
+// A creature its workspace made, from its kind's own record: its name over the model the record's origin says made it,
+// as the models read names that model; where the record names no model, or no read names it, the plain words build
+// mode calls it by, and "creature" until its label is read.
+const nemotron = { kind: 'model', provider: 'nebius_token_factory', model_id: 'nvidia/nemotron-3-super-120b-a12b', prompt_version: 'creature-v1', prompt_sha256: null, words_sha256: null, execution_sha256: null };
+const drafted = { label: 'Little yellow robot duck', origin: { profile: 'exulanica.origin/v1', class: 'drafted', by: nemotron } };
+assert.deepEqual(kindMaker(drafted), { provider: 'nebius_token_factory', modelId: 'nvidia/nemotron-3-super-120b-a12b' });
+assert.equal(kindMaker({ origin: { class: 'drafted', by: { ...nemotron, model_id: null } } }), null);
+assert.equal(kindMaker({ origin: { class: 'authored', by: { kind: 'account', account_id: '44444444-4444-4444-8444-444444444444' } } }), null);
+assert.equal(kindMaker({ label: 'Well' }), null);
+assert.equal(kindMaker(null), null);
+const models = [
+  { provider: 'nebius_token_factory', modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507', name: 'Qwen3 235B Instruct' },
+  { provider: 'nebius_token_factory', modelId: 'nvidia/nemotron-3-super-120b-a12b', name: 'Nemotron 3 Super 120B' },
+];
+const duck = { source: 'workspace', sha256: 'a'.repeat(64) };
+const duckLabel = (kind) => (kind === duck ? 'Little yellow robot duck' : null);
+const made = (fields) => creatureWords({ kind: duck, name: 'Little yellow robot duck', maker: kindMaker(drafted), models, kindLabel: duckLabel, ...fields });
+assert.deepEqual(made({}), { name: 'Little yellow robot duck', model: 'Nemotron 3 Super 120B' });
+assert.deepEqual(personLines(made({ name: 'Little yellow robot duck 2' })), ['Little yellow robot duck 2', 'Nemotron 3 Super 120B']);
+assert.deepEqual(made({ maker: null }), { name: 'little yellow robot duck', model: null });
+assert.deepEqual(made({ models: null }), { name: 'little yellow robot duck', model: null });
+assert.deepEqual(made({ maker: { provider: 'another_provider', modelId: 'nvidia/nemotron-3-super-120b-a12b' } }), { name: 'little yellow robot duck', model: null });
+assert.deepEqual(made({ maker: { provider: null, modelId: 'nvidia/nemotron-3-super-120b-a12b' } }), { name: 'Little yellow robot duck', model: 'Nemotron 3 Super 120B' });
+assert.deepEqual(made({ name: null, kindLabel: () => null }), { name: 'creature', model: null });
 
 console.log('data-view-things: all checks pass');

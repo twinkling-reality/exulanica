@@ -7,9 +7,11 @@
  *
  * Words come from the shipped catalogs: a premises by its use class's label in the society's catalog
  * (residential is "home"), a street tree and a piece of street furniture as build mode names them
- * (town-thing-names.mjs), a street by the name it states.
+ * (town-thing-names.mjs), a street by the name it states. A creature its workspace made is named from
+ * its kind's own record, with the model that made it.
  */
 import uses from '../../../assets/catalogs/society/society-use-class.v3.json' with { type: 'json' };
+import { thingName } from './build-words.mjs';
 import { townThingName } from './town-thing-names.mjs';
 
 const USE_WORDS = new Map(uses.entries.map((entry) => [entry.key, entry.label]));
@@ -248,4 +250,26 @@ export function personLines({ name, model = null }) {
   const lines = [typeof name === 'string' && name.trim() ? name.trim() : 'someone'];
   if (typeof model === 'string' && model.trim()) lines.push(model.trim());
   return lines;
+}
+
+/**
+ * The model a kind's own record says made it: its origin's maker (exulanica.origin/v1's `by`) where a model made the
+ * kind and the record names which, by provider and identifier; null where it names none (an older record names its
+ * model only through its receipts) or a person or a program made it.
+ */
+export function kindMaker(document) {
+  const by = document?.origin?.by;
+  if (by?.kind !== 'model' || typeof by.model_id !== 'string' || !by.model_id.trim()) return null;
+  return { provider: typeof by.provider === 'string' && by.provider ? by.provider : null, modelId: by.model_id };
+}
+
+/**
+ * A creature its workspace made, in a person's tag (personLines), from its own records: its name as the page calls it
+ * ("Little yellow robot duck") over the model its kind's record says made it (kindMaker), named as the models read
+ * names that model ("Nemotron 3 Super 120B"). Where the record names no model, or no read names it, the plain words
+ * build mode calls it by (thingName: "little yellow robot duck", "creature" until its label is read), alone.
+ */
+export function creatureWords({ kind, name, maker, models, kindLabel }) {
+  const model = maker ? (models ?? []).find((one) => one.modelId === maker.modelId && (maker.provider === null || one.provider === maker.provider))?.name : null;
+  return typeof model === 'string' && model && typeof name === 'string' && name ? { name, model } : { name: thingName({ kind }, kindLabel), model: null };
 }
