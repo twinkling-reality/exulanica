@@ -399,7 +399,11 @@ near land wears, and the backdrop is coloured over, the open ground of the look 
 in: the colour it draws `ground.default` in, with the world's setting over it, so a setting's
 desert sand, snowfields or field of grain is the land the town stands on
 (`openGroundColour`); a look that draws that ground from a texture, or a town drawn in no pack,
-leaves the land its own plain green. The
+leaves the land its own plain green. Past the town the land stands the scenery that open ground
+names in the [site scenery catalog](../assets/catalogs/world-kinds/site-scenery.v1.json), as a
+place stands its own beyond it: the trees grass names, on dry land only and never on the sand by
+the sea, out to the reach the catalog states; a setting's own ground names none, so a town in its
+setting's sand or snow stands on that ground alone. The
 tiles' own ground, where no street, footway or lot stands, wears what the near land wears, so the
 town's unbuilt land meets its land as one ground; its tree pits, drawn in the same texture set as
 its terrain, wear it too. Land that cannot be read is not stood in for: the world does not open. The town's people stand on the

@@ -13,6 +13,7 @@
  * north and steps up 500 mm east of 8 m, and a backdrop with the sea to the south.
  */
 import { createHash } from 'node:crypto';
+import { sceneryBeyond } from '@exulanica/atlas-core';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import { isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generated-world.js';
@@ -21,6 +22,7 @@ import {
   type TownLand,
 } from '../src/composition/town-land.js';
 import { townFurniture } from '../src/composition/town-furniture.js';
+import { SITE_SCENERY } from '../src/site-scenery.js';
 import type { GeneratedGround, SavedWorldEntry } from '../src/world-entry-api.js';
 import { levelWalk } from './navigation-walk.js';
 
@@ -46,13 +48,21 @@ vi.mock('../src/world-look.js', async (importOriginal) => ({
 }));
 // The land is read as the page reads it; what draws it round the tiles is replaced, so a test sees
 // which chunks the tiles cover and when the land is taken away.
-const drawnRound = vi.hoisted(() => ({ calls: [] as { covered: (x: number, y: number) => boolean; ground: unknown; disposed: boolean }[] }));
+const drawnRound = vi.hoisted(() => ({
+  calls: [] as { covered: (x: number, y: number) => boolean; ground: unknown; disposed: boolean }[],
+  scenery: [] as { key: unknown; pieces: { xMm: number; yMm: number }[]; destroyed: boolean }[],
+}));
 vi.mock('@exulanica/atlas-react/generated-site', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@exulanica/atlas-react/generated-site')>()),
   attachLandRound: (_host: unknown, _land: unknown, covered: (x: number, y: number) => boolean, _surfaces: unknown, ground?: unknown) => {
     const call = { covered, ground, disposed: false };
     drawnRound.calls.push(call);
     return { drawn: { ground: [] }, dispose: () => { call.disposed = true; } };
+  },
+  drawSiteScenery: (_device: unknown, drawn: { scenery: { stands: unknown }; pieces: { xMm: number; yMm: number }[] }) => {
+    const call = { key: drawn.scenery.stands, pieces: [...drawn.pieces], destroyed: false };
+    drawnRound.scenery.push(call);
+    return { root: { name: 'site-scenery' }, destroy: () => { call.destroyed = true; } };
   },
 }));
 vi.mock('@exulanica/atlas-core', async (importOriginal) => ({
@@ -177,6 +187,34 @@ describe("a town on its land's land, read", () => {
     expect(town.land.section.water.map((body) => body.kind)).toEqual(['sea']);
   });
 
+  it("stands the scenery its look's open ground names past the town, on its dry land, and none for a setting's own ground", async () => {
+    const { fetched } = host();
+    vi.stubGlobal('fetch', fetched);
+    const town = await loadTownLand(access, entry, LAND_SHA256);
+    const added: unknown[] = [];
+    const scene = { app: { graphicsDevice: {} }, environmentRoot: { addChild: (one: unknown) => added.push(one) } } as unknown as GeneratedTileHost;
+    const covered = (x: number, y: number): boolean => x === 0 && y === 0;
+    drawnRound.scenery.length = 0;
+    // A shipped look's grass: the site scenery catalog's trees for grass, past the town's chunk and
+    // never on it, on dry land only (all of this land, which stands 6 m and more above its sea).
+    const grass = town.draw(scene, covered, { linear: [0.25, 0.37, 0.12], swatch: 'grass' });
+    expect(drawnRound.scenery).toHaveLength(1);
+    const [trees] = drawnRound.scenery;
+    expect(trees!.key).toBe('tree');
+    const beyond = sceneryBeyond(WORLD, { widthMm: 128_000, depthMm: 128_000 }, SITE_SCENERY.byMaterial.get('grass')!);
+    expect(trees!.pieces.map((piece) => [piece.xMm, piece.yMm])).toEqual(beyond.map((piece) => [piece.xMm, piece.yMm]));
+    expect(trees!.pieces.length).toBeGreaterThan(0);
+    expect(trees!.pieces.every((piece) => town.land.dryAt(piece.xMm, piece.yMm))).toBe(true);
+    expect(trees!.pieces.some((piece) => piece.xMm >= 0 && piece.xMm < 128_000 && piece.yMm >= 0 && piece.yMm < 128_000)).toBe(false);
+    expect(added).toEqual([{ name: 'site-scenery' }]);
+    grass.dispose();
+    expect(trees!.destroyed).toBe(true);
+    // A setting's own sand, and the land's own plain ground, stand nothing.
+    town.draw(scene, covered, { linear: [0.69, 0.47, 0.22], swatch: 'setting_surface_0' }).dispose();
+    town.draw(scene, covered).dispose();
+    expect(drawnRound.scenery).toHaveLength(1);
+  });
+
   it.each([
     ['a section its tag does not name', host(section(), { path: 'land', etag: 'c'.repeat(64) }), 'a document its section does not name'],
     ['a chunk its section does not name', host(section(), { path: 'land/chunks/0/0', etag: 'c'.repeat(64) }), 'a document its section does not name'],
@@ -270,8 +308,9 @@ describe("a town on its land's land, drawn", () => {
     drawn.dispose();
     expect(order).toEqual(['tiles drawn', 'land drawn', 'land taken away', 'tiles taken away']);
     // In the open ground of the look the tiles are drawn in, where it is handed one; else the land's own.
-    withTownLand(tile, town, [{ tileX: 0, tileY: 0 }], [0.686, 0.468, 0.216]).attach({} as GeneratedTileHost).dispose();
-    expect(worn).toEqual([null, [0.686, 0.468, 0.216]]);
+    const sand = { linear: [0.686, 0.468, 0.216], swatch: 'setting_surface_0' } as const;
+    withTownLand(tile, town, [{ tileX: 0, tileY: 0 }], sand).attach({} as GeneratedTileHost).dispose();
+    expect(worn).toEqual([null, sand]);
   });
 
   it("wears the colour its look draws ground.default in: the setting's own over it, its upward swatch first, none from a texture", () => {

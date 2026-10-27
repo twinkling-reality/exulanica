@@ -157,9 +157,10 @@ export function baseGroundSlot(drawing: StructuredSiteDrawing): SiteSlot | null 
 /**
  * Whether a site point's land is drawn in a band its sea brings, the sand by it: the surface role
  * there as land cover reads it (`landBandAt` over the land's slope and height and the surfaces'
- * noise, `../style-pack/land-cover.ts`). Never on land with no sea.
+ * noise, `../style-pack/land-cover.ts`). Never on land with no sea. Scenery stands nowhere it is,
+ * round a place or round a town on its land.
  */
-function byTheSea(land: SiteLand, surfaces: LandSurfaces, eastMm: number, northMm: number): boolean {
+export function byTheSea(land: SiteLand, surfaces: LandSurfaces, eastMm: number, northMm: number): boolean {
   if (!land.section.water.some((body) => body.kind === 'sea')) return false;
   const role = landBandAt(surfaces, 'near', landSlopePermille(land.groundMm, eastMm, northMm), land.groundMm(eastMm, northMm),
     landNoiseShift(surfaces.noise, eastMm / 1000, -northMm / 1000), true);

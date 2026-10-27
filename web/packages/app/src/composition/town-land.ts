@@ -28,7 +28,7 @@
  * and everything that draws it is loaded with it.
  */
 
-import { entityTagDigest, type ResolvedStylePack, type Srgb8 } from '@exulanica/atlas-core';
+import { LAND_CHUNK_MM, entityTagDigest, sceneryBeyond, type ResolvedStylePack, type Srgb8 } from '@exulanica/atlas-core';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import type { DrawnSiteLand, SiteLand } from '@exulanica/atlas-react/generated-site';
 import { accessHeaders, type Credentials } from '../config.js';
@@ -56,28 +56,50 @@ type LinearRgb = readonly [number, number, number];
 export const OPEN_GROUND_ROLE = 'ground.default';
 
 /**
- * The colour a look draws a town's open ground in, sRGB: its `ground.default` surfaces' upward
- * swatch where it states one, else their swatch, with the world's setting already over it, so the
- * desert sand, snowfields or field of grain a setting states. Null where the look draws that ground
- * from a texture or states none: the land then keeps its own plain ground.
+ * The swatch a look draws a town's open ground in: its `ground.default` surfaces' upward swatch
+ * where it states one, else their swatch (`grass` in every shipped look, a setting's own key where
+ * a setting gives that ground its colour). Null where the look draws that ground from a texture or
+ * states none.
+ */
+export function openGroundSwatch(pack: Pick<ResolvedStylePack, 'surfaces'>): string | null {
+  const surface = pack.surfaces[OPEN_GROUND_ROLE];
+  return surface === undefined || !('swatch' in surface) ? null : surface.up ?? surface.swatch;
+}
+
+/**
+ * The colour a look draws a town's open ground in, sRGB: its open ground's swatch
+ * (`openGroundSwatch`) with the world's setting already over it, so the desert sand, snowfields or
+ * field of grain a setting states. Null where the look draws that ground from a texture or states
+ * none: the land then keeps its own plain ground.
  */
 export function openGroundColour(pack: Pick<ResolvedStylePack, 'swatches' | 'surfaces'>): Srgb8 | null {
-  const surface = pack.surfaces[OPEN_GROUND_ROLE];
-  if (surface === undefined || !('swatch' in surface)) return null;
-  return pack.swatches.get(surface.up ?? surface.swatch)?.srgb8 ?? null;
+  const swatch = openGroundSwatch(pack);
+  return swatch === null ? null : pack.swatches.get(swatch)?.srgb8 ?? null;
+}
+
+/**
+ * The open ground of the look a town is drawn in, as its land wears it: the colour, linear, and
+ * the swatch it is named by, which names the scenery the site scenery catalog stands on such ground
+ * (trees on grass). A setting's own swatch names none, so a town in its setting's sand or snow
+ * stands on that ground alone.
+ */
+export interface OpenGround {
+  readonly linear: LinearRgb;
+  readonly swatch: string;
 }
 
 export interface TownLand {
   readonly land: SiteLand;
   /**
    * Draw the land under the host's environment root, leaving out the chunks `covered` names, in
-   * `ground` (the town's look's open ground) or, where that is null, the land's own plain ground:
-   * with the material its near land wears, or null where it drew none.
+   * `open` (the town's look's open ground) with the scenery that ground stands, or, where that is
+   * null, in the land's own plain ground with none: with the material its near land wears, or null
+   * where it drew none.
    */
   draw(
     host: GeneratedTileHost,
     covered: (chunkX: number, chunkY: number) => boolean,
-    ground?: LinearRgb | null,
+    open?: OpenGround | null,
   ): { readonly ground?: LandGround | null; dispose(): void };
 }
 
@@ -113,10 +135,14 @@ export function askForTownLand(access: Credentials, entry: SavedWorldEntry): voi
  * each held to the digest the section gives it.
  */
 export async function loadTownLand(access: Credentials, entry: SavedWorldEntry, landSha256: string): Promise<TownLand> {
-  const [{ attachLandRound, parseSiteLandSection, readLandSection }, { sha256Hex }, { LAND_SURFACES }] = await Promise.all([
+  const [
+    { attachLandRound, byTheSea, drawSiteScenery, parseSiteLandSection, readLandSection }, { sha256Hex }, { LAND_SURFACES }, { SITE_SCENERY }, { SURFACE_MATERIALS },
+  ] = await Promise.all([
     import('@exulanica/atlas-react/generated-site'),
     import('@exulanica/atlas-react/playcanvas'),
     import('../land-surfaces.js'),
+    import('../site-scenery.js'),
+    import('../surface-materials.js'),
   ]);
   let bytes = 0;
   const until = Date.now() + LAND_WAIT_MS;
@@ -154,9 +180,28 @@ export async function loadTownLand(access: Credentials, entry: SavedWorldEntry, 
   const land = readLandSection(named, new Map(chunks), backdrop, sha256Hex, bytes);
   return Object.freeze({
     land,
-    draw: (host: GeneratedTileHost, covered: (chunkX: number, chunkY: number) => boolean, ground: LinearRgb | null = null) => {
-      const round = attachLandRound(host, land, covered, LAND_SURFACES, ground ?? undefined);
-      return { ground: round.drawn.ground[0]?.material ?? null, dispose: () => round.dispose() };
+    draw: (host: GeneratedTileHost, covered: (chunkX: number, chunkY: number) => boolean, open: OpenGround | null = null) => {
+      const round = attachLandRound(host, land, covered, LAND_SURFACES, open?.linear);
+      // What stands on the land past the town, as a place stands its scenery beyond it: the site
+      // scenery catalog's entry for the town's open ground, on dry land only and never on the sand
+      // by the sea, from the town's rectangle (the chunks under its tiles) outward.
+      const scenery = open === null ? undefined : SITE_SCENERY.byMaterial.get(open.swatch);
+      const under = land.chunks.filter((chunk) => covered(chunk.chunkX, chunk.chunkY));
+      let stood: { destroy(): void } | null = null;
+      if (scenery !== undefined && under.length > 0) {
+        const xs = under.map((chunk) => chunk.chunkX), ys = under.map((chunk) => chunk.chunkY);
+        const west = Math.min(...xs) * LAND_CHUNK_MM, south = Math.min(...ys) * LAND_CHUNK_MM;
+        const extent = { widthMm: (Math.max(...xs) + 1) * LAND_CHUNK_MM - west, depthMm: (Math.max(...ys) + 1) * LAND_CHUNK_MM - south };
+        const pieces = sceneryBeyond(entry.worldId, extent, scenery)
+          .map((piece) => ({ ...piece, xMm: piece.xMm + west, yMm: piece.yMm + south }))
+          .filter((piece) => land.dryAt(piece.xMm, piece.yMm) && !byTheSea(land, LAND_SURFACES, piece.xMm, piece.yMm));
+        if (pieces.length > 0) {
+          const drawn = drawSiteScenery(host.app.graphicsDevice, { scenery, pieces }, SURFACE_MATERIALS, land.groundMm);
+          host.environmentRoot.addChild(drawn.root);
+          stood = drawn;
+        }
+      }
+      return { ground: round.drawn.ground[0]?.material ?? null, dispose: () => { stood?.destroy(); round.dispose(); } };
     },
   });
 }
@@ -168,8 +213,8 @@ export function withoutEdge<Look extends object>(look: Look): Look {
 
 /**
  * The town's tiles with its land drawn round them whenever they are attached: every chunk no tile
- * covers, the backdrop and the water, taken away again with them, in `ground` (the open ground of
- * the look the tiles are drawn in, `openGroundColour`, linear) or the land's own where that is null.
+ * covers, the backdrop and the water, taken away again with them, in `open` (the open ground of
+ * the look the tiles are drawn in, with the scenery it stands) or the land's own where that is null.
  * The tiles' own ground, where no street, footway or lot stands, wears what the land round them
  * wears, so the town's unbuilt land meets its land in one ground rather than in a tile of bare soil
  * (the texture set a town's terrain is dressed in, which its tree pits share and so wear too); the
@@ -179,14 +224,14 @@ export function withTownLand(
   tile: LoadedGeneratedTile,
   town: TownLand,
   tiles: readonly Pick<GeneratedTile, 'tileX' | 'tileY'>[],
-  ground: LinearRgb | null = null,
+  open: OpenGround | null = null,
 ): LoadedGeneratedTile {
   const under = new Set(tiles.map((one) => `${one.tileX},${one.tileY}`));
   return {
     ...tile,
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
       const attachment = tile.attach(host);
-      const drawn = town.draw(host, (chunkX, chunkY) => under.has(`${chunkX},${chunkY}`), ground);
+      const drawn = town.draw(host, (chunkX, chunkY) => under.has(`${chunkX},${chunkY}`), open);
       const restore = wearLandGround(host, terrainSets(tile), drawn.ground ?? null);
       return {
         metrics: attachment.metrics,

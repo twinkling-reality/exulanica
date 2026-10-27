@@ -37,7 +37,7 @@ export type { DrawnCeiling } from './site-interior.js';
 export { SITE_CEILING, ceilingRests, drawSiteCeiling, lightFromAbove } from './site-interior.js';
 export type { DrawnScenery } from './site-scenery.js';
 export { SCENERY_STONES, SCENERY_TREES, drawSiteScenery, sceneryOf } from './site-scenery.js';
-export { SITE_BEYOND_DROP_M, baseGroundSlot, siteMount } from './site-mount.js';
+export { SITE_BEYOND_DROP_M, baseGroundSlot, byTheSea, siteMount } from './site-mount.js';
 
 export {readTerrainDressing, prepareTerrainDressing, createDressingReadiness} from './terrain-dressing.js';
 export type {PreparedDressing, TerrainDressing, TerrainDressingInstance} from './terrain-dressing.js';

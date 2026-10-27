@@ -45,7 +45,7 @@ import { entityTagDigest } from '@exulanica/atlas-core';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import type { StreetFurniture } from '@exulanica/atlas-react/playcanvas';
 import { rememberTownFurniture } from './town-furniture.js';
-import { furnitureOnLand, loadTownLand, openGroundColour, rememberTownLand, townGround, withTownLand, withoutEdge } from './town-land.js';
+import { furnitureOnLand, loadTownLand, openGroundColour, openGroundSwatch, rememberTownLand, townGround, withTownLand, withoutEdge } from './town-land.js';
 import { toApiError } from '@exulanica/graph-client';
 import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
 import { accessHeaders, type Credentials } from '../config.js';
@@ -376,12 +376,14 @@ export async function loadGeneratedWorld(
   rememberTownLand(entry.entryId, town);
   /**
    * The tiles as drawn: on land, with the land round them and no flat plane beyond them, the land in
-   * the open ground of the look they are drawn in (its setting's sand or snow too), else its own.
+   * the open ground of the look they are drawn in (its setting's sand or snow too) with the scenery
+   * that ground stands, else in its own.
    */
   const onLand = (tile: LoadedGeneratedTile, look: import('../world-look.js').PreparedWorldLook | null): LoadedGeneratedTile => {
     if (town === null) return tile;
-    const open = look === null ? null : openGroundColour(look.pack);
-    return withTownLand(tile, town, ground.tiles, open === null ? null : look!.style.linearRgb(open));
+    const colour = look === null ? null : openGroundColour(look.pack);
+    const swatch = look === null ? null : openGroundSwatch(look.pack);
+    return withTownLand(tile, town, ground.tiles, colour === null || swatch === null ? null : { linear: look!.style.linearRgb(colour), swatch });
   };
   const edged = <Look extends object>(look: Look): Look => (town === null ? look : withoutEdge(look));
   const [first, ...rest] = containers;
