@@ -1,12 +1,10 @@
-/* Making a world's own parts on the front door's light plane (DESIGN's frames 20 to 22, rulings N1 to
-   N20; L7: a one-lane part in its world-ui-<area> file). Built from world-ui.css's --u and tokens
-   and front-door.css's --nav-shape and --nav-edge (the page carries .ux-noveuis); the light plane's
-   own inks live here (N16). Sizes are CSS pixels at 1920 by 1080 multiplied by --ui-scale; text
-   under 16 px keeps a 12 px floor, a key cap's glyph 9 px (L5). The light plane ignores the system
-   theme, as the in-world surfaces do (N16). */
-
-/* Create a world over the front door and the app's shell (create-world.ts). */
-.wu-create-host { position: fixed; inset: 0; z-index: 55; }
+/* The light plane (DESIGN's frames 20 to 22, rulings N1 to N20; L7: a one-lane part in its world-ui-<area> file): the
+   light page the Integrations page stands on (integrations.ts, world-ui-integrations.css), its quiet command and key
+   row, and the in-world made note. Create a world itself is the composer page (create-world.css). Built from
+   world-ui.css's --u and tokens and front-door.css's --nav-shape and --nav-edge (the page carries .ux-noveuis); the
+   light plane's own inks live here (N16). Sizes are CSS pixels at 1920 by 1080 multiplied by --ui-scale; text under
+   16 px keeps a 12 px floor, a key cap's glyph 9 px (L5). The light plane ignores the system theme, as the in-world
+   surfaces do (N16). */
 
 .wu-light {
   --l-ink: #121715;
@@ -22,139 +20,48 @@
   --hr-quiet: var(--l-muted);
 }
 .wu-light :focus-visible { outline: 1px solid var(--l-focus); outline-offset: 2px; }
-/* The page's own container takes focus when the making page shows, for its keys and status: no ring round the
-   whole page; every control inside keeps its own (C5). */
+/* The page's own container takes focus for its keys and status: no ring round the whole page; every control inside
+   keeps its own (C5). */
 .wu-light:focus { outline: none; }
 
-/* The chosen world's still picture (N18) and its veils: frame 20 sharp, frame 21 blurred. */
+/* The chosen world's still picture (N18) and its veils. */
 .wu-light-world { position: absolute; inset: 0; z-index: -3; background: #ffffff center / cover no-repeat; }
-.wu-light[data-form="creating"] .wu-light-world { filter: blur(calc(30 * var(--u))) saturate(.8); transform: scale(1.08); }
 .wu-light-veil { position: absolute; inset: 0; z-index: -2; pointer-events: none;
   background: linear-gradient(90deg, rgba(255, 255, 255, .94) 0%, rgba(255, 255, 255, .86) 38%, rgba(255, 255, 255, .40) 60%, rgba(255, 255, 255, 0) 78%),
     linear-gradient(0deg, rgba(255, 255, 255, .92) 0%, rgba(255, 255, 255, .55) 22%, rgba(255, 255, 255, 0) 40%); }
-.wu-light[data-form="creating"] .wu-light-veil {
-  background: radial-gradient(calc(900 * var(--u)) calc(600 * var(--u)) at 20% 30%, rgba(168, 203, 210, .45), rgba(168, 203, 210, 0)),
-    radial-gradient(calc(800 * var(--u)) calc(500 * var(--u)) at 85% 80%, rgba(173, 146, 189, .22), rgba(173, 146, 189, 0)),
-    rgba(255, 255, 255, .80); }
 
 /* The wordmark, as the front door's .ux-entry-brand. */
 .wu-light-wordmark { position: absolute; left: calc(58 * var(--u)); top: calc(34 * var(--u)); margin: 0; font: 400 calc(28 * var(--u))/1.4 var(--font-sans); letter-spacing: -.035em; color: var(--l-ink); }
 
-/* The stepped surface: front-door.css's .ux-entry-hero::before, unchanged, at frame 20's and 21's sizes, 46u above and
-   left of the head in the column, so it scrolls with the parts it holds. */
+/* The stepped surface: front-door.css's .ux-entry-hero::before, unchanged, 46u above and left of the head in the
+   column, so it scrolls with the parts it holds. */
 .wu-light-surface { position: absolute; z-index: -1; left: 0; top: calc(var(--light-top) - 46 * var(--u)); width: calc(930 * var(--u)); height: calc(470 * var(--u)); pointer-events: none;
   background: radial-gradient(ellipse at 12% 75%, rgb(125 166 179 / 38%), transparent 80%), linear-gradient(105deg, rgb(168 203 210 / 64%), rgb(232 240 237 / 14%) 94%);
   -webkit-mask: var(--nav-shape) center / 100% 100% no-repeat; mask: var(--nav-shape) center / 100% 100% no-repeat; }
-.wu-light[data-form="creating"] .wu-light-surface { width: calc(1060 * var(--u)); height: calc(300 * var(--u)); }
 
-/* Where the parts sit: one column in reading order in the frame's body (the field, the price line, the notes box, any
-   refusal, then "Or start from" and the cards, which move down as lines come; frame 21's quote, then its steps),
-   scrolling where it is longer than the window. A tall window keeps frame 20's cards at its foot. The column reaches
-   46u left of the frame's side for the stepped surface; its first line stands lower on a tall window. */
+/* Where the parts sit: one column in reading order in the frame's body, scrolling where it is longer than the window.
+   The column reaches 46u left of the frame's side for the stepped surface; its first line stands lower on a tall
+   window. */
 .wu-light-column { grid-area: 2 / 1; z-index: 0; margin-left: calc(-46 * var(--u)); }
 .wu-light-body { position: relative; flex: 1 1 auto; overflow-x: hidden; display: flex; flex-direction: column; align-items: flex-start;
   --light-top: calc(196 * var(--u)); padding-top: var(--light-top); padding-left: calc(46 * var(--u)); padding-bottom: calc(40 * var(--u)); }
-.wu-light[data-form="creating"] .wu-light-body { --light-top: calc(192 * var(--u)); }
 .wu-light-head { position: relative; flex: none; width: min(calc(840 * var(--u)), 100%); }
-.wu-light[data-form="creating"] .wu-light-head { width: min(calc(980 * var(--u)), 100%); }
 .wu-light-lower { flex: none; align-self: stretch; margin-top: auto; }
-.wu-light[data-form="creating"] .wu-light-lower, .wu-light[data-sentence="true"] .wu-light-lower { margin-top: 0; }
-.wu-light[data-form="creating"] .wu-light-lower { align-self: flex-start; width: min(calc(720 * var(--u)), 100%); }
 /* The key row is the frame's own row under the body: the quiet command at its start, the keys at its end. */
 .wu-light-quiet { grid-area: 3 / 1; align-self: center; justify-self: start; }
 .wu-light-keys { grid-area: 3 / 1; align-self: center; justify-self: end; }
 @media (max-height: 899px) {
-  .wu-light-body, .wu-light[data-form="creating"] .wu-light-body { --light-top: calc(150 * var(--u)); }
-  /* Where the column can scroll, it ends just past the stepped surface, so its track stands beside the surface and
-     never over the world; the cards' strip scrolls sideways in it with its own fades. */
-  .wu-light[data-form="create"] .wu-light-column { justify-self: start; width: min(calc(930 * var(--u) + 16px), 100%); }
-  .wu-light[data-form="creating"] .wu-light-column { justify-self: start; width: min(calc(1060 * var(--u) + 16px), 100%); }
+  .wu-light-body { --light-top: calc(150 * var(--u)); }
 }
 @media (max-height: 699px) {
-  .wu-light-body, .wu-light[data-form="creating"] .wu-light-body { --light-top: calc(110 * var(--u)); padding-bottom: calc(24 * var(--u)); }
+  .wu-light-body { --light-top: calc(110 * var(--u)); padding-bottom: calc(24 * var(--u)); }
 }
 
 .wu-light-title { margin: 0; font: 200 calc(60 * var(--u))/1.1 var(--font-sans); letter-spacing: -.025em; color: var(--l-ink); }
 .wu-light-title:focus { outline: none; }
 .wu-light-label { display: block; margin: 0 0 calc(12 * var(--u)); font: 500 max(12px, calc(14 * var(--u)))/1 var(--font-sans); letter-spacing: .02em; color: var(--l-muted); }
-.wu-light-title + .wu-light-label, .wu-light-title + .wu-light-sentence-part { margin-top: calc(36 * var(--u)); }
-/* What a newcomer can do with AI here (C4): the page's sub style under the title, left with it; what follows moves down. */
-.wu-light-sub { margin: calc(14 * var(--u)) 0 0; font: 300 calc(22 * var(--u))/calc(32 * var(--u)) var(--font-sans); color: var(--l-sub); }
-.wu-light-sub + .wu-light-label, .wu-light-sub + .wu-light-sentence-part { margin-top: calc(42 * var(--u)); }
-/* The sentence in frame 21's head, in curly quotes, 12 under the label. */
-.wu-light-quote { margin: 0; font: 200 calc(44 * var(--u))/1.22 var(--font-sans); letter-spacing: -.02em; color: var(--l-ink); overflow-wrap: anywhere; }
-/* The whole sentence shows (N24): 28u past three lines, 20u past five. */
-.wu-light-quote[data-size="28"] { font-size: calc(28 * var(--u)); }
-.wu-light-quote[data-size="20"] { font-size: calc(20 * var(--u)); }
 .wu-light-line { margin: calc(12 * var(--u)) 0 0; max-width: calc(700 * var(--u)); font: 400 max(12px, calc(15 * var(--u)))/1.5 var(--font-sans); color: var(--l-muted); text-wrap: pretty; }
 .wu-light-line[data-tone="refused"] { color: var(--refused-ink-light); }
-/* The no-model and budget sentence in place of the field and orb (N7, N24): the surface is 930u by
-   300u and the cards stand 48u under it, with no "Or start from" (the sentence ends "these:"). */
-.wu-light[data-sentence="true"] .wu-light-surface { height: calc(300 * var(--u)); }
-/* The bottom veil rises with the cards, so their captions stay on white as on frame 20. */
-.wu-light[data-sentence="true"] .wu-light-veil {
-  background: linear-gradient(90deg, rgba(255, 255, 255, .94) 0%, rgba(255, 255, 255, .86) 38%, rgba(255, 255, 255, .40) 60%, rgba(255, 255, 255, 0) 78%),
-    linear-gradient(0deg, rgba(255, 255, 255, .92) 0%, rgba(255, 255, 255, .92) 42%, rgba(255, 255, 255, .55) 56%, rgba(255, 255, 255, 0) 70%); }
-.wu-light-sentence { margin: calc(36 * var(--u)) 0 0; max-width: calc(760 * var(--u)); font: 300 calc(24 * var(--u))/1.45 var(--font-sans); color: var(--l-ink); }
-
-/* ---------- The sentence field and its count (N1, N2) ---------- */
-.wu-light-row { display: flex; align-items: flex-start; gap: calc(26 * var(--u)); }
-.wu-light-field-box { flex: 1; min-width: 0; }
-.wu-light-field-rim { position: relative; border-radius: calc(14 * var(--u)); }
-.wu-light-field-rim::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; background: var(--nav-edge);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
-.wu-light-field { display: block; width: 100%; min-height: calc(140 * var(--u)); margin: 0; padding: calc(18 * var(--u)) calc(20 * var(--u)); border: 0; border-radius: calc(14 * var(--u)); resize: none;
-  font: 300 calc(24 * var(--u))/1.45 var(--font-sans); color: var(--l-ink); caret-color: var(--l-ink); background: rgba(255, 255, 255, .78);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 10px 40px rgba(18, 40, 44, .08); }
-.wu-light-field::placeholder { color: var(--l-faint); opacity: 1; }
-.wu-light-field:focus { outline: none; }
-.wu-light-field:focus-visible { outline: none; }
-.wu-light-field-rim:focus-within::after { padding: 1.5px; }
-.wu-light-count { margin-top: calc(9 * var(--u)); text-align: right; font: 400 max(12px, calc(13 * var(--u)))/1 var(--font-mono); color: var(--l-muted); }
-/* While the field is empty the count's line keeps its height, so nothing under it moves (N23). */
-.wu-light-count[data-empty="true"] { visibility: hidden; }
-
-/* ---------- The Create orb at 84 (5.8, the front door's .ux-entry-orb) ---------- */
-.wu-orb.wu-light-orb { width: calc(84 * var(--u)); height: calc(84 * var(--u)); margin-top: calc(22 * var(--u)); gap: calc(7 * var(--u));
-  color: #ffffff; font: 400 max(12px, calc(14 * var(--u)))/1 var(--font-sans); text-shadow: none;
-  background: radial-gradient(circle at 50% 48%, #4b555b 0%, #68777d 36%, rgb(202 215 218 / 85%) 68%, rgb(242 247 247 / 72%) 100%);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 38%), 0 2px 8px rgb(23 41 47 / 8%); transition: background var(--t-hover) var(--ease), opacity var(--t-hover) var(--ease); }
-.wu-orb.wu-light-orb::before, .wu-orb.wu-light-orb::after { content: none; }
-.wu-orb.wu-light-orb .wu-orb-ring { width: calc(20 * var(--u)); height: calc(20 * var(--u)); border: 1px solid rgb(255 255 255 / 70%); }
-.wu-orb.wu-light-orb .wu-orb-ring svg { width: calc(11 * var(--u)); height: calc(11 * var(--u)); }
-.wu-orb.wu-light-orb:hover:not(:disabled) { background: radial-gradient(circle at 50% 48%, #3f4c53 0%, #62777f 36%, rgb(202 215 218 / 90%) 68%, rgb(242 247 247 / 82%) 100%); }
-.wu-orb.wu-light-orb:focus-visible { outline: 2px solid var(--l-focus); outline-offset: 3px; }
-.wu-orb.wu-light-orb:disabled { cursor: default; }
-
-/* ---------- Cards to start from (N3), the front door's filmstrip ---------- */
-/* The cards' row: the served cards scroll; Blank stands after them, outside the scroll, so it always shows (N27). */
-.wu-film-row { display: flex; align-items: flex-end; gap: calc(18 * var(--u)); }
-.wu-film-row > .wu-film-card { flex: none; }
-/* The row keeps the chosen card's height (its 146u picture, N23), so "Or start from" never moves. */
-.wu-film-strip { flex: 0 1 auto; min-width: 0; display: flex; flex-wrap: nowrap; align-items: flex-end; gap: calc(18 * var(--u)); margin: -4px; padding: 4px; overflow: auto hidden; scroll-behavior: smooth; scrollbar-width: none;
-  min-height: calc(146.25 * var(--u) + 9 * var(--u) + 2 * max(12px, calc(13.5 * var(--u))) * 1.35 + 2px + 8px); }
-.wu-film-strip::-webkit-scrollbar { display: none; }
-/* More cards than fit scroll sideways with faded edges. */
-.wu-film-strip[data-more-before="true"] { -webkit-mask: linear-gradient(90deg, transparent, #000 calc(48 * var(--u))); mask: linear-gradient(90deg, transparent, #000 calc(48 * var(--u))); }
-.wu-film-strip[data-more-after="true"] { -webkit-mask: linear-gradient(270deg, transparent, #000 calc(48 * var(--u))); mask: linear-gradient(270deg, transparent, #000 calc(48 * var(--u))); }
-.wu-film-strip[data-more-before="true"][data-more-after="true"] { -webkit-mask: linear-gradient(90deg, transparent, #000 calc(48 * var(--u)), #000 calc(100% - 48 * var(--u)), transparent); mask: linear-gradient(90deg, transparent, #000 calc(48 * var(--u)), #000 calc(100% - 48 * var(--u)), transparent); }
-.wu-film-card { flex: none; display: block; width: calc(214 * var(--u)); margin: 0; padding: 0; border: 0; background: none; color: var(--l-ink); text-align: left; cursor: pointer; font: inherit;
-  transition: width 500ms var(--ease); }
-.wu-film-strip:focus-within .wu-film-card[aria-current="true"] { width: calc(260 * var(--u)); }
-.wu-film-picture { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: calc(7 * var(--u)); background: center / cover no-repeat; }
-.wu-film-picture::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
-  background: linear-gradient(110deg, #ffffffbd, #ffffff13 57%, rgb(27 48 52 / 20%)); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
-.wu-film-strip:focus-within .wu-film-card[aria-current="true"] .wu-film-picture::after { background: var(--nav-edge); }
-/* Blank's own picture; a card with no served picture is a quiet tile (B5). */
-.wu-film-card[data-picture="blank"] .wu-film-picture { background: linear-gradient(180deg, #eef3f4 0%, #f6f7f3 54%, #e3e2d8 55%, #d9d8cd 100%); }
-/* N30: the quiet card takes the stepped surface's own material, with no words on it. */
-.wu-film-card[data-picture="none"] .wu-film-picture {
-  background: radial-gradient(ellipse at 12% 75%, rgb(125 166 179 / 38%), transparent 80%), linear-gradient(105deg, rgb(168 203 210 / 64%), rgb(232 240 237 / 14%) 94%); }
-.wu-film-name { display: block; margin-top: calc(9 * var(--u)); font: 400 max(12px, calc(13.5 * var(--u)))/1.35 var(--font-sans); color: var(--l-ink); }
-.wu-film-strip:focus-within .wu-film-card[aria-current="true"] .wu-film-name::before { content: ''; display: inline-block; width: 3px; height: calc(9 * var(--u)); margin-right: calc(7 * var(--u)); background: var(--l-focus); }
-.wu-film-sub { display: block; margin-top: 2px; font: 400 max(12px, calc(12.5 * var(--u)))/1.35 var(--font-sans); color: var(--l-faint); }
-.wu-film-card:focus-visible { outline: none; }
-.wu-film-card:focus-visible .wu-film-picture { outline: 1px solid var(--l-focus); outline-offset: 3px; }
 
 /* ---------- The quiet command (5.11) and the key row (N5) ---------- */
 .wu-qcmd { position: relative; display: inline-flex; align-items: center; gap: calc(10 * var(--u)); min-height: 44px; margin: 0; padding: 0 calc(14 * var(--u)); border: 0; background: none; cursor: pointer;
@@ -163,32 +70,10 @@
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
 .wu-qcmd:hover { background: rgb(255 255 255 / 18%); }
 .wu-qcmd-key { font: 400 max(9px, calc(10 * var(--u)))/1 var(--font-mono); color: var(--l-muted); border: 1px solid rgba(18, 23, 21, .35); border-radius: calc(5 * var(--u)); padding: calc(4 * var(--u)) calc(5 * var(--u)); }
-/* A key in the row says what it does; it is not a button (the orb and the card are). */
+/* A key in the row says what it does; it is not a button. */
 .wu-light-hint { cursor: default; }
 .wu-light-hint::after { content: none; }
 .wu-light-hint:hover { background: none; }
-
-/* ---------- Steps on the light plane (5.17's geometry, N17; light colours from frame 21) ---------- */
-/* A running step's words shimmer (muted ink, deepening to ink in the band) and its dot breathes with them; when it
-   ends its words settle to ink, its dot fills and its check grows in, and the next step's words brighten. */
-.wu-light-steps .wu-step-dot { border: 0; box-shadow: 0 0 0 1.2px rgba(52, 71, 80, .35) inset; transition: background-color var(--motion-answer) var(--ease-quiet), box-shadow var(--motion-answer) var(--ease-quiet); }
-.wu-light-steps .wu-step-dot .wu-breath { left: 50%; top: 50%; width: calc(30 * var(--u)); height: calc(30 * var(--u)); margin: calc(-15 * var(--u)) 0 0 calc(-15 * var(--u)); background: radial-gradient(closest-side, rgba(100, 150, 166, .55), rgba(100, 150, 166, 0)); }
-.wu-light-steps .wu-step[data-state="now"] .wu-step-dot::after { animation: none; }
-.wu-light-steps .wu-step[data-state="done"] .wu-step-dot::after { animation: wu-check-in var(--motion-leave) var(--ease-settle) both; }
-@keyframes wu-check-in { from { opacity: 0; scale: .6; } to { opacity: 1; scale: 1; } }
-.wu-light-steps .wu-step[data-state="done"] .wu-step-dot { background: #344750; box-shadow: none; }
-.wu-light-steps .wu-step[data-state="done"] .wu-step-dot::after { border-color: #ffffff; border-width: 0 1.8px 1.8px 0; }
-.wu-light-steps .wu-step[data-state="now"] .wu-step-dot { border: 0; box-shadow: 0 0 0 1.5px #344750 inset; }
-.wu-light-steps .wu-step[data-state="now"] .wu-step-dot::after { background: var(--l-focus); box-shadow: 0 0 8px rgba(100, 150, 166, .9); }
-.wu-light-steps .wu-step-words { color: var(--l-ink); transition: color var(--motion-answer) var(--ease-quiet); }
-.wu-light-steps .wu-step[data-state="now"] .wu-step-words { color: var(--l-muted); --working-lit: var(--l-ink); transition: color var(--motion-arrive) var(--ease-glide); }
-.wu-light-steps .wu-step[data-state="next"] .wu-step-words, .wu-light-steps .wu-step-sub { color: var(--l-faint); }
-/* Step times in the muted ink: the faint one measured under 4.5:1 there (N22). */
-.wu-light-steps .wu-step-time { color: var(--l-muted); }
-.wu-light-steps + .wu-light-line { margin-top: calc(22 * var(--u)); }
-/* A step's time stays on one line ("1 min 4 s"). */
-.wu-light-steps .wu-step-time { white-space: nowrap; }
-.wu-hidden-words { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* ---------- The made note (frame 22, N13): glass in the world, centred at bottom 96 (L1) ---------- */
 .wu-made-note { position: absolute; left: 50%; bottom: calc(96 * var(--u)); transform: translateX(-50%); display: grid; grid-auto-flow: column; grid-auto-columns: auto; gap: 0 calc(40 * var(--u));
@@ -199,21 +84,13 @@
 /* Values wrap within their column (N13). */
 .wu-made-value { margin: 0; max-width: calc(380 * var(--u)); font: 400 calc(18 * var(--u))/1.3 var(--font-sans); color: var(--ink); }
 
-/* The world is made: the making frame leaves and the opening takes over (front-door.ts). */
-.wu-create-host[data-leaving="true"] { animation: wu-leave var(--motion-leave) var(--ease-leave) both; pointer-events: none; }
-
 @media (prefers-reduced-motion: reduce) {
-  .wu-film-card { transition: none; }
-  .wu-light-steps .wu-step[data-state="now"] .wu-step-words { color: var(--l-ink); }
-  .wu-light-steps .wu-step[data-state="done"] .wu-step-dot::after { animation-name: wu-fade; }
-  .wu-film-strip { scroll-behavior: auto; }
   .wu-made-note, .wu-made-note[data-leaving="true"] { animation-duration: 120ms; }
   .wu-made-note { animation-name: wu-fade; }
 }
 /* Reduced transparency makes the plane opaque white (N16); the note's glass is the core's opaque one. */
 @media (prefers-reduced-transparency: reduce) {
-  .wu-light-veil, .wu-light[data-form="creating"] .wu-light-veil { background: #ffffff; }
-  .wu-light-field { background: #ffffff; }
+  .wu-light-veil { background: #ffffff; }
 }
 /* More contrast makes the faint ink #3d4a50 (N16). */
 @media (prefers-contrast: more) {
@@ -223,21 +100,3 @@
   .wu-light-surface { background: Canvas; mask: none; -webkit-mask: none; border: 1px solid CanvasText; }
   .wu-qcmd { border: 1px solid ButtonText; }
 }
-
-/* Web notes (create-world.ts; WORDS.md "Web notes in Create, the words", DESIGN's frames/web-notes/): the check box
-   under the price line on frame 20, and the notes at the page's right on frame 21. */
-.wu-notes-ask { display: grid; grid-template-columns: auto 1fr; column-gap: calc(12 * var(--u)); row-gap: calc(4 * var(--u));
-  align-items: start; margin-top: calc(16 * var(--u)); max-width: calc(700 * var(--u)); cursor: pointer; }
-.wu-notes-box { appearance: none; box-sizing: border-box; width: calc(18 * var(--u)); height: calc(18 * var(--u)); margin: calc(2 * var(--u)) 0 0;
-  border-radius: calc(5 * var(--u)); border: 1.5px solid var(--l-focus); background: transparent; cursor: pointer; }
-.wu-notes-box:checked { background: var(--l-focus) center / 70% no-repeat
-  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E"); }
-.wu-notes-words { font: 400 max(12px, calc(15 * var(--u)))/1.5 var(--font-sans); color: var(--l-muted); }
-.wu-notes-line { grid-column: 2; font: 400 max(12px, calc(13 * var(--u)))/1.45 var(--font-sans); color: var(--l-faint); text-wrap: pretty; }
-.wu-notes-panel { position: absolute; left: calc(1220 * var(--u)); top: calc(512 * var(--u)); width: calc(600 * var(--u)); }
-.wu-notes-panel[hidden] { display: none; }
-.wu-notes-list { list-style: none; margin: calc(14 * var(--u)) 0 0; padding: 0; display: grid; row-gap: calc(10 * var(--u)); }
-.wu-notes-list li { font: 400 max(12px, calc(15 * var(--u)))/1.45 var(--font-sans); color: var(--l-ink); text-wrap: pretty; }
-.wu-notes-aspect { color: var(--l-faint); }
-.wu-notes-foot { margin: calc(16 * var(--u)) 0 0; font: 400 max(12px, calc(13 * var(--u)))/1.45 var(--font-sans); color: var(--l-faint); text-wrap: pretty; }
-.wu-notes-instead { margin: calc(14 * var(--u)) 0 0; font: 400 max(12px, calc(15 * var(--u)))/1.5 var(--font-sans); color: var(--l-muted); text-wrap: pretty; }

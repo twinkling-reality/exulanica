@@ -11,10 +11,16 @@ export const CREATE_WORDS = Object.freeze({
   /** The line under the title: what a newcomer can do with AI here (C4). */
   peopleMoveIn: 'People move in, and you choose an open AI model to decide for any of them.',
   describeIt: 'Describe it',
-  /** Today's placeholder, kept in the faint ink while the field is empty (N2). */
-  placeholder: 'A harbour with fishing boats, a market on the quay and a lighthouse',
+  /** The composer's placeholder, in the muted ink while it is empty: a sentence that makes a world (WORLDLOOK, 2 of 2). */
+  placeholder: 'A cozy little town by the sea at dusk',
   create: 'Create',
   orStartFrom: 'Or start from',
+  /** Over a ready world's name in the strip, and over Blank's (the composer page's mock). */
+  readyWorld: 'READY WORLD',
+  empty: 'EMPTY',
+  /** The strip's arrows. */
+  previous: 'Previous',
+  next: 'Next',
   noModelFree: 'No AI model · Free',
   blank: 'Blank',
   buildItYourself: 'Build it yourself · Free',
@@ -254,6 +260,17 @@ export const madeSpent = ({ spentUsd, unknownUsd = 0 }, maximumUsd) =>
 /** Under frame 21's steps, live (N10): "Spent $0.12 of at most $1.43". */
 export const spendLine = (spent, maximumUsd) => `Spent ${madeSpent(spent, maximumUsd)}`;
 
+/**
+ * The price in the composer's foot (the composer page's mock): "up to $0.26", the most a world made now may spend.
+ * Where less than that is left here (the offer's `left_usd`), the most is what is left (A1b), rounded down.
+ */
+export const priceUpTo = (maximumUsd, leftUsd = null) =>
+  `up to ${leftUsd !== null && Number(leftUsd) < Number(maximumUsd) ? leftAmount(leftUsd) : ceilingAmount(maximumUsd)}`;
+
+/** Under the making view's steps, live: "Spent $0.0061 of up to $0.26", with a part not known yet (N10, J5). */
+export const spentUpTo = ({ spentUsd, unknownUsd = 0 }, maximumUsd) =>
+  `Spent ${amount(spentUsd)} of up to ${ceilingAmount(maximumUsd)}${Number(unknownUsd) > 0 ? `, and up to ${amount(unknownUsd)} not known yet` : ''}`;
+
 /** Under a refusal where anything was spent (N9): "Spent $0.02 before it stopped." */
 export const refusalSpent = ({ spentUsd, unknownUsd = 0 }) =>
   Number(spentUsd) > 0 || Number(unknownUsd) > 0 ? `Spent ${spentSoFar(spentUsd, unknownUsd)} before it stopped.` : null;
@@ -289,6 +306,8 @@ export function setValue(land, setting = null) {
  */
 export const NOTES_WORDS = Object.freeze({
   ask: 'Read the web first for what such a place looks like',
+  /** The toggle in the composer's foot that asks for web notes (the composer page's mock), on until it is pressed. */
+  toggle: 'Search the web',
   steps: Object.freeze({
     plan: 'Choosing what to look up',
     search: 'Searching the web',
@@ -317,6 +336,17 @@ export const notesFoot = (searches) =>
 
 /** The made note's column (item 5): the counts the draft read states. */
 export const webColumn = (notes, searches) => `${counted(notes, 'note', 'notes')} from ${counted(searches, 'search', 'searches')}`;
+
+/**
+ * The toggle's details, shown on hover and keyboard focus (the composer page's mock): the planner's limit and the most
+ * the notes' two model calls add, from the offer.
+ */
+export const webTip = (searches, mostUsd) =>
+  `Looks up what such a place looks like before it is made: up to ${counted(searches, 'search', 'searches')} with ${NOTES_SOURCE}, which keeps ${searches === 1 ? 'it' : 'them'}. Adds at most ${ceilingAmount(mostUsd)}.`;
+
+/** Over the notes in the making view's second column: "FROM THE WEB, 3 SEARCHES", the searches sent, where any were. */
+export const webNotesLabel = (searches) =>
+  Number.isSafeInteger(searches) && searches > 0 ? `FROM THE WEB, ${counted(searches, 'SEARCH', 'SEARCHES')}` : 'FROM THE WEB';
 
 const ASPECT_LABELS = new Map(aspects.entries.map((entry) => [entry.key, entry.label]));
 

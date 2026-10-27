@@ -1,31 +1,33 @@
 // @vitest-environment happy-dom
-// Making a world's light parts (tools/previews/world-workspace/world-ui-create.ts): what they say to
-// a keyboard and a screen reader. The orb is one button, "Create", out of reach while it cannot
-// start; the field stops at its limit and counts from the first letter; the cards name themselves,
-// Blank last, one Tab stop; Esc is drawn once, as the quiet command, never in the key row; the
-// steps are a polite live region; the made note is announced once and leaves when dismissed.
+// Create a world (tools/previews/world-workspace/create-world.ts, ROOT's composer mock of 27 October) and its parts
+// (world-ui-create.ts): what they say to a keyboard and a screen reader, and the page over stand-in answers. The
+// composer's pill is one button, "Create", with its key; the web search toggle says its details as a tooltip; the
+// strip's cards name themselves, Blank last, one Tab stop, the current one marked and the page's picture following it;
+// Esc is drawn once; the steps are a polite live region; the made note is announced once and leaves when dismissed.
+// Every first Enter starts, showing the making view before the start answers, or says why in the price's place.
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-interface Step { words: string; state: 'done' | 'now' | 'next'; sub?: string; time?: string }
-interface SentenceField { readonly root: HTMLElement; readonly label: HTMLElement; readonly field: HTMLTextAreaElement; readonly count: HTMLElement; set(words: string): void }
-interface LightPage { readonly root: HTMLElement; readonly head: HTMLElement; readonly lower: HTMLElement; readonly quiet: HTMLElement; readonly keys: HTMLElement; form(next: 'create' | 'creating'): void }
-interface FilmCardWords { key: string; name: string; sub: string; picture: string | null; blank?: boolean }
-interface FilmStrip { readonly root: HTMLElement; readonly cards: readonly HTMLButtonElement[]; choose(index: number, focus?: boolean): void; readonly chosen: number }
+interface Step { key?: string; words: string; state: 'done' | 'now' | 'next'; sub?: string; time?: string }
+interface StripCard { key: string; name: string; picture: string | null; blank?: boolean }
+interface CreatePage { readonly root: HTMLElement; readonly column: HTMLElement; readonly foot: HTMLElement; readonly corner: HTMLElement; form(next: 'create' | 'creating'): void; picture(address: string | null): void }
+interface Composer {
+  readonly root: HTMLElement; readonly field: HTMLTextAreaElement; readonly pill: HTMLButtonElement; readonly web: HTMLButtonElement | null;
+  set(words: string): void; say(why: string | null, price: string | null): void; again(): void; ready(on: boolean): void;
+  offerWeb(web: { on: boolean; tip: string; onChange: (on: boolean) => void } | null): void;
+}
+interface WorldStrip { readonly root: HTMLElement; readonly cards: readonly HTMLButtonElement[]; readonly chosen: number; choose(index: number, focus?: boolean): void }
 interface CreateParts {
-  lightPage(options?: { form?: 'create' | 'creating'; picture?: string | null; labelledBy?: string }): LightPage;
-  sentenceField(options: { limit: number; value?: string; onInput?: (words: string) => void }): SentenceField;
-  createOrb(options: { onPress: () => void; ready?: boolean }): HTMLButtonElement;
-  setOrbReady(button: HTMLButtonElement, ready: boolean): void;
-  sentenceRow(field: SentenceField, button: HTMLButtonElement): HTMLElement;
-  filmStrip(cards: readonly FilmCardWords[], onStart: (key: string) => void): FilmStrip;
-  quietCommand(options: { onPress: () => void; place?: 'quiet' | 'row' }): HTMLButtonElement;
-  createKeyRow(row: HTMLElement, keys: { create: boolean; start: boolean }): void;
-  lightSteps(steps?: readonly Step[]): { readonly root: HTMLElement; set(steps: readonly Step[]): void };
-  lightLine(words: string, options?: { tone?: 'plain' | 'refused'; live?: boolean }): HTMLElement;
+  createPage(options: { labelledBy: string }): CreatePage;
+  createTitle(words: string, id: string): HTMLElement;
+  composer(options: { value?: string; onInput?: (words: string) => void; onCreate: () => void }): Composer;
+  worldStrip(cards: readonly StripCard[], options: { onStart: (key: string) => void; onChoose?: (card: StripCard) => void; labelledBy?: string }): WorldStrip;
+  makingSteps(): { readonly root: HTMLElement; set(steps: readonly Step[]): void };
+  webNotes(): { readonly root: HTMLElement; notes(label: string, notes: readonly { aspect: string; text: string }[]): void; instead(label: string, line: string): void };
+  quietCommand(options: { onPress: () => void; place?: 'quiet' | 'row' | 'corner' }): HTMLButtonElement;
   madeNote(columns: readonly { label: string; value: string }[]): { readonly root: HTMLElement; dismiss(): void };
 }
-interface CreateSteps { startCards(recipes?: readonly unknown[], kinds?: readonly unknown[]): FilmCardWords[] }
+interface CreateSteps { startCards(recipes?: readonly unknown[], kinds?: readonly unknown[]): StripCard[] }
 // Joined paths: the test runner still finds the files, and the type checker leaves the preview
 // modules (outside this package) out of the program.
 const parts = async (): Promise<CreateParts> => import('../../../../tools/previews/world-workspace/' + 'world-ui-create.ts') as Promise<CreateParts>;
@@ -39,182 +41,206 @@ const nameOf = (element: Element): string => {
 };
 const type = (field: HTMLTextAreaElement, words: string): void => { field.value = words; field.dispatchEvent(new Event('input')); };
 
-/** Frame 20 built from the parts, as the page will build it. */
-async function frame20(words = '') {
-  const create = await parts();
-  const { startCards } = await steps();
-  const page = create.lightPage({ labelledBy: 'title' });
-  document.body.append(page.root);
-  const title = document.createElement('h1'); title.id = 'title'; title.tabIndex = -1; title.textContent = 'Create a world';
-  const field = create.sentenceField({ limit: 1000, value: words });
-  const orb = create.createOrb({ onPress: () => {}, ready: words.trim().length > 0 });
-  page.head.append(title, create.sentenceRow(field, orb));
-  const strip = create.filmStrip(startCards([{ key: 'town', name: 'Small town', picture: null }], [{ key: 'wall', name: 'Wall city', priceUsd: '0.4' }]), () => {});
-  page.lower.append(strip.root);
-  const leave = create.quietCommand({ onPress: () => {} });
-  page.quiet.append(leave);
-  create.createKeyRow(page.keys, { create: words.trim().length > 0, start: false });
-  return { create, page, title, field, orb, strip, leave };
-}
+describe('the composer', () => {
+  it('takes the words with the mock\'s placeholder, and is one Create pill with its key, dimmed while it cannot start', async () => {
+    const { composer } = await parts();
+    let pressed = 0;
+    const box = composer({ onCreate: () => { pressed += 1; } });
+    document.body.append(box.root);
+    expect(box.field.tagName).toBe('TEXTAREA');
+    expect(box.field.placeholder).toBe('A cozy little town by the sea at dusk');
+    expect(box.field.getAttribute('aria-label')).toBe('Describe it');
+    expect([...box.root.querySelectorAll('button')]).toEqual([box.pill]);
+    expect(box.pill.textContent).toBe('Create↵');
+    expect(box.pill.getAttribute('aria-keyshortcuts')).toBe('Enter');
+    expect(box.pill.querySelector('.wu-composer-key')!.getAttribute('aria-hidden')).toBe('true');
+    // Dimmed, it is still a button that can be pressed: the press says why (N2, the first Enter).
+    expect(box.pill.getAttribute('aria-disabled')).toBe('true');
+    expect(box.pill.disabled).toBe(false);
+    box.pill.click();
+    expect(pressed).toBe(1);
+    box.ready(true);
+    expect(box.pill.hasAttribute('aria-disabled')).toBe(false);
+  });
 
-describe('the Create orb', () => {
-  it('is one button named "Create", dimmed and out of the Tab order until a word is typed', async () => {
-    const { create, page, orb, field } = await frame20();
-    const orbs = [...page.root.querySelectorAll('.wu-orb')];
-    expect(orbs).toEqual([orb]);
-    expect(orb.tagName).toBe('BUTTON');
-    expect(orb.querySelector('.wu-orb-word')!.textContent).toBe('Create');
-    expect(orb.disabled).toBe(true);
-    type(field.field, 'a harbour');
-    create.setOrbReady(orb, true);
-    expect(orb.disabled).toBe(false);
+  it('says the price, and why it cannot start in the price\'s place, each a polite status', async () => {
+    const { composer } = await parts();
+    const box = composer({ onCreate: () => {} });
+    document.body.append(box.root);
+    const why = box.root.querySelector<HTMLElement>('.wu-composer-why')!, price = box.root.querySelector<HTMLElement>('.wu-composer-price')!;
+    expect([why.getAttribute('role'), price.getAttribute('role')]).toEqual(['status', 'status']);
+    // In the foot's order: the toggle's place, the reason, the price, then Create.
+    expect([...box.root.querySelector('.wu-composer-foot')!.children].map((one) => one.className)).toEqual(['wu-composer-web', 'wu-composer-why', 'wu-composer-price', 'wu-composer-pill']);
+    expect([why.hidden, price.hidden]).toEqual([true, true]);
+    box.say(null, 'up to $0.26');
+    expect([why.hidden, price.textContent]).toEqual([true, 'up to $0.26']);
+    box.say('Reading what you can make here…', null);
+    expect([why.textContent, price.hidden]).toEqual(['Reading what you can make here…', true]);
+    // Pressed again on the same reason, it is said again: emptied, then said.
+    vi.useFakeTimers();
+    box.again();
+    expect(why.textContent).toBe('');
+    vi.advanceTimersByTime(0);
+    expect(why.textContent).toBe('Reading what you can make here…');
+  });
+
+  it('draws "Search the web" as a toggle where web notes are offered, its details a tooltip in the page\'s type', async () => {
+    const { composer } = await parts();
+    const box = composer({ onCreate: () => {} });
+    document.body.append(box.root);
+    expect(box.web).toBeNull();
+    const heard: boolean[] = [];
+    const tip = 'Looks up what such a place looks like before it is made: up to 3 searches with Tavily, which keeps them. Adds at most $0.05.';
+    box.offerWeb({ on: true, tip, onChange: (on) => heard.push(on) });
+    const chip = box.web!;
+    expect(chip.tagName).toBe('BUTTON');
+    expect(chip.textContent).toBe('Search the web');
+    expect(chip.getAttribute('aria-pressed')).toBe('true');
+    expect(chip.hasAttribute('title')).toBe(false);
+    const said = document.getElementById(chip.getAttribute('aria-describedby')!)!;
+    expect(said.getAttribute('role')).toBe('tooltip');
+    expect(said.textContent).toBe(tip);
+    chip.click();
+    expect(chip.getAttribute('aria-pressed')).toBe('false');
+    chip.click();
+    expect(heard).toEqual([false, true]);
+    // The tab order runs through the words, the toggle, then Create.
+    const order = [...box.root.querySelectorAll<HTMLElement>('textarea, button')].filter((one) => one.tabIndex >= 0);
+    expect(order).toEqual([box.field, chip, box.pill]);
+    box.offerWeb(null);
+    expect(box.web).toBeNull();
+    expect(box.root.querySelector('.wu-composer-chip')).toBeNull();
   });
 });
 
-describe('the sentence field', () => {
-  it('stops at the offer\'s limit, is labelled "Describe it" and counts from the first letter', async () => {
-    const { field } = await frame20();
-    expect(field.field.maxLength).toBe(1000);
-    const label = field.label as HTMLLabelElement;
-    expect(label.textContent).toBe('Describe it');
-    expect(label.htmlFor).toBe(field.field.id);
-    expect(field.field.placeholder).toBe('A harbour with fishing boats, a market on the quay and a lighthouse');
-    // Empty, the count keeps its line but is out of sight and out of a screen reader's reading (N23).
-    expect(field.count.dataset.empty).toBe('true');
-    expect(field.count.getAttribute('aria-hidden')).toBe('true');
-    type(field.field, 'Glass terraces with glowing pools above the sea at night, and a grand hotel at the top');
-    expect(field.count.dataset.empty).toBeUndefined();
-    expect(field.count.hasAttribute('aria-hidden')).toBe(false);
-    expect(field.count.textContent).toBe('86 of 1000');
-    expect(field.field.getAttribute('aria-describedby')).toBe(field.count.id);
-    field.set('x'.repeat(1200));
-    expect(field.count.textContent).toBe('1000 of 1000');
-    expect(field.count.dataset.full).toBe('true');
-    type(field.field, '');
-    expect(field.count.dataset.empty).toBe('true');
+describe('the strip of ready worlds', () => {
+  const strip = async (onChoose?: (card: StripCard) => void) => {
+    const create = await parts();
+    const { startCards } = await steps();
+    const cards = startCards([{ key: 'recipe:town', name: 'A small town', picture: '/card-pictures/recipe-town.jpg' }], [{ key: 'kind:wall', name: 'Wall city', priceUsd: '0.4' }]);
+    const started: string[] = [];
+    const shown = create.worldStrip(cards, { onStart: (key) => started.push(key), ...(onChoose ? { onChoose } : {}) });
+    document.body.append(shown.root);
+    return { shown, started };
+  };
+
+  it('names each card, says READY WORLD over a ready world and EMPTY over Blank, last, and makes one Tab stop', async () => {
+    const { shown, started } = await strip();
+    expect(shown.cards.map(nameOf)).toEqual(['A small town', 'Wall city', 'Blank']);
+    expect(shown.cards.map((card) => document.getElementById(card.getAttribute('aria-describedby')!)!.textContent)).toEqual(['READY WORLD', 'READY WORLD', 'EMPTY']);
+    expect(shown.cards.map((card) => card.tabIndex)).toEqual([0, -1, -1]);
+    expect(shown.cards[0]!.getAttribute('aria-current')).toBe('true');
+    expect(shown.cards.map((card) => card.dataset['picture'])).toEqual(['served', 'none', 'blank']);
+    expect(shown.cards[0]!.querySelector('img')!.getAttribute('src')).toBe('/card-pictures/recipe-town.jpg');
+    expect(shown.cards[0]!.querySelector('img')!.alt).toBe('');
+    expect(shown.cards[1]!.querySelector('img')).toBeNull();
+    // No price or sub-line under a name (the mock): its kind and its name alone.
+    expect(shown.cards[1]!.textContent).toBe('READY WORLDWall city');
+    shown.cards[1]!.click();
+    expect(started).toEqual(['kind:wall']);
+    expect(shown.root.getAttribute('role')).toBe('group');
+    expect(nameOf(shown.root)).toBe('Or start from');
+  });
+
+  it('moves the current card with its arrows, held at the ends, and tells the page each new one', async () => {
+    const chosen: (string | null)[] = [];
+    const { shown } = await strip((card) => chosen.push(card.picture));
+    const [previous, next] = [...shown.root.querySelectorAll<HTMLButtonElement>('.wu-strip-arrow')];
+    expect([previous!.getAttribute('aria-label'), next!.getAttribute('aria-label')]).toEqual(['Previous', 'Next']);
+    expect(previous!.getAttribute('aria-disabled')).toBe('true');
+    expect(chosen).toEqual(['/card-pictures/recipe-town.jpg']);
+    next!.click();
+    expect(shown.chosen).toBe(1);
+    expect(previous!.hasAttribute('aria-disabled')).toBe(false);
+    next!.click(); next!.click();
+    expect(shown.chosen).toBe(2);
+    expect(next!.getAttribute('aria-disabled')).toBe('true');
+    // Blank's tile is empty: the picture behind gives way to the ground.
+    expect(chosen).toEqual(['/card-pictures/recipe-town.jpg', null, null]);
+    shown.choose(0, true);
+    expect(document.activeElement).toBe(shown.cards[0]);
+    expect(shown.cards.filter((card) => card.hasAttribute('aria-current'))).toEqual([shown.cards[0]]);
   });
 });
 
-describe('the cards to start from', () => {
-  it('name themselves, keep Blank last and make one Tab stop that arrows move', async () => {
-    const { strip } = await frame20();
-    expect(strip.cards.map(nameOf)).toEqual(['Small town', 'Wall city', 'Blank']);
-    expect(strip.cards.map((card) => document.getElementById(card.getAttribute('aria-describedby')!)!.textContent)).toEqual(['No AI model · Free', 'At most $0.40', 'Build it yourself · Free']);
-    expect(strip.cards.map((card) => card.tabIndex)).toEqual([0, -1, -1]);
-    expect(strip.cards.map((card) => card.getAttribute('aria-keyshortcuts'))).toEqual(['Enter', 'Enter', 'Enter']);
-    strip.choose(2, true);
-    expect(strip.cards.map((card) => card.tabIndex)).toEqual([-1, -1, 0]);
-    expect(strip.cards[2]!.getAttribute('aria-current')).toBe('true');
-    expect(strip.cards.filter((card) => card.hasAttribute('aria-current'))).toHaveLength(1);
-    expect(document.activeElement).toBe(strip.cards[2]);
-    expect(strip.cards[2]!.dataset.picture).toBe('blank');
-    expect(strip.cards[0]!.dataset.picture).toBe('none');
-    // A quiet card's tile is the material alone: its name is said once, by the line under it (N30).
-    expect(strip.cards[0]!.querySelector('.wu-film-picture')!.textContent).toBe('');
-    expect(strip.cards[0]!.textContent).toBe('Small townNo AI model · Free');
-    expect(strip.root.querySelector('[role="group"]')!.getAttribute('aria-labelledby')).toBe(strip.root.querySelector('.wu-light-label')!.id);
+describe('the page and Esc', () => {
+  it('crossfades the current ready world\'s picture behind it, and the ground where there is none', async () => {
+    const { createPage } = await parts();
+    const page = createPage({ labelledBy: 'title' });
+    document.body.append(page.root);
+    const shown = (): string[] => [...page.root.querySelectorAll<HTMLElement>('.wu-create-media[data-shown="true"]')].map((one) => one.style.backgroundImage);
+    expect(page.root.getAttribute('role')).toBe('dialog');
+    expect(page.root.getAttribute('aria-modal')).toBe('true');
+    expect(page.root.querySelector('.wu-create-mark')!.textContent).toBe('exulanica');
+    expect(shown()).toEqual([]);
+    page.picture('/card-pictures/a.jpg');
+    expect(shown()).toHaveLength(1);
+    expect(shown()[0]).toContain('/card-pictures/a.jpg');
+    page.picture('/card-pictures/b.jpg');
+    expect(shown()).toHaveLength(1);
+    expect(shown()[0]).toContain('/card-pictures/b.jpg');
+    page.picture(null);
+    expect(shown()).toEqual([]);
+    page.form('creating');
+    expect(page.root.dataset['form']).toBe('creating');
   });
 
-  it('keep Blank after the cards that scroll, outside the scroll, so it always shows (N27)', async () => {
-    const { strip } = await frame20();
-    const scroller = strip.root.querySelector<HTMLElement>('.wu-film-strip')!;
-    const blank = strip.cards.at(-1)!;
-    expect(scroller.contains(blank)).toBe(false);
-    expect(strip.cards.slice(0, -1).every((card) => scroller.contains(card))).toBe(true);
-    expect(blank.parentElement).toBe(scroller.parentElement);
-    expect(blank.parentElement!.getAttribute('role')).toBe('group');
-  });
-
-  it('measure their faded edges once laid out and whenever the strip changes size (N27)', async () => {
-    const observed: { callback: () => void; target: Element | null }[] = [];
-    vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { observed.push({ callback, target: null }); } observe(target: Element) { observed.at(-1)!.target = target; } disconnect() {} });
-    try {
-      const { strip } = await frame20();
-      const scroller = strip.root.querySelector<HTMLElement>('.wu-film-strip')!;
-      const watch = observed.find((one) => one.target === scroller);
-      expect(watch).toBeDefined();
-      // Laid out wider than it shows: the far end fades without any scroll.
-      Object.defineProperties(scroller, { clientWidth: { value: 600, configurable: true }, scrollWidth: { value: 1400, configurable: true } });
-      watch!.callback();
-      expect(scroller.dataset.moreAfter).toBe('true');
-      expect(scroller.dataset.moreBefore).toBe('false');
-    } finally { vi.unstubAllGlobals(); }
-  });
-});
-
-describe('Esc and the key row', () => {
-  it('draws Esc once, as the quiet command "Your worlds", and never in the key row', async () => {
-    const { create, page, leave } = await frame20('a harbour');
+  it('draws Esc once, as the command "Your worlds" at the top right, its cap hidden', async () => {
+    const { createPage, quietCommand } = await parts();
+    const page = createPage({ labelledBy: 'title' });
+    document.body.append(page.root);
+    const leave = quietCommand({ onPress: () => {}, place: 'corner' });
+    page.corner.append(leave);
     expect(leave.tagName).toBe('BUTTON');
     expect(nameOf(leave)).toContain('Your worlds');
     expect(leave.getAttribute('aria-keyshortcuts')).toBe('Escape');
     expect(leave.querySelector('.wu-qcmd-key')!.getAttribute('aria-hidden')).toBe('true');
-    expect(leave.dataset.place).toBe('quiet');
-    expect(page.quiet.contains(leave)).toBe(true);
-    for (const keys of [{ create: true, start: false }, { create: false, start: true }, { create: true, start: true }]) {
-      create.createKeyRow(page.keys, keys);
-      const row = [...page.keys.querySelectorAll('[aria-keyshortcuts]')];
-      expect(row.map((one) => one.getAttribute('aria-keyshortcuts'))).not.toContain('Escape');
-      expect(page.keys.textContent).not.toContain('Esc');
-      expect([...page.root.querySelectorAll('[aria-keyshortcuts="Escape"]')]).toEqual([leave]);
-    }
-    create.createKeyRow(page.keys, { create: true, start: false });
-    expect(page.keys.textContent).toBe('EnterCreate');
-    // The row says keys; it is not a set of buttons (the orb and the cards are).
-    expect(page.keys.querySelectorAll('button')).toHaveLength(0);
-    create.createKeyRow(page.keys, { create: false, start: true });
-    expect(page.keys.textContent).toBe('EnterStart');
-  });
-
-  it('puts the focusable parts in reading order: field, orb, the chosen card, then Your worlds', async () => {
-    const { page, field, orb, strip, leave } = await frame20('a harbour');
-    const order = [...page.root.querySelectorAll<HTMLElement>('button, textarea, [tabindex]')].filter((one) => one.tabIndex >= 0 && !(one as HTMLButtonElement).disabled);
-    expect(order).toEqual([field.field, orb, strip.cards[0], leave]);
-    expect(page.root.getAttribute('role')).toBe('dialog');
-    expect(page.root.getAttribute('aria-labelledby')).toBe('title');
+    expect([...page.root.querySelectorAll('[aria-keyshortcuts="Escape"]')]).toEqual([leave]);
   });
 });
 
-describe('the steps', () => {
-  it('mark the running step and say each new one once in a polite live region', async () => {
+describe('the making view', () => {
+  it('marks the running step and says each new one once in a polite live region', async () => {
     const create = await parts();
-    const shown = create.lightSteps([{ words: 'Worked out what to make', state: 'done', time: '1 s' }, { words: 'Planning the place', state: 'now', time: '6 s' }]);
+    const shown = create.makingSteps();
+    shown.set([{ words: 'Worked out what to make', state: 'done', time: '1 s' }, { words: 'Planning the place', state: 'now', time: '6 s' }]);
     document.body.append(shown.root);
     const live = shown.root.querySelector('[aria-live]')!;
     expect(live.getAttribute('aria-live')).toBe('polite');
     expect(live.textContent).toBe('Planning the place');
     const now = shown.root.querySelector('[aria-current="step"]')!;
-    expect(now.querySelector('.wu-step-words')!.textContent).toBe('Planning the place');
+    expect(now.querySelector('.wu-making-words')!.textContent).toBe('Planning the place');
+    expect(now.querySelector('.wu-making-now')!.getAttribute('aria-hidden')).toBe('true');
     expect(shown.root.querySelectorAll('[aria-current]')).toHaveLength(1);
-    shown.set([{ words: 'Worked out what to make', state: 'done', time: '1 s' }, { words: 'Planning the place', state: 'now', time: '9 s' }]);
-    expect(live.textContent).toBe('Planning the place');
     shown.set([{ words: 'Worked out what to make', state: 'done', time: '1 s' }, { words: 'Planning the place', state: 'done', time: '9 s' }, { words: 'Building it', state: 'now', time: '12 s' }]);
     expect(live.textContent).toBe('Building it');
-    expect(shown.root.querySelectorAll('.wu-step')).toHaveLength(3);
-    expect(shown.root.querySelector('[aria-current="step"] .wu-step-time')!.textContent).toBe('12 s');
+    expect(shown.root.querySelectorAll('.wu-making-step')).toHaveLength(3);
+    expect(shown.root.querySelectorAll('.wu-making-now')).toHaveLength(1);
+    expect(shown.root.querySelector('[aria-current="step"] .wu-making-time')!.textContent).toBe('12 s');
   });
 
-  it('keep each step\'s row across reads, so only a new row arrives and only the running step shimmers (motion catalog)', async () => {
+  it('keeps each step\'s row across reads, so a time changes in place', async () => {
     const create = await parts();
-    const shown = create.lightSteps([{ words: 'Worked out what to make', state: 'done', time: '1 s' }, { words: 'Planning the place', state: 'now', time: '6 s' }]);
-    document.body.append(shown.root);
-    const [made, planning] = [...shown.root.querySelectorAll('.wu-step')];
-    const working = (): string[] => [...shown.root.querySelectorAll('.wu-working')].map((line) => line.closest('.wu-step')!.querySelector('.wu-step-words')!.textContent ?? '');
-    expect(working()).toEqual(['Planning the place']);
-    shown.set([{ words: 'Worked out what to make', state: 'done', time: '1 s' }, { words: 'Planning the place', state: 'done', time: '9 s' }, { words: 'Building it', state: 'now', time: '12 s' }]);
-    const rows = [...shown.root.querySelectorAll('.wu-step')];
-    // The same rows, not redrawn ones: identity, not likeness.
-    expect(rows[0]).toBe(made);
-    expect(rows[1]).toBe(planning);
-    expect(working()).toEqual(['Building it']);
-    expect(rows.map((row) => (row as HTMLElement).style.getPropertyValue('--motion-order'))).toEqual(['0', '1', '0']);
+    const shown = create.makingSteps();
+    shown.set([{ key: 'queued', words: 'Waiting to start', state: 'now', time: '0 s' }]);
+    const row = shown.root.querySelector('.wu-making-step');
+    shown.set([{ key: 'queued', words: 'Waiting to start', state: 'now', time: '1 s' }]);
+    shown.set([{ key: 'queued', words: 'Waiting to start', state: 'done', time: '2 s' }, { key: 'choosing', words: 'Worked out what to make', state: 'now', time: '3 s' }]);
+    expect(shown.root.querySelector('.wu-making-step')).toBe(row);
+    expect(row!.textContent).toBe('Waiting to start2 s');
   });
 
-  it('says a refusal in the light refusal ink as a status', async () => {
-    const { lightLine } = await parts();
-    const line = lightLine('These words don’t describe a place, so no world could be made from them. Try a place and what is in it.', { tone: 'refused', live: true });
-    expect(line.getAttribute('role')).toBe('status');
-    expect(line.dataset.tone).toBe('refused');
+  it('says the web notes under their label, each under its aspect, or the line in their place', async () => {
+    const { webNotes } = await parts();
+    const web = webNotes();
+    document.body.append(web.root);
+    expect(web.root.hidden).toBe(true);
+    web.notes('FROM THE WEB, 3 SEARCHES', [{ aspect: 'buildings', text: 'Low clusters of buildings with simple gabled roofs.' }]);
+    expect(web.root.hidden).toBe(false);
+    expect(nameOf(web.root)).toBe('FROM THE WEB, 3 SEARCHES');
+    expect([...web.root.querySelectorAll('.wu-making-note')].map((note) => note.textContent)).toEqual(['BuildingsLow clusters of buildings with simple gabled roofs.']);
+    web.instead('FROM THE WEB', 'The web notes could not be made, so it is made from your words alone.');
+    expect(web.root.textContent).toBe('FROM THE WEBThe web notes could not be made, so it is made from your words alone.');
   });
 });
 
@@ -236,8 +262,8 @@ describe('the made note', () => {
   });
 });
 
-// Create a world as a page (create-world.ts, frames 20 and 21) over stand-in answers: the offer and
-// the draft reads come through the workspace's own read path, a start through the app's client.
+// Create a world as a page (create-world.ts) over stand-in answers: the offer and the draft reads come through the
+// workspace's own read path, a start through the app's client.
 const opened: string[] = [];
 const starts: { words: string; key: string; most: string; reference?: string | null }[] = [];
 let startAnswer: () => Promise<unknown> = async () => ({ draftId: 'd-1', state: 'queued', refusal: null });
@@ -264,8 +290,8 @@ vi.mock('../src/world-making-api.ts', async (original) => {
   };
 });
 
-interface CreatePage { mountCreateWorld(options: { root: HTMLElement; credentials: unknown; entries: unknown; onClose: () => void }): { readonly isConnected: boolean; remove(): void } | null }
-const page = async (): Promise<CreatePage> => import('../../../../tools/previews/world-workspace/' + 'create-world.ts') as Promise<CreatePage>;
+interface CreatePageModule { mountCreateWorld(options: { root: HTMLElement; credentials: unknown; entries: unknown; onClose: () => void }): { readonly isConnected: boolean; remove(): void } | null }
+const page = async (): Promise<CreatePageModule> => import('../../../../tools/previews/world-workspace/' + 'create-world.ts') as Promise<CreatePageModule>;
 
 const OPERATION = {
   profile: 'exulanica.world-draft-operation/v1', basis: 'full_context_reservation_ceiling', estimate_is_expected_spend: false,
@@ -295,422 +321,153 @@ const key = (target: Element, code: string, extra: KeyboardEventInit = {}): Keyb
   target.dispatchEvent(event);
   return event;
 };
+const field = (): HTMLTextAreaElement => document.querySelector<HTMLTextAreaElement>('textarea.wu-composer-words')!;
+/** What the composer's foot says: why Create cannot start, and the price; each '' where it says none. */
+const why = (): string => { const said = document.querySelector<HTMLElement>('.wu-composer-why'); return said && !said.hidden ? said.textContent ?? '' : ''; };
+const price = (): string => { const said = document.querySelector<HTMLElement>('.wu-composer-price'); return said && !said.hidden ? said.textContent ?? '' : ''; };
+const making = (): boolean => document.querySelector('.wu-create[data-form="creating"]') !== null;
+const stepRows = (): string[][] => [...document.querySelectorAll('.wu-making-step')].map((row) => [row.querySelector('.wu-making-words')!.textContent ?? '', (row as HTMLElement).dataset['state'] ?? '', row.querySelector('.wu-making-time')!.textContent ?? '']);
 
 describe('Create a world as a page', () => {
-  let saved: unknown[] = [];
-  afterEach(() => { vi.unstubAllGlobals(); opened.length = 0; starts.length = 0; saved = []; startAnswer = async () => ({ draftId: 'd-1', state: 'queued', refusal: null }); });
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); opened.length = 0; starts.length = 0; cardsHeld.until = null; startAnswer = async () => ({ draftId: 'd-1', state: 'queued', refusal: null }); });
   const mount = async (onClose = () => {}) => {
     const root = document.createElement('div'); document.body.append(root);
-    const shown = (await page()).mountCreateWorld({ root, credentials: {}, entries: { ensureStarter: async () => ({ entryId: 'starter' }), entries: async () => saved }, onClose });
+    const shown = (await page()).mountCreateWorld({ root, credentials: {}, entries: { ensureStarter: async () => ({ entryId: 'starter' }), entries: async () => [] }, onClose });
     await settle();
     return shown!;
   };
+
+  it('opens on the mock: the wordmark, "Create a world", the composer, the strip and Esc, with nothing under the composer', async () => {
+    serve(offerOf({ host_keeps_until: '2026-12-15', starts: { an_hour: 12, left: 2, retry_after_seconds: null } }));
+    await mount();
+    expect(document.querySelector('.wu-create-mark')!.textContent).toBe('exulanica');
+    expect(document.querySelector('h1.wu-create-title')!.textContent).toBe('Create a world');
+    expect(document.activeElement).toBe(field());
+    expect(price()).toBe('up to $1.43');
+    expect(why()).toBe('');
+    expect([...document.querySelectorAll('.wu-strip-card')].map(nameOf)).toEqual(['Small town', 'Blank']);
+    expect(document.querySelector('.wu-create-corner .wu-qcmd')!.textContent).toBe('EscYour worlds');
+    // No lines of explanation (the mock): no count, no starts left, no host's keeping line, no line under the title.
+    const text = document.body.textContent!;
+    for (const filler of ['of 1000', 'more worlds can be started', 'stay on this server', 'People move in', 'An open model makes it', 'Or start from', 'You can leave this page']) {
+      expect(text).not.toContain(filler);
+    }
+    expect(document.querySelector('.wu-create-column')!.lastElementChild!.classList.contains('wu-composer')).toBe(true);
+  });
 
   it('keeps Tab within the page, from its last stop to its first and back, never on to the front door under it (C6)', async () => {
     serve(offerOf());
     const behind = document.createElement('button'); behind.textContent = 'Open My world'; document.body.append(behind);
     await mount();
-    const field = document.querySelector<HTMLTextAreaElement>('textarea.wu-light-field')!;
-    field.focus();
-    // Shift+Tab from the field, the first stop, goes to the last, Your worlds.
-    expect(key(field, 'Tab', { shiftKey: true }).defaultPrevented).toBe(true);
+    field().focus();
+    // Shift+Tab from the composer, the first stop, goes to the last, Your worlds.
+    expect(key(field(), 'Tab', { shiftKey: true }).defaultPrevented).toBe(true);
     expect(document.activeElement?.classList.contains('wu-qcmd')).toBe(true);
-    // Tab from the last stop comes back to the field, not on to the front door's own button.
+    // Tab from the last stop comes back to the composer, not on to the front door's own button.
     expect(key(document.activeElement!, 'Tab').defaultPrevented).toBe(true);
-    expect(document.activeElement).toBe(field);
+    expect(document.activeElement).toBe(field());
     expect(document.activeElement).not.toBe(behind);
     // Between the first and the last, the browser moves the focus.
-    expect(key(field, 'Tab').defaultPrevented).toBe(false);
-    document.body.replaceChildren();
+    expect(key(field(), 'Tab').defaultPrevented).toBe(false);
   });
 
-  it('says under the field how long a host keeps what is made where it states a day, and nothing where it states none (A5)', async () => {
-    const kept = 'The worlds you make here and the words you type stay on this server until it is deleted after 15\u00a0December\u00a02026.';
-    serve(offerOf());
-    const quiet = await mount();
-    expect(document.body.textContent).not.toContain('stay on this server');
-    quiet.remove(); document.body.replaceChildren();
-    serve(offerOf({ host_keeps_until: '2026-12-15' }));
-    await mount();
-    expect(document.body.textContent).toContain(kept);
-    document.body.replaceChildren();
-    // Said too where words make no world here and the starters stand alone (a host that takes none from a person).
-    serve(offerOf({ offered: false, code: 'kinds_from_people_not_offered', operation: null, host_keeps_until: '2026-12-15' }));
-    await mount();
-    expect(document.body.textContent).toContain(kept);
-  });
-
-  it('says a refusal now in its own words, with no starts left over it and Create dimmed', async () => {
+  it('says a refusal of the offer in its own words in the price\'s place, with no price beside it and Create dimmed', async () => {
     serve(offerOf({ offered: false, code: 'kind_draft_limit', operation: null }));
     await mount();
-    const text = document.body.textContent!;
-    expect(text).toContain('You’ve started as many worlds as you can this hour. Try again later.');
-    expect(text).not.toContain('more worlds can be started');
-    expect(text).not.toMatch(/USD|reservation|kind_draft_limit/u);
-    expect(document.querySelector<HTMLButtonElement>('.wu-light-orb')!.disabled).toBe(true);
+    expect(why()).toBe('You’ve started as many worlds as you can this hour. Try again later.');
+    expect(price()).toBe('');
+    expect(document.body.textContent).not.toMatch(/USD|reservation|kind_draft_limit|more worlds can be started/u);
+    expect(document.querySelector('.wu-composer-pill')!.getAttribute('aria-disabled')).toBe('true');
+    // Enter says it again, and starts nothing.
+    type(field(), 'A harbour');
+    key(field(), 'Enter');
+    await settle();
+    expect(why()).toBe('You’ve started as many worlds as you can this hour. Try again later.');
+    expect(starts).toEqual([]);
   });
 
-  it('says what a step of making could cost against what is left, with no field, where the budget left is short of one (N31, A1b)', async () => {
+  it('says what a step of making could cost against what is left, in the composer\'s place, where the budget left is short of one (N31, A1b)', async () => {
     serve(offerOf({ offered: false, code: 'world_draft_bound_exceeds_left', left_usd: '0.01', operation: { ...offerOf().operation, step_usd_at_most: '0.0344064' } }));
     await mount();
-    const text = document.body.textContent!;
-    expect(text).toContain('Making a world from your words can cost up to $0.04 a step, more than the $0.01 left for AI models here. You can still start from these:');
-    expect(text).not.toContain('The budget for AI models here is spent.');
-    expect(document.querySelector('.wu-light-field')).toBeNull();
+    expect(document.querySelector('.wu-create-sentence')!.textContent).toBe('Making a world from your words can cost up to $0.04 a step, more than the $0.01 left for AI models here. You can still start from these:');
+    expect(document.body.textContent).not.toContain('The budget for AI models here is spent.');
+    expect(document.querySelector('.wu-composer')).toBeNull();
+    // The strip under it is named by the sentence.
+    expect(document.querySelector('.wu-strip')!.getAttribute('aria-labelledby')).toBe(document.querySelector('.wu-create-sentence')!.id);
+    expect(document.querySelectorAll('.wu-strip-card').length).toBeGreaterThan(0);
   });
 
-  it('says spending is paused, not spent, with no field, where the authority is held closed (N34)', async () => {
+  it('says spending is paused, not spent, in the composer\'s place, where the authority is held closed (N34)', async () => {
     serve(offerOf({ offered: false, code: 'spending_suspended', operation: null }));
     await mount();
     const text = document.body.textContent!;
     expect(text).toContain('Spending on AI models is paused here, so nothing can be made from your words now. You can still start from these:');
     expect(text).not.toContain('is spent');
     expect(text).not.toContain('spending_suspended');
-    expect(document.querySelector('.wu-light-field')).toBeNull();
-  });
-
-  it('says the most is what is left where less than the whole is left, and the whole where it is (A1b)', async () => {
-    serve(offerOf({ left_usd: '0.05' }));
-    await mount();
-    expect(document.body.textContent).toContain('An open model makes it from your words: at most the $0.05 left for AI models here, and you see what it really spent.');
-    document.body.replaceChildren();
-    serve(offerOf());
-    await mount();
-    expect(document.body.textContent).toContain('An open model makes it from your words: at most $1.43, and you see what it really spent.');
-  });
-
-  it('says under the title what a newcomer can do, and names the person\'s own key where the draft runs on it (C4)', async () => {
-    const keyed = (extra: Record<string, unknown> = {}) => offerOf({ own_key: true, operation: { ...offerOf().operation, providers: [{ provider: 'nebius_token_factory', ceiling_usd: '1.4227' }] }, ...extra });
-    serve(keyed());
-    await mount();
-    const sub = document.querySelector('.wu-light-title + .wu-light-sub');
-    expect(sub?.textContent).toBe('People move in, and you choose an open AI model to decide for any of them.');
-    expect(document.body.textContent).toContain('An open model makes it with your Nebius key: at most $1.43, and you see what it really spent.');
-    document.body.replaceChildren();
-    serve(keyed({ left_usd: '0.12' }));
-    await mount();
-    expect(document.body.textContent).toContain('An open model makes it with your Nebius key: at most the $0.12 left for AI models here, and you see what it really spent.');
-    // A guest's page, or any server's budget: the line keeps its words, and the line under the title stands as well.
-    document.body.replaceChildren();
-    serve(keyed({ own_key: false }));
-    await mount();
-    expect(document.querySelector('.wu-light-sub')?.textContent).toBe('People move in, and you choose an open AI model to decide for any of them.');
-    expect(document.body.textContent).toContain('An open model makes it from your words: at most $1.43, and you see what it really spent.');
-    expect(document.body.textContent).not.toContain('your Nebius key');
-  });
-
-  describe('a draft held a step at a time (A1b)', () => {
-    const STEP = { ...offerOf().operation, step_usd_at_most: '0.0344064' };
-    const short = () => offerOf({ offered: false, code: 'world_draft_bound_exceeds_left', left_usd: '0.0085632', operation: { ...STEP } });
-    /** The offer as `offers` give it, one per read and the last again; each draft read as `reads` give it. */
-    const answer = (offers: Record<string, unknown>[], reads: Record<string, unknown>[] = []): { offerReads: () => number } => {
-      let read = 0;
-      vi.stubGlobal('fetch', vi.fn(async (address: string) => {
-        const body = address.endsWith('/worlds/drafts')
-          ? offers[Math.min(read++, offers.length - 1)]
-          : reads.shift() ?? { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
-        return { ok: true, status: 200, json: async () => body };
-      }));
-      return { offerReads: () => read };
-    };
-
-    it('says less than one step left at the press as the offer does before a word, with the cards, never "Something went wrong"', async () => {
-      const reads = answer([offerOf({ left_usd: '0.05', operation: { ...STEP } }), short()]);
-      startAnswer = async () => ({ draftId: 'd-1', state: 'refused', refusal: { code: 'world_draft_bound_exceeds_left' } });
-      await mount();
-      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour at night');
-      key(document.querySelector('.wu-light-field')!, 'Enter');
-      await settle(); await settle();
-      const text = document.body.textContent!;
-      expect(reads.offerReads()).toBe(2);
-      expect(text).toContain('Making a world from your words can cost up to $0.04 a step, more than the $0.0085 left for AI models here. You can still start from these:');
-      expect(text).not.toContain('Something went wrong');
-      expect(document.querySelector('.wu-light-field')).toBeNull();
-      expect(document.querySelectorAll('.wu-film-card').length).toBeGreaterThan(0);
-    });
-
-    it('says a draft stopped part way with its next step, what was left and what it spent, then reads what is left again', async () => {
-      const reads = answer([offerOf({ left_usd: '0.0344064', operation: { ...STEP } }), short()], [
-        { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
-        {
-          state: 'refused', elapsed_seconds: 2, poll_after_seconds: null, accounting: { reported_usd: '0.00583680' },
-          refusal: {
-            code: 'budget_exceeded',
-            spending: { reason: 'spending_limit_reached', retry: 'never', scope: 'workspace', detail: 'usd', limit: '0.03440640', committed: '0.02583680', requested: '0.03440640' },
-          },
-        },
-      ]);
-      await mount();
-      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A quiet town');
-      key(document.querySelector('.wu-light-field')!, 'Enter');
-      await settle(); await settle();
-      const text = document.body.textContent!;
-      expect(text).toContain('Making stopped part way: its next step could cost up to $0.04, more than the $0.0085 left for AI models here. No world was made, and it spent $0.0058.');
-      // In place of the spent budget's words and what was spent, and with no price the offer read before it can no longer hold.
-      expect(text).not.toContain('The budget for AI models here is spent.');
-      expect(text).not.toContain('before it stopped');
-      expect(text).not.toContain('An open model makes it');
-      expect(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!.value).toBe('A quiet town');
-      expect(reads.offerReads()).toBe(1);
-      // The next word reads what is left again.
-      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A quiet town by the sea');
-      await settle();
-      expect(reads.offerReads()).toBe(2);
-      expect(document.body.textContent).toContain('can cost up to $0.04 a step, more than the $0.0085 left for AI models here.');
-    });
-
-    it('says what a draft spent of the most it was funded with, where that is less than the whole', async () => {
-      answer([offerOf({ left_usd: '0.05', operation: { ...STEP } })], [
-        { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
-        { state: 'drafting', elapsed_seconds: 1, poll_after_seconds: 30, accounting: { reported_usd: '0.0003' }, funded_usd: '0.05000000', operation: { ...STEP } },
-      ]);
-      await mount();
-      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A quiet town');
-      key(document.querySelector('.wu-light-field')!, 'Enter');
-      await settle(); await settle();
-      expect(document.body.textContent).toContain('Spent $0.0003 of at most $0.05');
-    });
-
-    it('says the whole\u2019s most where the draft was funded with all of it: a control', async () => {
-      answer([offerOf({ operation: { ...STEP } })], [
-        { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
-        { state: 'drafting', elapsed_seconds: 1, poll_after_seconds: 30, accounting: { reported_usd: '0.0003' }, funded_usd: '1.42270000', operation: { ...STEP } },
-      ]);
-      await mount();
-      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A quiet town');
-      key(document.querySelector('.wu-light-field')!, 'Enter');
-      await settle(); await settle();
-      expect(document.body.textContent).toContain('Spent $0.0003 of at most $1.43');
-    });
-
-    it('still says a spent budget and what was spent where the refusal states no figures: a control', async () => {
-      answer([offerOf({ operation: { ...STEP } })], [
-        { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
-        { state: 'refused', elapsed_seconds: 2, poll_after_seconds: null, accounting: { reported_usd: '0.02' }, refusal: { code: 'budget_exceeded', spending: { reason: 'not_granted', retry: 'never' } } },
-      ]);
-      await mount();
-      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A quiet town');
-      key(document.querySelector('.wu-light-field')!, 'Enter');
-      await settle(); await settle();
-      const text = document.body.textContent!;
-      expect(text).toContain('The budget for AI models here is spent.');
-      expect(text).toContain('Spent $0.02 before it stopped.');
-      expect(text).not.toContain('Making stopped part way');
-    });
+    expect(document.querySelector('.wu-composer')).toBeNull();
   });
 
   it('still says a spent budget is spent: a control for N31', async () => {
     serve(offerOf({ offered: false, code: 'budget_exceeded', operation: null }));
     await mount();
-    expect(document.body.textContent).toContain('The budget for AI models here is spent. You can still start from these:');
+    expect(document.querySelector('.wu-create-sentence')!.textContent).toBe('The budget for AI models here is spent. You can still start from these:');
   });
 
-  it('opens with the focus in the field and starts once for Enter, with the same key on a retry', async () => {
-    serve(offerOf());
+  it('says the most is what is left where less than the whole is left, and the whole where it is (A1b)', async () => {
+    serve(offerOf({ left_usd: '0.05' }));
     await mount();
-    const field = document.querySelector<HTMLTextAreaElement>('.wu-light-field')!;
-    expect(document.activeElement).toBe(field);
-    expect(document.body.textContent).toContain('2 more worlds can be started this hour.');
-    type(field, 'A harbour at night');
-    // An answer that never came: Create again sends the same start.
-    startAnswer = async () => { throw new TypeError('network'); };
-    key(field, 'Enter');
-    await settle();
-    key(document.querySelector('.wu-light-field')!, 'Enter');
-    await settle();
-    expect(starts.map((one) => one.words)).toEqual(['A harbour at night', 'A harbour at night']);
-    expect(starts[1]!.key).toBe(starts[0]!.key);
-    // Shift+Enter is a new line, never a start.
-    const event = key(document.querySelector('.wu-light-field')!, 'Enter', { shiftKey: true });
-    expect(event.defaultPrevented).toBe(false);
-    expect(starts).toHaveLength(2);
-  });
-
-  it('keeps the focus in the field when the cards to start from arrive after it', async () => {
-    let release = () => {};
-    cardsHeld.until = new Promise<void>((resolve) => { release = resolve; });
-    serve(offerOf());
-    await mount();
-    const focusedFirst = document.activeElement === document.querySelector('.wu-light-field');
-    const cardsFirst = document.body.textContent?.includes('Small town');
-    cardsHeld.until = null;
-    release();
-    await settle();
-    expect(focusedFirst).toBe(true);
-    expect(cardsFirst).toBe(false);
-    // The page drew again with the cards: the field it drew has the focus, the caret in it.
-    expect(document.body.textContent).toContain('Small town');
-    expect(document.activeElement).toBe(document.querySelector('.wu-light-field'));
-  });
-
-  it('draws a served card\'s picture where the release captured one for what is served now', async () => {
-    const offer = offerOf();
-    vi.stubGlobal('fetch', vi.fn(async (address: string) => {
-      const body = address === '/card-pictures/card-pictures.v1.json'
-        ? { profile: 'exulanica.card-pictures/v1', entries: [{ card: 'recipe:town', reference: { values: {} }, picture: 'recipe-town.jpg' }], held: [] }
-        : address.endsWith('/worlds/drafts') ? offer : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
-      return { ok: true, status: 200, json: async () => body };
-    }));
-    await mount();
-    await settle();
-    const card = document.querySelector<HTMLElement>('.wu-film-card[data-key="recipe:town"]')!;
-    expect(card.dataset['picture']).toBe('served');
-    expect(card.querySelector<HTMLElement>('.wu-film-picture')!.style.backgroundImage).toContain('/card-pictures/recipe-town.jpg');
-  });
-
-  it('leaves on the first Esc, even from the field, and keeps the words for next time', async () => {
-    serve(offerOf());
-    let closed = 0;
-    const shown = await mount(() => { closed += 1; });
-    type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A quiet valley');
-    key(document.querySelector('.wu-light-field')!, 'Escape');
-    expect(closed).toBe(1);
-    expect(shown.isConnected).toBe(false);
-    await mount();
-    expect(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!.value).toBe('A quiet valley');
-  });
-
-  it('answers a starter card\'s press at once with its making steps, starts nothing else meanwhile, and gives the cards back on a refusal', async () => {
-    serve(offerOf());
-    const made: string[] = [];
-    let answer: { reject: (error: unknown) => void } | null = null;
-    let now = 1_000;
-    vi.spyOn(performance, 'now').mockImplementation(() => now);
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    const root = document.createElement('div'); document.body.append(root);
-    (await page()).mountCreateWorld({ root, credentials: {}, onClose: () => {}, entries: {
-      ensureStarter: async () => { made.push('blank'); return { entryId: 'starter' }; },
-      entries: async () => [],
-      makeGenerated: (key: string) => { made.push(key); return new Promise((_resolve, reject) => { answer = { reject }; }); },
-    } });
-    await settle();
-    const live = (): Element => document.querySelector('.wu-light-steps [aria-current="step"]')!;
-    type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour');
-    const card = document.querySelector<HTMLButtonElement>('.wu-film-card[data-key="recipe:town"]')!;
-    card.click();
-    // At once, the start not yet answered: frame 21, its head, and its one live step timed from the press.
-    expect(document.querySelector('.wu-light-quote')!.textContent).toBe('Small town');
-    expect(document.querySelector('.wu-light-label')!.textContent).toBe('Creating your world');
-    expect(live().querySelector('.wu-step-words')!.textContent).toBe('Building it');
-    expect(live().querySelector('.wu-step-time')!.textContent).toBe('0 s');
-    expect(document.body.textContent).toContain('You can leave this page. It carries on, and it waits in Your worlds.');
-    now += 7_400;
-    vi.advanceTimersByTime(1_000);
-    expect(live().querySelector('.wu-step-time')!.textContent).toBe('7 s');
-    // No card, field or Create is left to press; Enter, and the pressed card again, start nothing.
-    expect(document.querySelector('.wu-film-card, .wu-light-field, .wu-light-orb')).toBeNull();
-    key(document.querySelector('section.wu-light')!, 'Enter');
-    card.click();
-    await settle();
-    expect(made).toEqual(['town']);
-    expect(starts).toEqual([]);
-    // Refused: frame 20 again with the refusal said, every card pressable, and the step's clock stopped.
-    answer!.reject(Object.assign(new Error('refused'), { code: 'world_draft_failed' }));
-    await settle();
-    expect(document.querySelector('.wu-light-steps')).toBeNull();
-    expect(document.body.textContent).toContain('Something went wrong while making it, so nothing was made. Try again.');
-    expect(vi.getTimerCount()).toBe(0);
-    document.querySelector<HTMLButtonElement>('.wu-film-card[data-key="blank"]')!.click();
-    await settle();
-    expect(made).toEqual(['town', 'blank']);
-    vi.restoreAllMocks();
-  });
-
-  it('follows a draft by its served steps and comes back with the words, the refusal and what was spent', async () => {
-    serve(offerOf(), [
-      { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
-      { state: 'drafting', elapsed_seconds: 1, poll_after_seconds: 0, accounting: { reported_usd: '0.01' } },
-      { state: 'refused', elapsed_seconds: 4, poll_after_seconds: null, refusal: { code: 'world_not_a_place' }, accounting: { reported_usd: '0.02' } },
-    ]);
-    await mount();
-    type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'Purple');
-    key(document.querySelector('.wu-light-field')!, 'Enter');
-    await settle(); await settle();
-    const text = document.body.textContent!;
-    expect(text).toContain('These words don’t describe a place, so no world could be made from them. Try a place and what is in it.');
-    expect(text).toContain('Spent $0.02 before it stopped.');
-    expect(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!.value).toBe('Purple');
-    expect(opened).toEqual([]);
-  });
-
-  it('says Blank opens My world again once the blank world holds something its person placed (N27, C4b)', async () => {
-    serve(offerOf());
-    await mount();
-    const sub = () => document.querySelector('.wu-film-card[data-key="blank"] .wu-film-sub')!.textContent;
-    expect(sub()).toBe('Build it yourself · Free');
-    // A personal install makes My world at once: saved, but nothing placed in it yet.
+    expect(price()).toBe('up to $0.05');
     document.body.replaceChildren();
-    saved = [{ entryId: 'other', authoredScene: null, currentAuthoredEditSeq: 3 }, { entryId: 'starter', authoredScene: { kind: 'authored-starter' }, currentAuthoredEditSeq: 0 }];
+    serve(offerOf({ own_key: true }));
     await mount();
-    expect(sub()).toBe('Build it yourself · Free');
-    document.body.replaceChildren();
-    saved = [{ entryId: 'other', authoredScene: null, currentAuthoredEditSeq: 0 }, { entryId: 'starter', authoredScene: { kind: 'authored-starter' }, currentAuthoredEditSeq: 1 }];
-    await mount();
-    expect(sub()).toBe('Opens My world again · Free');
+    expect(price()).toBe('up to $1.43');
   });
 
-  it('opens Blank through its opening, marked for build mode', async () => {
-    serve(offerOf());
-    await mount();
-    const blank = document.querySelector<HTMLButtonElement>('.wu-film-card[data-key="blank"]')!;
-    expect([...document.querySelectorAll('.wu-film-card')].at(-1)).toBe(blank);
-    blank.click();
-    await settle();
-    expect(opened).toEqual(['starter']);
-    expect(JSON.parse(sessionStorage.getItem('exulanica.made.v1')!)).toMatchObject({ entryId: 'starter', build: true });
-  });
-
-  describe('the first Enter (never silent)', () => {
-    const field = (): HTMLTextAreaElement => document.querySelector<HTMLTextAreaElement>('.wu-light-field')!;
-    const creating = (): boolean => document.querySelector('section.wu-light[data-form="creating"]') !== null;
-    /** The lines under the field: the price's place and what is said there. */
-    const lines = (): string[] => [...document.querySelectorAll('.wu-light-head .wu-light-line')].map((line) => line.textContent ?? '');
-    const stepRows = (): string[][] => [...document.querySelectorAll('.wu-light-steps .wu-step')]
-      .map((row) => [row.querySelector('.wu-step-words')!.textContent ?? '', (row as HTMLElement).dataset['state'] ?? '', row.querySelector('.wu-step-time')!.textContent ?? '']);
-
-    it('shows frame 21 at once, "Waiting to start" timed from the press, with the start still unanswered', async () => {
+  describe('the first Enter', () => {
+    it('shows the making view at once, "Waiting to start" timed from the press, with the start still unanswered', async () => {
       serve(offerOf());
       let now = 5_000;
-      const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
-      try {
-        let answer: (value: unknown) => void = () => {};
-        startAnswer = () => new Promise((resolve) => { answer = resolve; });
-        await mount();
-        type(field(), 'A cozy little town by the sea at dusk');
-        key(field(), 'Enter');
-        // Nothing awaited: frame 21 is there before the start answers.
-        expect(creating()).toBe(true);
-        expect(document.querySelector('.wu-light-label')!.textContent).toBe('Creating your world');
-        expect(document.querySelector('.wu-light-quote')!.textContent).toBe('\u201cA cozy little town by the sea at dusk\u201d');
-        expect(stepRows()).toEqual([['Waiting to start', 'now', '0 s']]);
-        await settle();
-        expect(starts.map((one) => one.words)).toEqual(['A cozy little town by the sea at dusk']);
-        now += 2_400;
-        await new Promise((resolve) => setTimeout(resolve, 1_200));
-        expect(stepRows()).toEqual([['Waiting to start', 'now', '2 s']]);
-        // Answered, the draft's own steps follow the wait, which ends where they begin.
-        answer({ draftId: 'd-1', state: 'queued', refusal: null });
-        await settle();
-        expect(stepRows()[0]).toEqual(['Waiting to start', 'done', '2 s']);
-        expect(stepRows()[1]).toEqual(['Building it', 'now', '1 s']);
-      } finally { clock.mockRestore(); }
+      vi.spyOn(performance, 'now').mockImplementation(() => now);
+      let answer: (value: unknown) => void = () => {};
+      startAnswer = () => new Promise((resolve) => { answer = resolve; });
+      await mount();
+      type(field(), 'A cozy little town by the sea at dusk');
+      key(field(), 'Enter');
+      // Nothing awaited: the view is there before the start answers.
+      expect(making()).toBe(true);
+      expect(document.querySelector('h1.wu-create-title')!.textContent).toBe('Creating your world');
+      expect(document.querySelector('.wu-making-quote')!.textContent).toBe('“A cozy little town by the sea at dusk”');
+      expect(stepRows()).toEqual([['Waiting to start', 'now', '0 s']]);
+      expect(document.querySelector('.wu-strip, .wu-composer')).toBeNull();
+      await settle();
+      expect(starts.map((one) => one.words)).toEqual(['A cozy little town by the sea at dusk']);
+      now += 2_400;
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+      expect(stepRows()).toEqual([['Waiting to start', 'now', '2 s']]);
+      // Answered, the draft's own steps follow the wait, which ends where they begin.
+      answer({ draftId: 'd-1', state: 'queued', refusal: null });
+      await settle();
+      expect(stepRows()[0]).toEqual(['Waiting to start', 'done', '2 s']);
+      expect(stepRows()[1]).toEqual(['Building it', 'now', '1 s']);
     });
 
-    it('sends no second start for a second Enter while the first is in flight', async () => {
+    it('sends no second start for a second Enter, or a press, while the first is in flight', async () => {
       serve(offerOf());
       startAnswer = () => new Promise(() => {});
       await mount();
+      const pill = document.querySelector<HTMLButtonElement>('.wu-composer-pill')!;
       type(field(), 'A quiet valley');
       const first = field();
       key(first, 'Enter');
-      key(document.querySelector('section.wu-light')!, 'Enter');
+      key(document.querySelector('section.wu-create')!, 'Enter');
       key(first, 'Enter');
+      pill.click();
       await settle();
       expect(starts).toHaveLength(1);
-      expect(creating()).toBe(true);
+      expect(making()).toBe(true);
     });
 
-    it('says the price cannot be read where the offer has none, and reads it again at the press until it can start', async () => {
+    it('says the price cannot be read where the offer has none, and reads it again until it can start', async () => {
       const noPrice = offerOf({ operation: null });
       const offers = [noPrice, noPrice, offerOf()];
       let reads = 0;
@@ -719,25 +476,45 @@ describe('Create a world as a page', () => {
         return { ok: true, status: 200, json: async () => body };
       }));
       await mount();
-      expect(lines()).toContain('The price can\u2019t be read right now. Trying again.');
+      expect(why()).toBe('The price can’t be read right now. Trying again.');
+      expect(price()).toBe('');
       type(field(), 'A quiet valley');
       key(field(), 'Enter');
       await settle();
+      // Pressed, it reads the offer again at once, and says why still.
       expect(reads).toBe(2);
-      expect(lines()).toContain('The price can\u2019t be read right now. Trying again.');
+      expect(why()).toBe('The price can’t be read right now. Trying again.');
       expect(starts).toEqual([]);
-      expect(creating()).toBe(false);
+      expect(making()).toBe(false);
       // Read again after L14's first backoff: a price, and the next Enter starts.
       await new Promise((resolve) => setTimeout(resolve, 1_100));
       await settle();
       expect(reads).toBe(3);
-      expect(lines().some((line) => line.startsWith('An open model makes it'))).toBe(true);
+      expect([why(), price()]).toEqual(['', 'up to $1.43']);
       key(field(), 'Enter');
       await settle();
       expect(starts.map((one) => one.words)).toEqual(['A quiet valley']);
     });
 
-    it('takes words while the offer is read, says what it waits for at an Enter, then starts on an Enter once it is', async () => {
+    it('says the price cannot be read where the offer refuses for it, and reads it again at the press', async () => {
+      let reads = 0;
+      vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+        if (address.endsWith('/worlds/drafts')) reads += 1;
+        const body = address.endsWith('/worlds/drafts') ? offerOf({ offered: false, code: 'world_draft_price_unavailable', operation: null }) : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+        return { ok: true, status: 200, json: async () => body };
+      }));
+      await mount();
+      expect(why()).toBe('The price can’t be read right now. Trying again.');
+      expect(reads).toBe(1);
+      type(field(), 'A quiet valley');
+      key(field(), 'Enter');
+      await settle();
+      expect(reads).toBe(2);
+      expect(starts).toEqual([]);
+      expect(why()).toBe('The price can’t be read right now. Trying again.');
+    });
+
+    it('says what it waits for where the offer is not read yet, then starts on an Enter once it is', async () => {
       let release: () => void = () => {};
       const held = new Promise<void>((resolve) => { release = resolve; });
       vi.stubGlobal('fetch', vi.fn(async (address: string) => {
@@ -746,17 +523,16 @@ describe('Create a world as a page', () => {
         return { ok: true, status: 200, json: async () => body };
       }));
       await mount();
-      expect(lines()).toEqual(['Reading what you can make here\u2026']);
+      expect([why(), price()]).toEqual(['', '']);
       type(field(), 'A quiet valley');
       key(field(), 'Enter');
-      expect(lines()).toContain('Reading what you can make here\u2026');
+      expect(why()).toBe('Reading what you can make here…');
       expect(starts).toEqual([]);
-      expect(creating()).toBe(false);
+      expect(making()).toBe(false);
       expect(document.activeElement).toBe(field());
-      expect(field().value).toBe('A quiet valley');
       release();
       await settle();
-      expect(lines()).not.toContain('Reading what you can make here\u2026');
+      expect([why(), price()]).toEqual(['', 'up to $1.43']);
       key(field(), 'Enter');
       await settle();
       expect(starts.map((one) => one.words)).toEqual(['A quiet valley']);
@@ -767,10 +543,11 @@ describe('Create a world as a page', () => {
       await mount();
       type(field(), '');
       key(field(), 'Enter');
-      expect(lines()).toContain('Describe it');
+      expect(why()).toBe('Describe it');
+      expect(price()).toBe('up to $1.43');
       expect(starts).toEqual([]);
       type(field(), 'A');
-      expect(lines()).not.toContain('Describe it');
+      expect(why()).toBe('');
     });
 
     it('starts or says why on the first Enter in every order the offer, the cards, the typing and the Enter come in', async () => {
@@ -797,30 +574,28 @@ describe('Create a world as a page', () => {
         const surface = await mount();
         // The words kept from the order before go, so each order types its own.
         type(field(), '');
-        let first = '';
+        let first: 'started' | string | null = null;
         for (const event of order) {
           if (event === 'offer') offerIn();
           else if (event === 'cards') cardsIn();
-          else if (event === 'type') { if (!creating()) type(field(), 'A market town'); }
+          else if (event === 'type') { if (!making()) type(field(), 'A market town'); }
           else {
             key(field(), 'Enter');
-            first = creating() ? 'started' : lines().join(' | ');
+            first = making() ? 'started' : why();
           }
           await settle();
         }
         const said = `${order.join(', ')}: ${first}`;
         // Started only with the offer read and words typed before it; else a reason, never nothing.
         const could = order.indexOf('offer') < order.indexOf('enter') && order.indexOf('type') < order.indexOf('enter');
-        if (could) expect(first, said).toBe('started');
-        else expect(first, said).toContain(order.indexOf('offer') > order.indexOf('enter') ? 'Reading what you can make here\u2026' : 'Describe it');
-        expect(starts, said).toHaveLength(could ? 1 : 0);
+        expect(said).toBe(`${order.join(', ')}: ${could ? 'started' : order.indexOf('offer') > order.indexOf('enter') ? 'Reading what you can make here…' : 'Describe it'}`);
+        expect(starts).toHaveLength(could ? 1 : 0);
         // With everything in, an Enter starts.
         if (!could) {
           key(field(), 'Enter');
           await settle();
           expect(starts.map((one) => one.words), said).toEqual(['A market town']);
         }
-        cardsHeld.until = null;
         surface.remove();
       }
     });
@@ -837,9 +612,9 @@ describe('Create a world as a page', () => {
         return { ok: true, status: 200, json: async () => body };
       }));
       await mount();
-      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour at night');
+      type(field(), 'A harbour at night');
       clock += 61_000;
-      key(document.querySelector('.wu-light-field')!, 'Enter');
+      key(field(), 'Enter');
       await settle(); await settle();
       expect(reads).toBe(2);
       expect(starts.map((one) => one.most)).toEqual(['1.3']);
@@ -857,13 +632,264 @@ describe('Create a world as a page', () => {
         return { ok: true, status: 200, json: async () => body };
       }));
       await mount();
-      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour at night');
+      type(field(), 'A harbour at night');
       clock += 30_000;
-      key(document.querySelector('.wu-light-field')!, 'Enter');
+      key(field(), 'Enter');
       await settle(); await settle();
       expect(reads).toBe(1);
       expect(starts.map((one) => one.most)).toEqual(['1.4227']);
     } finally { now.mockRestore(); }
+  });
+
+  describe('a draft held a step at a time (A1b)', () => {
+    const STEP = { ...offerOf().operation, step_usd_at_most: '0.0344064' };
+    const short = () => offerOf({ offered: false, code: 'world_draft_bound_exceeds_left', left_usd: '0.0085632', operation: { ...STEP } });
+    /** The offer as `offers` give it, one per read and the last again; each draft read as `reads` give it. */
+    const answer = (offers: Record<string, unknown>[], reads: Record<string, unknown>[] = []): { offerReads: () => number } => {
+      let read = 0;
+      vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+        const body = address.endsWith('/worlds/drafts')
+          ? offers[Math.min(read++, offers.length - 1)]
+          : reads.shift() ?? { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+        return { ok: true, status: 200, json: async () => body };
+      }));
+      return { offerReads: () => read };
+    };
+
+    it('says less than one step left at the press as the offer does before a word, with the cards, never "Something went wrong"', async () => {
+      const reads = answer([offerOf({ left_usd: '0.05', operation: { ...STEP } }), short()]);
+      startAnswer = async () => ({ draftId: 'd-1', state: 'refused', refusal: { code: 'world_draft_bound_exceeds_left' } });
+      await mount();
+      type(field(), 'A harbour at night');
+      key(field(), 'Enter');
+      await settle(); await settle();
+      const text = document.body.textContent!;
+      expect(reads.offerReads()).toBe(2);
+      expect(text).toContain('Making a world from your words can cost up to $0.04 a step, more than the $0.0085 left for AI models here. You can still start from these:');
+      expect(text).not.toContain('Something went wrong');
+      expect(document.querySelector('.wu-composer')).toBeNull();
+      expect(document.querySelectorAll('.wu-strip-card').length).toBeGreaterThan(0);
+    });
+
+    it('says a draft stopped part way with its next step, what was left and what it spent, then reads what is left again', async () => {
+      const reads = answer([offerOf({ left_usd: '0.0344064', operation: { ...STEP } }), short()], [
+        { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
+        {
+          state: 'refused', elapsed_seconds: 2, poll_after_seconds: null, accounting: { reported_usd: '0.00583680' },
+          refusal: {
+            code: 'budget_exceeded',
+            spending: { reason: 'spending_limit_reached', retry: 'never', scope: 'workspace', detail: 'usd', limit: '0.03440640', committed: '0.02583680', requested: '0.03440640' },
+          },
+        },
+      ]);
+      await mount();
+      type(field(), 'A quiet town');
+      key(field(), 'Enter');
+      await settle(); await settle();
+      expect(why()).toBe('Making stopped part way: its next step could cost up to $0.04, more than the $0.0085 left for AI models here. No world was made, and it spent $0.0058.');
+      // In place of the spent budget's words and what was spent, and with no price the offer read before can no longer hold.
+      const text = document.body.textContent!;
+      expect(text).not.toContain('The budget for AI models here is spent.');
+      expect(text).not.toContain('before it stopped');
+      expect(price()).toBe('');
+      expect(field().value).toBe('A quiet town');
+      expect(reads.offerReads()).toBe(1);
+      // The next word reads what is left again.
+      type(field(), 'A quiet town by the sea');
+      await settle();
+      expect(reads.offerReads()).toBe(2);
+      expect(document.body.textContent).toContain('can cost up to $0.04 a step, more than the $0.0085 left for AI models here.');
+    });
+
+    it('says what a draft spent of the most it was funded with, where that is less than the whole', async () => {
+      answer([offerOf({ left_usd: '0.05', operation: { ...STEP } })], [
+        { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
+        { state: 'drafting', elapsed_seconds: 1, poll_after_seconds: 30, accounting: { reported_usd: '0.0003' }, funded_usd: '0.05000000', operation: { ...STEP } },
+      ]);
+      await mount();
+      type(field(), 'A quiet town');
+      key(field(), 'Enter');
+      await settle(); await settle();
+      expect(document.querySelector('.wu-making-spent')!.textContent).toBe('Spent $0.0003 of up to $0.05');
+    });
+
+    it('says the whole’s most where the draft was funded with all of it: a control', async () => {
+      answer([offerOf({ operation: { ...STEP } })], [
+        { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
+        { state: 'drafting', elapsed_seconds: 1, poll_after_seconds: 30, accounting: { reported_usd: '0.0003' }, funded_usd: '1.42270000', operation: { ...STEP } },
+      ]);
+      await mount();
+      type(field(), 'A quiet town');
+      key(field(), 'Enter');
+      await settle(); await settle();
+      expect(document.querySelector('.wu-making-spent')!.textContent).toBe('Spent $0.0003 of up to $1.43');
+    });
+
+    it('still says a spent budget and what was spent where the refusal states no figures: a control', async () => {
+      answer([offerOf({ operation: { ...STEP } })], [
+        { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
+        { state: 'refused', elapsed_seconds: 2, poll_after_seconds: null, accounting: { reported_usd: '0.02' }, refusal: { code: 'budget_exceeded', spending: { reason: 'not_granted', retry: 'never' } } },
+      ]);
+      await mount();
+      type(field(), 'A quiet town');
+      key(field(), 'Enter');
+      await settle(); await settle();
+      expect(why()).toBe('The budget for AI models here is spent. Spent $0.02 before it stopped.');
+      expect(document.body.textContent).not.toContain('Making stopped part way');
+    });
+  });
+
+  it('opens with the focus in the composer and starts once for Enter, with the same key on a retry', async () => {
+    serve(offerOf());
+    await mount();
+    expect(document.activeElement).toBe(field());
+    type(field(), 'A harbour at night');
+    // An answer that never came: back with the words and the reason, and Create again sends the same start.
+    startAnswer = async () => { throw new TypeError('network'); };
+    key(field(), 'Enter');
+    await settle();
+    expect(why()).toBe('Something went wrong while making it, so nothing was made. Try again.');
+    expect(field().value).toBe('A harbour at night');
+    expect(document.activeElement).toBe(field());
+    key(field(), 'Enter');
+    await settle();
+    expect(starts.map((one) => one.words)).toEqual(['A harbour at night', 'A harbour at night']);
+    expect(starts[1]!.key).toBe(starts[0]!.key);
+    // Shift+Enter is a new line, never a start.
+    const event = key(field(), 'Enter', { shiftKey: true });
+    expect(event.defaultPrevented).toBe(false);
+    expect(starts).toHaveLength(2);
+  });
+
+  it('keeps the focus in the composer when the cards to start from arrive after it', async () => {
+    let release = () => {};
+    cardsHeld.until = new Promise<void>((resolve) => { release = resolve; });
+    serve(offerOf());
+    await mount();
+    const focusedFirst = document.activeElement === field();
+    const cardsFirst = document.body.textContent?.includes('Small town');
+    const before = field();
+    type(before, 'A harbour');
+    release();
+    await settle();
+    expect(focusedFirst).toBe(true);
+    expect(cardsFirst).toBe(false);
+    // The strip drew again with the cards: the composer is the same one, its words and focus kept.
+    expect(document.body.textContent).toContain('Small town');
+    expect(field()).toBe(before);
+    expect(document.activeElement).toBe(before);
+    expect(before.value).toBe('A harbour');
+  });
+
+  it('draws a served card\'s picture, and the current card\'s behind the page', async () => {
+    const offer = offerOf();
+    vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+      const body = address === '/card-pictures/card-pictures.v1.json'
+        ? { profile: 'exulanica.card-pictures/v1', entries: [{ card: 'recipe:town', reference: { values: {} }, picture: 'recipe-town.jpg' }], held: [] }
+        : address.endsWith('/worlds/drafts') ? offer : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+      return { ok: true, status: 200, json: async () => body };
+    }));
+    await mount();
+    await settle();
+    const card = document.querySelector<HTMLElement>('.wu-strip-card[data-key="recipe:town"]')!;
+    expect(card.dataset['picture']).toBe('served');
+    expect(card.getAttribute('aria-current')).toBe('true');
+    expect(card.querySelector('img')!.getAttribute('src')).toBe('/card-pictures/recipe-town.jpg');
+    const behind = (): string[] => [...document.querySelectorAll<HTMLElement>('.wu-create-media[data-shown="true"]')].map((one) => one.style.backgroundImage);
+    expect(behind()).toHaveLength(1);
+    expect(behind()[0]).toContain('/card-pictures/recipe-town.jpg');
+    // Moved to Blank by its arrow key, the picture gives way to the ground; back, it returns.
+    card.focus();
+    key(card, 'ArrowRight');
+    expect(document.activeElement).toBe(document.querySelector('.wu-strip-card[data-key="blank"]'));
+    expect(behind()).toEqual([]);
+    key(document.activeElement!, 'ArrowLeft');
+    expect(behind()[0]).toContain('/card-pictures/recipe-town.jpg');
+  });
+
+  it('leaves on the first Esc, even from the composer, and keeps the words for next time', async () => {
+    serve(offerOf());
+    let closed = 0;
+    const shown = await mount(() => { closed += 1; });
+    type(field(), 'A quiet valley');
+    key(field(), 'Escape');
+    expect(closed).toBe(1);
+    expect(shown.isConnected).toBe(false);
+    await mount();
+    expect(field().value).toBe('A quiet valley');
+  });
+
+  it('answers a starter card\'s press at once with its making steps, starts nothing else meanwhile, and gives the cards back on a refusal', async () => {
+    serve(offerOf());
+    const made: string[] = [];
+    let answer: { reject: (error: unknown) => void } | null = null;
+    let now = 1_000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const root = document.createElement('div'); document.body.append(root);
+    (await page()).mountCreateWorld({ root, credentials: {}, onClose: () => {}, entries: {
+      ensureStarter: async () => { made.push('blank'); return { entryId: 'starter' }; },
+      entries: async () => [],
+      makeGenerated: (key: string) => { made.push(key); return new Promise((_resolve, reject) => { answer = { reject }; }); },
+    } });
+    await settle();
+    type(field(), 'A harbour');
+    const card = document.querySelector<HTMLButtonElement>('.wu-strip-card[data-key="recipe:town"]')!;
+    card.click();
+    // At once, the start not yet answered: the making view, the card's name, and its one live step timed from the press.
+    expect(document.querySelector('.wu-making-quote')!.textContent).toBe('Small town');
+    expect(document.querySelector('h1.wu-create-title')!.textContent).toBe('Creating your world');
+    expect(stepRows()).toEqual([['Building it', 'now', '0 s']]);
+    now += 7_400;
+    vi.advanceTimersByTime(1_000);
+    expect(stepRows()).toEqual([['Building it', 'now', '7 s']]);
+    // No card, composer or Create is left to press; Enter, and the pressed card again, start nothing.
+    expect(document.querySelector('.wu-strip-card, .wu-composer, .wu-composer-pill')).toBeNull();
+    key(document.querySelector('section.wu-create')!, 'Enter');
+    card.click();
+    await settle();
+    expect(made).toEqual(['town']);
+    expect(starts).toEqual([]);
+    // Refused: the page before Create again with the refusal said, every card pressable, and the step's clock stopped.
+    answer!.reject(Object.assign(new Error('refused'), { code: 'world_draft_failed' }));
+    await settle();
+    expect(document.querySelector('.wu-making-steps')).toBeNull();
+    expect(why()).toBe('Something went wrong while making it, so nothing was made. Try again.');
+    expect(field().value).toBe('A harbour');
+    expect(vi.getTimerCount()).toBe(0);
+    document.querySelector<HTMLButtonElement>('.wu-strip-card[data-key="blank"]')!.click();
+    await settle();
+    expect(made).toEqual(['town', 'blank']);
+  });
+
+  it('follows a draft by its served steps and comes back with the words, the refusal and what was spent', async () => {
+    serve(offerOf(), [
+      { state: 'choosing', elapsed_seconds: 0, poll_after_seconds: 0 },
+      { state: 'drafting', elapsed_seconds: 1, poll_after_seconds: 0, accounting: { reported_usd: '0.01' } },
+      { state: 'refused', elapsed_seconds: 4, poll_after_seconds: null, refusal: { code: 'world_not_a_place' }, accounting: { reported_usd: '0.02' } },
+    ]);
+    await mount();
+    type(field(), 'Purple');
+    key(field(), 'Enter');
+    await settle(); await settle();
+    expect(why()).toBe('These words don’t describe a place, so no world could be made from them. Try a place and what is in it. Spent $0.02 before it stopped.');
+    expect(price()).toBe('up to $1.43');
+    expect(field().value).toBe('Purple');
+    expect(opened).toEqual([]);
+    // A word typed takes the refusal away.
+    type(field(), 'Purple hills');
+    expect(why()).toBe('');
+  });
+
+  it('opens Blank through its opening, marked for build mode', async () => {
+    serve(offerOf());
+    await mount();
+    const blank = document.querySelector<HTMLButtonElement>('.wu-strip-card[data-key="blank"]')!;
+    expect([...document.querySelectorAll('.wu-strip-card')].at(-1)).toBe(blank);
+    blank.click();
+    await settle();
+    expect(opened).toEqual(['starter']);
+    expect(JSON.parse(sessionStorage.getItem('exulanica.made.v1')!)).toMatchObject({ entryId: 'starter', build: true });
   });
 
   describe('a start refused for its price (N32)', () => {
@@ -880,17 +906,18 @@ describe('Create a world as a page', () => {
         ? { draftId: 'd-1', state: 'refused', refusal: { code: 'world_draft_price_expired' } }
         : { draftId: 'd-2', state: 'queued', refusal: null });
       await mount();
-      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour at night');
-      key(document.querySelector('.wu-light-field')!, 'Enter');
+      type(field(), 'A harbour at night');
+      key(field(), 'Enter');
       await settle(); await settle();
     };
 
     it('stops and says the new figure when the price went up: a positive control', async () => {
       await pressedWith('1.6');
       expect(starts.map((one) => one.most)).toEqual(['1.4227']);
-      expect(document.body.textContent).toContain('The price went up before it started. It can now spend at most $1.60.');
+      expect(why()).toBe('The price went up before it started. It can now spend at most $1.60.');
+      expect(price()).toBe('up to $1.60');
       // Create again starts at the new price.
-      key(document.querySelector('.wu-light-field')!, 'Enter');
+      key(field(), 'Enter');
       await settle();
       expect(starts.map((one) => one.most)).toEqual(['1.4227', '1.6']);
     });
@@ -899,6 +926,7 @@ describe('Create a world as a page', () => {
       await pressedWith('1.4227');
       expect(starts.map((one) => [one.words, one.most])).toEqual([['A harbour at night', '1.4227'], ['A harbour at night', '1.4227']]);
       expect(starts[1]!.key).not.toBe(starts[0]!.key);
+      expect(making()).toBe(true);
       expect(document.body.textContent).not.toMatch(/price changed|price went up/u);
     });
 
@@ -920,14 +948,15 @@ describe('Create a world as a page', () => {
         ? { draftId: 'd-1', state: 'refused', refusal: { code: 'world_draft_price_expired' } }
         : { draftId: 'd-2', state: 'queued', refusal: null });
       await mount();
-      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour at night');
-      key(document.querySelector('.wu-light-field')!, 'Enter');
+      type(field(), 'A harbour at night');
+      key(field(), 'Enter');
       await settle(); await settle();
       const said = document.body.textContent!;
       expect(said).toContain('The price can’t be read right now. Trying again.');
       expect(said).not.toContain('The price changed before it started.');
       expect(starts).toHaveLength(1);
-      // Read again after the first backoff: the same price, so it starts at once and says nothing.
+      // Still on the making view, read again after the first backoff: the same price, so it starts at once and says nothing.
+      expect(making()).toBe(true);
       await new Promise((resolve) => setTimeout(resolve, 1100));
       await settle();
       expect(starts.map((one) => one.most)).toEqual(['1.4227', '1.4227']);
@@ -942,20 +971,20 @@ describe('Create a world as a page', () => {
       }));
       startAnswer = async () => ({ draftId: 'd-1', state: 'refused', refusal: { code: 'world_draft_price_expired' } });
       await mount();
-      type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'A harbour at night');
-      key(document.querySelector('.wu-light-field')!, 'Enter');
+      type(field(), 'A harbour at night');
+      key(field(), 'Enter');
       await settle(); await settle();
       const line = [...document.querySelectorAll('p, div, span')].find((one) => one.children.length === 0 && one.textContent === 'The price can’t be read right now. Trying again.');
       expect(line).toBeDefined();
-      expect(line!.getAttribute('data-tone')).toBeNull(); // The plain ink, not the refusal's.
+      expect(line!.getAttribute('data-tone')).toBeNull();
       expect(document.body.textContent).not.toContain('The price changed before it started.');
       expect(starts).toHaveLength(1);
     });
   });
 });
 
-// Web notes in Create (WORDS.md "Web notes in Create, the words"): asked for with a check box under the price line, the
-// notes' steps and the notes on frame 21, the draft started with them, or from the words alone where none came.
+// Web notes in Create: asked for with the composer's "Search the web" toggle (on until it is pressed), the notes' steps
+// and the notes on the making view, the draft started with them, or from the words alone where none came.
 describe('Create a world with web notes', () => {
   const READY = (JSON.parse(readFileSync('../tests/snapshots/world-drafts.served.json', 'utf8')) as Record<string, Record<string, unknown>>)['ready_place']!;
   const NOTES_OFFER = { offered: true, code: null, searches_at_most: 3, maximum_usd: '0.0153' };
@@ -996,33 +1025,42 @@ describe('Create a world with web notes', () => {
     (await page()).mountCreateWorld({ root, credentials: { baseUrl: 'https://host.test', token: 'install' }, entries: { ensureStarter: async () => ({ entryId: 'starter' }), entries: async () => [] }, onClose: () => {} });
     await settle();
   };
-  const priceText = () => [...document.querySelectorAll('.wu-light-line')].map((line) => line.textContent ?? '').find((line) => line.startsWith('An open model')) ?? '';
+  const chip = (): HTMLButtonElement => document.querySelector<HTMLButtonElement>('.wu-composer-chip')!;
 
-  it('asks for notes only when ticked, prices them, drafts with them and says what they gave', async () => {
+  it('searches the web first by default, prices the notes, drafts with them and says what they gave', async () => {
     serveNotes([request('running'), KEPT], [{ ...READY, references: { state: 'used', reference_id: 'r-1', code: null, detail: null, notes: 2, bundle_sha256: 'a'.repeat(64), basis: ['web_description'], searches: 3, spent_usd: '0.00200000' } }]);
     await mountNotes();
-    const box = document.querySelector<HTMLInputElement>('.wu-notes-box')!;
-    expect(box.checked).toBe(false);
-    expect(document.querySelector('.wu-notes-ask')!.textContent).toContain('Read the web first for what such a place looks like');
-    expect(document.querySelector('.wu-notes-line')!.textContent).toBe('Up to 3 web searches go to Tavily, made from your words with the names and details this install holds as yours left out, and Tavily keeps them. Adds at most $0.02.');
-    expect(priceText()).toContain('at most $1.43');
-    box.click();
-    expect(priceText()).toContain('at most $1.44');
-    type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'a cozy little town by the sea at dusk');
-    key(document.querySelector('.wu-light-field')!, 'Enter');
+    expect(chip().textContent).toBe('Search the web');
+    expect(chip().getAttribute('aria-pressed')).toBe('true');
+    expect(document.getElementById(chip().getAttribute('aria-describedby')!)!.textContent)
+      .toBe('Looks up what such a place looks like before it is made: up to 3 searches with Tavily, which keeps them. Adds at most $0.02.');
+    // On, the price is the whole most with the notes; off, the draft's alone.
+    expect(price()).toBe('up to $1.44');
+    chip().click();
+    expect(price()).toBe('up to $1.43');
+    chip().click();
+    expect(price()).toBe('up to $1.44');
+    type(field(), 'a cozy little town by the sea at dusk');
+    key(field(), 'Enter');
+    // The making view at once, the wait first, before the notes request answers.
+    expect(making()).toBe(true);
+    expect(stepRows()[0]).toEqual(['Waiting to start', 'now', '0 s']);
     await settle();
     await new Promise((resolve) => setTimeout(resolve, 1100));
     await settle(); await settle();
     const posted = asked.find((one) => one.method === 'POST' && one.path === '/worlds/references')!;
     expect(posted.body).toMatchObject({ purpose: 'world_draft', description: 'a cozy little town by the sea at dusk', web: true });
     expect(starts.map((one) => one.reference)).toEqual(['r-1']);
-    const panel = document.querySelector('.wu-notes-panel')!;
-    expect(panel.textContent).toContain('From the web');
-    expect(panel.textContent).toContain('Buildings · Narrow terraced houses in soft pastel colours');
-    expect(panel.textContent).toContain('A model wrote these from 3 web searches. They help plan the place and are never facts about it.');
-    const steps = [...document.querySelectorAll('.wu-step-words')].map((one) => one.textContent);
-    expect(steps.slice(0, 4)).toEqual(['Waiting to start', 'Choosing what to look up', 'Searching the web', 'Writing notes from what it found']);
-    expect(steps.filter((one) => one === 'Waiting to start')).toHaveLength(1);
+    const web = document.querySelector('.wu-making-web')!;
+    expect(web.querySelector('.wu-making-kind')!.textContent).toBe('FROM THE WEB, 3 SEARCHES');
+    expect([...web.querySelectorAll('.wu-making-note')].map((note) => note.textContent)).toEqual([
+      'BuildingsNarrow terraced houses in soft pastel colours', 'Vehicles and boatsSmall wooden fishing boats moored in a row',
+    ]);
+    // No line of explanation under the notes (the mock).
+    expect(web.textContent).not.toContain('A model wrote these');
+    const words = stepRows().map((row) => row[0]);
+    expect(words.slice(0, 4)).toEqual(['Waiting to start', 'Choosing what to look up', 'Searching the web', 'Writing notes from what it found']);
+    expect(words.filter((one) => one === 'Waiting to start')).toHaveLength(1);
     await settle(); await settle();
     const handed = JSON.parse(sessionStorage.getItem('exulanica.made.v1') ?? 'null') as { columns: { label: string; value: string }[] } | null;
     expect(handed?.columns.find((column) => column.label === 'From the web')?.value).toBe('2 notes from 3 searches');
@@ -1031,29 +1069,29 @@ describe('Create a world with web notes', () => {
   it('drafts from the words alone where no notes came, and says why where they would stand', async () => {
     serveNotes('refused', []);
     await mountNotes();
-    type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'a cozy little town by the sea at dusk');
-    // Ticked by a press, the box holds the focus: Space is left to it, and Enter creates as from the field.
-    const box = document.querySelector<HTMLInputElement>('.wu-notes-box')!;
-    box.click(); box.focus();
-    expect(key(box, 'Space').defaultPrevented).toBe(false);
-    key(box, 'Enter');
+    type(field(), 'a cozy little town by the sea at dusk');
+    // The toggle is a button: Enter and Space on it press it, as anywhere; Enter in the words creates.
+    chip().focus();
+    expect(key(chip(), 'Space').defaultPrevented).toBe(false);
+    expect(key(chip(), 'Enter').defaultPrevented).toBe(false);
+    field().focus();
+    key(field(), 'Enter');
     await settle(); await settle();
     expect(starts.map((one) => one.reference)).toEqual([null]);
-    expect(document.querySelector('.wu-notes-panel')!.textContent).toContain('The web notes could not be made, so it is made from your words alone.');
+    expect(document.querySelector('.wu-making-web')!.textContent).toBe('FROM THE WEBThe web notes could not be made, so it is made from your words alone.');
   });
 
   describe('the start after the notes (the judges\' server, 27 October: a quote expired while the notes ran)', () => {
     const priced = (maximum: string) => offerOf({ own_key: true, notes: NOTES_OFFER, operation: { ...offerOf().operation, maximum_usd: maximum } });
     const refusedFor = (code: string) => Object.assign(new Error('refused'), { code });
     const offerReads = () => asked.filter((one) => one.method === 'GET' && one.path === '/worlds/drafts').length;
-    /** Ticks the box, types, presses Enter in the field and lets the notes and the start answer. */
+    /** With "Search the web" on, as it opens, types, presses Enter in the words and lets the notes and the start answer. */
     const pressedWithNotes = async (): Promise<void> => {
       await mountNotes();
-      document.querySelector<HTMLInputElement>('.wu-notes-box')!.click();
-      const field = document.querySelector<HTMLTextAreaElement>('.wu-light-field')!;
-      type(field, 'a cozy little town by the sea at dusk');
-      field.focus();
-      key(field, 'Enter');
+      expect(chip().getAttribute('aria-pressed')).toBe('true');
+      type(field(), 'a cozy little town by the sea at dusk');
+      field().focus();
+      key(field(), 'Enter');
       await settle(); await settle(); await settle();
     };
 
@@ -1065,28 +1103,30 @@ describe('Create a world with web notes', () => {
       // Read when Create opened, again after the notes, and again after the refusal.
       expect(offerReads()).toBe(3);
       expect(starts.map((one) => one.reference)).toEqual(['r-1', 'r-1']);
-      // Following the draft on frame 21, never left on the notes' last step.
-      expect([...document.querySelectorAll('.wu-step-words')].map((one) => one.textContent)).toContain('Building it');
+      // Following the draft on the making view, never left on the notes' last step.
+      expect(making()).toBe(true);
+      expect(stepRows().map((row) => row[0])).toContain('Building it');
       expect(document.body.textContent).not.toMatch(/price changed|price went up/u);
     });
 
-    it('stops at a higher price and says the new figure where the price was, waiting for Create', async () => {
+    it('stops at a higher price and says the new figure in the price\'s place, waiting for Create', async () => {
       serveNotes([KEPT], [], [priced('1.4227'), priced('1.4227'), priced('1.6')]);
       startAnswer = async () => { throw refusedFor('world_draft_price_expired'); };
       await pressedWithNotes();
       expect(starts).toHaveLength(1);
-      expect(document.body.textContent).toContain('The price went up before it started. It can now spend at most $1.60.');
-      expect(document.querySelector('.wu-light-steps')).toBeNull();
-      expect(document.querySelector('.wu-notes-panel')).toBeNull();
-      expect(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!.value).toBe('a cozy little town by the sea at dusk');
+      expect(making()).toBe(false);
+      expect(why()).toBe('The price went up before it started. It can now spend at most $1.60.');
+      expect(price()).toBe('up to $1.62');
+      expect(field().value).toBe('a cozy little town by the sea at dusk');
     });
 
     it('stops at a higher price read after the notes before any start is sent', async () => {
       serveNotes([KEPT], [], [priced('1.4227'), priced('1.6')]);
       await pressedWithNotes();
       expect(starts).toEqual([]);
-      expect(document.body.textContent).toContain('The price went up before it started. It can now spend at most $1.60.');
-      expect(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!.value).toBe('a cozy little town by the sea at dusk');
+      expect(making()).toBe(false);
+      expect(why()).toBe('The price went up before it started. It can now spend at most $1.60.');
+      expect(field().value).toBe('a cozy little town by the sea at dusk');
     });
 
     it('does not loop on a second refusal for its price: it says the price changed, with the new most, and waits', async () => {
@@ -1096,33 +1136,38 @@ describe('Create a world with web notes', () => {
       await new Promise((resolve) => setTimeout(resolve, 1200));
       await settle();
       expect(starts.map((one) => one.reference)).toEqual(['r-1', 'r-1']);
-      expect(document.body.textContent).toContain('The price changed before it started. Here is the new most it can spend.');
-      // The notes were this draft's own: the box is unticked again, and the price is the draft's.
-      expect(document.body.textContent).toContain('at most $1.43, and you see what it really spent.');
-      expect(document.querySelector<HTMLInputElement>('.wu-notes-box')!.checked).toBe(false);
-      expect(document.querySelector('.wu-light-steps')).toBeNull();
+      expect(making()).toBe(false);
+      expect(why()).toBe('The price changed before it started. Here is the new most it can spend.');
+      expect(price()).toBe('up to $1.44');
     });
 
-    it('leaves frame 21 for any other refusal, its sentence said and the words kept', async () => {
+    it('leaves the making view for any other refusal, its sentence said and the words kept', async () => {
       serveNotes([KEPT], []);
       startAnswer = async () => { throw refusedFor('kind_draft_busy'); };
       await pressedWithNotes();
       expect(starts).toHaveLength(1);
-      expect(document.body.textContent).toContain('A world is being made already. It waits in Your worlds when it\u2019s done.');
-      expect(document.querySelector('.wu-light-steps')).toBeNull();
-      expect(document.querySelector('.wu-notes-panel')).toBeNull();
-      expect(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!.value).toBe('a cozy little town by the sea at dusk');
-      expect(document.activeElement).toBe(document.querySelector('.wu-light-field'));
+      expect(making()).toBe(false);
+      expect(why()).toBe('A world is being made already. It waits in Your worlds when it\u2019s done.');
+      expect(document.querySelector('.wu-making-steps, .wu-making-web')).toBeNull();
+      expect(field().value).toBe('a cozy little town by the sea at dusk');
+      expect(document.activeElement).toBe(field());
     });
   });
 
-  it('asks the web for nothing where the box is not ticked: a control', async () => {
+  it('asks the web for nothing where the toggle is pressed off: a control', async () => {
     serveNotes([request('running')], []);
     await mountNotes();
-    type(document.querySelector<HTMLTextAreaElement>('.wu-light-field')!, 'a cozy little town by the sea at dusk');
-    key(document.querySelector('.wu-light-field')!, 'Enter');
+    chip().click();
+    type(field(), 'a cozy little town by the sea at dusk');
+    key(field(), 'Enter');
     await settle();
     expect(asked.some((one) => one.path.startsWith('/worlds/references'))).toBe(false);
     expect(starts.map((one) => one.reference)).toEqual([null]);
+    // Pressed off, it stays off when the page opens again, until it is pressed on.
+    document.body.replaceChildren();
+    await mountNotes();
+    expect(chip().getAttribute('aria-pressed')).toBe('false');
+    chip().click();
+    expect(chip().getAttribute('aria-pressed')).toBe('true');
   });
 });

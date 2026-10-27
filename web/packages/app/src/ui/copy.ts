@@ -486,7 +486,7 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldSentence.offer.unreadable': 'The server returned a creation offer this app cannot read. Ask the installation operator to check that the app and API versions match.',
   'worldSentence.offer.connection': 'The creation service could not be reached. Check your connection, then try again.',
   'worldSentence.progress.interrupted': 'Progress could not be checked. The draft may still be running; check its progress again.',
-  'worldSentence.placeholder': 'A harbour with fishing boats, a market on the quay and a lighthouse',
+  'worldSentence.placeholder': 'A cozy little town by the sea at dusk',
   'worldSentence.notice':
     'Your words are sent to an AI model to draft the world. A short description of what you asked '
     + 'for is kept with the world.',

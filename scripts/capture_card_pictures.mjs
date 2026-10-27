@@ -20,7 +20,7 @@ import { open } from './rehearsal/cdp.mjs';
 
 /** The key the page keeps a world's first view under (web/packages/app/src/composition/world-pictures.ts). */
 const KEPT_PREFIX = 'exulanica.world-picture.v1.';
-/** The card tile's picture: 16:9, twice the largest tile Create draws at 1920. */
+/** The card tile's picture: 16:9, over three times the largest card Create's strip draws (200 wide); blurred, it also fills the page behind. */
 const SIZE = Object.freeze({ width: 640, height: 360 });
 const QUALITY = 0.82;
 /** How long a card's world may take to open, and its first view to be kept (measured 31 to 72 s). */
@@ -44,13 +44,13 @@ const made = [];
 try {
   mkdirSync(options.out, { recursive: true });
   for (const card of cards) {
-    const offered = `document.querySelector('.wu-film-card[data-key=' + ${JSON.stringify(JSON.stringify(card))} + ']')`;
+    const offered = `document.querySelector('.wu-strip-card[data-key=' + ${JSON.stringify(JSON.stringify(card))} + ']')`;
     // The old document answers until the new one replaces it: wait for a new time origin first.
     const before = await page.evaluate('performance.timeOrigin');
     await page.navigate(`${origin}/`);
     await page.waitFor(`performance.timeOrigin !== ${before}`, OPEN_MS, 'the page to load');
-    await page.waitFor(`document.querySelector('.your-worlds-create, .wu-film-card') !== null`, OPEN_MS, 'the front door or Create');
-    if (!(await page.evaluate(`document.querySelector('.wu-film-card') !== null`))) {
+    await page.waitFor(`document.querySelector('.your-worlds-create, .wu-strip-card') !== null`, OPEN_MS, 'the front door or Create');
+    if (!(await page.evaluate(`document.querySelector('.wu-strip-card') !== null`))) {
       await page.click(`document.querySelector('.your-worlds-create')`, 'Create a world');
     }
     await page.waitFor(`${offered} !== null`, OPEN_MS, `Create to offer ${card}`);

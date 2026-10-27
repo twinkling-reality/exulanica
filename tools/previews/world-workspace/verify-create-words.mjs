@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import {
-  NOTES_WORDS, aspectLabel, notesAskLine, notesFoot, sumUsd, webColumn,
+  NOTES_WORDS, aspectLabel, notesAskLine, notesFoot, sumUsd, webColumn, webNotesLabel, webTip,
   CREATE_WORDS, PROVIDER_NAMES, REFUSAL_BY_CODE, REFUSAL_WORDS, STEP_WORDS, budgetShort, cardSub, ceilingAmount, countWords, keyName, leftAmount, madeSpent, hostKeepsLine, priceLine,
-  priceUp, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine, stepTime, stoppedLine,
+  priceUp, priceUpTo, refusalSpent, refusalWords, setValue, spendLine, spentUpTo, startsLeftLine, stepTime, stoppedLine,
 } from './create-words.mjs';
 
 // Frame 20's words, as WORDS.md "Making a world" and N1 to N20 say them.
@@ -57,9 +57,33 @@ assert.equal(startsLeftLine(0), null);
 assert.equal(cardSub(null), 'No AI model · Free');
 assert.equal(cardSub('0'), 'No AI model · Free');
 assert.equal(cardSub('0.4'), 'At most $0.40');
-// The placeholder is today's, read from the app's copy rather than retyped.
+// The placeholder is today's, read from the app's copy rather than retyped: a sentence that makes a world (WORLDLOOK,
+// 2 of 2); the harbour sentence it replaced made none.
 const copy = readFileSync(new URL('../../../web/packages/app/src/ui/copy.ts', import.meta.url), 'utf8');
 assert.ok(copy.includes(`'worldSentence.placeholder': '${CREATE_WORDS.placeholder}'`), 'the placeholder is copy.ts\'s');
+assert.equal(CREATE_WORDS.placeholder, 'A cozy little town by the sea at dusk');
+assert.doesNotMatch(copy, /A harbour with fishing boats/u);
+
+// The composer page's words (ROOT's mock of 27 October): the strip's kinds and arrows, the toggle and its details, the
+// price in the composer's foot and what was spent under the making view's steps.
+assert.equal(CREATE_WORDS.readyWorld, 'READY WORLD');
+assert.equal(CREATE_WORDS.empty, 'EMPTY');
+assert.deepEqual([CREATE_WORDS.previous, CREATE_WORDS.next], ['Previous', 'Next']);
+assert.equal(NOTES_WORDS.toggle, 'Search the web');
+assert.equal(priceUpTo('0.2577'), 'up to $0.26');
+assert.equal(priceUpTo('0.20766720', '0.05'), 'up to $0.05');
+assert.equal(priceUpTo('0.20766720', '0.0599'), 'up to $0.05');
+assert.equal(priceUpTo('0.20766720', '0.20766720'), 'up to $0.21');
+assert.equal(priceUpTo('0.20766720', null), 'up to $0.21');
+assert.equal(priceUpTo('0.20766720', '0.00428'), 'up to $0.0042');
+assert.equal(spentUpTo({ spentUsd: 0.0061 }, '0.2577'), 'Spent $0.0061 of up to $0.26');
+assert.equal(spentUpTo({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), 'Spent $0.12 of up to $1.43, and up to $0.03 not known yet');
+assert.equal(spentUpTo({ spentUsd: 0 }, '0.26'), 'Spent $0 of up to $0.26');
+assert.equal(webTip(3, '0.0453'), 'Looks up what such a place looks like before it is made: up to 3 searches with Tavily, which keeps them. Adds at most $0.05.');
+assert.equal(webTip(1, '0.01'), 'Looks up what such a place looks like before it is made: up to 1 search with Tavily, which keeps it. Adds at most $0.01.');
+assert.equal(webNotesLabel(3), 'FROM THE WEB, 3 SEARCHES');
+assert.equal(webNotesLabel(1), 'FROM THE WEB, 1 SEARCH');
+for (const none of [0, null, undefined, 1.5]) assert.equal(webNotesLabel(none), 'FROM THE WEB', String(none));
 
 // Frame 21's and 22's words.
 assert.equal(CREATE_WORDS.creating, 'Creating your world');
@@ -171,12 +195,13 @@ const said = [
   ...Object.values(CREATE_WORDS), ...Object.values(STEP_WORDS), ...Object.values(REFUSAL_WORDS),
   priceLine('1.43'), priceLine('1.43', '0.05'), priceUp('$1.60'), budgetShort('0.0344', '0.01'), spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), startsLeftLine(2),
   refusalSpent({ spentUsd: 0.02 }), stoppedLine(bound, { spentUsd: 0.0058368 }),
+  priceUpTo('1.43', '0.05'), spentUpTo({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), webTip(3, '0.05'), webNotesLabel(3),
   setValue({ title: coast, chosen_by: 'setting', words: [], fell_back: false }, { parts: [{ title: 'By the sea' }], words: ['by the sea'] }),
 ];
 for (const line of said) {
   assert.doesNotMatch(line, /\u2014|US\$|provider|session|[a-z]+_[a-z_]+|Design\./u, line);
 }
-for (const file of ['create-words.mjs', 'create-steps.mjs', 'world-ui-create.ts', 'world-ui-create.css', 'verify-create-steps.mjs']) {
+for (const file of ['create-words.mjs', 'create-steps.mjs', 'world-ui-create.ts', 'world-ui-create.css', 'create-world.ts', 'create-world.css', 'verify-create-steps.mjs']) {
   assert.doesNotMatch(readFileSync(new URL(file, import.meta.url), 'utf8'), /\u2014/u, file);
 }
 
@@ -192,6 +217,19 @@ for (const [, size] of css.matchAll(/(?:font:\s*\d+\s+|font-size:\s*)calc\((\d+(
 }
 assert.match(css, /\.wu-qcmd-key \{[^}]*font: 400 max\(9px, calc\(10 \* var\(--u\)\)\)/u);
 assert.doesNotMatch(css, /font:\s*\d+\s+\d+(?:\.\d+)?px/u, 'a fixed font size');
+
+// The composer page's stylesheet (create-world.css): the mock's inks, column edge and curve once, in the mock's own
+// pixels rather than --u; motion only at 160 ms and 500 ms; less motion, less transparency and forced colours honoured.
+const page = readFileSync(new URL('create-world.css', import.meta.url), 'utf8');
+for (const token of ['--c-ink-2: rgb(255 255 255 / 72%)', '--c-ink-3: rgb(255 255 255 / 48%)', '--c-col: clamp(48px, 24.5vw, 470px)', '--c-ease: cubic-bezier(.25, .46, .45, .94)']) {
+  assert.equal(page.split(token).length - 1, 1, token);
+}
+for (const query of ['prefers-reduced-motion: reduce', 'prefers-reduced-transparency: reduce', 'forced-colors: active']) assert.ok(page.includes(query), query);
+assert.match(page, /\.wu-strip-card \{[^}]*transition: width 500ms var\(--c-ease\)/u);
+assert.match(page, /\.wu-strip-card\[aria-current="true"\] \{ width: 200px; \}/u);
+assert.doesNotMatch(page, /var\(--u\)/u, 'the mock\'s pixels, never the --u scale');
+for (const [, ms] of page.matchAll(/(\d+)ms/gu)) assert.ok(['160', '500'].includes(ms), `a ${ms} ms motion`);
+assert.doesNotMatch(page, /\btitle=|text-transform/u);
 
 // With WORDS_MD naming DESIGN's word list (kept outside the repository), each phrase here is in it.
 const words = process.env.WORDS_MD;

@@ -1,18 +1,16 @@
 // The parts page (world-ui-parts.html): every shared in-world part once, in its states, with the
 // example words of DESIGN's frames, so a reviewer sees the parts beside the frames before any
 // screen uses them. Nothing here reads a world. ?view=create, creating, refused, no-model and made
-// show making a world's light parts (world-ui-create.ts) with stand-in answers; ?empty leaves the
-// field empty, ?chosen=<n> marks a card chosen and ?thumbs=<folder> draws the cards' pictures.
+// show making a world's parts (world-ui-create.ts) with stand-in answers; ?empty leaves the
+// composer empty, ?chosen=<n> makes a card current and ?thumbs=<folder> draws the cards' pictures.
 // ?view=creature-describe, creature-making and creature-made show making a creature where it will
 // stand (world-ui-creature.ts) with the sheet's example words, over ?picture= as the world.
 import {
   areaBanner, cardWords, chip, glyphRows, keyWord, label, mountUiScale, notes, orb, page, pill, promptColumn, promptRow,
   nameTag, outline, path, ring, rule, scaleOf, shade, sideCard, stepList, tip,
 } from './world-ui.ts';
-import {
-  createKeyRow, createOrb, filmStrip, lightLabel, lightLine, lightPage, lightSteps, madeNote, quietCommand, sentenceField, sentenceRow,
-} from './world-ui-create.ts';
-import { CREATE_WORDS, madeSpent, priceLine, refusalSpent, refusalWords, setValue, spendLine, startsLeftLine } from './create-words.mjs';
+import { composer, createPage, createTitle, madeNote, makingSteps, quietCommand, webNotes, worldStrip } from './world-ui-create.ts';
+import { CREATE_WORDS, madeSpent, priceUpTo, refusalSpent, refusalWords, setValue, spentUpTo, webNotesLabel, webTip } from './create-words.mjs';
 import { draftSteps, madeColumns, startCards } from './create-steps.mjs';
 import { creatureField, madeGroup, makerLine, makingGroup, standLabel } from './world-ui-creature.ts';
 // The product's fonts and their tokens, as the app loads them (bootstrap.ts).
@@ -46,45 +44,52 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
     add(madeGroup({ label: 'yellow pond wader', words, modelName: 'Nemotron 3 Super 120B', spentUsd: '0.00420000', sketch: query.has('sketch'), placeable: true }), layer);
   }
 } else if (view === 'create' || view === 'creating' || view === 'no-model' || view === 'refused') {
-  // Making a world's light parts (frames 20 and 21) with the frames' example words and stand-in
-  // answers; ?picture= is the chosen world's still picture behind them.
+  // Making a world's parts (ROOT's composer mock) with the mock's example words and stand-in answers; ?picture= is
+  // the current ready world's picture behind them, ?empty leaves the composer empty, ?chosen=<n> makes a card current
+  // and ?thumbs=<folder> draws the cards' pictures.
   (root.querySelector('.parts-world') as HTMLElement).hidden = true;
-  const light = lightPage({ form: view === 'creating' ? 'creating' : 'create', picture, labelledBy: 'parts-create-title' });
-  add(light.root);
-  light.quiet.append(quietCommand({ onPress: press }));
-  const words = 'Glass terraces with glowing pools above the sea at night, and a grand hotel at the top';
+  const shown = createPage({ labelledBy: 'parts-create-title' });
+  add(shown.root);
+  shown.picture(picture);
+  shown.corner.append(quietCommand({ onPress: press, place: 'corner' }));
+  const words = 'A cozy little town by the sea at dusk';
   if (view === 'creating') {
-    light.head.append(lightLabel(CREATE_WORDS.creating));
-    const quote = add(document.createElement('p'), light.head); quote.className = 'wu-light-quote'; quote.id = 'parts-create-title'; quote.textContent = `\u201c${words}\u201d`;
-    const reads = [{ state: 'choosing', elapsed_seconds: 0 }, { state: 'drafting', elapsed_seconds: 1 }, { state: 'making', elapsed_seconds: 6 }, { state: 'making', elapsed_seconds: 12 }];
-    light.lower.append(lightSteps(draftSteps(reads)).root, lightLine(spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.4227'), { live: true }), lightLine(CREATE_WORDS.leave));
+    shown.form('creating');
+    const steps = makingSteps();
+    const reads = [{ state: 'choosing', elapsed_seconds: 0 }, { state: 'drafting', elapsed_seconds: 1 }, { state: 'making', elapsed_seconds: 24 }, { state: 'making', elapsed_seconds: 25 }];
+    steps.set(draftSteps(reads));
+    const spent = document.createElement('p'); spent.className = 'wu-making-spent'; spent.textContent = spentUpTo({ spentUsd: 0.0061 }, '0.26');
+    const web = webNotes();
+    web.notes(webNotesLabel(3), [{ aspect: 'buildings', text: 'Low clusters of buildings with simple gabled roofs, spaced irregularly.' }]);
+    const left = div('');
+    left.append(steps.root, spent);
+    const grid = div('wu-making');
+    grid.append(left, web.root);
+    const quote = document.createElement('p'); quote.className = 'wu-making-quote'; quote.textContent = `\u201c${words}\u201d`;
+    shown.column.append(createTitle(CREATE_WORDS.creating, 'parts-create-title'), quote, grid);
   } else {
-    const title = add(document.createElement('h1'), light.head); title.className = 'wu-light-title'; title.id = 'parts-create-title'; title.tabIndex = -1; title.textContent = CREATE_WORDS.title;
+    shown.column.append(createTitle(CREATE_WORDS.title, 'parts-create-title'));
     if (view === 'no-model') {
-      const sentence = add(document.createElement('p'), light.head); sentence.className = 'wu-light-sentence'; sentence.textContent = CREATE_WORDS.noModel;
+      const sentence = add(document.createElement('p'), shown.column); sentence.className = 'wu-create-sentence'; sentence.textContent = CREATE_WORDS.noModel;
     } else {
-      const field = sentenceField({ limit: 1000, value: query.get('empty') === null ? words : '' });
-      const ready = field.field.value.trim().length > 0;
-      light.head.append(sentenceRow(field, createOrb({ onPress: press, ready })));
-      if (view === 'refused') {
-        light.head.append(lightLine(refusalWords('world_not_a_place'), { tone: 'refused', live: true }), lightLine(refusalSpent({ spentUsd: 0.02 })!, { tone: 'refused' }));
-      } else {
-        light.head.append(lightLine(priceLine('1.4227')), lightLine(startsLeftLine(2)!));
-      }
-      createKeyRow(light.keys, { create: ready, start: false });
+      const box = composer({ onCreate: press });
+      shown.column.append(box.root);
+      box.set(query.get('empty') === null ? words : '');
+      box.offerWeb({ on: true, tip: webTip(3, '0.05'), onChange: press });
+      box.say(view === 'refused' ? `${refusalWords('world_not_a_place')} ${refusalSpent({ spentUsd: 0.02 })}` : null, priceUpTo('0.26'));
+      box.ready(box.field.value.trim().length > 0);
     }
-    // Stand-in cards: the frames' names (the server's, never a list in code), one without a picture.
-    // ?thumbs=<folder address> draws their pictures; without it each is the quiet tile.
+    // Stand-in cards: the mock's names (the server's, never a list in code), one without a picture.
+    // ?thumbs=<folder address> draws their pictures; without it each is the empty tile.
     const thumbs = query.get('thumbs');
     const thumb = (name: string): string | null => (thumbs ? `${thumbs}${name}.jpg` : null);
     const cards = startCards([
-      { key: 'town', name: 'Small town', picture: thumb('town') }, { key: 'bay', name: 'Terraces on the bay', picture: thumb('bay') },
-      { key: 'canyon', name: 'Tower canyon', picture: thumb('canyon') },
-    ], [{ key: 'wall', name: 'Wall city', picture: null, priceUsd: '0.4' }]);
-    const strip = filmStrip(cards, press);
-    light.lower.append(strip.root);
+      { key: 'recipe:small_town', name: 'A small town', picture: thumb('recipe-small_town') }, { key: 'recipe:market_town', name: 'A market town', picture: thumb('recipe-market_town') },
+      { key: 'kind:town', name: 'A town', picture: thumb('kind-town') },
+    ], [{ key: 'kind:island_hamlet', name: 'Hamlet on a sky island', picture: null, priceUsd: '0.4' }]);
+    const strip = worldStrip(cards, { onStart: press, onChoose: (card) => { if (!picture) shown.picture(card.picture); } });
+    shown.foot.append(strip.root);
     if (query.get('chosen') !== null) strip.choose(Number(query.get('chosen')));
-    else strip.cards.forEach((card) => card.removeAttribute('aria-current'));
   }
 } else if (view === 'made') {
   // Frame 22's made note over the world, with the banner's made form.
