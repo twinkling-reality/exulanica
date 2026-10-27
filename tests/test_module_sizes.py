@@ -100,6 +100,12 @@ LIMITS: dict[str, tuple[int, str]] = {
         "compiler accepts it, and a requirement's target label matched whatever its case and "
         "refused naming the label and its fault",
     ),
+    "exulanica/api/services.py": (
+        1_545,
+        "what a running instance is wired to: the write and read databases, the object store, the "
+        "model client, the derivative queue's drain, and each offer the installation makes, "
+        "web notes and creatures for every guest among them",
+    ),
     "tools/previews/world-workspace/contextual-world.ts": (
         1_526,
         "the world view's host: its corners, people, speech, building (which lets go of a chosen "
