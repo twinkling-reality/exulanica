@@ -660,6 +660,172 @@ describe('Create a world as a page', () => {
     expect(JSON.parse(sessionStorage.getItem('exulanica.made.v1')!)).toMatchObject({ entryId: 'starter', build: true });
   });
 
+  describe('the first Enter (never silent)', () => {
+    const field = (): HTMLTextAreaElement => document.querySelector<HTMLTextAreaElement>('.wu-light-field')!;
+    const creating = (): boolean => document.querySelector('section.wu-light[data-form="creating"]') !== null;
+    /** The lines under the field: the price's place and what is said there. */
+    const lines = (): string[] => [...document.querySelectorAll('.wu-light-head .wu-light-line')].map((line) => line.textContent ?? '');
+    const stepRows = (): string[][] => [...document.querySelectorAll('.wu-light-steps .wu-step')]
+      .map((row) => [row.querySelector('.wu-step-words')!.textContent ?? '', (row as HTMLElement).dataset['state'] ?? '', row.querySelector('.wu-step-time')!.textContent ?? '']);
+
+    it('shows frame 21 at once, "Waiting to start" timed from the press, with the start still unanswered', async () => {
+      serve(offerOf());
+      let now = 5_000;
+      const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+      try {
+        let answer: (value: unknown) => void = () => {};
+        startAnswer = () => new Promise((resolve) => { answer = resolve; });
+        await mount();
+        type(field(), 'A cozy little town by the sea at dusk');
+        key(field(), 'Enter');
+        // Nothing awaited: frame 21 is there before the start answers.
+        expect(creating()).toBe(true);
+        expect(document.querySelector('.wu-light-label')!.textContent).toBe('Creating your world');
+        expect(document.querySelector('.wu-light-quote')!.textContent).toBe('\u201cA cozy little town by the sea at dusk\u201d');
+        expect(stepRows()).toEqual([['Waiting to start', 'now', '0 s']]);
+        await settle();
+        expect(starts.map((one) => one.words)).toEqual(['A cozy little town by the sea at dusk']);
+        now += 2_400;
+        await new Promise((resolve) => setTimeout(resolve, 1_200));
+        expect(stepRows()).toEqual([['Waiting to start', 'now', '2 s']]);
+        // Answered, the draft's own steps follow the wait, which ends where they begin.
+        answer({ draftId: 'd-1', state: 'queued', refusal: null });
+        await settle();
+        expect(stepRows()[0]).toEqual(['Waiting to start', 'done', '2 s']);
+        expect(stepRows()[1]).toEqual(['Building it', 'now', '1 s']);
+      } finally { clock.mockRestore(); }
+    });
+
+    it('sends no second start for a second Enter while the first is in flight', async () => {
+      serve(offerOf());
+      startAnswer = () => new Promise(() => {});
+      await mount();
+      type(field(), 'A quiet valley');
+      const first = field();
+      key(first, 'Enter');
+      key(document.querySelector('section.wu-light')!, 'Enter');
+      key(first, 'Enter');
+      await settle();
+      expect(starts).toHaveLength(1);
+      expect(creating()).toBe(true);
+    });
+
+    it('says the price cannot be read where the offer has none, and reads it again at the press until it can start', async () => {
+      const noPrice = offerOf({ operation: null });
+      const offers = [noPrice, noPrice, offerOf()];
+      let reads = 0;
+      vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+        const body = address.endsWith('/worlds/drafts') ? offers[Math.min(reads++, offers.length - 1)] : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+        return { ok: true, status: 200, json: async () => body };
+      }));
+      await mount();
+      expect(lines()).toContain('The price can\u2019t be read right now. Trying again.');
+      type(field(), 'A quiet valley');
+      key(field(), 'Enter');
+      await settle();
+      expect(reads).toBe(2);
+      expect(lines()).toContain('The price can\u2019t be read right now. Trying again.');
+      expect(starts).toEqual([]);
+      expect(creating()).toBe(false);
+      // Read again after L14's first backoff: a price, and the next Enter starts.
+      await new Promise((resolve) => setTimeout(resolve, 1_100));
+      await settle();
+      expect(reads).toBe(3);
+      expect(lines().some((line) => line.startsWith('An open model makes it'))).toBe(true);
+      key(field(), 'Enter');
+      await settle();
+      expect(starts.map((one) => one.words)).toEqual(['A quiet valley']);
+    });
+
+    it('takes words while the offer is read, says what it waits for at an Enter, then starts on an Enter once it is', async () => {
+      let release: () => void = () => {};
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+        if (address.endsWith('/worlds/drafts')) await held;
+        const body = address.endsWith('/worlds/drafts') ? offerOf() : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+        return { ok: true, status: 200, json: async () => body };
+      }));
+      await mount();
+      expect(lines()).toEqual(['Reading what you can make here\u2026']);
+      type(field(), 'A quiet valley');
+      key(field(), 'Enter');
+      expect(lines()).toContain('Reading what you can make here\u2026');
+      expect(starts).toEqual([]);
+      expect(creating()).toBe(false);
+      expect(document.activeElement).toBe(field());
+      expect(field().value).toBe('A quiet valley');
+      release();
+      await settle();
+      expect(lines()).not.toContain('Reading what you can make here\u2026');
+      key(field(), 'Enter');
+      await settle();
+      expect(starts.map((one) => one.words)).toEqual(['A quiet valley']);
+    });
+
+    it('says "Describe it" for an Enter with no words, and starts nothing', async () => {
+      serve(offerOf());
+      await mount();
+      type(field(), '');
+      key(field(), 'Enter');
+      expect(lines()).toContain('Describe it');
+      expect(starts).toEqual([]);
+      type(field(), 'A');
+      expect(lines()).not.toContain('Describe it');
+    });
+
+    it('starts or says why on the first Enter in every order the offer, the cards, the typing and the Enter come in', async () => {
+      const events = ['offer', 'cards', 'type', 'enter'] as const;
+      const orders: (typeof events[number])[][] = [];
+      const permute = (done: (typeof events[number])[], left: readonly (typeof events[number])[]): void => {
+        if (left.length === 0) { orders.push(done); return; }
+        left.forEach((one, at) => permute([...done, one], left.filter((_, other) => other !== at)));
+      };
+      permute([], events);
+      expect(orders).toHaveLength(24);
+      for (const order of orders) {
+        document.body.replaceChildren();
+        starts.length = 0;
+        startAnswer = () => new Promise(() => {});
+        let offerIn: () => void = () => {}, cardsIn: () => void = () => {};
+        const offerHeld = new Promise<void>((resolve) => { offerIn = resolve; });
+        cardsHeld.until = new Promise<void>((resolve) => { cardsIn = resolve; });
+        vi.stubGlobal('fetch', vi.fn(async (address: string) => {
+          if (address.endsWith('/worlds/drafts')) await offerHeld;
+          const body = address.endsWith('/worlds/drafts') ? offerOf() : { state: 'making', elapsed_seconds: 1, poll_after_seconds: 3 };
+          return { ok: true, status: 200, json: async () => body };
+        }));
+        const surface = await mount();
+        // The words kept from the order before go, so each order types its own.
+        type(field(), '');
+        let first = '';
+        for (const event of order) {
+          if (event === 'offer') offerIn();
+          else if (event === 'cards') cardsIn();
+          else if (event === 'type') { if (!creating()) type(field(), 'A market town'); }
+          else {
+            key(field(), 'Enter');
+            first = creating() ? 'started' : lines().join(' | ');
+          }
+          await settle();
+        }
+        const said = `${order.join(', ')}: ${first}`;
+        // Started only with the offer read and words typed before it; else a reason, never nothing.
+        const could = order.indexOf('offer') < order.indexOf('enter') && order.indexOf('type') < order.indexOf('enter');
+        if (could) expect(first, said).toBe('started');
+        else expect(first, said).toContain(order.indexOf('offer') > order.indexOf('enter') ? 'Reading what you can make here\u2026' : 'Describe it');
+        expect(starts, said).toHaveLength(could ? 1 : 0);
+        // With everything in, an Enter starts.
+        if (!could) {
+          key(field(), 'Enter');
+          await settle();
+          expect(starts.map((one) => one.words), said).toEqual(['A market town']);
+        }
+        cardsHeld.until = null;
+        surface.remove();
+      }
+    });
+  });
+
   it('reads a sheet held past the server\'s 60 s again before the start, and starts with the fresh one (fake clock)', async () => {
     let clock = Date.now();
     const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);

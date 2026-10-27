@@ -151,6 +151,9 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   let offerFailures = 0, offerOffline = false;
   // When the offer held was read, by this page's clock (FRESH_MS).
   let offerAt = 0;
+  // A press of Create that could not start, where the offer's state alone does not say why (no words yet): said under
+  // the field until the words change.
+  let asked = false;
   // The sentence that names the cards where no field is drawn (N24), else null.
   let sentenceId: string | null = null;
   // Web notes for the next draft (WORDS.md "Web notes in Create, the words"): off until the person ticks the box, each
@@ -192,9 +195,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     const state = offerState(rawOffer);
     const head: Node[] = [title(), peopleMoveIn()];
     sentenceId = null;
-    if (rawOffer === null) {
-      head.push(lightLine(offerOffline ? CREATE_WORDS.offline : CREATE_WORDS.loading, { live: true }));
-    } else if (state.page === 'no-model' || state.page === 'budget' || state.page === 'paused' || state.page === 'short' || state.page === 'not-offered') {
+    if (rawOffer !== null && (state.page === 'no-model' || state.page === 'budget' || state.page === 'paused' || state.page === 'short' || state.page === 'not-offered')) {
       // No field and no orb (N7, N24, N25, N31, N34): the sentence, which names the cards under it.
       const sentence = document.createElement('p'); sentence.className = 'wu-light-sentence';
       sentence.id = sentenceId = 'wu-create-sentence';
@@ -206,6 +207,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       const limit = offer?.descriptionCharacters ?? 1000;
       field = sentenceField({ limit, value: keptWords, onInput: (words) => {
         keptWords = words;
+        if (asked) { asked = false; drawCreate(); field?.field.focus(); return; }
         if (refusal !== null && refusal.code !== 'world_draft_price_expired' && refusal.code !== PRICE_UP && refusal.code !== PRICE_UNAVAILABLE) {
           // After a draft stopped part way the offer read before it is out of date (A1b): read again for what is left.
           const stale = refusal.stopped === true;
@@ -222,14 +224,17 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       // the starts left. A refusal of the offer itself (Create cannot be pressed) stands alone, so no
       // price or starts sit over it (the walk saw "12 of 12 starts left" over one); a price that
       // cannot be read is said in the plain ink while the offer is read again (N25).
-      const now = state.page === 'refused' && state.code ? state.code : null;
-      if (now === 'world_draft_price_unavailable') head.push(lightLine(refusalWords(now), { live: true }));
+      // While the offer is read, the field takes words and the line in the price's place says what it waits for; an
+      // offer with no price says so in the plain ink while it is read again (N25).
+      const now = state.page === 'refused' && state.code ? state.code : state.page === 'offered' && offer?.operation == null ? PRICE_UNAVAILABLE : null;
+      if (rawOffer === null) head.push(lightLine(offerOffline ? CREATE_WORDS.offline : CREATE_WORDS.loading, { live: true }));
+      else if (now === 'world_draft_price_unavailable') head.push(lightLine(refusalWords(now), { live: true }));
       else if (now !== null) head.push(lightLine(refusalWords(now), { tone: 'refused', live: true }));
       else {
         if (refusal !== null) {
           head.push(lightLine(refusal.words ?? refusalWords(refusal.code), refusal.code === PRICE_UNAVAILABLE ? { live: true } : { tone: 'refused', live: true }));
           if (refusal.spent) head.push(lightLine(refusal.spent, { tone: 'refused' }));
-        }
+        } else if (asked && !(field.field.value.trim())) head.push(lightLine(CREATE_WORDS.describeIt, { live: true }));
         if (offer?.operation && !refusal?.stopped) {
           // Ticked, the price line's figure is the whole most with the notes (item 2).
           const operation = offer.operation, notes = notesOffered();
@@ -331,6 +336,8 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
 
   /** Reads the offer (raw for its codes, parsed for its sealed quote), quietly again on failure (L14). */
   const readOffer = async (): Promise<void> => {
+    // One read again waits at a time: a read now takes the place of one waiting.
+    window.clearTimeout(again);
     try {
       const raw = await readRaw(credentials, '/worlds/drafts', signal);
       offer = parseWorldDraftOffer(raw);
@@ -342,34 +349,55 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       const next = afterRead(offerFailures, false, 0);
       offerFailures = next.failed;
       if (next.offline && !offerOffline) { offerOffline = true; drawCreate(); }
-      window.setTimeout(() => { if (!signal.aborted) void readOffer(); }, next.retryMs);
+      again = window.setTimeout(() => { if (!signal.aborted) void readOffer(); }, next.retryMs);
       return;
     }
     if (signal.aborted) return;
     const state = offerState(rawOffer);
-    if (state.page === 'following') { void follow(state.draftId, keptWords); return; }
+    if (state.page === 'following') { if (form === 'create') void follow(state.draftId, keptWords, creatingFrame(keptWords, null)); return; }
+    // A making on show answers by its own reads.
+    if (form !== 'create') return;
     const hadFocus = field !== null && document.activeElement === field.field;
     drawCreate();
     if (hadFocus || priceRetries === 0) field?.field.focus({ preventScroll: true });
     // A price that cannot be read now: the offer is read again quietly, with L14's backoff (N25).
-    if (state.page === 'refused' && state.code === 'world_draft_price_unavailable') {
+    if ((state.page === 'refused' && state.code === PRICE_UNAVAILABLE) || (state.page === 'offered' && offer?.operation == null)) {
       const next = afterRead(priceRetries, false, 0);
       priceRetries = next.failed;
-      window.setTimeout(() => { if (!signal.aborted && form === 'create') void readOffer(); }, next.retryMs);
+      again = window.setTimeout(() => { if (!signal.aborted && form === 'create') void readOffer(); }, next.retryMs);
     } else priceRetries = 0;
   };
   let priceRetries = 0;
+  // The offer's read again, waiting its turn.
+  let again = 0;
 
-  /** Create: starts a draft of the words (N2) at the most the person sees now, after asking the web for notes where they
-   * are wanted, then follows it on frame 21. */
+  /**
+   * Create: an Enter in the field, on the notes box or a press of the orb. One that can start shows frame 21 at once,
+   * "Waiting to start" timed from the press, before the start answers, and starts a draft of the words (N2) at the most
+   * the person sees now, after asking the web for notes where they are wanted. One that cannot says why under the field
+   * (the offer not read yet, no words, a price that cannot be read, which it reads again, or the offer's refusal), and
+   * keeps the words. Never silent.
+   */
   const create = async (): Promise<void> => {
-    const words = field?.field.value.trim() ?? '';
-    if (!ready() || offer?.operation == null) return;
+    if (busy || form !== 'create' || field === null) return;
+    const words = field.field.value.trim();
+    const state = offerState(rawOffer);
+    if (state.page !== 'offered' || offer?.operation == null || !words) {
+      asked = true;
+      drawCreate();
+      field?.field.focus({ preventScroll: true });
+      // With no price to start at, a press reads the offer again at once, and starts the quiet backoff over.
+      if (rawOffer !== null && ((state.page === 'offered' && offer?.operation == null) || (state.page === 'refused' && state.code === PRICE_UNAVAILABLE))) {
+        priceRetries = 0;
+        void readOffer();
+      }
+      return;
+    }
+    asked = false;
     const agreed = offer.operation.maximumUsd;
     const notes = notesOffered();
     if (notes !== null && notesWanted) { void lookUp(words, notes.mostUsd, agreed); return; }
-    if (orb) setOrbReady(orb, false);
-    void start(words, { agreed });
+    void start(words, { agreed, frame: creatingFrame(words, performance.now()) });
   };
 
   /** Reads the offer for its operation sheet now: the parsed offer, or null where it cannot be read. */
@@ -384,16 +412,18 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   };
 
   /** What a start carries to its retry: the most the person saw (null once it was made again), the notes, their request. */
-  interface StartMore { readonly agreed: string | null; readonly notes: NotesMade | null; readonly referenceId: string | null; readonly spent?: string | null }
+  interface StartMore {
+    readonly agreed: string | null; readonly frame: CreatingFrame | null; readonly notes: NotesMade | null; readonly referenceId: string | null; readonly spent?: string | null;
+  }
 
   /**
-   * Starts a draft of `words` at `agreed`, the most the person saw, then follows it; after notes, on their frame 21 and
-   * with them. A sheet held through the notes, or read more than FRESH_MS ago, is read again before the start is sent:
+   * Starts a draft of `words` at `agreed`, the most the person saw, on frame 21 drawn at the press, then follows it; after
+   * notes, with them. A sheet held through the notes, or read more than FRESH_MS ago, is read again before the start is sent:
    * the offer as it stands then says whether a start can go, and a higher price is said and waits for Create (N32).
    * `retried` on the one start made again after a refusal for its price, which is not made again from its own.
    */
-  const start = async (words: string, { agreed, notes = null, referenceId = null, retried = false }: {
-    readonly agreed: string; readonly notes?: NotesMade | null; readonly referenceId?: string | null; readonly retried?: boolean;
+  const start = async (words: string, { agreed, frame, notes = null, referenceId = null, retried = false }: {
+    readonly agreed: string; readonly frame: CreatingFrame; readonly notes?: NotesMade | null; readonly referenceId?: string | null; readonly retried?: boolean;
   }): Promise<void> => {
     busy = true;
     if ((notes !== null && !retried) || Date.now() - offerAt > FRESH_MS) {
@@ -401,41 +431,42 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       if (signal.aborted) return;
       // Unread, the start goes with the sheet held, and the server says whether it holds.
       if (fresh !== null) {
-        if (offerState(rawOffer).page !== 'offered' || fresh.operation === null) { back(words, notes, null); return; }
+        if (offerState(rawOffer).page !== 'offered' || fresh.operation === null) { back(words, frame, notes, null); return; }
         if (Number(fresh.operation.maximumUsd) > Number(agreed)) {
-          back(words, notes, { code: PRICE_UP, spent: null, words: priceUp(ceilingAmount(fresh.operation.maximumUsd)) });
+          back(words, frame, notes, { code: PRICE_UP, spent: null, words: priceUp(ceilingAmount(fresh.operation.maximumUsd)) });
           return;
         }
       }
     }
     const operation = offer?.operation ?? null;
-    if (operation === null) { back(words, notes, { code: PRICE_UNAVAILABLE, spent: null }); return; }
+    if (operation === null) { back(words, frame, notes, { code: PRICE_UNAVAILABLE, spent: null }); return; }
     // The submission a press of Create sends; the same one again on a retry of the same words and sheet, so a start
     // whose answer was lost is never a second draft (the idempotency key).
     if (submission === null || submission.words !== words || submission.referenceId !== referenceId || submission.sent.operation !== operation) {
       submission = { words, referenceId, sent: { idempotencyKey: crypto.randomUUID(), operation, maximumUsd: operation.maximumUsd, ...(referenceId === null ? {} : { referenceId }) } };
     }
-    const more: StartMore = { agreed: retried ? null : agreed, notes, referenceId };
+    const more: StartMore = { agreed: retried ? null : agreed, frame, notes, referenceId };
     try {
       const draft = await making.start(words, submission.sent);
       submission = null;
       busy = false;
       if (signal.aborted) return;
       if (draft.state === 'refused') { startRefused(words, draft.refusal?.code ?? 'world_draft_failed', more); return; }
-      void follow(draft.draftId, words, notes);
+      void follow(draft.draftId, words, frame, notes);
     } catch (error) {
       busy = false;
       if (signal.aborted) return;
       const code = codeOf(error);
       // A start whose answer never came keeps its key, so Create again is the same start.
-      if (code === null) { back(words, notes, { code: 'world_draft_failed', spent: null }); return; }
+      if (code === null) { back(words, frame, notes, { code: 'world_draft_failed', spent: null }); return; }
       submission = null;
       startRefused(words, code, more);
     }
   };
 
-  /** Frame 20 again with the words kept (N9) and the refusal said; frame 21 and its notes gone where they were drawn. */
-  const back = (words: string, notes: NotesMade | null, said: typeof refusal): void => {
+  /** Frame 20 again with the words kept (N9) and the refusal said; frame 21, its clock and its notes gone. */
+  const back = (words: string, frame: CreatingFrame | null, notes: NotesMade | null, said: typeof refusal): void => {
+    frame?.stop();
     notes?.panel.root.remove();
     keptWords = words || keptWords;
     refusal = said;
@@ -451,13 +482,13 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
    */
   const startRefused = (words: string, code: string, more: StartMore): void => {
     if (PRICE_CODES.includes(code)) { void requote(words, code, more, 0); return; }
-    if (code === SHORT_CODE) { back(words, more.notes, null); void readOffer(); return; }
-    back(words, more.notes, { code, spent: more.spent ?? null });
+    if (code === SHORT_CODE) { back(words, more.frame, more.notes, null); void readOffer(); return; }
+    back(words, more.frame, more.notes, { code, spent: more.spent ?? null });
   };
 
-  /** A draft refused while it was made: the same, with what was spent (N9). */
-  const refused = (code: string, spent: string | null): void => {
-    startRefused(keptWords, code, { agreed: null, notes: null, referenceId: null, spent });
+  /** A draft refused while it was made, or a card's making: the same, with what was spent (N9). */
+  const refused = (code: string, spent: string | null, frame: CreatingFrame | null = null): void => {
+    startRefused(keptWords, code, { agreed: null, frame, notes: null, referenceId: null, spent });
   };
 
   /** A draft stopped part way (A1b): its sentence in place of the spent budget's and what was spent, with no price under it. */
@@ -482,26 +513,37 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     const spent = more.spent ?? null;
     if (most === null) {
       const state = offerState(rawOffer);
-      if (fresh !== null && state.page !== 'offered' && !(state.page === 'refused' && state.code === PRICE_UNAVAILABLE)) { back(words, more.notes, null); return; }
-      const line = form === 'creating' ? more.notes?.frame.offline ?? null : null;
+      if (fresh !== null && state.page !== 'offered' && !(state.page === 'refused' && state.code === PRICE_UNAVAILABLE)) { back(words, more.frame, more.notes, null); return; }
+      const line = form === 'creating' ? more.frame?.offline ?? null : null;
       if (line !== null) { line.textContent = refusalWords(PRICE_UNAVAILABLE); line.hidden = false; }
-      else { more.notes?.panel.root.remove(); refusal = { code: PRICE_UNAVAILABLE, spent }; drawCreate(); }
+      else { more.frame?.stop(); more.notes?.panel.root.remove(); refusal = { code: PRICE_UNAVAILABLE, spent }; drawCreate(); }
       const next = afterRead(failures, false, 0);
       window.setTimeout(() => { if (!signal.aborted) void requote(words, code, more, next.failed); }, next.retryMs);
       return;
     }
-    if (more.notes) more.notes.frame.offline.hidden = true;
+    if (more.frame) more.frame.offline.hidden = true;
     if (more.agreed !== null && Number(most) <= Number(more.agreed)) {
       refusal = null;
-      void start(words, { agreed: more.agreed, notes: form === 'creating' ? more.notes : null, referenceId: more.referenceId, retried: true });
+      // Made once more where the first was: on its frame 21, or on one drawn now where the start had none.
+      const frame = form === 'creating' && more.frame !== null ? more.frame : creatingFrame(words, performance.now());
+      void start(words, { agreed: more.agreed, frame, notes: form === 'creating' ? more.notes : null, referenceId: more.referenceId, retried: true });
       return;
     }
-    back(words, more.notes, more.agreed !== null ? { code: PRICE_UP, spent, words: priceUp(ceilingAmount(most)) } : { code, spent });
+    back(words, more.frame, more.notes, more.agreed !== null ? { code: PRICE_UP, spent, words: priceUp(ceilingAmount(most)) } : { code, spent });
   };
 
-  /** Frame 21's parts: the quote, the steps, the spend line and the offline line, drawn once for a making. */
-  interface CreatingFrame { readonly quote: HTMLElement; readonly steps: LightSteps; readonly spend: HTMLElement; readonly offline: HTMLElement }
-  const creatingFrame = (words: string): CreatingFrame => {
+  /**
+   * Frame 21's parts: the quote, the steps, the spend line and the offline line, drawn once for a making. With
+   * `pressed`, "Waiting to start" leads the steps, timed from the press until the first step after it shows; `after`
+   * draws the steps that follow it (the notes' and the draft's, a served "Waiting to start" left out); with no press
+   * (a draft followed when the page opens), the steps as served. `stop` stops the waiting step's clock.
+   */
+  interface CreatingFrame {
+    readonly quote: HTMLElement; readonly steps: LightSteps; readonly spend: HTMLElement; readonly offline: HTMLElement;
+    after(steps: readonly Step[]): void;
+    stop(): void;
+  }
+  const creatingFrame = (words: string, pressed: number | null): CreatingFrame => {
     form = 'creating';
     page.form('creating');
     const quote = document.createElement('p');
@@ -517,11 +559,27 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     sizeQuote(quote);
     keys();
     page.root.focus({ preventScroll: true });
-    return { quote, steps, spend, offline };
+    let latest: readonly Step[] = [];
+    let waited: number | null = null;
+    let clock = 0;
+    const stop = (): void => window.clearInterval(clock);
+    const draw = (): void => {
+      if (pressed === null) { steps.set(latest); return; }
+      const now = performance.now();
+      if (latest.length > 0 && waited === null) { waited = (now - pressed) / 1000; stop(); }
+      steps.set([{ key: 'queued', words: STEP_WORDS.queued, state: latest.length > 0 ? 'done' : 'now', time: stepTime(waited ?? (now - pressed) / 1000) }, ...latest]);
+    };
+    if (pressed !== null) clock = window.setInterval(draw, 1000);
+    signal.addEventListener('abort', stop);
+    draw();
+    return {
+      quote, steps, spend, offline, stop,
+      after(next) { latest = pressed === null ? next : next.filter((step) => step.key !== 'queued'); draw(); },
+    };
   };
 
   /** What the notes phase hands the draft it starts: its steps, its panel and the most the notes may add. */
-  interface NotesMade { readonly frame: CreatingFrame; readonly steps: readonly Step[]; readonly panel: NotesPanel; readonly mostUsd: string }
+  interface NotesMade { readonly steps: readonly Step[]; readonly panel: NotesPanel; readonly mostUsd: string }
 
   /**
    * Web notes first (items 3 and 4): the request asked for the words, its steps drawn as they happen with their times
@@ -530,13 +588,11 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
    */
   const lookUp = async (words: string, mostUsd: string, agreed: string): Promise<void> => {
     busy = true;
-    const frame = creatingFrame(words);
+    const frame = creatingFrame(words, performance.now());
     const panel = notesPanel();
     page.root.append(panel.root);
     signal.addEventListener('abort', () => panel.root.remove());
-    const pressed = performance.now();
     const started: Record<string, number> = {}, seconds: Record<string, number> = {};
-    let waited: number | null = null;
     const drawn = (request: ReferenceRequest | null): Step[] => {
       const now = performance.now();
       for (const step of request?.steps ?? []) {
@@ -545,17 +601,14 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
           if (step.state === 'running' || seconds[step.step] === undefined) seconds[step.step] = (now - started[step.step]!) / 1000;
         }
       }
-      const shown = notesSteps(request?.steps ?? [], seconds);
-      if (shown.length > 0 && waited === null) waited = (now - pressed) / 1000;
-      const waiting: Step = { words: STEP_WORDS.queued, state: shown.length > 0 ? 'done' : 'now', time: stepTime(waited ?? (now - pressed) / 1000) };
-      return [waiting, ...shown];
+      return notesSteps(request?.steps ?? [], seconds);
     };
-    frame.steps.set(drawn(null));
+    frame.after(drawn(null));
     let request: ReferenceRequest | null = null;
     try {
       request = await references().request({ purpose: 'world_draft', description: words, idempotencyKey: crypto.randomUUID() });
       while (!signal.aborted && !referenceFinished(request)) {
-        frame.steps.set(drawn(request));
+        frame.after(drawn(request));
         await new Promise((resolve) => window.setTimeout(resolve, 1000));
         if (signal.aborted) return;
         request = await references().read(request.referenceId);
@@ -566,17 +619,17 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     }
     if (signal.aborted) return;
     const steps = drawn(request);
-    frame.steps.set(steps);
+    frame.after(steps);
     const outcome = request === null ? 'notMade' : notesOutcome(request);
     if (request !== null && referenceHasNotes(request)) panel.notes(request.notes, notesFoot(request.searches.length));
     else panel.instead(notesNotUsedLine(outcome));
     notesWanted = false;
-    void start(words, { agreed, notes: { frame, steps, panel, mostUsd }, referenceId: request !== null && referenceHasNotes(request) ? request.referenceId : null });
+    void start(words, { agreed, frame, notes: { steps, panel, mostUsd }, referenceId: request !== null && referenceHasNotes(request) ? request.referenceId : null });
   };
 
   /** Frame 21: follows draft `draftId` by its served reads until it is ready or refused; after notes, on their frame. */
-  const follow = async (draftId: string, words: string, notes: NotesMade | null = null): Promise<void> => {
-    const { quote, steps, spend, offline } = notes?.frame ?? creatingFrame(words);
+  const follow = async (draftId: string, words: string, frame: CreatingFrame, notes: NotesMade | null = null): Promise<void> => {
+    const { quote, spend, offline } = frame;
     const reads: RawDraft[] = [];
     const maximum = offer?.operation?.maximumUsd ?? null;
     let failed = 0;
@@ -597,8 +650,8 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       failed = 0; offline.hidden = true;
       reads.push(raw);
       if (!quote.textContent && typeof raw['description'] === 'string' && raw['description']) { quote.textContent = `“${raw['description']}”`; sizeQuote(quote); }
-      // After notes, their steps first and "Waiting to start" once (item 3).
-      steps.set(notes === null ? draftSteps(reads) : [...notes.steps, ...draftSteps(reads).filter((step: { readonly key: string }) => step.key !== 'queued')]);
+      // After the wait from the press, the notes' steps first, then the draft's (item 3).
+      frame.after([...(notes?.steps ?? []), ...draftSteps(reads)]);
       const noted = raw['references'] as { state?: unknown; code?: unknown; notes?: unknown; searches?: unknown; spent_usd?: unknown } | null | undefined;
       // A kind of place the notes do not reach says so in their place (item 4).
       if (notes !== null && noted?.state === 'not_used' && noted.code === 'reference_not_for_this_tool') notes.panel.instead(notesNotUsedLine(null, 'reference_not_for_this_tool'));
@@ -613,6 +666,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       const most = notes === null || draftMost === null ? draftMost : sumUsd(draftMost, notes.mostUsd);
       if (spent !== null && most !== null) { spend.textContent = spendLine(spent, most); spend.hidden = false; }
       if (raw['state'] === 'ready') {
+        frame.stop();
         const used = noted?.state === 'used' && typeof noted.notes === 'number' && typeof noted.searches === 'number';
         await made(raw, spent, most, used ? webColumn(noted.notes as number, noted.searches as number) : null);
         return;
@@ -620,11 +674,12 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       if (raw['state'] === 'refused') {
         const code = typeof (raw['refusal'] as { code?: unknown } | null)?.code === 'string' ? (raw['refusal'] as { code: string }).code : 'world_draft_failed';
         keptWords = words || keptWords;
+        frame.stop();
         notes?.panel.root.remove();
         // Stopped part way where its next step could cost more than was left (A1b): said with its figures.
         const stopped = spent === null ? null : stoppedLine((raw['refusal'] as { spending?: unknown } | null)?.spending ?? null, spent);
         if (stopped !== null) stoppedPartWay(code, stopped);
-        else refused(code, spent === null ? null : refusalSpent(spent));
+        else refused(code, spent === null ? null : refusalSpent(spent), frame);
         return;
       }
       const delay = pollDelay(raw);
@@ -724,7 +779,8 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       : strip !== null && strip.cards.includes(active as HTMLButtonElement) ? 'card'
         : active instanceof HTMLInputElement && active.classList.contains('wu-notes-box') ? 'box'
           : active instanceof HTMLButtonElement ? 'button' : 'page';
-    const fate = createKey(event, { page: form, focus, canCreate: ready() });
+    // Every plain Enter in the field or on the notes box asks to create: create() starts, or says why it cannot.
+    const fate = createKey(event, { page: form, focus, canCreate: true });
     if (fate === 'pass' || fate === 'type' || fate === 'quiet') { event.stopPropagation(); return; }
     event.preventDefault();
     event.stopPropagation();
@@ -740,6 +796,9 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
   page.root.tabIndex = -1;
 
   drawCreate();
+  // Focus opens in the field (N6), which takes words while the offer is read.
+  const focusField = (): void => { field?.field.focus({ preventScroll: true }); };
+  focusField();
   void readOffer();
   void readCards();
   return {
