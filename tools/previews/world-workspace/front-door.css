@@ -48,7 +48,6 @@ body.ux-review #shell .ux-world-entry .your-worlds-card[aria-current="true"] .yo
 body.ux-review #shell .ux-world-entry .your-worlds-picture::after { content:''; position:absolute; inset:0; border-radius:7px; padding:1px; pointer-events:none; background:linear-gradient(110deg,#ffffffbd,#ffffff13 57%,rgb(27 48 52 / 20%)); mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0); mask-composite:exclude; }
 body.ux-review #shell .ux-world-entry .your-worlds-card[aria-current="true"] .your-worlds-picture::after { background:var(--nav-edge); }
 body.ux-review #shell .ux-world-entry .world-entry-choice-title { margin:8px 0 0; font:400 12px/1.4 var(--ui-font-brand); color:var(--entry-ink); }
-body.ux-review #shell .ux-world-entry .your-worlds-card[aria-current="true"] .world-entry-choice-title::before { content:''; display:inline-block; width:3px; height:9px; margin-right:7px; background:var(--menu-accent); }
 .ux-entry-arrows { display:flex; gap:4px; }
 body.ux-review #shell .ux-entry-arrows button:not(.entry-command) { position:relative; isolation:isolate; display:inline-flex; align-items:center; justify-content:center; width:40px; height:44px; padding:0; border:0; border-radius:0; background:none; color:var(--entry-ink); cursor:pointer; }
 body.ux-review #shell .ux-entry-arrows button:not(.entry-command)::before { content:''; position:absolute; inset:7px 5px; z-index:-1; border-radius:8px; background:none; }
