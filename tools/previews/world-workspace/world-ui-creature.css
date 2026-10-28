@@ -1,8 +1,8 @@
 /* Making a creature where it will stand (R-CREATURE-BUILD-SHEET.md): the sheet's 1920 numbers in reference units
-   (--u), its 1440 sizes as floors, every colour and face from world-ui.css's tokens. Whatever the window, the field,
-   the making group and the made card stand inside the shared frame's margins (world-page-frame.css), the same numbers
-   here as there: sides 120 from 1700 wide, 64 from 1280, 32 below; the head's top 84, 56 under 1700 wide or 900 tall,
-   28 under 700 tall; the key row 56, 44 under 700 tall. */
+   (--u), its 1440 sizes as floors. Whatever the window, the field, the making view and the made card stand inside the
+   shared frame's margins (world-page-frame.css), the same numbers here as there: sides 120 from 1700 wide, 64 from
+   1280, 32 below; the head's top 84, 56 under 1700 wide or 900 tall, 28 under 700 tall; the key row 56, 44 under 700
+   tall. */
 .wu-creature-layer { --frame-side: 120px; --frame-top: 84px; --frame-bottom: 56px; }
 @media (max-width: 1699px) { .wu-creature-layer { --frame-side: 64px; } }
 @media (max-width: 1279px) { .wu-creature-layer { --frame-side: 32px; } }
@@ -34,31 +34,71 @@
 /* The toggle's details over it, the composer standing low in the view. */
 .wu-creature-field .wu-composer-tip { top: auto; bottom: calc(100% + 12px); }
 .wu-creature-stand { color: var(--ink); font: 450 calc(14 * var(--u))/1.43 var(--font-sans); transform: translate(-50%, calc(-100% - 36 * var(--u))); white-space: nowrap; }
-/* The making group and the made card: at the sheet's place and width where the window has room, else moved in and
-   narrowed to stand between the frame's sides. */
+
+/* The making view and the made card in Create's making view's design (create-world.css's .wu-making parts, drawn by
+   world-ui-create.ts): plain type in Create's ink, no panel, over the world held dark on their side. Create's third ink
+   is lifted here from 48% to 60% white, so the smallest type (the times, what was spent, the notes' labels) holds 4.5:1
+   over the shade even where the world behind is as bright as white. They stand in the half of the view the stand is
+   not in, at its outer side of the frame, clear of the stand's ring and light by --stand-clear at the most they reach
+   (the sheet's 1120 at 1920 by 1080), their title at Create's 26% of the window, and inside the frame's margins at
+   every window. As wide as their words: the steps alone, or a made card, take what they need, and with web notes asked
+   for the view takes the whole width the half leaves from the start, so nothing moves when the notes come. */
 .wu-creature-group {
-  --group-width: min(calc(520 * var(--u)), calc(100vw - 2 * var(--frame-side)));
-  left: clamp(var(--frame-side), calc(1120 * var(--u)), calc(100vw - var(--frame-side) - var(--group-width)));
-  top: calc(404 * var(--u));
-  width: var(--group-width);
-  color: var(--ink);
+  --c-ink: #ffffff;
+  --c-ink-2: rgb(255 255 255 / 72%);
+  --c-ink-3: rgb(255 255 255 / 60%);
+  --c-accent: #8fb7c6;
+  --c-focus: #b9d6e0;
+  --stand-clear: calc(160 * var(--u));
+  --group-top: max(calc(var(--frame-top) + 48px), 26vh);
+  --group-width: min(760px, calc(50vw - var(--frame-side) - var(--stand-clear)), calc(100vw - 2 * var(--frame-side)));
+  position: absolute;
+  right: var(--frame-side);
+  top: var(--group-top);
+  width: fit-content;
+  min-width: min(420px, var(--group-width));
+  max-width: var(--group-width);
+  color: var(--c-ink);
+  text-shadow: none;
 }
+.wu-creature-group.wu-creature-noted { width: var(--group-width); }
+/* Beside a stand right of the middle, the left half of the view, mirrored (DESIGN, 26 October). */
+.wu-creature-group.wu-creature-left { right: auto; left: var(--frame-side); }
+/* The shade: the world held dark behind the words, as Create's page is held dark at its sides: one field of the ground
+   at 80% from past the view's edge on their side to 96 px beyond them, blurred by 48 px, so it falls off to nothing
+   with no edge and stays whole under every word. It lies under the world view's other parts (z-index -1 in
+   #contextual-world's stacking context; the group makes none of its own), so the corners keep their own glass. At 78%
+   or more of the ground over a world as white as can be, the ground under the words is at most about rgb(64 64 64):
+   white on it 10:1, the second ink 6.3:1, the third 4.9:1 and the refused ink 6.8:1. */
+.wu-creature-group::before {
+  content: ''; position: absolute; z-index: -1; top: -96px; bottom: -96px; left: -96px; right: calc(-1 * var(--frame-side) - 120px); pointer-events: none;
+  border-radius: 48px; background: rgb(10 13 15 / 80%); filter: blur(48px);
+}
+.wu-creature-group.wu-creature-left::before { left: calc(-1 * var(--frame-side) - 120px); right: -96px; }
 /* Its words in a part of their own (world-ui-creature.ts's groupBody), no taller than the room down to the key row; where
-   they take more, the part scrolls with the frame's fades and track. */
-.wu-creature-body { display: grid; gap: calc(16 * var(--u)); max-height: calc(100vh - 404 * var(--u) - var(--frame-bottom)); }
-/* Until its words take more than that room it clips nothing (the dot's glow, the shade's text shadow), as before; the
-   room on its left keeps the glow whole once it scrolls. */
-.wu-creature-group .wu-frame-scroll { overflow: visible; padding: 0 0 0 calc(12 * var(--u)); margin-left: calc(-12 * var(--u)); }
-.wu-creature-group .wu-frame-track { --hr-quiet: var(--ink); }
+   they take more (many notes, a short window), the part scrolls with the frame's fades and track. */
+.wu-creature-body { max-height: calc(100vh - var(--group-top) - var(--frame-bottom)); }
+/* Until its words take more than that room it clips nothing (the running step's dot and its ring), as before. */
+.wu-creature-group .wu-frame-scroll { overflow: visible; padding-right: 0; }
+.wu-creature-group .wu-frame-track { --hr-quiet: var(--c-ink); }
 /* The world's layer takes no pointer; a part that scrolls takes the wheel, and room on its right for the track. */
-.wu-creature-body[data-above="true"], .wu-creature-body[data-below="true"] { overflow: hidden auto; padding-right: calc(12 * var(--u)); pointer-events: auto; }
-.wu-creature-title { margin: 0; font: 300 max(36px, calc(44 * var(--u)))/1.1 var(--font-sans); letter-spacing: -.02em; }
-.wu-creature-quote { margin: 0; font: italic 400 max(18px, calc(18 * var(--u)))/1.33 var(--font-sans); }
-.wu-creature-from, .wu-creature-step { margin: 0; font: 400 max(18px, calc(19 * var(--u)))/1.4 var(--font-sans); }
-.wu-creature-small { margin: 0; font: 400 calc(13 * var(--u))/1.85 var(--font-sans); }
-.wu-creature-step { display: flex; align-items: center; gap: calc(12 * var(--u)); }
-.wu-creature-dot { width: calc(10 * var(--u)); height: calc(10 * var(--u)); border-radius: 50%; background: var(--live); box-shadow: 0 0 calc(8 * var(--u)) var(--live); }
-.wu-creature-time { font: 400 calc(13 * var(--u))/1 var(--font-mono); opacity: .58; }
+.wu-creature-body[data-above="true"], .wu-creature-body[data-below="true"] { overflow: hidden auto; padding: 0 12px 0 8px; margin-left: -8px; pointer-events: auto; }
+/* Create's two columns, the steps and what was spent, and the web notes beside them, in the room of half the view;
+   the steps alone at Create's own width; one over the other where the half has no room for two. */
+.wu-creature-group .wu-making { grid-template-columns: minmax(262px, .85fr) minmax(0, 1fr); gap: 32px; }
+.wu-creature-group .wu-making:has(> .wu-making-web[hidden]) { grid-template-columns: minmax(0, 400px); }
+@media (max-width: 1699px) { .wu-creature-group .wu-making { gap: 24px; } }
+@media (max-width: 1299px) { .wu-creature-group .wu-making { grid-template-columns: minmax(0, 1fr); gap: 26px; } }
+/* Why the making ended with nothing made, or that it takes longer, under the steps in their type. */
+.wu-creature-why { margin: 18px 0 0; font: 400 15px/1.45 var(--font-sans); color: var(--c-ink); text-wrap: pretty; }
+.wu-creature-why.wu-refused { color: var(--refused-ink); }
+.wu-creature-group .wu-rows { --glyph: max(28px, calc(32 * var(--u))); --word: max(16px, calc(19 * var(--u))); margin-top: 18px; }
+/* The made card: what it was made from over its name, as a made world's banner says it over its name; the words; Place,
+   or where it waits and Back; and who made it for how much, in the making view's spend line. */
+.wu-creature-from { margin: 0 0 10px; font: 400 15px/1.45 var(--font-sans); color: var(--c-ink-2); text-wrap: pretty; }
+.wu-creature-made .wu-making-quote { margin-bottom: 0; }
+.wu-creature-nowhere { margin: 18px 0 0; font: 400 15px/1.45 var(--font-sans); color: var(--c-ink); text-wrap: pretty; }
+.wu-creature-made .wu-rows + .wu-creature-why { margin-top: 12px; }
 /* Light rising from the stand while the creature is made: #e8f0ed at .78 at the ring, clear 300 up, blurred 14. */
 .wu-creature-light {
   position: absolute; width: calc(180 * var(--u)); height: calc(300 * var(--u)); transform: translate(-50%, -100%);
@@ -78,20 +118,10 @@
 .wu-creature-leader line { stroke: var(--ink); stroke-opacity: .7; stroke-width: max(1px, calc(1.2 * var(--u))); }
 /* While a creature step shows, the reticle and the look tag give way (as under a scene, T13). */
 #contextual-world:has(> .wu-creature-layer) :is(.wu-reticle, .wu-tag, .cg-look) { visibility: hidden; }
-/* Web notes in the making group (Create's frame 21 with "creature", WORDS.md 12:34): each passed step with its time, then
-   the notes under "From the web" in the over-label's mono, each aspect first in the faint ink. */
-.wu-creature-notes-line { margin: 0; font: 400 max(12px, calc(13 * var(--u)))/1.45 var(--font-sans); color: var(--ink-2); text-wrap: pretty; }
-.wu-creature-passed { color: var(--ink-2); }
-.wu-creature-missed { color: var(--ink-3); }
-.wu-creature-tick { flex: none; width: calc(10 * var(--u)); height: calc(10 * var(--u)); border-radius: 50%; background: var(--ink-2); }
-.wu-creature-missed .wu-creature-tick { background: transparent; box-shadow: inset 0 0 0 1.25px var(--ink-3); }
-.wu-creature-notes { display: grid; gap: calc(6 * var(--u)); }
-/* A making group with web notes stands where the field stood, above the hints, and grows upward with its notes, as far
-   as the frame's head. */
-.wu-creature-group.wu-creature-noted { top: auto; bottom: calc(136 * var(--u)); }
-.wu-creature-noted .wu-creature-body { max-height: calc(100vh - 136 * var(--u) - var(--frame-top)); }
-/* Beside a stand right of the middle, the group takes the left half of the view, mirrored (DESIGN, 26 October). */
-.wu-creature-group.wu-creature-left { left: clamp(var(--frame-side), calc(280 * var(--u)), calc(100vw - var(--frame-side) - var(--group-width))); }
-.wu-creature-notes-over { margin: 0; font: 500 max(11px, calc(12 * var(--u)))/1.4 var(--font-mono); letter-spacing: .04em; color: var(--ink-2); }
-.wu-creature-notes-list { margin: 0; padding: 0; list-style: none; display: grid; gap: calc(4 * var(--u)); font: 400 max(13px, calc(15 * var(--u)))/1.45 var(--font-sans); }
-.wu-creature-notes-aspect { color: var(--ink-3); }
+/* Reduced transparency: the shade all but opaque, as Create's parts stand on the ground. */
+@media (prefers-reduced-transparency: reduce) {
+  .wu-creature-group::before { background: rgb(10 13 15 / 94%); }
+}
+@media (forced-colors: active) {
+  .wu-creature-group::before { background: Canvas; }
+}

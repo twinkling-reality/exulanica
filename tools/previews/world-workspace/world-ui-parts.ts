@@ -5,16 +5,16 @@
 // composer empty, ?chosen=<n> makes a card current and ?thumbs=<folder> draws the cards' pictures.
 // ?view=creature-describe, creature-making and creature-made show making a creature where it will
 // stand (world-ui-creature.ts) with the sheet's example words, over ?picture= as the world; ?notes adds the web notes
-// ("Search the web" pressed, and the making group's steps and notes, standing on the field's line), ?left the groups'
+// ("Search the web" pressed, and on the making view the notes' steps and the notes beside them), ?left the groups'
 // place beside a stand right of the middle.
 import {
   areaBanner, cardWords, chip, glyphRows, keyWord, label, mountUiScale, notes, orb, page, pill, promptColumn, promptRow,
   nameTag, outline, path, ring, rule, scaleOf, shade, sideCard, stepList, tip,
 } from './world-ui.ts';
 import { composer, createPage, createTitle, madeNote, makingSteps, quietCommand, webNotes, worldStrip } from './world-ui-create.ts';
-import { CREATE_WORDS, madeLine, priceUpTo, refusalSpent, refusalWords, spentUpTo, webNotesLabel, webTip } from './create-words.mjs';
-import { draftSteps, startCards } from './create-steps.mjs';
-import { creatureField, madeGroup, makingGroup, standLabel } from './world-ui-creature.ts';
+import { CREATE_WORDS, STEP_WORDS, madeLine, priceUpTo, refusalSpent, refusalWords, spentUpTo, stepTime, webNotesLabel, webTip } from './create-words.mjs';
+import { draftSteps, notesSteps, startCards } from './create-steps.mjs';
+import { CREATURE_WORDS, creatureField, madeGroup, makingGroup, standLabel } from './world-ui-creature.ts';
 // The product's fonts and their tokens, as the app loads them (bootstrap.ts).
 import '../../../web/packages/presentation/src/tokens.css';
 
@@ -32,6 +32,8 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
   // Making a creature where it will stand (r17t, r19t, r19b), with stand-in answers: the round wader of the final pictures.
   const words = 'a round yellow body with a pale flat bill on two short legs', price = '0.37355520';
   const layer = add(div('wu-creature-layer'));
+  // Over the world as the world view's own layer stands (#contextual-world), so the making view's shade lies under it.
+  layer.style.cssText = 'position: fixed; inset: 0; z-index: 25; pointer-events: none;';
   if (view === 'creature-describe') {
     const shown = creatureField({ maximum: 400, onInput: press, onMake: press });
     add(shown.root, layer);
@@ -44,19 +46,26 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
     // As the screen shows it: at a stand above the composer (one below its top is no stand).
     const over = add(standLabel(), layer); over.style.left = '62vw'; over.style.top = 'calc(50vh - 40px)';
   } else if (view === 'creature-making') {
+    // The steps as the making view draws them, with stand-in times: with ?notes the notes' steps before the drafter's.
     const making = makingGroup({ words });
-    if (query.has('notes')) {
-      making.root.classList.add('wu-creature-noted');
-      for (const [step, time] of [['Choosing what to look up', '0:02'], ['Searching the web', '0:05'], ['Writing notes from what it found', '0:09']]) making.passed(step!, time!);
+    const noted = query.has('notes');
+    making.steps([
+      { key: 'queued', words: STEP_WORDS.queued, state: 'done', time: stepTime(1) },
+      ...(noted ? notesSteps([{ step: 'plan', state: 'done' }, { step: 'search', state: 'done' }, { step: 'read', state: 'done' }], { plan: 1, search: 4, read: 6 }) : []),
+      { key: 'drafting', words: CREATURE_WORDS.drafting, state: 'now', time: stepTime(14) },
+    ]);
+    if (noted) {
       making.notes([
-        { aspect: 'buildings', text: 'A rounded body and a short flat bill, like a small duck seen side on.' },
+        { aspect: 'anatomy', text: 'A rounded body and a short flat bill, like a small duck seen side on.' },
+        { aspect: 'anatomy', text: 'Two short legs set wide under the body, each ending in a broad webbed foot.' },
+        { aspect: 'part_layout', text: 'The head sits on a short neck at the front, the tail a small upturned point.' },
         { aspect: 'materials_and_colour', text: 'Soft yellow down, paler on the breast, the bill a pale orange.' },
-        { aspect: 'landscape_and_plants', text: 'At home at the edge of ponds and shallow reedy water.' },
+        { aspect: 'materials_and_colour', text: 'Small dark eyes set high on the sides of the head.' },
         { aspect: 'scale', text: 'About the height of a bench seat, its legs short and set wide.' },
-        { aspect: 'clothing', text: 'No markings beyond a darker cap on the crown.' },
+        { aspect: 'scale', text: 'Light enough to be lifted with one hand.' },
+        { aspect: 'part_layout', text: 'Short wings folded flat along the sides of the body.' },
       ], 3);
     }
-    making.step('Making the creature', false, '0:14');
     // What a read states it has spent so far: the notes' calls, the drafter's call under way not known yet.
     const notesMost = '0.0453', most = query.has('notes') ? String(Number(price) + Number(notesMost)) : price;
     making.spent(query.has('notes') ? { spentUsd: 0.0011, unknownUsd: Number(price) } : { spentUsd: 0, unknownUsd: Number(price) }, most);

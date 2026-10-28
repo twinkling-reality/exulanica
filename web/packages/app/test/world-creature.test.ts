@@ -118,11 +118,11 @@ describe('making a creature where it will stand', () => {
     expect(opened.key(press('Enter'))).toBe(true);
     await settle();
     expect(calls.ask).toEqual(['a round yellow body with a pale flat bill on two short legs']);
-    // The made card keeps only its name, how it was made, the words, Place, and who made it for how much (ROOT's sweep).
+    // The made card keeps only how it was made over its name, the words, Place, and who made it for how much (ROOT's sweep).
     const card = root.querySelector('.wu-creature-made')!;
     const parts = [...card.querySelectorAll('.wu-creature-title, .wu-creature-from, .wu-creature-quote, [aria-keyshortcuts], .wu-creature-small')].map((part) => part.textContent);
     expect(parts).toEqual([
-      'Yellow pond wader', 'Made from your words', '“a round yellow body with a pale flat bill on two short legs”', 'Place',
+      'Made from your words', 'Yellow pond wader', '“a round yellow body with a pale flat bill on two short legs”', 'Place',
       'Made by Nemotron 3 Super 120B · spent $0.0042',
     ]);
     expect(card.textContent).toBe(parts.join(''));
@@ -383,7 +383,7 @@ describe('making a creature where it will stand', () => {
       field.dispatchEvent(new Event('input'));
       opened.key(press('Enter'));
       await settle();
-      expect(root.querySelector('.wu-creature-step.wu-refused')?.textContent).toBe(words);
+      expect(root.querySelector('.wu-creature-why.wu-refused')?.textContent).toBe(words);
       // Nothing carries on at the server, so the live spend goes; nothing was spent, so no spend.
       expect(root.textContent).not.toContain('of up to');
       expect(root.textContent).not.toContain('Spent');
@@ -416,9 +416,11 @@ describe('making a creature where it will stand', () => {
         await vi.advanceTimersByTimeAsync(60_000);
         // Not left on its making step: it says it cannot tell how the making went, where a made creature would be,
         // and offers Try again (Esc goes back to building, as from any step).
-        expect(root.querySelector('.wu-creature-step.wu-refused')?.textContent)
+        expect(root.querySelector('.wu-creature-why.wu-refused')?.textContent)
           .toBe('This page can\'t tell how the making went. If the creature was made, it waits in Creatures.');
-        expect(root.textContent).not.toContain('Making the creature');
+        // No step is left under way: making the creature is drawn as not done, with its time.
+        expect(root.querySelector('.wu-making-step[aria-current="step"]')).toBeNull();
+        expect(root.querySelector('.wu-making-step[data-state="next"]')?.textContent).toMatch(/^Making the creature\d+ s$/);
         expect(root.querySelector('.wu-creature-group [aria-keyshortcuts="Enter"]')?.textContent).toBe('Try again');
         expect(opened.key(press('Enter'))).toBe(true);
         expect(root.querySelector('textarea')?.value).toBe('a round yellow body');
@@ -485,7 +487,7 @@ describe('making a creature where it will stand', () => {
       field.dispatchEvent(new Event('input'));
       opened.key(press('Enter'));
       const late = 'This is taking longer than usual. The creature waits in Creatures when it\'s done.';
-      await vi.waitFor(() => expect(root.querySelector('.wu-creature-step')?.textContent).toBe(late));
+      await vi.waitFor(() => expect(root.querySelector('.wu-creature-why')?.textContent).toBe(late));
       expect(root.querySelector('.wu-refused')).toBeNull();
       // The line says it may still finish; the small print keeps the spend last read.
       expect(root.querySelector('.wu-creature-group .wu-creature-small')?.textContent).toBe('Spent $0 of up to $0.38');
@@ -607,16 +609,16 @@ describe('the creature panel inside the window', () => {
         bottom: value(creature, '.wu-creature-layer', '--frame-bottom', width, height),
       }, `${width}x${height}`).toEqual(margins);
     }
-    // The field's width, the groups' width and place, and their words' height are each held inside those margins.
+    // The field's width, the groups' width and place, and their words' height are each held inside those margins: a
+    // group stands on one side of the frame, no wider than the half beside the stand or the room between the sides.
     const rule = (selector: string, property: string): string | undefined => value(creature, selector, property, 1920, 1080);
     expect(rule('.wu-creature-field', 'width')).toMatch(/^min\(.+, calc\(100vw - 2 \* var\(--frame-side\)\)\)$/);
-    expect(rule('.wu-creature-group', '--group-width')).toMatch(/^min\(.+, calc\(100vw - 2 \* var\(--frame-side\)\)\)$/);
-    expect(rule('.wu-creature-group', 'width')).toBe('var(--group-width)');
-    for (const selector of ['.wu-creature-group', '.wu-creature-group.wu-creature-left']) {
-      expect(rule(selector, 'left')).toMatch(/^clamp\(var\(--frame-side\), .+, calc\(100vw - var\(--frame-side\) - var\(--group-width\)\)\)$/);
-    }
+    expect(rule('.wu-creature-group', '--group-width')).toMatch(/^min\(.+, calc\(50vw - var\(--frame-side\) - var\(--stand-clear\)\), calc\(100vw - 2 \* var\(--frame-side\)\)\)$/);
+    expect(rule('.wu-creature-group', 'max-width')).toBe('var(--group-width)');
+    expect(rule('.wu-creature-group.wu-creature-noted', 'width')).toBe('var(--group-width)');
+    expect(rule('.wu-creature-group', 'right')).toBe('var(--frame-side)');
+    expect([rule('.wu-creature-group.wu-creature-left', 'right'), rule('.wu-creature-group.wu-creature-left', 'left')]).toEqual(['auto', 'var(--frame-side)']);
     expect(rule('.wu-creature-body', 'max-height')).toMatch(/^calc\(100vh - .+ - var\(--frame-bottom\)\)$/);
-    expect(rule('.wu-creature-noted .wu-creature-body', 'max-height')).toMatch(/^calc\(100vh - .+ - var\(--frame-top\)\)$/);
   });
 
   it("keeps the making group's and the made card's words in a part that scrolls with the frame's fades and track where they take more room than the window leaves", async () => {
@@ -634,11 +636,11 @@ describe('the creature panel inside the window', () => {
     expect(body.querySelector('.wu-creature-title')?.textContent).toBe(CREATURE_WORDS.making);
     // Read again as its steps come.
     sized(body, 900, 400);
-    making.passed('Searching the web', '0:05');
+    making.steps([{ key: 'queued', words: 'Waiting to start', state: 'done', time: '1 s' }, { key: 'search', words: 'Searching the web', state: 'now', time: '5 s' }]);
     await vi.waitFor(() => expect(body.dataset.below).toBe('true'));
     expect(track.hidden).toBe(false);
     sized(body, 400, 400);
-    making.step('Making the creature', false, '0:14');
+    making.steps([{ key: 'queued', words: 'Waiting to start', state: 'done', time: '1 s' }, { key: 'drafting', words: 'Making the creature', state: 'now', time: '14 s' }]);
     await vi.waitFor(() => expect(body.dataset.below).toBe('false'));
     expect(track.hidden).toBe(true);
     // The made card's words too, read again as its Place row changes.
@@ -731,23 +733,26 @@ describe('web notes before a creature is made', () => {
     expect(root.querySelector('.wu-creature-made .wu-creature-small')?.textContent).toBe('Made by Nemotron 3 Super 120B · spent $0.0053');
   });
 
-  it('shows at most four notes in the making group, counts the rest, and says what wrote them', async () => {
+  it('shows every note beside the steps under the searches sent, after one "Waiting to start", each step timed in seconds', async () => {
     const { openCreatureScreen } = await screen();
     const done = request('partial', [step('plan', 'done'), step('search', 'done'), step('read', 'done'), step('bundle', 'done')], seven);
-    // The draft ends with nothing made, so the making group with its notes stays to be read.
+    // The draft ends with nothing made, so the making view with its notes stays to be read.
     const { deps, root } = noted([done], stopped);
     const opened = await openCreatureScreen(deps);
     type(root, 'a little yellow robot duck');
     tick(root);
     opened.key(press('Enter'));
     await settle();
-    const notes = root.querySelector('.wu-creature-notes')!;
-    expect(notes.textContent).toContain('From the web');
-    expect(notes.textContent).toContain('Anatomy · Note 1 on a round body');
-    expect(notes.textContent).toContain('Note 4 on a round body');
-    expect(notes.textContent).not.toContain('Note 5 on a round body');
-    expect(notes.textContent).toContain('And 3 more notes.');
-    expect(notes.textContent).toContain('A model wrote these from 3 web searches. They help make the creature and are never facts about it.');
+    // Create's making view: one row a step, its time in seconds; the draft's own wait is part of making the creature.
+    const rows = [...root.querySelectorAll('.wu-making-step')].map((row) => [row.querySelector('.wu-making-words')?.textContent, row.querySelector('.wu-making-time')?.textContent]);
+    expect(rows.map(([words]) => words)).toEqual(['Waiting to start', 'Choosing what to look up', 'Searching the web', 'Writing notes from what it found', 'Making the creature']);
+    for (const [, time] of rows) expect(time).toMatch(/^\d+ s$/);
+    const notes = root.querySelector('.wu-creature-group .wu-making-web')!;
+    expect(notes.querySelector('.wu-making-kind')?.textContent).toBe('FROM THE WEB, 3 SEARCHES');
+    expect([...notes.querySelectorAll('.wu-making-note')].map((note) => note.textContent)).toEqual(seven.map((note, at) => `${({ anatomy: 'Anatomy', materials_and_colour: 'Materials and colour', scale: 'Scale', part_layout: 'Part layout' } as Record<string, string>)[note.aspect]}Note ${at + 1} on a round body`));
+    // No line on what wrote them, and none left out.
+    expect(notes.textContent).not.toContain('A model wrote these');
+    expect(notes.textContent).not.toContain('more notes');
   });
 
   it('makes it from the words alone, and says why, where the notes fail or find nothing', async () => {
@@ -763,7 +768,7 @@ describe('web notes before a creature is made', () => {
       opened.key(press('Enter'));
       await settle();
       expect(asked).toEqual([{ words: 'a little yellow robot duck', referenceId: null }]);
-      expect(root.querySelector('.wu-creature-notes')!.textContent).toBe(words);
+      expect(root.querySelector('.wu-making-web .wu-making-note')!.textContent).toBe(words);
       document.body.replaceChildren();
     }
   });

@@ -19,7 +19,7 @@ import { accessHeaders, type Credentials } from '../../../web/packages/app/src/c
 import type { SavedWorldEntry, WorldEntryClient } from '../../../web/packages/app/src/world-entry-api.ts';
 import { ReferencesClient, referenceFinished, referenceHasNotes, type ReferenceRequest } from '../../../web/packages/app/src/references-api.ts';
 import {
-  composer, createPage, createTitle, makingSteps, quietCommand, webNotes, worldStrip,
+  composer, createPage, createTitle, fitQuote, makingSteps, quietCommand, webNotes, worldStrip,
   type Composer, type MakingSteps, type StripCard, type WebNotes, type WorldStrip,
 } from './world-ui-create.ts';
 import type { Step } from './world-ui.ts';
@@ -45,8 +45,6 @@ const BLANK_TITLE = 'My world';
 /** The page's title, which names it; and the sentence in the composer's place, which names the strip under it. */
 const TITLE_ID = 'wu-create-title';
 const SENTENCE_ID = 'wu-create-sentence';
-/** The quote's most lines at the mock's 21 px, then at 17 px; past them 15 px. */
-const QUOTE_LINES = [3, 5] as const;
 
 /** The words typed here, kept across leaving and coming back in this page (N6). */
 let keptWords = '';
@@ -391,7 +389,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     const grid = element('div', 'wu-making');
     grid.append(left, web.root);
     page.column.replaceChildren(createTitle(CREATE_WORDS.creating, TITLE_ID), quote, grid);
-    sizeQuote(quote);
+    fitQuote(quote);
     page.root.focus({ preventScroll: true });
     let latest: readonly Step[] = [];
     let waited: number | null = null;
@@ -590,7 +588,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       }
       failed = 0; frame.line.hidden = true;
       reads.push(raw);
-      if (!frame.quote.textContent && typeof raw['description'] === 'string' && raw['description']) { frame.quote.textContent = `“${raw['description']}”`; sizeQuote(frame.quote); }
+      if (!frame.quote.textContent && typeof raw['description'] === 'string' && raw['description']) { frame.quote.textContent = `“${raw['description']}”`; fitQuote(frame.quote); }
       // After notes, their steps first, then the draft's.
       frame.after([...(notes?.steps ?? []), ...draftSteps(reads)]);
       const noted = raw['references'] as { state?: unknown; code?: unknown; notes?: unknown; searches?: unknown; spent_usd?: unknown } | null | undefined;
@@ -623,17 +621,6 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       const delay = pollDelay(raw);
       await new Promise((resolve) => window.setTimeout(resolve, delay ?? 3000));
     }
-  };
-
-  /** The whole sentence shows: the mock's 21 px while it fits in three lines, 17 px in five, 15 px after. */
-  const sizeQuote = (quote: HTMLElement): void => {
-    delete quote.dataset.size;
-    const lines = (): number => {
-      const height = parseFloat(getComputedStyle(quote).lineHeight) || 1;
-      return Math.round(quote.getBoundingClientRect().height / height);
-    };
-    if (lines() > QUOTE_LINES[0]) quote.dataset.size = '17';
-    if (lines() > QUOTE_LINES[1]) quote.dataset.size = '15';
   };
 
   /** Ready: the made note's line handed to the world's arrival, then the world opens (frame 22). */

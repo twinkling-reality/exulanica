@@ -328,6 +328,23 @@ export function worldStrip(cards: readonly StripCard[], { onStart, onChoose, lab
   return strip;
 }
 
+/** The making view's quote's most lines at the mock's 21 px, then at 17 px; past them 15 px. */
+const QUOTE_LINES = [3, 5] as const;
+
+/**
+ * The making view's quote (`.wu-making-quote`, on the page) sized so the whole sentence shows: the mock's 21 px while
+ * it fits in three lines, 17 px in five, 15 px after.
+ */
+export function fitQuote(quote: HTMLElement): void {
+  delete quote.dataset.size;
+  const lines = (): number => {
+    const height = parseFloat(getComputedStyle(quote).lineHeight) || 1;
+    return Math.round(quote.getBoundingClientRect().height / height);
+  };
+  if (lines() > QUOTE_LINES[0]) quote.dataset.size = '17';
+  if (lines() > QUOTE_LINES[1]) quote.dataset.size = '15';
+}
+
 /** One step's row, kept across redraws, and what it shows now. */
 interface StepRow { readonly item: HTMLLIElement; readonly words: HTMLElement; readonly time: HTMLTimeElement; drawn: Step | null }
 

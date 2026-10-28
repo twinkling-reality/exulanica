@@ -10,8 +10,9 @@ import { CreatureDraftsClient, draftEnded, type CreatureDraft, type CreatureNote
 import type { Credentials } from '../../../web/packages/app/src/config.ts';
 import { ReferencesClient, referenceFinished, referenceHasNotes, type ReferenceRequest } from '../../../web/packages/app/src/references-api.ts';
 import { CREATURE_WORDS, creatureField, leader, madeGroup, makingGroup, placeRow, standLabel, standLight, type MakingGroup } from './world-ui-creature.ts';
-import { priceUpTo, webTip } from './create-words.mjs';
-import { withNotesSpent } from './create-steps.mjs';
+import { STEP_WORDS, priceUpTo, stepTime, webTip } from './create-words.mjs';
+import { notesSteps, withNotesSpent } from './create-steps.mjs';
+import type { Step } from './world-ui.ts';
 import { ANCHOR_INSET } from './world-ui-layout.mjs';
 
 /** How far ahead of the eye the stand is looked for (the sheet's 8 m: 3 m falls under the field). */
@@ -138,6 +139,66 @@ export interface CreatureScreen {
 
 const pause = (ms: number): Promise<void> => new Promise((resolve) => { setTimeout(resolve, ms); });
 
+/** What times a making's steps on its making view. */
+export interface MakingClock {
+  /** Whether "Waiting to start" is the step under way: nothing after it has shown yet. */
+  waiting(): boolean;
+  /** The notes request's steps as it serves them now. */
+  notes(steps: readonly { readonly step: string; readonly state: string }[]): void;
+  /** The drafter is at work: "Making the creature" from now, once. */
+  drafting(): void;
+  /** The making ended: every time stops, the step under way drawn as not done where `missed`. */
+  stop(missed?: boolean): void;
+}
+
+/**
+ * The making view's steps timed as Create's making view times them (create-world.ts), by this page's clock, since the
+ * draft and the notes request state no times: "Waiting to start" from `waitingFrom` (the press) until a step after it
+ * shows, once; the notes' steps as their request serves them (create-steps.mjs's notesSteps), each from when this page
+ * first saw it; then "Making the creature" from when the drafter was asked, or the read that first found it at work.
+ * Each time reads "N s" (create-words.mjs's stepTime), the one under way counting each second while the view shows.
+ */
+export function makingClock(view: MakingGroup, waitingFrom: number | null): MakingClock {
+  let requestSteps: readonly { readonly step: string; readonly state: string }[] = [];
+  const noteFrom: Record<string, number> = {}, noteSeconds: Record<string, number> = {};
+  let waitingUntil: number | null = null, draftingFrom: number | null = null, stoppedAt: number | null = null, missed = false;
+  const draw = (): void => {
+    const now = stoppedAt ?? Date.now();
+    for (const step of requestSteps) {
+      if (step.state !== 'running' && step.state !== 'done' && step.state !== 'missed') continue;
+      noteFrom[step.step] ??= now;
+      if (step.state === 'running' || noteSeconds[step.step] === undefined) noteSeconds[step.step] = (now - noteFrom[step.step]!) / 1000;
+    }
+    // A notes step still running when the drafter starts or the making stops was cut off (the page followed it no
+    // longer): drawn as not done, so one step at most is under way.
+    const notes = (notesSteps(requestSteps, noteSeconds) as Step[])
+      .map((step) => step.state === 'now' && (draftingFrom !== null || stoppedAt !== null) ? { ...step, state: 'next' as const } : step);
+    const steps: Step[] = [];
+    if (waitingFrom !== null) {
+      if (waitingUntil === null && (notes.length > 0 || draftingFrom !== null)) waitingUntil = now;
+      steps.push({ key: 'queued', words: STEP_WORDS.queued, state: waitingUntil !== null ? 'done' : missed ? 'next' : 'now', time: stepTime(((waitingUntil ?? now) - waitingFrom) / 1000) });
+    }
+    steps.push(...notes);
+    if (draftingFrom !== null) steps.push({ key: 'drafting', words: CREATURE_WORDS.drafting, state: missed ? 'next' : 'now', time: stepTime((now - draftingFrom) / 1000) });
+    view.steps(steps);
+  };
+  // Each second while the view shows; a view taken down (Esc, Try again, made) stops it.
+  const tick = setInterval(() => { if (view.root.isConnected) draw(); else clearInterval(tick); }, 1000);
+  draw();
+  return {
+    waiting: () => waitingFrom !== null && waitingUntil === null,
+    notes(steps) { if (stoppedAt === null) { requestSteps = steps; draw(); } },
+    drafting() { if (stoppedAt === null && draftingFrom === null) { draftingFrom = Date.now(); draw(); } },
+    stop(miss = false) {
+      if (stoppedAt !== null) return;
+      stoppedAt = Date.now();
+      missed = miss;
+      clearInterval(tick);
+      draw();
+    },
+  };
+}
+
 /**
  * Opens the describe screen over the world: reads the offer, finds the stand and, where a draft of this person's is
  * still being made, follows it, so a reload loses nothing.
@@ -156,9 +217,10 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
   let retryable = false;
   let ended = false;
   const field = creatureField({ maximum: WORDS_MAXIMUM, onInput: (typed) => { words = typed; foot(); }, onMake: () => { void make(); } });
-  // Whether the person ticked the web notes box for this creature (off until ticked, each creature its own choice), and
-  // whether a notes request was made for the creature being made (its spend is then part of the making's).
-  let withNotes = false, notesAsked = false;
+  // Whether the person ticked the web notes box for this creature (off until ticked, each creature its own choice),
+  // whether a notes request was made for the creature being made (its spend is then part of the making's), and whether
+  // its making view was drawn for notes.
+  let withNotes = false, notesAsked = false, noted = false;
   const label = standLabel(), light = standLight();
   let standAt: { readonly x: number; readonly y: number } | null = null;
   // The made creature that waits in Creatures, nothing ahead having taken it: Back goes there with it in focus.
@@ -258,69 +320,60 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     group.classList.toggle('wu-creature-left', standAt !== null && standAt.x > innerWidth / 2);
   }
 
-  /** The making group, its light and the stand's label put away: the field gives way to the steps. */
-  function startMaking(): MakingGroup {
+  /** A making on show: its view, and the clock that times its steps. */
+  interface Making { readonly view: MakingGroup; readonly clock: MakingClock }
+
+  /**
+   * The making view, its light and the stand's label put away: the field gives way to the steps, "Waiting to start"
+   * timed from `waitingFrom` (the press) where given.
+   */
+  function startMaking(waitingFrom: number | null): Making {
     state = 'making';
     field.root.remove();
-    const making = makingGroup({ words });
-    // With web notes asked for, the group grows by the notes: it stands on the field's line and grows upward.
-    making.root.classList.toggle('wu-creature-noted', withNotes && notesOffered() !== null);
-    besideStand(making.root);
+    const view = makingGroup({ words });
+    // With web notes asked for, the view takes the whole width the half leaves from the start, so the notes move
+    // nothing when they come; the made card after it keeps that width.
+    noted = withNotes && notesOffered() !== null;
+    view.root.classList.toggle('wu-creature-noted', noted);
+    besideStand(view.root);
     label.remove();
-    layer.append(making.root);
+    layer.append(view.root);
     if (standAt !== null) layer.prepend(light);
-    return making;
+    return { view, clock: makingClock(view, waitingFrom) };
   }
-  const clock = (ms: number): string => { const seconds = Math.floor(ms / 1000); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; };
 
   /**
    * Web notes on the words before the drafter is asked (Create's frame 21 with "creature"): the request's steps as
    * they pass, each with its time, then its notes; the reference id to draft with, or null where none came, said in
    * place. Esc does not stop it: the page goes on asking, so the creature is still made and waits in Creatures.
    */
-  async function followNotes(making: MakingGroup, sent: string): Promise<string | null> {
+  async function followNotes(making: Making, sent: string): Promise<string | null> {
     let request: ReferenceRequest;
     try {
       request = await deps.notes!.request({ purpose: 'things', description: sent, idempotencyKey: deps.key?.() ?? crypto.randomUUID() });
       notesAsked = true;
     } catch {
-      making.alone(CREATURE_WORDS.notesFailed);
+      making.view.alone(CREATURE_WORDS.notesFailed);
       return null;
     }
-    const started = Date.now(), deadline = started + NOTES_FOLLOW_MS;
-    // When each step was first seen running, and which have been drawn as passed.
-    const since = new Map<string, number>([['waiting', started]]), passed = new Set<string>();
-    const draw = (now: number): void => {
-      const steps = request.steps.filter((step) => CREATURE_WORDS.notesSteps[step.step] !== undefined && step.state !== 'skipped');
-      if (request.status !== 'queued' && !passed.has('waiting')) { passed.add('waiting'); making.passed(CREATURE_WORDS.waiting, clock(now - started)); }
-      for (const step of steps) {
-        if (step.state === 'running' && !since.has(step.step)) since.set(step.step, now);
-        if ((step.state === 'done' || step.state === 'missed') && !passed.has(step.step)) {
-          passed.add(step.step);
-          making.passed(CREATURE_WORDS.notesSteps[step.step]!, clock(now - (since.get(step.step) ?? now)), step.state === 'missed');
-        }
-      }
-      const current = steps.find((step) => step.state === 'running' || step.state === 'waiting');
-      const words = request.status === 'queued' || current === undefined ? CREATURE_WORDS.waiting : CREATURE_WORDS.notesSteps[current.step]!;
-      making.step(words, false, clock(now - (since.get(current?.step ?? 'waiting') ?? started)));
-    };
+    const deadline = Date.now() + NOTES_FOLLOW_MS;
     while (!referenceFinished(request) && Date.now() < deadline) {
-      draw(Date.now());
+      making.clock.notes(request.steps);
       await wait(1000);
       request = await deps.notes!.read(request.referenceId).catch(() => request);
     }
-    draw(Date.now());
+    making.clock.notes(request.steps);
     if (!referenceFinished(request)) {
       // Past the time the page follows it: it is stopped, and the creature is made from the words alone.
       void deps.notes!.cancel(request.referenceId).catch(() => null);
-      making.alone(CREATURE_WORDS.notesFailed);
+      making.view.alone(CREATURE_WORDS.notesFailed, request.searches.length);
       return null;
     }
     if (referenceHasNotes(request)) {
-      making.notes(request.notes, request.searches.length);
+      making.view.notes(request.notes, request.searches.length);
       return request.referenceId;
     }
-    making.alone(request.status === 'complete' || request.status === 'partial' ? CREATURE_WORDS.notesNone : CREATURE_WORDS.notesFailed);
+    making.view.alone(request.status === 'complete' || request.status === 'partial' ? CREATURE_WORDS.notesNone : CREATURE_WORDS.notesFailed, request.searches.length);
     return null;
   }
 
@@ -332,21 +385,26 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     });
   }
 
-  async function follow(draft: CreatureDraft, making: MakingGroup = startMaking()): Promise<void> {
+  /**
+   * Follows `draft` on its making view until it ends: one found on opening gets a view of its own, waiting where it is
+   * still queued. "Making the creature" begins at once after the notes' steps, as the draft's own wait is part of it, and
+   * otherwise once a read finds the drafter at work.
+   */
+  async function follow(draft: CreatureDraft, making: Making = startMaking(draft.status === 'queued' ? Date.now() : null)): Promise<void> {
     const started = Date.now();
     const timeout = offer?.timing.timeoutSeconds ?? 50;
     const deadline = started + (2 * timeout + 10) * 1000;
     let current = draft, missed = 0;
-    showSpent(making, current);
+    const draw = (read: CreatureDraft): void => { if (read.status !== 'queued' || !making.clock.waiting()) making.clock.drafting(); };
+    draw(current);
+    showSpent(making.view, current);
     while (!ended && !draftEnded(current) && Date.now() < deadline && missed < READS_MISSED) {
-      const seconds = Math.floor((Date.now() - started) / 1000);
-      making.step(current.status === 'queued' ? CREATURE_WORDS.waiting : CREATURE_WORDS.drafting, false, clock(seconds * 1000));
       await wait(1000);
       if (ended) return;
       const read = await readDraft(current.draftId);
       if (ended) return;
       missed = read === null ? missed + 1 : 0;
-      if (read !== null) { current = read; showSpent(making, current); }
+      if (read !== null) { current = read; draw(current); showSpent(making.view, current); }
     }
     if (ended) return;
     light.remove();
@@ -355,17 +413,20 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
       // would be, and offers Try again (a draft still being made is then followed rather than asked twice).
       state = 'ended';
       retryable = true;
-      making.ended(CREATURE_WORDS.cantTell, tryAgain, null);
+      making.clock.stop(true);
+      making.view.ended(CREATURE_WORDS.cantTell, tryAgain, null);
       return;
     }
     if (current.status === 'kept' && current.kind !== null) {
       state = 'made';
-      making.root.remove();
+      making.clock.stop();
+      making.view.root.remove();
       const card = madeGroup({
         label: current.label, words, modelName: current.model?.name ?? null, spentUsd: spentOf(current),
         notes: current.references?.state === 'used' ? current.references.notes : 0,
         placeable: stand !== null, onBack: back,
       });
+      card.classList.toggle('wu-creature-noted', noted);
       besideStand(card);
       layer.append(card);
       if (stand === null) waiting = current.kind.sha256;
@@ -386,14 +447,16 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     if (!draftEnded(current)) {
       // Still being made when the page stops following: it carries on at the server and waits in Creatures.
       state = 'late';
-      making.late(CREATURE_WORDS.takingLonger);
+      making.clock.stop();
+      making.view.late(CREATURE_WORDS.takingLonger);
       return;
     }
     state = 'ended';
     // A refused draft says its check's own sentence; changed words may pass, so Try again shows under it too.
     const failed = current.refusal !== null ? { words: current.refusal.detail, retry: true } : FAILED[current.failure ?? ''] ?? { words: CREATURE_WORDS.wentWrong, retry: true };
     retryable = failed.retry;
-    making.ended(failed.words, retryable ? tryAgain : null, spentOf(current));
+    making.clock.stop(true);
+    making.view.ended(failed.words, retryable ? tryAgain : null, spentOf(current));
   }
 
   /**
@@ -440,8 +503,10 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     if (sent === '') return;
     words = sent;
     notesAsked = false;
-    // With the box ticked, the notes first, in the making group, and the drafter asked with them where they came.
-    const making = withNotes && notesOffered() !== null ? startMaking() : null;
+    // "Waiting to start" is timed from the press, as Create's is.
+    const pressed = Date.now();
+    // With the box ticked, the notes first, on the making view, and the drafter asked with them where they came.
+    const making = withNotes && notesOffered() !== null ? startMaking(pressed) : null;
     const referenceId = making === null ? null : await followNotes(making, sent);
     let asked: CreatureDraft;
     try {
@@ -450,16 +515,17 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
       const code = codeOf(error);
       // One draft open at a time: the one being made is followed rather than refused (a second page asked it).
       const running = code === 'creature_limit_reached' ? (await deps.client.drafts().catch(() => [])).find((draft) => !draftEnded(draft)) : undefined;
-      if (running !== undefined) { await follow(running, making ?? undefined); return; }
+      if (running !== undefined) { await follow(running, making ?? startMaking(pressed)); return; }
       const refused = code === 'creature_limit_reached' ? CREATURE_WORDS.hourLimit : REFUSED[code ?? ''] ?? CREATURE_WORDS.wentWrong;
       if (making === null) { field.composer.say(refused, null); return; }
-      // Refused after the notes: the making group says why, and Try again goes back to the field with the words.
+      // Refused after the notes: the making view says why, and Try again goes back to the field with the words.
       state = 'ended';
       retryable = true;
-      making.ended(refused, tryAgain, null);
+      making.clock.stop(true);
+      making.view.ended(refused, tryAgain, null);
       return;
     }
-    await follow(asked, making ?? undefined);
+    await follow(asked, making ?? startMaking(pressed));
   }
 
   /** Back to building, and where the made creature waits in Creatures, to it there (Esc does the same). */
