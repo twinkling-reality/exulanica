@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 
+import { readFileSync, readdirSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildYourWorlds, onlyUntouchedStarter } from '../src/composition/world-entry.js';
 import {
   FIRST_VIEW_WAIT, FRAME_CHECK, frameCheckFor, frameJpeg, holdsWorld, jpegWithoutMetadata, keepFirstViewPicture, keepWorldPicture, mayPutPicture,
-  readServedPictures, worldPicture, type PictureSource,
+  ownWorldPicture, readServedPictures, worldPicture, type PictureSource,
 } from '../src/composition/world-pictures.js';
 import type { SavedWorldEntry, SavedWorldEntryPicture } from '../src/world-entry-api.js';
 
@@ -157,6 +158,19 @@ describe('the pictures on Your worlds', () => {
     // Anything else under the key is not a picture and is not shown.
     window.localStorage.setItem(`exulanica.world-picture.v1.${quiet.entryId}`, 'javascript:alert(1)');
     expect(worldPicture(quiet)).toBeNull();
+  });
+
+  it('shows the world its card opens on, never a painting of it: no page asks for a world\'s paintings or labels one', () => {
+    // 27 October: a showcase world's card showed an aerial painting labelled "invented appearance" while the world
+    // behind it opened on its street. A card shows the world's own picture, the frame the engine drew of it.
+    expect(worldPicture).toBe(ownWorldPicture);
+    // The app's pages (its development-only lab apart) and the workspace's own, front door and Create among them.
+    const pages = [`${process.cwd()}/packages/app/src`, `${process.cwd()}/../tools/previews/world-workspace`].flatMap((root) =>
+      readdirSync(root, { recursive: true, encoding: 'utf8' })
+        .filter((path) => /\.(?:ts|mjs|css|html)$/.test(path) && !path.startsWith('dev/'))
+        .map((path) => ({ path, text: readFileSync(`${root}/${path}`, 'utf8') })));
+    expect(pages.length).toBeGreaterThan(200);
+    expect(pages.filter(({ text }) => /\/world\/paintings|invented appearance|data-world-painting/i.test(text)).map(({ path }) => path)).toEqual([]);
   });
 });
 

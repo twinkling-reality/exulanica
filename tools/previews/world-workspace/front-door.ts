@@ -25,12 +25,7 @@ export function frontDoorPicture(entry: SavedWorldEntry): string | null {
   return capturedPicture(captures, entry);
 }
 
-/**
- * What stands behind the page and opens a world: its own picture, never its painting. The live preview and the world
- * that follow it are drawn live, so a painting there would turn into another look a moment later (a painting stands
- * only where it holds its view, world-painting.ts), and the words a card's painting carries are drawn for a card's
- * size. A card still shows its world's painting (`worldPicture`).
- */
+/** What stands behind the page and opens a world: its own picture, as its card shows it (`worldPicture`). */
 const backdropPicture = (entry: SavedWorldEntry): string | null => frontDoorPicture(entry) ?? ownWorldPicture(entry);
 
 /** Whether a world's land is still baking, which its opening names from its first frame (C3b). */

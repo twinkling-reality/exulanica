@@ -1,16 +1,14 @@
 /**
  * The pictures on Your worlds' cards.
  *
- * A card shows, first, its world's painting where the world keeps one (`../world-paintings-api.ts`): its first view's,
- * else its newest, with "invented appearance" written on the picture itself, at its bottom right on a dark pill sized to
- * read at a card's size, so a card never shows a painting without saying so.
- * Else it shows the picture the server keeps of its world (`exulanica/world/saved_entry_pictures.py`),
- * while that picture shows the world as opening it draws it now, read by its digest and checked
- * against it. Else it shows the picture this browser kept: a frame of the world as this browser last
- * drew it, taken from the renderer's canvas a few seconds after the world opens and again when the
- * person leaves for Your worlds, kept in `localStorage`. Else it shows the brand's blend in place of
- * one: a picture of another world, even one made from the same recipe (every world of a recipe is
- * its own), never stands in for it. Storage that is full, blocked or absent only means no picture.
+ * A card shows the engine's own picture of its world, the world that opens behind it: the picture the server keeps of
+ * its world (`exulanica/world/saved_entry_pictures.py`), while that picture shows the world as opening it draws it
+ * now, read by its digest and checked against it. Else it shows the picture this browser kept: a frame of the world as
+ * this browser last drew it, taken from the renderer's canvas a few seconds after the world opens and again when the
+ * person leaves for Your worlds, kept in `localStorage`. Else it shows the brand's blend in place of one: a picture of
+ * another world, even one made from the same recipe (every world of a recipe is its own), never stands in for it, nor
+ * does a painting of the world, which shows a world it does not open on (27 October). Storage that is full, blocked or
+ * absent only means no picture.
  *
  * The frame taken a few seconds after a world opens is its first view. That one is also put to the
  * server, so every browser shows it, unless the server's is current already. A frame of a world that
@@ -19,8 +17,6 @@
  */
 
 import type { SavedWorldEntry, SavedWorldEntryPicture } from '../world-entry-api.js';
-import { PAINTING_LABEL, type WorldPaintingsClient } from '../world-paintings-api.js';
-import { firstViewPainting } from './world-painting.js';
 
 const KEY_PREFIX = 'exulanica.world-picture.v1.';
 /** The size Your worlds draws it at most: behind the page, faded at its edges. */
@@ -59,76 +55,8 @@ export function ownWorldPicture(entry: SavedWorldEntry): string | null {
   return stored(entry.entryId);
 }
 
-/** Each world's painted first view this page has read, labelled on the picture: the painting's digest and URL. */
-const painted = new Map<string, { readonly sha256: string; readonly url: string }>();
-
-/** The picture a card shows for `entry`, or null: its world's painting first, else a picture of the world itself. */
-export function worldPicture(entry: SavedWorldEntry): string | null {
-  return painted.get(entry.entryId)?.url ?? ownWorldPicture(entry);
-}
-
-/** The height of a card's picture on Your worlds at 1920, in pixels, and the size its words must read at there. */
-const CARD_PICTURE_HEIGHT = 95;
-const CARD_WORDS_PX = 11;
-
-/**
- * A painting with "invented appearance" written on it at its bottom right, on a dark pill, sized so the words read at
- * `CARD_WORDS_PX` on a card, as a JPEG; the painting alone where it cannot be drawn.
- */
-async function labelled(bytes: Blob): Promise<Blob> {
-  try {
-    const bitmap = await createImageBitmap(bytes);
-    const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const context = canvas.getContext('2d');
-    if (context === null) return bytes;
-    context.drawImage(bitmap, 0, 0);
-    const size = Math.round((bitmap.height * CARD_WORDS_PX) / CARD_PICTURE_HEIGHT);
-    context.font = `${size}px system-ui, sans-serif`;
-    const pad = Math.round(size * 0.4);
-    const width = context.measureText(PAINTING_LABEL).width + 2 * pad;
-    const left = bitmap.width - pad - width, top = bitmap.height - pad - size - 2 * pad;
-    context.fillStyle = 'rgba(0, 0, 0, 0.72)';
-    context.fillRect(left, top, width, size + 2 * pad);
-    context.fillStyle = '#f2efe8';
-    context.textBaseline = 'middle';
-    context.fillText(PAINTING_LABEL, left + pad, top + pad + size / 2);
-    return await new Promise<Blob>((resolve) => canvas.toBlob((blob) => resolve(blob ?? bytes), 'image/jpeg', 0.86));
-  } catch {
-    return bytes;
-  }
-}
-
-/**
- * Read each of `entries`' world's painting this page does not hold yet (its first view's, else its newest), with
- * "invented appearance" written on it. Resolves how many were added, so cards are drawn again when any were. A world whose
- * paintings cannot be read keeps its own picture.
- */
-export async function readPaintedPictures(
-  client: Pick<WorldPaintingsClient, 'paintings' | 'picture'>, entries: readonly SavedWorldEntry[],
-): Promise<number> {
-  const added = await Promise.all(entries.map(async (entry) => {
-    try {
-      const paintings = await client.paintings(entry.worldId);
-      // Its first view's painting where one stands there, else its newest (a painting that does not hold its first
-      // view stays on the card).
-      const painting = firstViewPainting(paintings) ?? paintings[0] ?? null;
-      if (painting === null || painted.get(entry.entryId)?.sha256 === painting.sha256) return 0;
-      const bytes = await labelled(await client.picture(entry.worldId, painting.sha256));
-      const previous = painted.get(entry.entryId);
-      painted.set(entry.entryId, { sha256: painting.sha256, url: URL.createObjectURL(bytes) });
-      if (previous !== undefined) URL.revokeObjectURL(previous.url);
-      return 1;
-    } catch {
-      return 0;
-    }
-  }));
-  return added.reduce<number>((sum, one) => sum + one, 0);
-}
-
-/** What a painted card says, for a test or a reader of the card. */
-export const PAINTED_CARD_LABEL = PAINTING_LABEL;
+/** The picture a card shows for `entry`, or null: a picture of the world itself, the one it opens on. */
+export const worldPicture = ownWorldPicture;
 
 /** The server's two picture calls (`WorldEntryClient.picture` and `putPicture`). */
 export interface PictureServer {

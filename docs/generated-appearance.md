@@ -763,8 +763,10 @@ everywhere: the painting changes only how the views look.
   one is a showcase world's copy (`POST /worlds/showcase/{showcase}`): it keeps the card paintings
   its document names, painted by that run, for the copy's world (`exulanica/world/showcase_worlds.py`).
 - **Who reads them.** `GET /world/paintings?world_id=` lists a world's paintings, newest first, and
-  `GET /world/paintings/{sha256}?world_id=` answers one's bytes; both need `world.read`. Every
-  painting is labelled invented appearance wherever it is shown.
+  `GET /world/paintings/{sha256}?world_id=` answers one's bytes; both need `world.read`. No page of
+  the product reads or shows one (27 October): a card showing a painted view promised a world the
+  live one behind it did not show. A world's card shows the engine's own picture of it, the view it
+  opens at, and the world opens on its live view alone.
 - **What may be painted.** No world that holds, or held, a photograph is given a painting, so
   nothing derived from a photograph is sent to a GPU or kept.
 - **Erasure.** A world's paintings are deleted with it by its identity's own trigger (migration

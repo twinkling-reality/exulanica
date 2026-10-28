@@ -37,9 +37,9 @@ Hosted model calls go to Nebius Token Factory, and a model can also run on your 
 [model manifest](exulanica/models/models.manifest.json) names the models, including NVIDIA
 Nemotron, Qwen, and DeepSeek. A world's shape and the look it is drawn with come from its own
 records. Its paintings, its own views painted from its words by an open image model on Nebius AI
-Cloud, are labelled "invented appearance" and show only on the world's cards and at a first view
-they were checked against; one showcase world's colours were measured from its painting
-([a world's paintings](docs/generated-appearance.md#12-a-worlds-paintings)).
+Cloud, are kept as records and shown on none of the product's pages: a world's card shows the
+engine's own picture of it, as it opens; one showcase world's colours were measured from its
+painting ([a world's paintings](docs/generated-appearance.md#12-a-worlds-paintings)).
 
 <p align="center">
   <img src="assets/brand/exulanica/readme-worlds-for-ai-agents.svg" width="100%" alt="Product direction: a world you build sits at the centre, and open models run the agents in it, each model in its own role. Swap the model behind a role and compare the two runs. Hand building, photographs and imported content are ways to build the world.">

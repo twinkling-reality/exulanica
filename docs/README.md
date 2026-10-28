@@ -3,7 +3,7 @@
 Exulanica: Worlds for AI Agents. This hub routes a task to the document that owns it.
 [Product direction](product-direction.md) owns the public name, scope and delivery order.
 A world's shape and drawn look come from its own records; its paintings, made by an open image
-model and labelled "invented appearance", show only on its cards and at a checked first view, and
+model, are kept as records and shown on no page (its card shows the engine's own picture of it), and
 one showcase world's colours were measured from its painting ([a world's paintings](generated-appearance.md#12-a-worlds-paintings)). Comparing models on one
 saved world is one capability. The
 [people and models guide](capabilities/simulation.md) explains it. The
