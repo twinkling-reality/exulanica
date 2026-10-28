@@ -81,6 +81,34 @@
       244,
       250
      ]
+    },
+    "wall.brick_running_bond": {
+     "srgb8": [
+      75,
+      59,
+      45
+     ]
+    },
+    "wall.cast_concrete": {
+     "srgb8": [
+      150,
+      146,
+      138
+     ]
+    },
+    "wall.painted_render": {
+     "srgb8": [
+      236,
+      232,
+      220
+     ]
+    },
+    "wall.painted_timber": {
+     "srgb8": [
+      107,
+      97,
+      88
+     ]
     }
    },
    "swatches": {},
@@ -211,7 +239,7 @@
   "engine": "exulanica-society/v7"
  },
  "title": "A snowy mountain town with a bakery",
- "version": 2,
+ "version": 3,
  "world": {
   "kind": null,
   "land": {

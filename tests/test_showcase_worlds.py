@@ -32,7 +32,7 @@ CAST_MODEL = {
     "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
 }
 #: A shipped showcase world, whose card painting and look the tests below lend a test world.
-SHIPPED = json.loads((catalog.SHOWCASE_DIRECTORY / "mountain-town.v2.json").read_text())
+SHIPPED = json.loads((catalog.SHOWCASE_DIRECTORY / "mountain-town.v3.json").read_text())
 
 
 @pytest.fixture(name="made")
