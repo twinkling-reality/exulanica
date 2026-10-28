@@ -1,65 +1,241 @@
 import { el } from '../dom.js';
-import { p, codeBlock, inline, table, source, routeLink, type DocumentPage } from './elements.js';
-
-const steps = (...items: string[]) => el('ol', {}, items.map(text => el('li', { text })));
-const onward = (href: string, text: string) => el('p', { class: 'docs-onward' }, [routeLink(href, text)]);
+import { codeBlock, entries, inline, note, onward, p, source, steps, type DocumentPage } from './elements.js';
 
 export function quickstart(): DocumentPage {
-  return { title: 'Quickstart', introduction: 'Create a world, shape its content, connect models and inspect what happens.', sourcePath: 'docs/capabilities/world-creation.md', chapters: [
-    { key: 'access', title: 'Open Your Workspace', nodes: [p('Sign in at your installation’s application address. An empty workspace has no world until one is created. POST /world-entries/starter makes the authored starter. On the public server, a newcomer opens on that installation’s arrival world, not an empty town. Your worlds lists the worlds you can open and provides the controls to create another.'), p('If you are running Exulanica yourself, complete installation first. Saved worlds require a persistent API and database; live model decisions also require a configured provider.'), onward('/docs/self-hosting', 'Installation')] },
-    { key: 'create', title: 'Create a World', nodes: [steps('Open Your worlds and choose Create a world.', 'Make a small town or a market town from a specification preset, and change only values the served schema allows.', 'Choose Create world. The server saves the world and bakes its tiles off the request. Open it once those tiles are baked.'), p('A world drafted from your own words is available only when EXULANICA_KINDS_FROM_PEOPLE is on. You can also build in an authored starter or use reviewed personal sources through their own workflow.'), onward('/docs/worlds', 'Worldbuilding')] },
-    { key: 'shape', title: 'Add and Edit Content', nodes: [p('Use Add object to place a catalog asset supported by the world. Select it to inspect and change its position, appearance or supported behavior. Your edits belong to the saved world.'), p('For imported 3D assets, complete admission and preparation before placement. Appearance, physical behavior and model decisions have separate contracts; importing a mesh does not give it an agent role.'), onward('/docs/assets', 'Assets and Imports')] },
-    { key: 'decide', title: 'Connect a Model', nodes: [p('A decision role determines what an agent observes and which choices a model can propose. Discover the roles your world supports before choosing a model.'), p('For a world with people, open their controls and choose a model under Decided by. Select the people it should decide for, then select Use for the chosen people. A junction signal has its own role and controls.'), p('At a decision point, the model receives context and offered choices. The engine validates its answer and records the outcome. Missing or invalid answers leave the routine in control.'), onward('/docs/models', 'Models and Decisions')] },
-    { key: 'inspect', title: 'Inspect Decisions', nodes: [p('Select an agent to inspect its activity and recorded decisions. Read what it observed, which action was proposed and whether the engine applied it. Replay follows stored decisions without calling the model again.'), onward('/docs/world-api/replay', 'Read recorded history through the API')] },
-    { key: 'compare', title: 'Compare Models', nodes: [p('For worlds with a supported comparison workflow, open Compare. Choose a group and two models, review the planned runs and set a spending bound. Both sides start from the same saved state.'), p('The browser comparison runs one simulated hour for a group of people. Read its verdict and same-model control before interpreting a visible difference. This is a supported experiment within a world, rather than a requirement for every world you build.'), onward('/docs/comparisons', 'Comparisons and Replay')] },
-    { key: 'next', title: 'Build an Integration', nodes: [p('Use the World API to inspect or edit saved state. To run your own decision-maker, connect an outside agent through Python or MCP using a grant issued by the world owner.'), onward('/docs/world-api', 'World API'), onward('/docs/agents', 'Agent Integration')] },
-  ] };
+  return {
+    title: 'Quickstart',
+    introduction: 'Create a world, shape its content, connect models and inspect what happens.',
+    sourcePath: 'docs/capabilities/world-creation.md',
+    chapters: [
+      { key: 'access', title: 'Open Your Workspace', nodes: [
+        p('Sign in at your installation’s application address. Your worlds lists the worlds you can open and the controls to create another. An empty workspace has no world until you create one.'),
+        p('On the public server, a newcomer opens on that installation’s arrival world, not an empty town.'),
+        note('If you run Exulanica yourself, finish Installation first. Saved worlds need a persistent API and database. Live model decisions also need a configured provider.'),
+        onward('/docs/self-hosting', 'Installation'),
+      ] },
+      { key: 'create', title: 'Create a World', nodes: [
+        steps(
+          'Open Your worlds and choose Create a world.',
+          'Pick a small town or a market town. Change only the values the form allows.',
+          'Choose Create world. The server saves the world and bakes its tiles off the request. Open it once those tiles are baked.',
+        ),
+        note('A world drafted from your own words is available only when EXULANICA_KINDS_FROM_PEOPLE is on. You can also start from an authored starter or from reviewed personal sources.'),
+        onward('/docs/worlds', 'Worldbuilding'),
+      ] },
+      { key: 'shape', title: 'Add and Edit Content', nodes: [
+        p('Use Add object to place a catalog asset the world supports. Select it to change its position, appearance, or supported behavior. Those edits belong to the saved world.'),
+        p('For your own 3D file, finish admission and preparation before you place it. Importing a mesh does not give it an agent role.'),
+        onward('/docs/assets', 'Assets and Imports'),
+      ] },
+      { key: 'decide', title: 'Connect a Model', nodes: [
+        p('A decision role says what an agent observes and which choices a model may propose. Read the roles your world supports before you pick a model.'),
+        p('For a world with people, open their controls and choose a model under Decided by. Select the people it should decide for, then select Use for the chosen people. A junction signal has its own role and controls.'),
+        p('At a decision point, the model receives context and offered choices. The engine checks the answer and records the outcome. A missing or invalid answer leaves the routine in control.'),
+        onward('/docs/models', 'Models and Decisions'),
+      ] },
+      { key: 'inspect', title: 'Inspect Decisions', nodes: [
+        p('Select an agent to inspect its activity and recorded decisions. Read what it observed, which action was proposed, and whether the engine applied it. Replay follows stored decisions without calling the model again.'),
+        onward('/docs/world-api/replay', 'Read recorded history through the API'),
+      ] },
+      { key: 'compare', title: 'Compare Models', nodes: [
+        p('If the world supports Compare, open it. Choose a group and two models, review the planned runs, and set a spending bound. Both sides start from the same saved state.'),
+        p('The browser comparison runs one simulated hour for a group of people. Read the verdict and the same-model control before treating a visible difference as a model result. Comparison is an experiment inside a world, not a requirement for every world you build.'),
+        onward('/docs/comparisons', 'Comparisons and Replay'),
+      ] },
+      { key: 'next', title: 'Build an Integration', nodes: [
+        p('Use the World API to inspect or edit saved state. To run your own decision-maker, connect an outside agent through Python or MCP with a grant issued by the world owner.'),
+        onward('/docs/world-api', 'World API'),
+        onward('/docs/agents', 'Agent Integration'),
+      ] },
+    ],
+  };
 }
 
 export function worldConcepts(): DocumentPage {
-  return { title: 'World Structure', introduction: 'A world is a place you can change and inspect, with durable state beneath what you see.', sourcePath: 'docs/world-memory-model.md', chapters: [
-    { key: 'layers', title: 'What Makes a World', nodes: [p('The engine defines movement and interaction. Content defines places, objects and agents. Models and routines decide what agents do. Each layer can change without replacing the others.'), el('div', { class: 'docs-world-layers' }, [el('div', {}, [el('strong', { text: 'Content' }), p('Places · objects · agents')]), el('div', {}, [el('strong', { text: 'Decisions' }), p('Routines · models · recorded choices')]), el('div', {}, [el('strong', { text: 'Engine' }), p('Movement · validation · world rules')])]), p('A model proposes a decision. The engine decides whether that proposal can take effect. Rendered images, meshes and splats are representations of the world; they do not define every object’s identity or behavior.')] },
-    { key: 'identity', title: 'World, Version and Saved Entry', nodes: [table(['Term', 'Use it for'], [['World', 'The owned place and the content that belongs to it. A workspace can hold several worlds.'], ['Version', 'A specific authored state with objects, overrides and edit history.'], ['Saved entry', 'The title and references used to reopen a world and its authored version.'], ['State digest', 'The exact state an edit is based on. Edits can advance state under the same version ID.']]), p('Keep both the world ID and version ID when building a client. A version ID alone is not a frozen copy of every later edit; use its state digest to detect changes.'), onward('/docs/world-api/version', 'Read a version')] },
-    { key: 'origin', title: 'Keep Origins Distinct', nodes: [p('A photograph is an observation. A reconstructed surface is an interpretation of its sources. A catalog placement is authored content. A simulated event is something that happened in a run. Sharing one place does not make these interchangeable.'), p('A generated town does not establish that a real town existed. An agent’s behavior does not predict a real person’s choices.'), onward('/docs/assets', 'Assets, imports and provenance')] },
-    { key: 'history', title: 'State and Recorded Time', nodes: [p('Authored edits change the place. Recorded decisions describe what its agents did over time. Replay reads those stored decisions without another model call.'), p('Comparisons start their arms from the same saved state so model changes can be examined against a common starting point. Inspect the comparison definition and control before attributing differences to a model.'), onward('/docs/comparisons', 'Comparisons and Replay')] },
-    { key: 'composition', title: 'A Foundation for Larger Worlds', nodes: [p('The product’s composition design connects authored places, personal sources and permitted imported content through identities and provenance. It provides room for richer worlds without treating every visible detail as a separate canonical object.'), p('General geographic extraction, arbitrary world rules, and a complete runnable import are not supported operations. Use the capabilities your installation reports for each world.'), source('docs/world-composition-contract.md', 'Composition contract'), onward('/docs/world-api/capabilities', 'Discover supported operations')] },
-  ] };
+  return {
+    title: 'World Structure',
+    introduction: 'A world is a place you can change and inspect, with durable state beneath what you see.',
+    sourcePath: 'docs/world-memory-model.md',
+    chapters: [
+      { key: 'layers', title: 'What Makes a World', nodes: [
+        p('A world keeps what exists, what agents do, and what the engine will accept as separate parts. One can change without replacing the others.'),
+        p('Content is the places, objects, and agents that belong to the world.'),
+        p('Decisions are what an agent does: a routine, a chosen model, or a recorded choice.'),
+        p('The engine is movement, checks, and world rules that stay valid.'),
+        p('A model proposes a decision. The engine decides whether that proposal can take effect. Rendered images, meshes, and splats show the world. They do not define every object’s identity or behavior.'),
+      ] },
+      { key: 'identity', title: 'World, Version and Saved Entry', nodes: [
+        entries([
+          { label: 'World', detail: 'The owned place and the content that belongs to it. A workspace can hold several worlds.' },
+          { label: 'Version', detail: 'A specific authored state with objects, overrides, and edit history.' },
+          { label: 'Saved entry', detail: 'The title and references used to reopen a world and its authored version.' },
+          { label: 'State digest', detail: 'The exact state an edit is based on. Edits can advance state under the same version ID.' },
+        ]),
+        p('Keep both the world ID and the version ID when you build a client. A version ID alone is not a frozen copy of every later edit. Use its state digest to detect changes.'),
+        onward('/docs/world-api/version', 'Read a version'),
+      ] },
+      { key: 'origin', title: 'Keep Origins Distinct', nodes: [
+        p('A photograph is an observation. A reconstructed surface is an interpretation of its sources. A catalog placement is authored content. A simulated event is something that happened in a run. Sharing one place does not make these interchangeable.'),
+        p('A generated town does not establish that a real town existed. An agent’s behavior does not predict a real person’s choices.'),
+        onward('/docs/assets', 'Assets and Imports'),
+      ] },
+      { key: 'history', title: 'State and Recorded Time', nodes: [
+        p('Authored edits change the place. Recorded decisions describe what its agents did over time. Replay reads those stored decisions without another model call.'),
+        p('Comparisons start their arms from the same saved state so a model change can be examined against a common starting point. Inspect the comparison definition and control before attributing differences to a model.'),
+        onward('/docs/comparisons', 'Comparisons and Replay'),
+      ] },
+      { key: 'composition', title: 'A Foundation for Larger Worlds', nodes: [
+        p('The composition design connects authored places, personal sources, and permitted imported content through identities and provenance. It leaves room for richer worlds without treating every visible detail as a separate canonical object.'),
+        p('General geographic extraction, arbitrary world rules, and a complete runnable import are not supported operations. Use the capabilities your installation reports for each world.'),
+        source('docs/world-composition-contract.md', 'Composition contract'),
+        onward('/docs/world-api/capabilities', 'Discover supported operations'),
+      ] },
+    ],
+  };
 }
 
 export function authentication(): DocumentPage {
-  return { title: 'Authentication', introduction: 'Use the right credential for your workspace, your API client or one outside agent.', sourcePath: 'docs/capabilities/world-api.md', chapters: [
-    { key: 'credentials', title: 'Choose Your Access Path', nodes: [table(['Client', 'Access'], [['Browser', 'Sign in using the account flow configured by the installation. Personal token-based setups use developer-token entry.'], ['API client', 'A bearer token issued by the server operator, bound to a workspace and permissions.'], ['Outside agent', 'An owner-issued grant key for authorized turns. It is separate from an owner API token.']]), p('The website does not issue a public hosted API key. Use your installation’s API address and credentials.'), onward('/docs/self-hosting#docs-self-hosting-api', 'Configure a personal API')] },
-    { key: 'bearer', title: 'Authenticate an API Request', nodes: [p('Set your server address and EXULANICA_TOKEN to the token issued by its operator. Keep the credential outside source files and shared examples.'), codeBlock('Check workspace access', 'export EXULANICA_API_URL="http://127.0.0.1:8000"\n# Set EXULANICA_TOKEN privately to your workspace token.\ncurl --fail-with-body "$EXULANICA_API_URL/worlds" \\\n  -H "Authorization: Bearer $EXULANICA_TOKEN"', 'bash'), p('A successful response lists the worlds in that token’s workspace and its world-count policy. An empty list is a valid response.'), onward('/docs/world-api/list-worlds', 'List worlds: parameters and response')] },
-    { key: 'permissions', title: 'Permissions and World Availability', nodes: [el('p', {}, ['World reads require ', inline('world.read'), '; world writes require ', inline('world.write'), '. Model calls also depend on their own permissions and spending configuration.']), p('Permission and capability are separate. A token may allow a write while the selected world does not support it, or while a required service is unavailable. Read the world’s capability descriptor before offering an action.'), p('Every request for a world’s content carries its world_id. References outside the token’s workspace return unknown_reference rather than exposing another workspace’s content.'), onward('/docs/world-api/capabilities', 'Read a world’s capabilities')] },
-    { key: 'agents', title: 'Give an Agent Bounded Access', nodes: [p('The world owner issues an expiring grant to decide for named world agents or bring in a visitor body. The key authorizes that grant’s turns; it does not give the agent the owner’s workspace permissions.'), p('Owners can revoke a grant or replace its key. Missed turns and disconnected agents leave the world’s routine in control.'), onward('/docs/agents#docs-agents-connect', 'Issue and use an agent grant')] },
-    { key: 'failures', title: 'When Access Fails', nodes: [p('Check the server address first: the landing site and browser application are not the API server. Then check the credential’s workspace, permissions and expiration. For an outside agent, ask the owner whether the grant was revoked or its key replaced.'), onward('/docs/errors', 'Errors and Recovery')] },
-  ] };
+  return {
+    title: 'Authentication',
+    introduction: 'Use the right credential for your workspace, your API client or one outside agent.',
+    sourcePath: 'docs/capabilities/world-api.md',
+    chapters: [
+      { key: 'credentials', title: 'Choose Your Access Path', nodes: [
+        entries([
+          { label: 'Browser', detail: 'Sign in using the account flow configured by the installation. Personal token-based setups use developer-token entry.' },
+          { label: 'API client', detail: 'A bearer token issued by the server operator, bound to a workspace and permissions.' },
+          { label: 'Outside agent', detail: 'An owner-issued grant key for authorized turns. It is separate from an owner API token.' },
+        ]),
+        p('The website does not issue a public hosted API key. Use your installation’s API address and credentials.'),
+        onward('/docs/self-hosting#docs-self-hosting-api', 'Configure a personal API'),
+      ] },
+      { key: 'bearer', title: 'Authenticate an API Request', nodes: [
+        p('Set your server address and EXULANICA_TOKEN to the token issued by its operator. Keep the credential outside source files and shared examples.'),
+        codeBlock('Check workspace access', 'export EXULANICA_API_URL="http://127.0.0.1:8000"\n# Set EXULANICA_TOKEN privately to your workspace token.\ncurl --fail-with-body "$EXULANICA_API_URL/worlds" \\\n  -H "Authorization: Bearer $EXULANICA_TOKEN"', 'bash'),
+        p('A successful response lists the worlds in that token’s workspace and its world-count policy. An empty list is a valid response.'),
+        onward('/docs/world-api/list-worlds', 'List worlds: parameters and response'),
+      ] },
+      { key: 'permissions', title: 'Permissions and World Availability', nodes: [
+        el('p', {}, ['World reads require ', inline('world.read'), '; world writes require ', inline('world.write'), '. Model calls also depend on their own permissions and spending configuration.']),
+        p('Permission and capability are separate. A token may allow a write while the selected world does not support it, or while a required service is unavailable. Read the world’s capability descriptor before offering an action.'),
+        p('Every request for a world’s content carries its world_id. References outside the token’s workspace return unknown_reference rather than exposing another workspace’s content.'),
+        onward('/docs/world-api/capabilities', 'Read a world’s capabilities'),
+      ] },
+      { key: 'agents', title: 'Give an Agent Bounded Access', nodes: [
+        p('The world owner issues an expiring grant to decide for named world agents or bring in a visitor body. The key authorizes that grant’s turns. It does not give the agent the owner’s workspace permissions.'),
+        p('Owners can revoke a grant or replace its key. Missed turns and disconnected agents leave the world’s routine in control.'),
+        onward('/docs/agents#docs-agents-connect', 'Issue and use an agent grant'),
+      ] },
+      { key: 'failures', title: 'When Access Fails', nodes: [
+        p('Check the server address first: the landing site and browser application are not the API server. Then check the credential’s workspace, permissions, and expiration. For an outside agent, ask the owner whether the grant was revoked or its key replaced.'),
+        onward('/docs/errors', 'Errors and Recovery'),
+      ] },
+    ],
+  };
 }
 
 export function assets(): DocumentPage {
-  return { title: 'Assets and Imports', introduction: 'Build a world from reusable assets, your own 3D content and reference material, with origins and permitted uses preserved.', sourcePath: 'docs/world-composition-contract.md', chapters: [
-    { key: 'content', title: 'Choose What Belongs in Your World', nodes: [p('Content supplies what exists in a world: its buildings, objects, environments and agents. The engine supplies movement and interaction; models supply decisions. Bringing in appearance alone does not give an asset behavior.'), table(['Content path', 'Purpose'], [['Catalog assets', 'Place reviewed, versioned objects with declared dimensions, appearance and supported behavior.'], ['Your own 3D assets', 'Admit a supported static GLB into your workspace, prepare it and place its validated output.'], ['Reference material', 'Associate reviewed sources with a world without treating the reference as recovered geometry.'], ['Reconstructed places', 'Derive a representation from eligible sources, preserving the coverage and meaning of the observation.']])] },
-    { key: 'catalog', title: 'Place a Catalog Asset', nodes: [p('Use Add object and choose an asset offered by the world. Select a supported region and position it with the controls available for that object. Reopen the saved world to continue working on the same authored state.'), p('For a client, read capabilities and the asset catalog before making an edit. Supply the asset digest and current state digest so the server can validate both what you are placing and the state you are changing.'), onward('/docs/world-api/objects', 'Place an object through the API')] },
-    { key: 'import', title: 'Import Your Own 3D Content', nodes: [p('Workspace asset admission accepts self-contained static GLB files: triangle meshes, materials and embedded PNG or JPEG textures. Declare the asset’s units, identity and rights alongside the bytes.'), steps('Read /workspace-assets to discover the admitted profile, resource limits and availability.', 'Upload the declaration and content together. The server validates the container, rights and digest before admission.', 'Wait for preparation to complete and confirm the prepared output is placeable.', 'Use the composition preview and apply operations supported by the target world. Admission alone does not place the asset.'), p('A placed workspace asset has no behavior binding. It is an obstacle with declared bounds; versions containing these assets are withheld from World Memory Package export. External resource references, rigged characters and animated objects are outside this static profile. Imported assets remain private to their workspace; an admitted asset does not become shared catalog content.'), source('docs/workspace-asset-admission.md', 'Asset formats, preparation and placement contract'), onward('/docs/api-reference#docs-api-reference-workspace-assets', 'Asset admission API operations')] },
-    { key: 'references', title: 'Use References without Changing Their Meaning', nodes: [p('Reference photographs connect reviewed material to a world. Attaching one does not reconstruct its geometry. Generated town recipes do not accept photograph attachments.'), p('Where the installation supports building from personal sources, Make a world from my photographs composes reviewed sources into regions. Later sources join only after confirmation of the additions. A declared floor is authored ground, not a surface recovered from an image.'), p('Reconstruction depends on actual source coverage. A single image supplies a partial surface; a standpoint join supplies a view to look around in, without unseen backs or measured metric scale. Do not infer a complete, walkable place from a successful processing job.'), source('docs/capabilities/scene-reconstruction.md', 'Reconstruction and coverage guide')] },
-    { key: 'provenance', title: 'Preserve Origin and Rights', nodes: [p('Keep imported assets, observed sources, reconstructed representations and authored additions distinguishable. Preserve the source, processing history and permitted uses of each import. A generated addition does not establish an observed fact.'), p('The composition design connects these content paths through stable identities and provenance. General geographic extraction and automatic landscape blending are design targets; use the world’s declared operations for supported placement.'), source('docs/world-composition-contract.md', 'Composition contract'), source('docs/privacy-consent-threat-model.md', 'Source permissions and consent')] },
-  ] };
+  return {
+    title: 'Assets and Imports',
+    introduction: 'Build a world from reusable assets, your own 3D content and reference material, with origins and permitted uses preserved.',
+    sourcePath: 'docs/world-composition-contract.md',
+    chapters: [
+      { key: 'content', title: 'Choose What Belongs in Your World', nodes: [
+        p('Content supplies what exists in a world: buildings, objects, environments, and agents. The engine supplies movement and interaction. Models supply decisions. Bringing in appearance alone does not give an asset behavior.'),
+        entries([
+          { label: 'Catalog assets', detail: 'Place reviewed, versioned objects with declared dimensions, appearance, and supported behavior.' },
+          { label: 'Your own 3D assets', detail: 'Admit a supported static GLB into your workspace, prepare it, and place its validated output.' },
+          { label: 'Reference material', detail: 'Associate reviewed sources with a world without treating the reference as recovered geometry.' },
+          { label: 'Reconstructed places', detail: 'Derive a representation from eligible sources, preserving the coverage and meaning of the observation.' },
+        ]),
+      ] },
+      { key: 'catalog', title: 'Place a Catalog Asset', nodes: [
+        p('Use Add object and choose an asset the world offers. Select a supported region and position it with the controls available for that object. Reopen the saved world to continue the same authored state.'),
+        p('For a client, read capabilities and the asset catalog before making an edit. Supply the asset digest and current state digest so the server can validate both what you are placing and the state you are changing.'),
+        onward('/docs/world-api/objects', 'Place an object through the API'),
+      ] },
+      { key: 'import', title: 'Import Your Own 3D Content', nodes: [
+        p('Workspace asset admission accepts self-contained static GLB files: triangle meshes, materials, and embedded PNG or JPEG textures. Declare the asset’s units, identity, and rights alongside the bytes.'),
+        steps(
+          'Read /workspace-assets to discover the admitted profile, resource limits, and availability.',
+          'Upload the declaration and content together. The server validates the container, rights, and digest before admission.',
+          'Wait for preparation to complete and confirm the prepared output is placeable.',
+          'Use the composition preview and apply operations supported by the target world. Admission alone does not place the asset.',
+        ),
+        p('A placed workspace asset has no behavior binding. It is an obstacle with declared bounds. Versions containing these assets are withheld from World Memory Package export. External resource references, rigged characters, and animated objects are outside this static profile. Imported assets remain private to their workspace. An admitted asset does not become shared catalog content.'),
+        source('docs/workspace-asset-admission.md', 'Asset formats, preparation and placement contract'),
+        onward('/docs/api-reference#docs-api-reference-workspace-assets', 'Asset admission API operations'),
+      ] },
+      { key: 'references', title: 'Use References without Changing Their Meaning', nodes: [
+        p('Reference photographs connect reviewed material to a world. Attaching one does not reconstruct its geometry. Generated town recipes do not accept photograph attachments.'),
+        p('Where the installation supports building from personal sources, Make a world from my photographs composes reviewed sources into regions. Later sources join only after confirmation of the additions. A declared floor is authored ground, not a surface recovered from an image.'),
+        p('Reconstruction depends on actual source coverage. A single image supplies a partial surface. A standpoint join supplies a view to look around in, without unseen backs or measured metric scale. Do not infer a complete, walkable place from a successful processing job.'),
+        source('docs/capabilities/scene-reconstruction.md', 'Reconstruction and coverage guide'),
+      ] },
+      { key: 'provenance', title: 'Preserve Origin and Rights', nodes: [
+        p('Keep imported assets, observed sources, reconstructed representations, and authored additions distinguishable. Preserve the source, processing history, and permitted uses of each import. A generated addition does not establish an observed fact.'),
+        p('The composition design connects these content paths through stable identities and provenance. General geographic extraction and automatic landscape blending are design targets. Use the world’s declared operations for supported placement.'),
+        source('docs/world-composition-contract.md', 'Composition contract'),
+        source('docs/privacy-consent-threat-model.md', 'Source permissions and consent'),
+      ] },
+    ],
+  };
 }
 
 export function worldRules(): DocumentPage {
-  return { title: 'World Rules', introduction: 'Understand how a world moves, how agents can act and which controls shape a run.', sourcePath: 'docs/product-direction.md', chapters: [
-    { key: 'engine', title: 'Rules Belong to the World', nodes: [p('The engine defines valid movement and interaction. An agent or model chooses among actions the world offers; it cannot rewrite the engine by asking for an unsupported action.'), p('Walking, small-bird flight and roads are movement modules selected by data. A generated town’s vehicles drive its road network on the world’s shared clock. Objects carry supported behavior bindings rather than a separate script for every instance.'), source('docs/movement-modules-contract.md', 'Movement modules'), source('docs/world-objects-contract.md', 'Objects and behaviors')] },
-    { key: 'control', title: 'Change a Supported Condition', nodes: [p('Inspect a world’s capabilities to find the edits and interactions it supports. Change an object’s position, appearance or supported behavior through the same validated state boundary used by the application.'), p('For a comparison, keep the starting state fixed and change the declared model choice. A different starting world answers a different question; its result should not be presented as a controlled model swap.'), onward('/docs/comparisons', 'Set up a controlled comparison')] },
-    { key: 'design', title: 'Configurable Simulation', nodes: [p('The product design allows world rules to become versioned data: explicit parameters, units, limits, permissions and replay semantics. General rules, physics adapters and scientific workflows require their own validated capability contracts.'), p('An arbitrary rule editor, model-run weather or economy, robotics backend and validated human-behavior predictor are not supported workflows. The shared architecture leaves room for them without presenting a demonstration as a general simulator.'), source('docs/product-direction.md', 'Simulation scope and acceptance criteria')] },
-    { key: 'inspect', title: 'Keep Runs Reproducible', nodes: [p('A useful run preserves its starting state, configuration, model choices, recorded decisions and relevant runtime bounds. Replay consumes stored decisions; it does not re-execute model inference or establish that a physical simulation was rerun.'), p('Use the authenticated API for an independent reader, and inspect export coverage before handing a result to another tool.'), onward('/docs/portability', 'Read and export world state')] },
-  ] };
+  return {
+    title: 'World Rules',
+    introduction: 'Understand how a world moves, how agents can act and which controls shape a run.',
+    sourcePath: 'docs/product-direction.md',
+    chapters: [
+      { key: 'engine', title: 'Rules Belong to the World', nodes: [
+        p('The engine defines valid movement and interaction. An agent or model chooses among actions the world offers. It cannot rewrite the engine by asking for an unsupported action.'),
+        p('Walking, small-bird flight, and roads are movement modules selected by data. A generated town’s vehicles drive its road network on the world’s shared clock. Objects carry supported behavior bindings rather than a separate script for every instance.'),
+        source('docs/movement-modules-contract.md', 'Movement modules'),
+        source('docs/world-objects-contract.md', 'Objects and behaviors'),
+      ] },
+      { key: 'control', title: 'Change a Supported Condition', nodes: [
+        p('Inspect a world’s capabilities to find the edits and interactions it supports. Change an object’s position, appearance, or supported behavior through the same validated state boundary used by the application.'),
+        p('For a comparison, keep the starting state fixed and change the declared model choice. A different starting world answers a different question. Its result should not be presented as a controlled model swap.'),
+        onward('/docs/comparisons', 'Set up a controlled comparison'),
+      ] },
+      { key: 'design', title: 'Configurable Simulation', nodes: [
+        p('The product design allows world rules to become versioned data: explicit parameters, units, limits, permissions, and replay semantics. General rules, physics adapters, and scientific workflows require their own validated capability contracts.'),
+        p('An arbitrary rule editor, model-run weather or economy, robotics backend, and validated human-behavior predictor are not supported workflows. The shared architecture leaves room for them without presenting a demonstration as a general simulator.'),
+        source('docs/product-direction.md', 'Simulation scope and acceptance criteria'),
+      ] },
+      { key: 'inspect', title: 'Keep Runs Reproducible', nodes: [
+        p('A useful run preserves its starting state, configuration, model choices, recorded decisions, and relevant runtime bounds. Replay consumes stored decisions. It does not re-execute model inference or establish that a physical simulation was rerun.'),
+        p('Use the authenticated API for an independent reader, and inspect export coverage before handing a result to another tool.'),
+        onward('/docs/portability', 'Export and Portability'),
+      ] },
+    ],
+  };
 }
 
 export function portability(): DocumentPage {
-  return { title: 'Export and Portability', introduction: 'Read a world from another tool, or carry a signed projection with a clear account of what it includes.', sourcePath: 'docs/world-memory-package.md', chapters: [
-    { key: 'api', title: 'Build Against Saved State', nodes: [p('Use the authenticated World API for live reads and edits. Retain world identity, version identity and the state digest. Capability descriptors say which operations and representations the selected world supports.'), onward('/docs/world-api', 'World API overview')] },
-    { key: 'package', title: 'World Memory Package', nodes: [p('A World Memory Package is a signed portable projection of one snapshot. Its manifest and digests describe integrity. It is not the live store, a database backup or permission to reuse a source.'), p('Authored-world and environment-instance extensions carry supported authored state separately from the base profile. A package does not supply missing asset bytes or establish a runnable import.'), source('docs/world-memory-package.md', 'Package profile, extensions and commands')] },
-    { key: 'privacy', title: 'Plan for the Recipient', nodes: [p('Raw media, embeddings and identity exemplars are excluded by default. A source reference can describe excluded bytes without giving the recipient access to them. Review the projection and its rights before sharing it.'), p('An exported copy cannot be recalled. Deleting live data and exporting again produces a different package; the difference records what was removed or recomputed.')] },
-    { key: 'backup', title: 'Back Up a Personal Installation', nodes: [p('Back up both the database and the content directory. Neither an API read nor a signed package replaces an operational backup of the installation.'), onward('/docs/self-hosting#docs-self-hosting-operations', 'Database and content maintenance')] },
-  ] };
+  return {
+    title: 'Export and Portability',
+    introduction: 'Read a world from another tool, or carry a signed projection with a clear account of what it includes.',
+    sourcePath: 'docs/world-memory-package.md',
+    chapters: [
+      { key: 'api', title: 'Build Against Saved State', nodes: [
+        p('Use the authenticated World API for live reads and edits. Retain world identity, version identity, and the state digest. Capability descriptors say which operations and representations the selected world supports.'),
+        onward('/docs/world-api', 'World API overview'),
+      ] },
+      { key: 'package', title: 'World Memory Package', nodes: [
+        p('A World Memory Package is a signed portable projection of one snapshot. Its manifest and digests describe integrity. It is not the live store, a database backup, or permission to reuse a source.'),
+        p('Authored-world and environment-instance extensions carry supported authored state separately from the base profile. A package does not supply missing asset bytes or establish a runnable import.'),
+        source('docs/world-memory-package.md', 'Package profile, extensions and commands'),
+      ] },
+      { key: 'privacy', title: 'Plan for the Recipient', nodes: [
+        p('Raw media, embeddings, and identity exemplars are excluded by default. A source reference can describe excluded bytes without giving the recipient access to them. Review the projection and its rights before sharing it.'),
+        p('An exported copy cannot be recalled. Deleting live data and exporting again produces a different package. The difference records what was removed or recomputed.'),
+      ] },
+      { key: 'backup', title: 'Back Up a Personal Installation', nodes: [
+        p('Back up both the database and the content directory. Neither an API read nor a signed package replaces an operational backup of the installation.'),
+        onward('/docs/self-hosting#docs-self-hosting-operations', 'Database and content maintenance'),
+      ] },
+    ],
+  };
 }

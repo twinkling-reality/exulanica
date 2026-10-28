@@ -1,14 +1,98 @@
-/* Product and Use Cases share one hierarchy, alignment and capture treatment. */
-.feature-pane { --page-top: 110px; --feature-offset: clamp(24px,4vh,48px); isolation: isolate; }
-.feature-pane > .feature-sheet { position: relative; z-index: 1; min-height: calc(100dvh - var(--page-top)); justify-content: flex-start; padding-block: var(--feature-offset) 24px; }
-.feature-column { width: 46%; max-width: 520px; margin-left: 52%; }
-.feature-sheet h1 { font-size: var(--reading-title); line-height: var(--reading-title-leading); letter-spacing: var(--reading-title-tracking); }
-.feature-sheet p { font-size: var(--reading-body-size); line-height: 1.55; }
-.feature-sheet .feature-lead { font-size: 21px; line-height: 1.45; }
-.feature-capture { position: absolute; width: 42%; top: var(--feature-offset); left: 0; }
-.feature-capture img { display: block; width: 100%; height: auto; border-radius: var(--reading-radius); }
+/* Capabilities is a picture-and-task index. It does not use Overview's vertical axis. */
+.feature-pane {
+  --page-top: 110px;
+  --row-hover: color-mix(in srgb, var(--landing-ink) 50%, var(--landing-action-hover));
+  --row-hover-edge: color-mix(in srgb, var(--landing-ink) 72%, var(--landing-canvas));
+  --row-pressed: color-mix(in srgb, var(--landing-ink) 58%, var(--landing-action-pressed));
+  isolation: isolate;
+}
+:root[data-theme='landing-dark'] .feature-pane {
+  --row-hover: color-mix(in srgb, var(--landing-ink) 30%, var(--landing-action-hover));
+  --row-hover-edge: color-mix(in srgb, var(--landing-ink) 50%, var(--landing-canvas));
+  --row-pressed: color-mix(in srgb, var(--landing-ink) 38%, var(--landing-action-pressed));
+}
+.work-sheet { max-width: 960px; padding-bottom: 72px; }
+.feature-pane :is(.work-sheet, .journey-index) > h1,
+.feature-pane .task-copy h1 {
+  font-weight: var(--reading-weight-title);
+  font-size: var(--reading-title);
+  letter-spacing: var(--reading-title-tracking);
+  line-height: var(--reading-title-leading);
+}
+.work-lead {
+  max-width: 42ch;
+  margin-top: var(--reading-space-2);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.work-rows { margin-top: var(--reading-space-4); }
+.work-row { border-top: 1px solid var(--reading-line); }
+.work-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px 40px;
+  align-items: center;
+  margin-inline: -12px;
+  padding: var(--reading-space-4) 12px;
+  border-radius: var(--reading-row-radius);
+  box-shadow: inset 0 0 0 1px transparent;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--reading-motion) var(--reading-ease), color var(--reading-motion) var(--reading-ease), box-shadow var(--reading-motion) var(--reading-ease);
+}
+.work-row.has-figure .work-link { grid-template-columns: minmax(0, 1fr) minmax(220px, 340px); }
+.work-copy h2,
+.journey-row h2 {
+  font-weight: 400;
+  font-size: var(--reading-section);
+  letter-spacing: -.03em;
+  line-height: 1.25;
+}
+.work-copy p {
+  max-width: 42ch;
+  margin-top: 10px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--reading-body);
+  transition: color var(--reading-motion) var(--reading-ease);
+}
+.row-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: var(--reading-body-size);
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--reading-ink);
+}
+.feature-pane :is(.work-link, .journey-row):is(:hover, :focus-visible) {
+  background: var(--row-hover);
+  box-shadow: inset 0 0 0 1px var(--row-hover-edge);
+  color: var(--reading-ink);
+}
+.feature-pane :is(.work-link, .journey-row):is(:hover, :focus-visible) :is(p, figcaption) { color: var(--reading-ink); }
+.feature-pane :is(.work-link, .journey-row):active { background: var(--row-pressed); }
+.work-link img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1.5;
+  object-fit: cover;
+  border-radius: var(--reading-radius);
+}
+.work-row figcaption {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--reading-muted);
+  transition: color var(--reading-motion) var(--reading-ease);
+}
+
 @media(max-width:760px) {
-  .feature-pane { --page-top: 154px; --feature-offset: 40px; }
-  .feature-column { width: 100%; max-width: 520px; margin-inline: auto; }
-  .feature-capture { position: static; width: 100%; max-width: 520px; margin: 28px auto 0 !important; }
+  .feature-pane { --page-top: 154px; }
+  .work-sheet { padding-bottom: 48px; }
+  .work-link,
+  .work-row.has-figure .work-link { grid-template-columns: 1fr; padding: var(--reading-space-3) 12px; }
+  .work-row figure { order: 2; }
 }

@@ -63,7 +63,7 @@ describe('documentation source and navigation contracts', () => {
 
   it('keeps card exports readable without merging adjacent links', () => {
     const markdown = readingFiles().get('/docs.md')!;
-    expect(markdown).toContain('- [Create and shape a world](/docs/worlds):');
+    expect(markdown).toContain('[Worldbuilding](/docs/worlds)');
     expect(markdown).not.toContain('Copy Page');
   });
 });

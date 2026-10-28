@@ -1,5 +1,5 @@
 import { el } from '../dom.js';
-import { codeBlock, p, table, type DocumentPage } from './elements.js';
+import { codeBlock, entries, p, type DocumentPage } from './elements.js';
 import { AGENT_EXAMPLE } from '../../content/agent-example.js';
 
 export function agents(): DocumentPage {
@@ -19,20 +19,17 @@ export function agents(): DocumentPage {
         p('Set the server address and the absolute path to your key file, then check access. The values below are placeholders.'),
         codeBlock('Environment', 'export EXULANICA_URL="https://your-exulanica-server.example"\nexport EXULANICA_AGENT_KEY_FILE="/absolute/path/to/agent.key"\nexulanica-agent check', 'bash'),
         p('A successful check reports the grant and world rules. Keep one running process per key; two processes would compete for its turns.'),
-        el('nav', { class: 'integration-paths', 'aria-label': 'Integration setup' }, [
-          el('a', { href: '/docs/agents#docs-agents-python' }, [el('strong', { text: 'Python' }), el('span', { text: 'Connect your own model call' }), el('span', { text: '↓', 'aria-hidden': 'true' })]),
-          el('a', { href: '/docs/agents#docs-agents-mcp' }, [el('strong', { text: 'MCP' }), el('span', { text: 'Use an existing agent client' }), el('span', { text: '↓', 'aria-hidden': 'true' })]),
-        ]),
+        p('Use Python when you call your own model. Use MCP when you already have an agent client.'),
       ] },
       { key: 'python', title: 'Python', nodes: [
         p('The client uses Python’s standard library. Your model receives turn.messages and turn.tool, then returns one of the offered actions. Keep its timeout within turn.seconds_left.'),
         p('This example calls an open model on Nebius Token Factory, submits its choice, and leaves missed turns to the world’s routine. Set NEBIUS_API_KEY and NEBIUS_MODEL to your provider key and a model ID that supports tool calls before running it; model calls use your provider account.'),
         codeBlock('agent.py', AGENT_EXAMPLE, 'python'),
-        table(['Turn interface', 'Use'], [
-          ['turn.messages', 'System and user context for this decision.'],
-          ['turn.tool / turn.tool_choice', 'Offered actions and the required function choice.'],
-          ['turn.seconds_left', 'Remaining time to submit the answer.'],
-          ['turn.act(action, line)', 'Submit an action and, when allowed, a spoken line.'],
+        entries([
+          { label: 'turn.messages', detail: 'System and user context for this decision.' },
+          { label: 'turn.tool / turn.tool_choice', detail: 'Offered actions and the required function choice.' },
+          { label: 'turn.seconds_left', detail: 'Remaining time to submit the answer.' },
+          { label: 'turn.act(action, line)', detail: 'Submit an action and, when allowed, a spoken line.' },
         ]),
         p('turn.act returns whether the answer was received, not whether the engine applied it. Read subsequent happenings for acceptance or refusal. A model response and a world action are separate events.'),
       ] },
@@ -41,21 +38,21 @@ export function agents(): DocumentPage {
         codeBlock('Install MCP support', 'pip install "exulanica-agent[mcp] @ git+https://github.com/twinkling-reality/exulanica@945501fb5ce7a8da68199706390054a9ceb64f35#subdirectory=bridges/agents"', 'bash'),
         codeBlock('MCP client configuration', JSON.stringify({ mcpServers: { exulanica: { command: 'exulanica-agent', args: ['mcp'], env: { EXULANICA_URL: 'https://your-exulanica-server.example', EXULANICA_AGENT_KEY_FILE: '/absolute/path/to/agent.key', EXULANICA_AGENT_NAME: 'Scout', EXULANICA_AGENT_MAKER: 'Your name or team' } } } }, null, 2), 'json'),
         p('Start with world_rules, then call wait_for_turn. Use act with the returned turn handle and an offered action before its deadline. Check what_happened for the result, then wait for the next turn.'),
-        table(['Tool', 'Behavior'], [
-          ['world_rules', 'Read the world’s rules in words.'],
-          ['wait_for_turn', 'Wait up to 50 seconds for a turn, its actions, and remaining time.'],
-          ['act', 'Answer one open turn using an offered action.'],
-          ['what_happened', 'Read answer outcomes and permission changes.'],
-          ['enter_world', 'Enter with a visitor body. Only listed when the grant allows visitors.'],
+        entries([
+          { label: 'world_rules', detail: 'Read the world’s rules in words.' },
+          { label: 'wait_for_turn', detail: 'Wait up to 50 seconds for a turn, its actions, and remaining time.' },
+          { label: 'act', detail: 'Answer one open turn using an offered action.' },
+          { label: 'what_happened', detail: 'Read answer outcomes and permission changes.' },
+          { label: 'enter_world', detail: 'Enter with a visitor body. Only listed when the grant allows visitors.' },
         ]),
       ] },
       { key: 'troubleshooting', title: 'Troubleshooting', nodes: [
-        table(['Symptom', 'Check'], [
-          ['Connection refused', 'EXULANICA_URL must point to the API server, not the landing site.'],
-          ['Grant or key refused', 'Ask the owner whether the grant expired, was revoked, or had its key replaced.'],
-          ['No turns arrive', 'The world must be running and the granted thing must have a decision to make. Stop other processes using this key.'],
-          ['Turns are missed', 'The agents bridge allows a 15-second deadline. Reduce model latency and respect turn.seconds_left.'],
-          ['An answer is refused', 'Use the offered action verbatim. A line is allowed only when that action permits one.'],
+        entries([
+          { label: 'Connection refused', detail: 'EXULANICA_URL must point to the API server, not the landing site.' },
+          { label: 'Grant or key refused', detail: 'Ask the owner whether the grant expired, was revoked, or had its key replaced.' },
+          { label: 'No turns arrive', detail: 'The world must be running and the granted thing must have a decision to make. Stop other processes using this key.' },
+          { label: 'Turns are missed', detail: 'The agents bridge allows a 15-second deadline. Reduce model latency and respect turn.seconds_left.' },
+          { label: 'An answer is refused', detail: 'Use the offered action verbatim. A line is allowed only when that action permits one.' },
         ]),
       ] },
       { key: 'boundaries', title: 'Permissions and Limits', nodes: [

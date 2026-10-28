@@ -9,7 +9,7 @@ export function nodeMarkdown(node: Node): string {
   const element = node as HTMLElement;
   if (element.matches('button, input, kbd, [role="tablist"], [role="status"], [aria-hidden="true"], .docs-code-toolbar')) return '';
   if (element.matches('.docs-paths a')) return `- [${element.querySelector('span')?.textContent}](${element.getAttribute('href')}): ${element.querySelector('p')?.textContent}\n\n`;
-  if (element.matches('.docs-world-layers > div')) return `**${element.querySelector('strong')?.textContent}**: ${element.querySelector('p')?.textContent}\n\n`;
+  if (element.matches('a.docs-index-link')) return `- [${element.querySelector('strong')?.textContent}](${element.getAttribute('href')}): ${element.querySelector('span')?.textContent}\n\n`;
   if (element.matches('.api-operation-index a')) return `[${Array.from(element.children).map(child => child.textContent).join(' · ')}](${element.getAttribute('href')})`;
   if (element.classList.contains('api-field-heading')) return Array.from(element.children).map(child => nodeMarkdown(child)).join(' · ') + '\n\n';
   if (element.classList.contains('api-route')) return Array.from(element.children).map(child => nodeMarkdown(child)).join(' ') + '\n\n';

@@ -1,4 +1,3 @@
-import { ENDPOINTS } from './docs/worldApi.js';
 import { readingTools } from './reading-tools.js';
 import { documentMarkdown } from '../content/markdown.js';
 import { el } from './dom.js';
@@ -28,15 +27,18 @@ export function buildDocumentation(kind: DocumentationKind): HTMLElement {
   const id = documentId(kind);
   const isApi = kind.startsWith('world-api') || kind === 'api-reference';
   const isOperation = kind.startsWith('world-api-');
-  const links: HTMLElement[] = [];
-  let navGroup = '';
+  const grouped = new Map<string, typeof DOCUMENTS[number][]>();
   for (const item of DOCUMENTS.filter(item => item.group !== 'API Operations' && (!isApi || item.group === 'Developer Tools'))) {
-    const group = item.group;
-    if (group !== navGroup) { links.push(el('p', { class: 'docs-nav-label', text: group })); navGroup = group; }
-    links.push(el('a', { href: item.href, text: item.label, ...(item.key === kind ? { 'aria-current': 'page' } : {}) }));
+    const items = grouped.get(item.group) ?? [];
+    items.push(item);
+    grouped.set(item.group, items);
   }
+  const links = [...grouped.entries()].map(([group, items]) => el('div', { class: 'docs-nav-group' }, [
+    el('p', { class: 'docs-nav-label', text: group }),
+    ...items.map(item => el('a', { href: item.href, text: item.label, ...(item.key === kind ? { 'aria-current': 'page' } : {}) })),
+  ]));
   const sidebar = disclosure('Documentation', 'docs-navigation', el('nav', { class: 'docs-sidebar', 'aria-label': 'Documentation' }, [
-    ...(isApi ? [el('a', { href: '/docs', class: 'docs-nav-back' }, [icon('arrow'), el('span', { text: 'All guides' })])] : []), ...links, ...(kind.startsWith('world-api') ? [el('div', { class: 'api-navigation' }, [el('p', { class: 'docs-nav-label', text: 'API Operations' }), ...ENDPOINTS.map(operation => el('a', { href: `/docs/world-api/${operation.key}`, ...(kind === `world-api-${operation.key}` ? { 'aria-current': 'page' } : {}) }, [el('span', { class: `api-nav-method ${operation.method}`, text: operation.method.toUpperCase() }), el('span', { text: operation.title })]))])] : []),
+    ...(isApi ? [el('a', { href: '/docs', class: 'docs-nav-back' }, [icon('arrow'), el('span', { text: 'All guides' })])] : []), ...links,
   ]), 760);
   const chapters = page.chapters.map(chapter => el('section', { id: `${id}-${chapter.key}`, class: 'docs-chapter', tabindex: '-1' }, [
     el('h2', {}, isOperation && chapter.key === 'request' ? [chapter.title] : [el('a', { class: 'docs-section-link', href: `${entry.href}#${id}-${chapter.key}`, text: chapter.title })]), ...chapter.nodes,

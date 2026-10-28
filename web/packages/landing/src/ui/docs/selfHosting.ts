@@ -1,5 +1,5 @@
 import { el } from '../dom.js';
-import { p, codeBlock, table, source, type DocumentPage } from './elements.js';
+import { p, codeBlock, entries, source, type DocumentPage } from './elements.js';
 export function selfHosting(): DocumentPage {
   return {
     title: 'Installation',
@@ -7,7 +7,11 @@ export function selfHosting(): DocumentPage {
     sourcePath: 'docs/development-setup.md',
     chapters: [
       { key: 'prerequisites', title: 'Prerequisites', nodes: [
-        table(['Component', 'Required version'], [['Browser application', 'Node.js 22 or newer and pnpm 10.7.1'], ['API', 'Python 3.11 and uv'], ['Database', 'PostgreSQL 18 with pgvector']]),
+        entries([
+          { label: 'Browser application', detail: 'Node.js 22 or newer and pnpm 10.7.1.' },
+          { label: 'API', detail: 'Python 3.11 and uv.' },
+          { label: 'Database', detail: 'PostgreSQL 18 with pgvector.' },
+        ]),
         codeBlock('Clone Exulanica', 'git clone https://github.com/twinkling-reality/exulanica.git\ncd exulanica'),
         p('The browser, API, and workers are separate processes. The following commands run from the repository root unless a step changes directory.'),
       ] },
@@ -35,7 +39,7 @@ export function selfHosting(): DocumentPage {
         p('EXULANICA_SOCIETY_CONTROL_WORKSPACES is a JSON array of workspace ids. A bare id is refused at startup, and no society in that workspace is played. A process budget resets when the process restarts. Hosted installations should configure the shared durable spending authority. Without a provider, people can follow routines but model-dependent operations remain unavailable.'),
         el('p', {}, ['Once configured, follow ', el('a', { href: '/docs/models#docs-models-models', text: 'Choose a model' }), ' in Models and decisions.']),
       ] },
-      { key: 'services', title: 'Prepare the Services Your World Needs', nodes: [table(['Workflow', 'Required service'], [['Saved catalog worlds', 'Persistent database, content store and published catalogs.'], ['Generated towns', 'Generated-tile preparation worker and its configured build inputs. A saved town waits until its tiles are baked.'], ['Live people and comparisons', 'Playback for the workspace, comparison execution and configured model/spending services.'], ['Your own 3D assets', 'Workspace asset preparation worker. Admitted content waits until a compatible preparer runs.'], ['Reconstructed places', 'Source admission and the reconstruction services appropriate to the input.']]), p('The commands above establish a local API foundation. Select and configure the workers for your workflow before expecting every creation path to run. Read /readyz and the world’s capability refusals to identify missing services.'), source('docs/deployment.md', 'Service topology, worker configuration and deployment profiles')] },
+      { key: 'services', title: 'Prepare the Services Your World Needs', nodes: [entries([{ label: 'Saved catalog worlds', detail: 'Persistent database, content store and published catalogs.' }, { label: 'Generated towns', detail: 'Generated-tile preparation worker and its configured build inputs. A saved town waits until its tiles are baked.' }, { label: 'Live people and comparisons', detail: 'Playback for the workspace, comparison execution and configured model/spending services.' }, { label: 'Your own 3D assets', detail: 'Workspace asset preparation worker. Admitted content waits until a compatible preparer runs.' }, { label: 'Reconstructed places', detail: 'Source admission and the reconstruction services appropriate to the input.' }]), p('The commands above establish a local API foundation. Select and configure the workers for your workflow before expecting every creation path to run. Read /readyz and the world’s capability refusals to identify missing services.'), source('docs/deployment.md', 'Service topology, worker configuration and deployment profiles')] },
       { key: 'operations', title: 'Maintenance', nodes: [
         codeBlock('Back up and verify', 'uv run exulanica-local-db backup --directory ~/Exulanica/database\nuv run exulanica-local-db verify --directory ~/Exulanica/database'),
         p('Database backups do not include EXULANICA_DATA_DIR. Back up the content directory too, and keep copies on another disk. Use exulanica-local-db upgrade for this managed database; it backs up and rehearses the migration before applying it.'),

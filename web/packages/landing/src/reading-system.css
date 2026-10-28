@@ -82,9 +82,9 @@
   --reading-line: color-mix(in srgb, var(--landing-ink) 15%, var(--landing-canvas));
   --reading-edge: color-mix(in srgb, var(--landing-ink) 35%, var(--landing-canvas));
   --reading-surface: color-mix(in srgb, var(--landing-ink) 2%, var(--landing-canvas));
-  --reading-hover: color-mix(in srgb, var(--landing-ink) 4%, var(--landing-canvas));
+  --reading-hover: color-mix(in srgb, var(--landing-ink) 6%, var(--landing-action-hover));
   --reading-selected: color-mix(in srgb, var(--landing-ink) 6%, var(--landing-canvas));
-  --reading-pressed: color-mix(in srgb, var(--landing-ink) 9%, var(--landing-canvas));
+  --reading-pressed: color-mix(in srgb, var(--landing-ink) 12%, var(--landing-action-hover));
   --reading-disabled: var(--landing-ink-faint);
   --reading-control-profile: 8px;
   --reading-action-corner: 8px;
@@ -116,10 +116,11 @@
   --reading-code-string: #b8d8cc;
   --reading-code-keyword: #d5bde4;
 }
-:is(.site-page,.docs-article) :is(h1,h2,h3) { color: var(--reading-ink); font-weight: 400; letter-spacing: -.035em; }
-:is(.site-page,.docs-article) h1 { font-size: var(--reading-title); line-height: 1.15; }
-:is(.site-page,.docs-article) h2 { font-size: var(--reading-section); line-height: 1.25; }
-:is(.site-page,.docs-article) p { color: var(--reading-body); line-height: var(--reading-leading); }
+.site-page :is(h1,h2,h3) { color: var(--reading-ink); font-weight: 400; letter-spacing: -.035em; }
+.site-page h1 { font-size: var(--reading-title); line-height: 1.15; }
+.site-page h2 { font-size: var(--reading-section); line-height: 1.25; }
+.site-page p { color: var(--reading-body); line-height: var(--reading-leading); }
+.docs-article :is(h1,h2,h3) { color: var(--reading-ink); }
 :is(.site-page,.documentation-pane,.documentation-search) :is(a,button,input,summary):focus-visible { outline: 2px solid var(--reading-focus); outline-offset: 3px; }
 .nav-direct { text-decoration: none; }
 

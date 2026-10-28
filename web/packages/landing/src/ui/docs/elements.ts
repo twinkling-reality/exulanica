@@ -17,6 +17,9 @@ export const source = (path: string, label: string): HTMLAnchorElement => {
 };
 export const p = (text: string): HTMLParagraphElement => el('p', { text });
 export const inline = (text: string): HTMLElement => el('code', { text });
+export const steps = (...items: string[]): HTMLElement => el('ol', { class: 'docs-steps' }, items.map(text => el('li', { text })));
+export const onward = (href: string, text: string): HTMLElement => el('p', { class: 'docs-onward' }, [routeLink(href, text)]);
+export const note = (text: string): HTMLElement => el('aside', { class: 'docs-note' }, [p(text)]);
 
 export function codeBlock(label: string, value: string, language = 'text', highlight = true): HTMLElement {
   const status = el('span', { class: 'docs-copy-status', role: 'status', 'aria-live': 'polite' });
@@ -42,6 +45,20 @@ export function table(headers: string[], rows: string[][]): HTMLElement {
       el('tbody', {}, rows.map((row) => el('tr', {}, row.map((text) => el('td', { text }))))),
     ]),
   ]);
+}
+
+/** Glossary terms. Not destinations. */
+export function entries(rows: { label: string; detail: string }[]): HTMLElement {
+  return el('dl', { class: 'docs-entries' }, rows.map(row =>
+    el('div', { class: 'docs-entry' }, [el('dt', { text: row.label }), el('dd', { text: row.detail })]),
+  ));
+}
+
+/** Standalone guide destinations. The whole row is the link. */
+export function destinations(rows: { label: string; detail: string; href: string }[]): HTMLElement {
+  return el('nav', { class: 'docs-index', 'aria-label': 'Guides' }, rows.map(row =>
+    el('a', { class: 'docs-index-link', href: row.href }, [el('strong', { text: row.label }), el('span', { text: row.detail })]),
+  ));
 }
 
 export interface Chapter { key: string; title: string; nodes: Node[] }

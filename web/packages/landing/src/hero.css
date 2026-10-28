@@ -4,7 +4,7 @@
 .pane-title .hero-content { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); width: 350px; max-width: calc(100% - 72px); margin: 0; padding: 0; text-align: center; z-index: 2; animation: none; }
 .pane-title .hero-heading { margin: 0; font-size: clamp(20px, 1.65vw, 25px); font-weight: 400; line-height: 1.18; letter-spacing: -.035em; color: var(--ink-faint); }
 .hero-heading > span { display: block; }
-.hero-heading .hero-statement { color: var(--ink); font-weight: 500; }
+.hero-heading .hero-statement { color: var(--ink); font-weight: 400; }
 .pane-title .hero-actions { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; margin: 0; z-index: 2; }
 .pane-title .primary-action { min-height: 48px; padding: 0 28px; border-radius: 999px; background: var(--ink); color: var(--ground); font-size: 14px; }
 .pane-title .primary-action:hover { background: var(--ink-soft); }
@@ -108,7 +108,7 @@
 .world-center-preview::before { display: none; }
 /* World names and catalog metadata share one typographic scale. */
 .world-center-preview h2, .world-center-preview .preview-description, .world-center-preview .preview-invitation { font-size: clamp(20px, 1.65vw, 25px); font-weight: 400; line-height: 1.18; letter-spacing: -.035em; }
-.world-center-preview h2 { margin: 0; color: var(--ink); font-weight: 500; }
+.world-center-preview h2 { margin: 0; color: var(--ink); font-weight: 400; }
 .world-center-preview .preview-description { margin: 0; color: var(--ink-faint); }
 .world-center-preview .preview-invitation { margin: 0; color: var(--ink-faint); }
 .world-center-preview { pointer-events: none; }

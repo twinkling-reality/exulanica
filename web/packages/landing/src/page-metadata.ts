@@ -6,8 +6,8 @@ const hasMarkdown = (route: Route): boolean => route.path === '/docs' || route.p
 const DESCRIPTIONS: Readonly<Record<string, string>> = {
   '/': 'Worlds for AI Agents. Create places and inhabitants, shape how they interact, and hand supported roles to open models.',
   '/product': 'Worlds for AI Agents. Build a place, choose open models for the roles the engine registers, and keep its state and recorded decisions.',
-  '/product/capabilities': 'Create and edit worlds, choose open models, inspect decisions, and connect outside projects with Exulanica.',
-  '/use-cases': 'Compare open models, create a saved world, or connect an outside agent with Python or MCP.',
+  '/product/capabilities': 'Worlds, agents, open models, experiments, and your own agent. Open models for minds. Open source only for the Apache-2.0 software.',
+  '/use-cases': 'Agent Experiments, Worldbuilding, and Agent Development.',
   '/blog': 'This site does not publish a blog.',
   '/docs': 'Run Exulanica, work with the World API, and connect outside agents through Python or MCP.',
   '/docs/worlds': 'Create a saved world, place supported objects, and reopen its saved state.',

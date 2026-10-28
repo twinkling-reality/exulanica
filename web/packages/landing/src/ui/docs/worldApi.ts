@@ -1,5 +1,5 @@
 import { el } from '../dom.js';
-import { codeBlock, inline, p, table, routeLink, type DocumentPage } from './elements.js';
+import { codeBlock, destinations, entries, inline, onward, p, routeLink, type DocumentPage } from './elements.js';
 import { endpoint, type Endpoint } from './api-endpoint.js';
 
 export const ENDPOINTS = [
@@ -16,15 +16,43 @@ export const ENDPOINTS = [
 ] as const satisfies readonly Endpoint[];
 export function worldApi(): DocumentPage {
   return {
-    title: 'World API', introduction: 'Create and edit persistent worlds. Inspect their state, available models, and recorded decisions over HTTP.', sourcePath: 'docs/capabilities/world-api.md',
+    title: 'World API', introduction: 'Use HTTP when a program must read or change a world. Use the application to build in the browser. Use Agent Integration when an outside model answers authorized turns.', sourcePath: 'docs/capabilities/world-api.md',
     chapters: [
       { key: 'authentication', title: 'Authentication', nodes: [
-        el('div', { class: 'api-authentication' }, [el('div', {}, [el('p', {}, ['Requests use ', inline('Authorization: Bearer <token>'), '. Tokens belong to a workspace. Read operations require ', inline('world.read'), '; edits require ', inline('world.write'), '. Use the URL of your Exulanica server. For a local installation:'])]),
-        codeBlock('Environment', 'export EXULANICA_API_URL="http://127.0.0.1:8000"\n# Set EXULANICA_TOKEN to the token issued by your server operator.', 'bash')]),
-        el('p', {}, ['These references cover world creation, versioned edits, model roles, and society reads. ', el('a', { href: '/openapi.json', text: 'Download the full OpenAPI schema' }), ' for all routes and nested definitions. The ', inline('/openapi.json'), ' on your running server describes that installation.']),
+        el('p', {}, ['Requests use ', inline('Authorization: Bearer <token>'), '. Tokens belong to a workspace. Read operations require ', inline('world.read'), '; edits require ', inline('world.write'), '. Use the URL of your Exulanica server. For a local installation:']),
+        codeBlock('Environment', 'export EXULANICA_API_URL="http://127.0.0.1:8000"\n# Set EXULANICA_TOKEN to the token issued by your server operator.', 'bash'),
+        el('p', {}, ['The ', inline('/openapi.json'), ' on your running server describes that installation. ', el('a', { href: '/openapi.json', text: 'Download the pinned OpenAPI schema' }), '.']),
       ] },
-      { key: 'operations', title: 'Operations', nodes: [el('nav', { class: 'api-operation-index', 'aria-label': 'API operations' }, ENDPOINTS.map(entry => el('a', { href: `/docs/world-api/${entry.key}` }, [el('span', { class: `api-method ${entry.method}`, text: entry.method.toUpperCase() }), el('strong', { text: entry.title }), el('code', { text: entry.path })])))] },
-      { key: 'workflow', title: 'Read Before You Write', nodes: [p('List the workspace’s worlds, read its saved entry and version, then discover capabilities. Retain the state digest before editing. Inspect the saved state after a lost connection before retrying a write.'), el('p', {}, [el('a', { href: '/docs/authentication', text: 'Authentication' }), ' · ', el('a', { href: '/docs/errors', text: 'Errors and Recovery' }), ' · ', el('a', { href: '/docs/portability', text: 'Export and Portability' })])] },
+      { key: 'worldbuilding', title: 'Worldbuilding', nodes: [
+        p('Create or reopen a world, then keep the world ID the later routes require.'),
+        destinations([
+          { label: 'List Worlds', detail: 'GET /worlds. Return the worlds in your workspace.', href: '/docs/world-api/list-worlds' },
+          { label: 'List Recipes', detail: 'GET /worlds/recipes. Return the server’s world recipes.', href: '/docs/world-api/recipes' },
+          { label: 'Generate a World', detail: 'POST /worlds/generated. Generate and save a world from a recipe.', href: '/docs/world-api/generate' },
+          { label: 'List Saved Entries', detail: 'GET /world-entries. Read the saved entries your workspace can reopen.', href: '/docs/world-api/entries' },
+        ]),
+      ] },
+      { key: 'state', title: 'World Structure', nodes: [
+        p('Read the version, discover what it supports, then edit against the current state digest.'),
+        destinations([
+          { label: 'Read a Version', detail: 'GET /world/versions/{version_id}. Read authored state and retain state_sha256 before editing.', href: '/docs/world-api/version' },
+          { label: 'Read Capabilities', detail: 'GET /world/versions/{version_id}/capabilities. Discover supported operations for this version.', href: '/docs/world-api/capabilities' },
+          { label: 'Place an Object', detail: 'POST /world/versions/{version_id}/objects. Place a catalog asset against the current digest.', href: '/docs/world-api/objects' },
+        ]),
+      ] },
+      { key: 'decisions', title: 'Models and Decisions', nodes: [
+        p('Read the roles a world offers, the society attached to a version, and the history those decisions recorded.'),
+        destinations([
+          { label: 'List Decision Roles', detail: 'GET /world/versions/{version_id}/models. Read roles, offered models, and current choices.', href: '/docs/world-api/models' },
+          { label: 'Read Society State', detail: 'GET /world/versions/{version_id}/society. Read the society attached to this version.', href: '/docs/world-api/society' },
+          { label: 'Read Recorded History', detail: 'GET /world/versions/{version_id}/society/replay. Replay stored decisions without a model call.', href: '/docs/world-api/replay' },
+        ]),
+      ] },
+      { key: 'workflow', title: 'Read Before You Write', nodes: [
+        p('List the workspace’s worlds, read its saved entry and version, then discover capabilities. Retain the state digest before editing. Inspect the saved state after a lost connection before retrying a write.'),
+        onward('/docs/errors', 'Errors and Recovery'),
+        onward('/docs/portability', 'Export and Portability'),
+      ] },
     ],
   };
 }
@@ -39,16 +67,20 @@ export function apiOperation(entry: Endpoint): DocumentPage {
 export function errors(): DocumentPage {
   return { title: 'Errors and Recovery', introduction: 'Resolve permission, availability and state conflicts without duplicating a write.', sourcePath: 'docs/capabilities/world-api.md', chapters: [
       { key: 'responses', title: 'Errors and Retries', nodes: [
-        table(['Response', 'Meaning', 'Action'], [
-          ['403 worlds_read_only', 'The deployment cannot register worlds.', 'Use a writable deployment.'],
-          ['404 unknown_reference', 'The reference is unknown or outside this workspace.', 'Check IDs and the token’s workspace.'],
-          ['409 stale_object_base', 'The state changed after you read it.', 'Reread, reconcile, and submit against the new digest.'],
-          ['422', 'A request field or generated-world parameter is invalid.', 'Read the error detail and correct the input.'],
+        entries([
+          { label: '403 worlds_read_only', detail: 'The deployment cannot register worlds. Use a writable deployment.' },
+          { label: '404 unknown_reference', detail: 'The reference is unknown or outside this workspace. Check IDs and the token’s workspace.' },
+          { label: '409 stale_object_base', detail: 'The state changed after you read it. Reread, reconcile, and submit against the new digest.' },
+          { label: '422', detail: 'A request field or generated-world parameter is invalid. Read the error detail and correct the input.' },
         ]),
         p('Do not blindly retry a write after a lost connection: first inspect the world or saved entry to determine whether the change was applied. Capability availability and token permission are separate checks.'),
       ] },
-    { key: 'availability', title: 'Unavailable Is Not Unsupported', nodes: [table(['State', 'What to do'], [['available', 'The server would attempt the operation. Inputs and state are still validated.'], ['unavailable', 'Read the reason. A dependency or the world\'s state prevents this operation. Permission is separate: an operation can be available and still not permitted to this token.'], ['unsupported', 'This kind of world, engine or role does not support the operation. Choose a supported operation.'], ['unknown', 'A required fact is outside what this caller may read. Do not guess availability.']]), p('Read capability descriptors when your UI needs to decide whether to offer an action. Handle the write’s own refusal too: state can change between discovery and submission.')] },
+    { key: 'availability', title: 'Unavailable Is Not Unsupported', nodes: [entries([{ label: 'available', detail: 'The server would attempt the operation. Inputs and state are still validated.' }, { label: 'unavailable', detail: 'Read the reason. A dependency or the world\'s state prevents this operation. Permission is separate: an operation can be available and still not permitted to this token.' }, { label: 'unsupported', detail: 'This kind of world, engine or role does not support the operation. Choose a supported operation.' }, { label: 'unknown', detail: 'A required fact is outside what this caller may read. Do not guess availability.' }]), p('Read capability descriptors when your UI needs to decide whether to offer an action. Handle the write’s own refusal too: state can change between discovery and submission.')] },
     { key: 'writes', title: 'Recover a Failed Edit', nodes: [p('For a stale base, read the version again and reconcile your intended change against its new state digest. Do not silently overwrite another client’s edit.'), p('After a network timeout, read the affected world or saved entry first. Submit again only after determining whether the original change took effect. Use a documented idempotency field when the operation offers one; do not invent a global retry key.')] },
-    { key: 'configuration', title: 'Check the Installation', nodes: [p('For connection failures, verify the API address and /readyz. Optional workers and model providers have their own prerequisites; a running server does not establish that each service is ready.'), el('p', {}, [el('a', { href: '/docs/self-hosting', text: 'Installation and maintenance' }), ' · ', el('a', { href: '/docs/authentication#docs-authentication-failures', text: 'Access troubleshooting' })])] },
+    { key: 'configuration', title: 'Check the Installation', nodes: [
+        p('For connection failures, verify the API address and /readyz. Optional workers and model providers have their own prerequisites; a running server does not establish that each service is ready.'),
+        onward('/docs/self-hosting', 'Installation'),
+        onward('/docs/authentication#docs-authentication-failures', 'Authentication'),
+      ] },
   ] };
 }

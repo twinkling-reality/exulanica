@@ -30,7 +30,7 @@ function fields(input: Schema, depth = 0, parents: string[] = []): HTMLElement {
   const rows = Object.entries(schema.properties ?? {});
   if (!rows.length) return p(schema.description ?? (schema.type === 'object' ? 'An object with properties defined by the server.' : type(input)));
   return el('div', { class: 'api-fields' }, rows.map(([name, value]) => {
-    const constraints = ['minLength', 'maxLength', 'minimum', 'maximum', 'pattern'].filter(k => value[k] !== undefined).map(k => `${k}: ${value[k]}`).join(' · ');
+    const constraints = ['minLength', 'maxLength', 'minimum', 'maximum', 'pattern'].filter(k => value[k] !== undefined).map(k => `${k}: ${value[k]}`).join(', ');
     const nested = resolve(value.anyOf?.find(s => s.type !== 'null') ?? value);
     const children: Node[] = [el('div', { class: 'api-field-heading' }, [el('code', { text: name }), el('span', { text: type(value) }), ...(schema.required?.includes(name) ? [el('span', { class: 'api-required', text: 'required' })] : [])])];
     const description = value.description ?? (depth === 0 ? descriptions[name] : undefined);
@@ -72,12 +72,12 @@ with urllib.request.urlopen(request) as response:
     el('div', { class: 'api-endpoint-grid' }, [
       el('div', { class: 'api-description' }, [...(includeDescription ? [p(entry.description)] : []),
         ...(entry.note ? [p(entry.note)] : []),
-        ...(parameters.length ? [el('h3', { text: 'Parameters' }), ...parameters.map(parameter => el('div', { class: 'api-field' }, [el('div', { class: 'api-field-heading' }, [el('code', { text: parameter.name }), el('span', { text: `${parameter.in} · ${type(parameter.schema)}` }), el('span', { class: 'api-required', text: parameter.required ? 'required' : 'optional' })])]))] : []),
+        ...(parameters.length ? [el('h3', { text: 'Parameters' }), ...parameters.map(parameter => el('div', { class: 'api-field' }, [el('div', { class: 'api-field-heading' }, [el('code', { text: parameter.name }), el('span', { text: `${parameter.in}, ${type(parameter.schema)}` }), el('span', { class: 'api-required', text: parameter.required ? 'required' : 'optional' })])]))] : []),
         ...(bodySchema ? [el('h3', { text: 'Request body' }), fields(bodySchema)] : []),
         el('section', { class: 'api-response-fields' }, [el('h3', { text: 'Response' }), el('div', { class: 'api-response-status' }, [el('span', { text: response[0] }), el('span', { text: 'application/json' })]), ...(responseSchema ? [fields(responseSchema)] : [p(response[1].description)])]),
       ]),
       el('div', { class: 'api-example' }, [requestTabs(entry.key, curl, python),
-        ...(responseSchema ? [el('details', { class: 'api-response-example' }, [el('summary', { text: `${response[0]} · Response structure` }), codeBlock('Response structure', JSON.stringify(responseShape(responseSchema), null, 2), 'json'), el('p', { class: 'api-example-note', text: 'Types and structure, not a live response. Expand properties for the complete field definitions.' })])] : []),
+        ...(responseSchema ? [el('details', { class: 'api-response-example' }, [el('summary', { text: `${response[0]} Response structure` }), codeBlock('Response structure', JSON.stringify(responseShape(responseSchema), null, 2), 'json'), el('p', { class: 'api-example-note', text: 'Types and structure, not a live response. Expand properties for the complete field definitions.' })])] : []),
       ]),
     ]),
   ];
