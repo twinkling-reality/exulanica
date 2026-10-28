@@ -230,6 +230,32 @@ describe('making a creature where it will stand', () => {
     expect(again.calls.creatures).toEqual([kept.kind!.sha256]);
   });
 
+  it('stands it at the ground point ahead in a world nobody lives in yet, and nowhere where the stand read fails otherwise', async () => {
+    const { openCreatureScreen } = await screen();
+    const refused = (status: number, code: string): Error => Object.assign(new Error(code), { status, code });
+    // A version with no society answers the stand read 404 unknown_reference (docs/synthetic-society-contract.md).
+    for (const [refusal, ground] of [[refused(404, 'unknown_reference'), true], [refused(424, 'unavailable_society_input'), false], [refused(500, 'internal'), false]] as const) {
+      const { deps, calls, root } = world();
+      const opened = await openCreatureScreen({ ...deps, client: { ...deps.client, stand: async () => { throw refusal; } } });
+      expect(root.textContent?.includes('The creature appears here')).toBe(ground);
+      const field = root.querySelector('textarea')!;
+      field.value = 'a round yellow body';
+      field.dispatchEvent(new Event('input'));
+      opened.key(press('Enter'));
+      await settle();
+      if (ground) {
+        // Held where the tray would place it, 8 m ahead, for build mode's own Place.
+        expect(calls.marked[0]).toEqual({ positionMm: [9000, 0] });
+        expect(calls.hold).toEqual([{ kind: { source: 'workspace', sha256: 'a'.repeat(64) }, at: { xMm: 9000, zMm: 0 } }]);
+        expect(root.querySelector('.wu-creature-made [aria-keyshortcuts="Enter"]')?.textContent).toBe('Place');
+      } else {
+        expect(calls.hold).toEqual([]);
+        expect(root.querySelector('.wu-creature-made')?.textContent).toContain('There is no open ground ahead');
+      }
+      document.body.replaceChildren();
+    }
+  });
+
   it('says where the creature appears while it is described, and no longer once it is being made', async () => {
     const { openCreatureScreen } = await screen();
     const { deps, root } = world({ reads: [{ ...queued, status: 'running' }, { ...queued, status: 'running' }, kept] });

@@ -1,6 +1,7 @@
 // Making a creature where it will stand (unit 9, DESIGN's R-CREATURE-BUILD-SHEET.md): opened from build mode's
 // "Make a creature" tile. The spot 8 m ahead is marked where the society would take the creature in (the
-// stand read, GET .../society/stand), the person's words go in the field, the draft is read every second while
+// stand read, GET .../society/stand), or in a world nobody lives in yet at that ground point itself, the person's
+// words go in the field, the draft is read every second while
 // it is made, and once made the kept kind stands there held by build mode (build-mode.ts's hold), whose own keys
 // place it where it was made or put it back. Where the offer offers web notes, a ticked box first asks for notes on
 // the words (a reference request, references-api.ts), shows its steps and its notes, and asks the drafter with them;
@@ -79,6 +80,16 @@ const codeOf = (error: unknown): string | null => {
   return typeof code === 'string' && code ? code : null;
 };
 
+/** Where the creature will stand on the region's ground: a society's stand, or a ground point where no society is. */
+export type Stand = Pick<SocietyStand, 'positionMm'>;
+
+/**
+ * Whether the stand read was refused because the version holds no society (404 `unknown_reference`, as the society's
+ * state read is: docs/synthetic-society-contract.md), as in a world nobody lives in yet.
+ */
+const noSociety = (error: unknown): boolean =>
+  (error as { readonly status?: unknown } | null)?.status === 404 && codeOf(error) === 'unknown_reference';
+
 /** How a hold ends, as build mode answers it. */
 export type Held = { readonly outcome: 'placed'; readonly thingId: string } | { readonly outcome: 'put-back' } | null;
 
@@ -94,7 +105,7 @@ export interface CreatureScreenDeps {
   /** The region-frame point on the ground this far ahead of the eye, or null where none is in view. */
   readonly ahead: (millimetres: number) => { readonly xMm: number; readonly zMm: number } | null;
   /** The ring on the ground at the stand, and the screen point the label floats at; hidden with null. */
-  readonly mark: (stand: SocietyStand | null) => { readonly x: number; readonly y: number } | null;
+  readonly mark: (stand: Stand | null) => { readonly x: number; readonly y: number } | null;
   /** Where the held creature's head shows on the screen, for the made card's leader; null where it is not drawn. */
   readonly head?: () => { readonly x: number; readonly y: number } | null;
   /**
@@ -137,7 +148,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
   layer.className = 'wu-creature-layer';
   deps.root.append(layer);
   let offer: CreatureOffer | null = null;
-  let stand: SocietyStand | null = null;
+  let stand: Stand | null = null;
   let words = '';
   // 'late': the page stopped following a draft the server is still making; it waits in Creatures when done.
   let state: 'describe' | 'making' | 'made' | 'ended' | 'late' = 'describe';
@@ -206,9 +217,22 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
       && !(field && field.height > 0 && at.y > field.top)
       && !(pill && pill.height > 0 && at.y < pill.bottom);
   }
+  /**
+   * The stand at the ground point ahead: where the society would take the creature in, or, in a world nobody lives in
+   * yet (no society to take it in), that ground point itself, where the tray would place it; then build mode's hold
+   * and the server's placing say whether it can stand there, as they do for a thing placed from the tray. None where
+   * the read is refused for anything else, or answers that no walking node is open there.
+   */
+  async function standNear(version: { readonly versionId: string; readonly worldId: string }, point: { readonly xMm: number; readonly zMm: number }): Promise<Stand | null> {
+    try {
+      return await deps.client.stand(version.versionId, version.worldId, point);
+    } catch (error) {
+      return noSociety(error) ? { positionMm: [point.xMm, point.zMm] } : null;
+    }
+  }
   async function findStand(): Promise<void> {
     const version = deps.version(), point = deps.ahead(STAND_AHEAD_MM);
-    stand = version === null || point === null ? null : await deps.client.stand(version.versionId, version.worldId, point).catch(() => null);
+    stand = version === null || point === null ? null : await standNear(version, point);
     if (ended) return;
     if (stand === null) { deps.mark(null); return; }
     // A stand out of view, or one the eye does not see (build mode's mark answers none), is no stand: the creature
