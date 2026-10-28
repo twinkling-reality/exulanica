@@ -1,7 +1,7 @@
 {
  "profile": "exulanica.world-setting-composed/v1",
  "about": "Each named part of a world's setting composed for every look of the library at its current version, and one part of every axis together: what exulanica.world.world_settings.compose_setting returns, written by scripts/style_packs/composed_settings.py and held to it by tests/test_world_settings.py. The page's tests draw these.",
- "parts_version": 5,
+ "parts_version": 6,
  "composed": [
   {
    "pack_id": "exulanica.cozy-town",
@@ -708,11 +708,18 @@
        138
       ]
      },
+     "wall.limestone_ashlar": {
+      "srgb8": [
+       120,
+       96,
+       74
+      ]
+     },
      "wall.painted_render": {
       "srgb8": [
-       236,
-       232,
-       220
+       104,
+       82,
+       64
       ]
      },
      "wall.painted_timber": {
@@ -844,11 +851,18 @@
        138
       ]
      },
+     "wall.limestone_ashlar": {
+      "srgb8": [
+       120,
+       96,
+       74
+      ]
+     },
      "wall.painted_render": {
       "srgb8": [
-       236,
-       232,
-       220
+       104,
+       82,
+       64
       ]
      },
      "wall.painted_timber": {
@@ -1071,11 +1085,18 @@
        138
       ]
      },
+     "wall.limestone_ashlar": {
+      "srgb8": [
+       120,
+       96,
+       74
+      ]
+     },
      "wall.painted_render": {
       "srgb8": [
-       236,
-       232,
-       220
+       104,
+       82,
+       64
       ]
      },
      "wall.painted_timber": {
@@ -1850,11 +1871,18 @@
        138
       ]
      },
+     "wall.limestone_ashlar": {
+      "srgb8": [
+       120,
+       96,
+       74
+      ]
+     },
      "wall.painted_render": {
       "srgb8": [
-       236,
-       232,
-       220
+       104,
+       82,
+       64
       ]
      },
      "wall.painted_timber": {
@@ -1986,11 +2014,18 @@
        138
       ]
      },
+     "wall.limestone_ashlar": {
+      "srgb8": [
+       120,
+       96,
+       74
+      ]
+     },
      "wall.painted_render": {
       "srgb8": [
-       236,
-       232,
-       220
+       104,
+       82,
+       64
       ]
      },
      "wall.painted_timber": {
@@ -2213,11 +2248,18 @@
        138
       ]
      },
+     "wall.limestone_ashlar": {
+      "srgb8": [
+       120,
+       96,
+       74
+      ]
+     },
      "wall.painted_render": {
       "srgb8": [
-       236,
-       232,
-       220
+       104,
+       82,
+       64
       ]
      },
      "wall.painted_timber": {
@@ -2992,11 +3034,18 @@
        138
       ]
      },
+     "wall.limestone_ashlar": {
+      "srgb8": [
+       120,
+       96,
+       74
+      ]
+     },
      "wall.painted_render": {
       "srgb8": [
-       236,
-       232,
-       220
+       104,
+       82,
+       64
       ]
      },
      "wall.painted_timber": {
@@ -3128,11 +3177,18 @@
        138
       ]
      },
+     "wall.limestone_ashlar": {
+      "srgb8": [
+       120,
+       96,
+       74
+      ]
+     },
      "wall.painted_render": {
       "srgb8": [
-       236,
-       232,
-       220
+       104,
+       82,
+       64
       ]
      },
      "wall.painted_timber": {
@@ -3355,11 +3411,18 @@
        138
       ]
      },
+     "wall.limestone_ashlar": {
+      "srgb8": [
+       120,
+       96,
+       74
+      ]
+     },
      "wall.painted_render": {
       "srgb8": [
-       236,
-       232,
-       220
+       104,
+       82,
+       64
       ]
      },
      "wall.painted_timber": {
@@ -4134,11 +4197,18 @@
        138
       ]
      },
+     "wall.limestone_ashlar": {
+      "srgb8": [
+       120,
+       96,
+       74
+      ]
+     },
      "wall.painted_render": {
       "srgb8": [
-       236,
-       232,
-       220
+       104,
+       82,
+       64
       ]
      },
      "wall.painted_timber": {
@@ -4270,11 +4340,18 @@
        138
       ]
      },
+     "wall.limestone_ashlar": {
+      "srgb8": [
+       120,
+       96,
+       74
+      ]
+     },
      "wall.painted_render": {
       "srgb8": [
-       236,
-       232,
-       220
+       104,
+       82,
+       64
       ]
      },
      "wall.painted_timber": {
@@ -4497,11 +4574,18 @@
        138
       ]
      },
+     "wall.limestone_ashlar": {
+      "srgb8": [
+       120,
+       96,
+       74
+      ]
+     },
      "wall.painted_render": {
       "srgb8": [
-       236,
-       232,
-       220
+       104,
+       82,
+       64
       ]
      },
      "wall.painted_timber": {

@@ -24,7 +24,7 @@ told apart. What a setting may change in a preset, the rules' figures and the bo
 ``assets/style-packs/settings/setting-cases.v1.json`` holds both to the same verdict on every case:
 the same refusal by reason and path, or the same digest of the setting and of the pack as drawn.
 
-**Named parts.** ``assets/style-packs/settings/setting-parts.v5.json`` (:data:`PARTS_FILE`) lists
+**Named parts.** ``assets/style-packs/settings/setting-parts.v6.json`` (:data:`PARTS_FILE`) lists
 parts a person or a model may choose by name, one an axis (a sky, a ground, a cover), each stated
 for any pack. :func:`compose_setting` turns the chosen parts into the exact setting for one pack: a
 part's swatch the pack does not have is left out, its colour for a family's upward faces becomes one
@@ -35,8 +35,9 @@ its sun climbs, which a gradient's colours do not, so the same figures cannot se
 also state what it changes over a pack whose preset states haze (``for_haze``): a haze draws in
 place of any fog, so a weather's fog would not show there without its own haze. The sand, sea and
 snowfield grounds and the snow colour the look roles a town's brick, render, concrete and painted
-timber walls take, so a town is built of its ground's colours in any look. The setting stores the
-figures, not the names, so a later version of the parts never changes a world.
+timber walls take, and the snowfields and the snow its limestone too, so a town is built of its
+ground's colours in any look. The setting stores the figures, not the names, so a later version of
+the parts never changes a world.
 Earlier versions stay at their paths and are not read, version 1 for the record that names it by
 digest.
 
@@ -106,9 +107,10 @@ __all__ = [
 PROFILE: Final = "exulanica.world-setting/v1"
 RULES_PROFILE: Final = "exulanica.world-setting-rules/v1"
 PARTS_PROFILE: Final = "exulanica.world-setting-parts/v1"
-#: The parts file read: version 4 states the haze a part's light draws over a look that states
-#: haze, and version 3 what it changes over a computed sky.
-PARTS_FILE: Final = "setting-parts.v5.json"
+#: The parts file read: version 6 builds a town in snowfields or under snow of wood, version 5
+#: colours a town's walls by its ground, version 4 states the haze a part's light draws over a look
+#: that states haze, and version 3 what it changes over a computed sky.
+PARTS_FILE: Final = "setting-parts.v6.json"
 #: The kinds of computed sky a look's preset may state (``sky.model``), as its reader reads them.
 SKY_MODEL_KINDS: Final = ("analytic",)
 #: The profile of the parts as ``GET /world/style-packs`` lists them.

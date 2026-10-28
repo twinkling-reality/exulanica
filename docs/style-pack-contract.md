@@ -935,7 +935,7 @@ as drawn (`tests/test_world_settings.py`, `web/packages/atlas-core/test/world-se
 Every look the library holds stands in light its own setting rule accepts, in every version it
 still serves.
 
-**Named parts.** `setting-parts.v5.json` lists parts a person or a model chooses by name, one an
+**Named parts.** `setting-parts.v6.json` lists parts a person or a model chooses by name, one an
 axis, each stated for any pack (the night has its stars, the moon's face, a moon dim enough for its face to show and
 its own gradient sky on any look; earlier versions stay at their paths and are not read, version 1
 for the record that names it by digest):
@@ -959,16 +959,20 @@ and mist, as the night does on any look. A pack whose preset states haze draws i
 fog, so over such a preset an alternative also takes its own haze (`for_haze`): dawn mist,
 overcast, thick fog and the night state their fog as a haze of the same density, even with height,
 in the colour their sky draws at the horizon, so the land and the water fade into it alike and the
-far sea meets the sky; clear noon and dusk keep the look's own haze. Version 5 gives three
-grounds and snow a town's walls: each colours the look roles a town's brick, render, concrete and
-painted timber walls take (`town-look-roles.v1.json`), so a desert town is built of sun dried
-earth, sand and weathered wood, a town by the sea of whitewash, pastel blue and mint, and a
-town in snowfields or under snow of dark timber, whitewash and stone, all colours the repository
-already held (the surface materials' adobe, sand, plaster, stone and timber, Cozy town's pastel
-car colours, Finished town's bark and fence). It does so in every look: one that draws those
-walls from texture sets, as Finished town does, draws them flat in these colours, as snow draws
-its footways. No swatch is restated, so no piece changes, and neither the walls' fallback a
-place's walls take nor any other part's colour moves (`tests/test_world_settings.py`). The
+far sea meets the sky; clear noon and dusk keep the look's own haze. Three grounds and snow give a
+town its walls: each colours the look roles a town's brick, render, concrete and painted timber
+walls take (`town-look-roles.v1.json`), and the snowfields and the snow its limestone too. A desert
+town is built of sun dried earth, sand and weathered wood and a town by the sea of whitewash,
+pastel blue and mint, colours the repository already held (the surface materials' adobe, sand,
+plaster and timber, Cozy town's pastel car colours). A town in snowfields or under snow is built of
+wood and stone: its render and limestone as timber in two browns judged from pictures of generated
+towns (version 5 whitewashed the render and kept the look's own limestone, which left a snowy town
+of either cream), its brick as dark timber and its painted timber as weathered grey wood (Finished
+town's bark and fence), and its concrete as the surface material stone. It does so in every look:
+one that draws those walls from texture sets, as Finished town does, draws them flat in these
+colours, as snow draws its footways. No swatch is restated, so no piece changes, and neither the
+walls' fallback a place's walls take nor any other part's colour moves
+(`tests/test_world_settings.py`). The
 setting stores the figures and the parts' keys, so a later version of the parts file never changes
 a world. Each part, composed for every look of the library, is drawn by the browser's reader and
 held to the bound every look's own light is held to, a surface in shade lit at most twice as blue

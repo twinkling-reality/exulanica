@@ -488,7 +488,7 @@ def test_a_look_step_that_cannot_answer_leaves_the_draft_and_says_why(
 
 SETTING_ROLE = setting_choosing.CHOOSER_ROLE
 #: The host's named parts, read from the committed file, not through the loader under test.
-PARTS_FILE = json.loads((SETTINGS_DIRECTORY / "setting-parts.v5.json").read_text("utf-8"))
+PARTS_FILE = json.loads((SETTINGS_DIRECTORY / "setting-parts.v6.json").read_text("utf-8"))
 
 
 def _setting(words: list[str], **parts: str | None) -> HttpResponse:

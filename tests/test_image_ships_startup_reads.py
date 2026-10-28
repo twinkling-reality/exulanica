@@ -111,7 +111,7 @@ def test_every_file_a_worlds_setting_is_checked_against_ships_in_the_api_image()
     # A positive control: each of the three files was opened.
     assert {
         "assets/style-packs/settings/setting-rules.v1.json",
-        "assets/style-packs/settings/setting-parts.v5.json",
+        "assets/style-packs/settings/setting-parts.v6.json",
         "assets/colour/srgb8-linear16.v1.json",
     } <= set(read), read
     missing = [path for path in read if not (image.allowlisted(path) and image.shipped(path))]
