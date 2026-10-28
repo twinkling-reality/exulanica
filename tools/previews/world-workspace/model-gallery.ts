@@ -70,7 +70,7 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
   /** Draws the page; with `reveal` (a key or a press moved the focus, even onto the row it was on) the row in focus is brought into view. */
   function draw(reveal = false) {
     if (!made || !row) return;
-    const { read, about, fromServer, shown } = view();
+    const { read, about, shown } = view();
     focus = Math.min(focus, shown.rows.length - 1);
     const content = made.content;
     // What was scrolled stays scrolled across a draw: the list always, the card's words while it shows the same model.
@@ -86,7 +86,7 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
     face.style.width = face.style.height = '';
     face.classList.add('wu-frame-face');
     over.append(face, element('span', '', shown.over));
-    head.append(over, element('h1', 'wu-g2-title wu-frame-title', shown.title), element('div', 'wu-g2-role wu-frame-role', shown.role));
+    head.append(over, element('h1', 'wu-g2-title wu-frame-title', shown.title));
     head.querySelector('h1')!.tabIndex = -1;
     const list = element('div', 'wu-g2-list');
     for (const group of shown.groups) {
@@ -102,7 +102,7 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
         if (one.current) name.append(element('span', 'wu-g2-current', CHARACTER_WORDS.current));
         words.append(name);
         if (one.sub) words.append(subLine(one.sub));
-        button.append(element('span', 'wu-g2-num', one.key), element('span', `wu-g2-mark${one.model ? '' : ' routine'}`, one.mark), words, element('span', 'wu-g2-cost', one.cost));
+        button.append(element('span', 'wu-g2-num', one.key), words, element('span', 'wu-g2-cost', one.cost));
         button.addEventListener('click', () => { focus = index; refusal = null; draw(true); });
         block.append(button);
       }
@@ -114,22 +114,20 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
         words.append(name);
         if (faint.sub) words.append(element('div', 'wu-g2-sub', faint.sub));
         if (faint.line) words.append(element('div', 'wu-g2-sub', faint.line));
-        line.append(element('span', 'wu-g2-num empty'), element('span', 'wu-g2-mark', faint.mark), words);
+        line.append(element('span', 'wu-g2-num empty'), words);
         block.append(line);
       }
-      if (group.waiting) block.append(element('div', 'wu-g2-fold', group.waiting));
       if (group.fold) {
         const fold = element('div', 'wu-g2-fold');
-        fold.append(element('div', 'wu-g2-sub', group.fold.line), element('div', 'wu-g2-sub', group.fold.sub));
+        fold.append(element('div', 'wu-g2-sub', group.fold.line));
         block.append(fold);
       }
       list.append(block);
     }
     const chosenRow = shown.rows[focus];
-    const detail = galleryDetail({ read, row: chosenRow, who: about.who, fromServer });
+    const detail = galleryDetail({ read, row: chosenRow, who: about.who });
     // The card's words scroll; its action row and a refusal stay at its bottom.
     const card = element('div', 'wu-g2-detail'), words = element('div', 'wu-g2-scroll');
-    const top = element('div', 'wu-g2-top');
     const named = element('div', 'wu-g2-named');
     named.append(element('div', 'wu-g2-dname', detail.name));
     if (detail.by) {
@@ -141,23 +139,17 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
       }
       named.append(by);
     }
-    top.append(element('span', `wu-g2-mark big${chosenRow?.model ? '' : ' routine'}`, detail.mark), named);
-    words.append(top);
-    if (detail.line) words.append(element('p', 'wu-g2-line', detail.line));
+    words.append(named);
     if (detail.why.length) {
-      words.append(element('div', 'wu-g2-k', GALLERY_WORDS.why));
       const why = element('ul', 'wu-g2-why');
       why.append(...detail.why.map((said: string) => element('li', '', said)));
       words.append(why);
     }
     if (detail.words) {
       words.append(element('div', 'wu-g2-k', GALLERY_WORDS.inWords));
-      const quote = element('div', 'wu-g2-quote', detail.words.said);
-      if (detail.words.from) quote.append(element('span', 'wu-g2-from', detail.words.from));
-      words.append(quote);
+      words.append(element('div', 'wu-g2-quote', detail.words.said));
     }
     if (detail.facts.length) {
-      words.append(element('div', 'wu-g2-k', GALLERY_WORDS.fromCard));
       const facts = element('div', 'wu-g2-facts');
       for (const fact of detail.facts) facts.append(element('div', 'wu-g2-fk', fact.key), element('div', 'wu-g2-fv', fact.value));
       words.append(facts);
@@ -165,7 +157,6 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
     const listPart = scrollingColumn(list), wordsPart = scrollingColumn(words);
     const act = element('div', 'wu-g2-act');
     act.append(keyButton(['Enter'], detail.act, () => void use(focus)));
-    if (detail.then) act.append(element('span', 'wu-g2-then', detail.then));
     card.append(wordsPart.column, act);
     if (refusal) card.append(element('p', 'wu-g2-refused', refusal));
     if (busy) card.setAttribute('aria-busy', 'true');

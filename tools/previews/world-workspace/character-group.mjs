@@ -260,18 +260,6 @@ export function overRows(read, current = null) {
   }));
 }
 
-/** The code a model on this computer is refused by while no server runs there (PROJECT's A2 liveness read). */
-export const NOT_RUNNING = 'provider_not_running';
-
-/**
- * Whether the chooser's group for this computer stands with no model in it (A3 item 2, amended 17:22): this install
- * lets a model on this computer in, and none runs yet. Where it does not let one in, the group is left out.
- */
-export function noneRunningHere(read) {
-  const models = read?.models ?? [];
-  return models.some(model => model.local === true && model.refusal === NOT_RUNNING) && !models.some(model => model.local === true && !model.refusal);
-}
-
 /** Whether every model a run asks runs on this computer: `chosen` the models chosen, as the models read names them. */
 export function freeHere(read, chosen) {
   const local = new Set((read?.models ?? []).filter(model => model.local).map(model => `${model.provider}/${model.modelId}`));

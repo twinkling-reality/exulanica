@@ -3,7 +3,6 @@
    head, the body and the key row filling the window; the list and the card's words scroll in their own columns). */
 .wu-g2 .wu-g2-over { display: flex; align-items: center; gap: 12px; font: 400 14px/1 var(--font-mono); color: var(--hr-quiet); letter-spacing: .02em; }
 .wu-g2 .wu-g2-title { margin: 14px 0 0; font-family: var(--font-sans); font-weight: 200; line-height: 1.08; letter-spacing: -.022em; color: var(--hr-ink); outline: none; }
-.wu-g2 .wu-g2-role { margin-top: 16px; font-family: var(--font-sans); font-weight: 400; line-height: 1.45; color: #24333a; }
 
 /* The list at least 340 and at most 760 wide (44 % of the body between), the card at least 420 and at most 820. */
 .wu-g2 .wu-g2-body { display: grid; grid-template-columns: clamp(340px, 44%, 760px) minmax(420px, 820px); column-gap: var(--frame-gap); }
@@ -12,38 +11,31 @@
 
 .wu-g2 .wu-g2-group { margin-bottom: 18px; }
 .wu-g2 .wu-g2-label { font: 400 13px/1 var(--font-sans); color: var(--hr-quiet); margin: 0 0 6px 16px; }
-.wu-g2 .wu-g2-row { display: grid; grid-template-columns: 30px 34px 1fr auto; column-gap: 14px; align-items: center; width: 100%; padding: 10px 16px;
+.wu-g2 .wu-g2-row { display: grid; grid-template-columns: 30px 1fr auto; column-gap: 14px; align-items: center; width: 100%; padding: 10px 16px;
   border: 0; border-radius: 12px; background: none; text-align: left; color: var(--hr-ink); cursor: pointer; font: inherit; box-sizing: border-box; }
 .wu-g2 .wu-g2-row[aria-current="true"] { background: rgba(255,255,255,.80); box-shadow: inset 0 0 0 1.5px #6496a6, 0 8px 24px rgba(18,40,44,.08); }
 .wu-g2 .wu-g2-row.faint { cursor: default; opacity: .5; }
 .wu-g2 .wu-g2-num { width: 26px; height: 26px; box-sizing: border-box; border: 1px solid rgba(18,23,21,.35); border-radius: 7px; display: grid; place-items: center;
   font: 400 12px/1 var(--font-mono); color: var(--hr-quiet); }
 .wu-g2 .wu-g2-num.empty { border: 0; }
-.wu-g2 .wu-g2-mark { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(180deg, #f7faf9, #e3ebea);
-  box-shadow: inset 0 0 0 1px rgba(100,150,166,.45); font: 500 12px/1 var(--font-sans); color: #3f6f80; letter-spacing: .02em; }
-.wu-g2 .wu-g2-mark.routine { background: none; box-shadow: inset 0 0 0 1px rgba(18,23,21,.18); color: #5b6b72; }
 .wu-g2 .wu-g2-name { font: 400 18px/1.25 var(--font-sans); }
 .wu-g2 .wu-g2-sub { margin-top: 2px; font: 400 13px/1.3 var(--font-sans); color: #5b6b72; }
 .wu-g2 .wu-g2-part { display: inline-block; max-width: 100%; }
 .wu-g2 .wu-g2-cost { font: 400 14px/1.2 var(--font-sans); color: #24333a; text-align: right; white-space: nowrap; }
 .wu-g2 .wu-g2-current { margin-left: 10px; font: 500 11px/1 var(--font-mono); color: #3f6f80; letter-spacing: .02em; }
-.wu-g2 .wu-g2-fold { padding: 6px 16px 0 94px; opacity: .6; }
+.wu-g2 .wu-g2-fold { padding: 6px 16px 0 60px; opacity: .6; }
 
 /* The card: never taller than its column; its words scroll, its action row stays at its bottom on its own ground. */
 .wu-g2 .wu-g2-detail { align-self: start; display: grid; grid-template-rows: minmax(0, 1fr) auto auto; max-height: 100%; min-height: 0; padding: 30px 34px 28px;
   box-sizing: border-box; border-radius: 16px; background: rgba(255,255,255,.78); box-shadow: inset 0 0 0 1px rgba(18,23,21,.08), 0 18px 48px rgba(18,40,44,.10); }
-.wu-g2 .wu-g2-top { display: grid; grid-template-columns: 56px 1fr; column-gap: 18px; align-items: center; }
-.wu-g2 .wu-g2-mark.big { width: 56px; height: 56px; border-radius: 14px; font-size: 17px; }
 .wu-g2 .wu-g2-dname { font: 300 34px/1.1 var(--font-sans); letter-spacing: -.012em; }
 .wu-g2 .wu-g2-by { margin-top: 6px; font: 400 15px/1.3 var(--font-sans); color: var(--hr-quiet); }
 .wu-g2 .wu-g2-link { color: #2f6a7c; text-decoration: none; border-bottom: 1px solid rgba(47,106,124,.35); }
-.wu-g2 .wu-g2-line { margin: 20px 0 0; font: 400 16px/1.45 var(--font-sans); }
 .wu-g2 .wu-g2-k { margin-top: 24px; font: 400 12px/1 var(--font-mono); color: var(--hr-quiet); letter-spacing: .03em; }
 .wu-g2 .wu-g2-why { margin: 10px 0 0; padding: 0; list-style: none; }
 .wu-g2 .wu-g2-why li { position: relative; padding-left: 18px; margin-top: 6px; font: 400 16px/1.45 var(--font-sans); }
 .wu-g2 .wu-g2-why li::before { content: ''; position: absolute; left: 2px; top: .62em; width: 6px; height: 6px; border-radius: 50%; background: #6496a6; }
 .wu-g2 .wu-g2-quote { margin-top: 10px; font: italic 300 19px/1.45 var(--font-sans); }
-.wu-g2 .wu-g2-from { display: block; margin-top: 4px; font: normal 400 13px/1.4 var(--font-sans); color: #5b6b72; }
 .wu-g2 .wu-g2-facts { margin-top: 10px; display: grid; grid-template-columns: 120px 1fr; row-gap: 7px; column-gap: 16px; }
 .wu-g2 .wu-g2-fk { font: 400 14px/1.45 var(--font-sans); color: #5b6b72; }
 .wu-g2 .wu-g2-fv { font: 400 14px/1.45 var(--font-sans); }
@@ -52,7 +44,6 @@
   background: #121715; color: #fff; font: 400 16px/1 var(--font-sans); cursor: pointer; }
 .wu-g2 .wu-g2-act .wu-hr-cap { color: #fff; border-color: rgba(255,255,255,.55); }
 .wu-g2 .wu-g2-act .wu-hr-key-word { color: #fff; }
-.wu-g2 .wu-g2-then { font: 400 14px/1.4 var(--font-sans); color: var(--hr-quiet); max-width: 470px; }
 .wu-g2 .wu-g2-refused { margin: 14px 0 0; font: 400 14px/1.4 var(--font-sans); color: var(--hr-refused); }
 
 /* The key row's hints (the frame places the row under the body, the hints at its right). */

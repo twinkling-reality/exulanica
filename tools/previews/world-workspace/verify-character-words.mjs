@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { checkingLine, notAbleFold, notAbleLine, overLine, reasonsOn, runnerCalls, runnerOpen } from './character-words.mjs';
+import { checkingLine, notAbleFold, notAbleLine, overLine, runnerCalls, runnerOpen } from './character-words.mjs';
 import { declaredParts, deciderWords, decidesPrint, runSectionLine, CHARACTER_WORDS, amount, askWho, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineBetween, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
@@ -56,7 +56,6 @@ assert.equal(rowPrice({ price: null }), '');
 assert.equal(providerName({ provider: 'nebius_token_factory', providerDescription: 'Nebius Token Factory, which serves open models.' }), 'Nebius Token Factory');
 assert.equal(providerName({ provider: 'nebius_token_factory' }), 'nebius_token_factory', 'no description: the provider\'s key');
 assert.equal(keyGroup('Nebius Token Factory'), 'With your Nebius Token Factory key, per million tokens');
-assert.equal(CHARACTER_WORDS.chooserIntro, 'Open models, each from its maker. Picking one spends nothing. Only a run spends.');
 assert.equal(CHARACTER_WORDS.hereFree, 'On this computer, free');
 assert.equal(CHARACTER_WORDS.serverBudget, "From this server's budget, per million tokens");
 const nemotron = { maker: 'NVIDIA', parameters: { total: '120B', active: '12B' }, licence: 'NVIDIA Nemotron Open Model License', says: 'This model is optimized for collaborative agents and high-volume workloads.' };
@@ -68,7 +67,7 @@ assert.equal(makerLine({ card: null }), null);
 assert.deepEqual(cardWords({ card: nemotron }), { said: '\u201cThis model is optimized for collaborative agents and high-volume workloads.\u201d', from: "from NVIDIA's model card · NVIDIA Nemotron Open Model License" });
 assert.equal(cardWords({}), null);
 // Never a word that sets one model against another (A3 item 5) in the product's own words of the gallery.
-for (const words of [CHARACTER_WORDS.chooserIntro, CHARACTER_WORDS.hereFree, CHARACTER_WORDS.serverBudget, CHARACTER_WORDS.noneRunning, keyGroup('Nebius Token Factory')]) {
+for (const words of [CHARACTER_WORDS.hereFree, CHARACTER_WORDS.serverBudget, keyGroup('Nebius Token Factory')]) {
   assert.doesNotMatch(words, /\b(best|better|fastest|faster|top|rank|score|cheapest|smartest)\b/iu, words);
 }
 assert.equal(modelLine({ price: { input: '0', output: '0' }, local: true }), 'On this computer · Free');
@@ -156,8 +155,6 @@ assert.equal(longLicence, `from your runner · \u201c${'L'.repeat(79)}\u2026\u20
 assert.equal(runnerOpen({ runner: { licence: null, checkedMs: null } }), null, 'nothing known: nothing opens');
 // The world's list folds the not-able rows (DESIGN 11:58).
 assert.equal(notAbleFold(4), 'And 4 more on this computer that cannot decide for a person here.');
-assert.equal(reasonsOn(called({ name: 'Cyra Moss' })), "Their reasons are on Cyra Moss's day page.");
-assert.equal(reasonsOn(called({ name: null, kind: 'Resident' })), "Their reasons are on the resident's day page.");
 // A guest's faint row (U2, DESIGN 12:20): one attempt's most and what is left, each to the figure that tells them apart.
 assert.equal(overLine('0.04300000', '0.03000000'), 'Asking it once can cost up to $0.043, more than the $0.03 left for AI models here.');
 assert.equal(overLine('0.01290000', '0.01250000'), 'Asking it once can cost up to $0.0129, more than the $0.0125 left for AI models here.');

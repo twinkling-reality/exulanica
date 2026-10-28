@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { GROUP_LAYOUT, SAID_READ, choosableModels, offersModels, deciderOf, freeHere, groupContent, groupHeld, groupPlace, keepLastSaid, lastSaid, noneRunningHere, overRows, questionGroup, readLastSaid } from './character-group.mjs';
+import { GROUP_LAYOUT, SAID_READ, choosableModels, offersModels, deciderOf, freeHere, groupContent, groupHeld, groupPlace, keepLastSaid, lastSaid, overRows, questionGroup, readLastSaid } from './character-group.mjs';
 import { CHARACTER_WORDS, GROUP_WORDS, called, decidesPrint, modelsDecide, quoted, runSpentWords, saidUnder } from './character-words.mjs';
 import { dayWord } from './talk-words.mjs';
 
@@ -212,12 +212,6 @@ const served = [
 ];
 const ordered = choosableModels({ models: served });
 assert.deepEqual(ordered.map(model => model.name), ['Qwen3 4B Instruct', 'Nemotron 3 Nano 30B', 'Qwen3 235B Instruct'], 'this computer first, then the lowest price');
-// This computer's group where none runs yet (A3 item 2): its label and one line, no key, never focused; left out where
-// the install does not let one in, or once one runs.
-assert.equal(noneRunningHere({ models: [{ ...served[2], refusal: 'provider_not_running' }, served[1]] }), true);
-assert.equal(noneRunningHere({ models: [{ ...served[2], refusal: 'provider_not_admitted' }, served[1]] }), false);
-assert.equal(noneRunningHere({ models: served }), false);
-assert.equal(noneRunningHere(null), false);
 // F5: only a model this install can ask is offered. A server on this computer the install does not reach, or a hosted
 // provider it holds no key for, is refused in the models read and left out of both choosers.
 const refusedHere = [

@@ -29,13 +29,9 @@ export const CHARACTER_WORDS = Object.freeze({
   free: 'Free',
   current: 'Current',
   chooseModel: 'Choose an AI model',
-  /** Above the chooser's rows (A3): what the models are, and that picking one spends nothing. */
-  chooserIntro: 'Open models, each from its maker. Picking one spends nothing. Only a run spends.',
   /** The chooser's groups by where a model runs (A3), free first; the key group is keyGroup's. */
   hereFree: 'On this computer, free',
   serverBudget: "From this server's budget, per million tokens",
-  /** The group of models on this computer where none runs yet (A3 item 2, amended 17:22). */
-  noneRunning: 'None is running yet. Start one with a local model runner, and it shows here, free.',
   /** A model a person's own runner holds, while a check on this computer runs (L1): its faint row, after its name. */
   checking: 'Checking that it can decide for a person here…',
   /** The faint label over the runner's models a check found not able, after the group's choosable rows (L1). */
@@ -216,9 +212,6 @@ export function cardWords(model) {
 
 /** The world's model list folds a runner's models a check found not able into one line (L1, DESIGN 11:58). */
 export const notAbleFold = count => `And ${count} more on this computer that cannot decide for a person here.`;
-
-/** Under the fold: where each one's reason is told. */
-export const reasonsOn = who => `Their reasons are on ${possessive(who.within)} day page.`;
 
 /** A runner's model being checked (L1): "Llama · 1.2B · Checking that it can decide for a person here…". */
 export const checkingLine = model => `${model.name} · ${CHARACTER_WORDS.checking}`;

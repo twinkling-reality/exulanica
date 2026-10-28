@@ -56,7 +56,10 @@ describe('the model gallery page (G2)', () => {
     expect(root.querySelector('.wu-g2-row[aria-current="true"] .wu-g2-name')?.textContent).toBe('Nemotron 3 Nano 30B');
     expect(root.querySelector('.wu-g2-dname')?.textContent).toBe('Nemotron 3 Nano 30B');
     expect(root.querySelector('.wu-g2-link')?.getAttribute('href')).toBe(card.source);
-    expect(all(root, '.wu-g2-fk')).toEqual(['Size', 'Reads', 'Licence', 'Runs on', 'A decision', 'In this world']);
+    expect(all(root, '.wu-g2-fk')).toEqual(['Size', 'Reads', 'Licence', 'A decision', 'In this world']);
+    // No line on what the models are, no maker's marks, no headings over the card's parts, nothing after Choose.
+    expect(root.querySelector('.wu-g2-role, .wu-g2-mark, .wu-g2-then, .wu-g2-from')).toBeNull();
+    expect(all(root, '.wu-g2-k')).toEqual(["In its maker's words"]);
   });
 
   it('chooses at once by a number through the host\'s write, then closes; Esc closes unchanged', async () => {
