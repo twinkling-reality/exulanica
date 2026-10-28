@@ -148,9 +148,7 @@ export function mountFrontDoor({ root, entries, credentials }: { root: HTMLEleme
   };
   const previous = arrow('Previous world', 'forward', -1), next = arrow('Next world', 'forward', 1);
   previous.classList.add('ux-entry-previous');
-  const playback = document.createElement('button'); playback.type = 'button';
-  const reflectPlayback = () => { playback.replaceChildren(icon(preview.enabled ? 'pause' : 'play')); playback.setAttribute('aria-label', preview.enabled ? 'Pause the preview' : 'Play the preview'); };
-  playback.onclick = () => { preview.toggle(); reflectPlayback(); }; reflectPlayback(); arrows.append(playback, createRow);
+  arrows.append(createRow);
   root.insertBefore(arrows, strip);
   let selected: SavedWorldEntry | null = null;
   const details = document.createElement('button'); details.type = 'button'; details.className = 'entry-command ux-entry-details-open'; details.textContent = 'Details';
@@ -194,10 +192,9 @@ export function mountFrontDoor({ root, entries, credentials }: { root: HTMLEleme
   };
   const observer = new MutationObserver(() => reflect());
   observer.observe(strip, { attributes: true, attributeFilter: ['aria-current'], subtree: true });
-  const preference = matchMedia('(prefers-reduced-motion: reduce)'); preference.addEventListener('change', reflectPlayback);
   const lifetime = new MutationObserver(() => {
     if (root.isConnected) return;
-    observer.disconnect(); lifetime.disconnect(); preference.removeEventListener('change', reflectPlayback);
+    observer.disconnect(); lifetime.disconnect();
     window.removeEventListener('storage', refreshPictures); preview.dispose(); title.getAnimations().forEach(animation => animation.cancel());
   });
   lifetime.observe(root.parentElement!, { childList: true });

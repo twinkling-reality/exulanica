@@ -376,10 +376,10 @@ export function createScenePreview(root: HTMLElement) {
     const old = current; current = waiting; waiting = null; current!.style.opacity = '1'; retire(old); root.dataset.nativePreview = 'ready';
   };
   window.addEventListener('message', receive);
-  const preference = () => { if (reduced.matches) { enabled = false; stopLive(); } };
+  // The live world follows the system's motion setting alone: its still picture while less motion is asked for.
+  const preference = () => { enabled = !previewPage && !reduced.matches; if (enabled) startLive(); else stopLive(); };
   reduced.addEventListener('change', preference);
   return {
-    get enabled() { return enabled; },
     select(entry: SavedWorldEntry, picture: string | null) {
       selected = entry; const serial = ++sequence;
       const next = document.createElement('div'); next.className = 'ux-entry-still'; next.style.backgroundImage = picture ? `url("${picture}")` : 'none'; next.style.opacity = '0'; field.append(next);
@@ -388,7 +388,6 @@ export function createScenePreview(root: HTMLElement) {
       if (current) retire(current); current = null;
       startLive();
     },
-    toggle() { enabled = !enabled; if (enabled) startLive(); else stopLive(); return enabled; },
     dispose() { disposed = true; ++sequence; stopLive(); window.removeEventListener('message', receive); reduced.removeEventListener('change', preference); field.remove(); },
   };
 }
