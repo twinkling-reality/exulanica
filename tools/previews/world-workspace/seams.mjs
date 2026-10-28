@@ -54,7 +54,8 @@ export const occurrences = (code, target) => code.split(target).length - 1;
  * Throws, naming the seam, where a target does not occur exactly once.
  *
  * Your worlds becomes the front door (front-door.ts): its pictures, its Open, which goes to this
- * workspace's world view of the chosen world, and its look. A world opened by its address
+ * workspace's world view of the chosen world, the showcase worlds it offers after the saved ones,
+ * and its look. A world opened by its address
  * (`?entry=`) mounts the workspace's world view, or, in a scene preview, only the preview's camera.
  * A world's page shows its opening (world-opening.ts) from the app's first script, beside the app's
  * own start (its small module loads while the app's large one does), and the app reports each
@@ -162,6 +163,8 @@ import { bakeReach, bakeShare } from '/@fs/${here}/opening-steps.mjs';
     if (entry.generatedGround?.tiles.some((tile) => tile.state === 'failed')) await state.worldEntries?.askForBakesAgain(entry).catch(() => 0);
     return openFromFrontDoor(entry.entryId);
   };`)
-    .replace(seam('Your worlds front door'), seam('Your worlds front door') + '\n  mountFrontDoor({ root: yourWorlds.root, entries: state.savedWorldEntries, credentials: state.credentials });')
+    // The front door offers the installation's showcase worlds the workspace does not hold yet through Your worlds' own
+    // offer, after the saved worlds.
+    .replace(seam('Your worlds front door'), seam('Your worlds front door') + '\n  mountFrontDoor({ root: yourWorlds.root, entries: state.savedWorldEntries, credentials: state.credentials, offer: yourWorlds.offer });')
     .replace(seam('Your worlds create'), '        creating = mountCreateWorld({ root: yourWorlds.root, credentials: state.credentials, entries: state.worldEntries, onClose: closeCreate });');
 }

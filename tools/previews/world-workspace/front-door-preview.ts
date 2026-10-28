@@ -379,14 +379,25 @@ export function createScenePreview(root: HTMLElement) {
   // The live world follows the system's motion setting alone: its still picture while less motion is asked for.
   const preference = () => { enabled = !previewPage && !reduced.matches; if (enabled) startLive(); else stopLive(); };
   reduced.addEventListener('change', preference);
+  /** `picture` behind the page, in place of what stood there, with no live world yet. */
+  const showStill = (picture: string | null) => {
+    const serial = ++sequence;
+    const next = document.createElement('div'); next.className = 'ux-entry-still'; next.style.backgroundImage = picture ? `url("${picture}")` : 'none'; next.style.opacity = '0'; field.append(next);
+    const prior = still; still = next;
+    requestAnimationFrame(() => { if (serial !== sequence || disposed) { next.remove(); return; } next.style.opacity = '1'; retire(prior); });
+    if (current) retire(current); current = null;
+  };
   return {
     select(entry: SavedWorldEntry, picture: string | null) {
-      selected = entry; const serial = ++sequence;
-      const next = document.createElement('div'); next.className = 'ux-entry-still'; next.style.backgroundImage = picture ? `url("${picture}")` : 'none'; next.style.opacity = '0'; field.append(next);
-      const prior = still; still = next;
-      requestAnimationFrame(() => { if (serial !== sequence || disposed) { next.remove(); return; } next.style.opacity = '1'; retire(prior); });
-      if (current) retire(current); current = null;
+      selected = entry;
+      showStill(picture);
       startLive();
+    },
+    /** `picture` alone: a world the workspace does not hold yet has no saved world to draw live. */
+    show(picture: string | null) {
+      selected = null;
+      showStill(picture);
+      waiting?.remove(); waiting = null; root.dataset.nativePreview = 'paused';
     },
     dispose() { disposed = true; ++sequence; stopLive(); window.removeEventListener('message', receive); reduced.removeEventListener('change', preference); field.remove(); },
   };

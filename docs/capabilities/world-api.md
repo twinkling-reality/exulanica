@@ -53,6 +53,8 @@ and world generation are routes of their own contracts, listed with every other 
 | `GET /world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
 | `GET /world/behaviours` | The reviewed behaviours an object may be given, with each parameter's bounds |
 | `GET /world-entries` | The workspace's saved worlds, each naming the version and state it reopens at |
+| `GET /worlds/showcase` | The showcase worlds the installation serves: each one's key, title, sentence, identity and card picture's digest ([showcase worlds](#showcase-worlds)) |
+| `GET /worlds/showcase/{showcase}/picture` | A showcase world's card picture, by the digest the catalog names |
 | `POST /worlds/showcase/{showcase}` | The caller's own copy of a showcase world, made again from what its sentence's draft decided with no model call and brought to life as it lived; or the copy already held ([showcase worlds](#showcase-worlds)) |
 | `GET /world/source-media` | Protected topology source slots, including their region ids |
 
@@ -97,6 +99,16 @@ route needs `world.write` and `model.invoke`. A copy's people are its own: a soc
 drawn from its world and its workspace, so the cast gives the same models to the people at the
 same places, and a copy keeps no history but its own. The workspace page opens one from the address
 `/?world=<key>`, which the public site's showcase links use.
+
+`GET /worlds/showcase` lists the served worlds by key, each with its title (the one its copy is
+given), its sentence, its `world_id` (the identity every copy is made under, so a page knows a
+world its workspace holds by its entry's) and its card picture's record (`sha256`, `media_type`,
+`width`, `height`), whose bytes `GET /worlds/showcase/{showcase}/picture?sha256=` answers while
+the digest is theirs (404 `picture_not_found` otherwise). Both are the installation's own files,
+the same for every caller and naming nothing of any workspace, so they need only `world.read`, a
+guest's session included. The workspace's front door lists, after the workspace's own worlds, each
+served world the workspace does not hold yet, as a card of its picture and title; its Open makes
+the copy as the link does and opens it, and from then on the copy is the workspace's own card.
 
 ### People and models
 

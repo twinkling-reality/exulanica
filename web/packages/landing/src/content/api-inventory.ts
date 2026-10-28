@@ -27519,6 +27519,134 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/worlds/showcase",
+    "method": "get",
+    "id": "showcase_catalog_worlds_showcase_get",
+    "title": "The showcase worlds this installation serves, each with its card picture's digest.",
+    "description": "Every served showcase world's key, title, sentence, identity and card picture's record.",
+    "group": "worlds",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ShowcaseCatalogView"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "path": "/worlds/showcase/{showcase}/picture",
+    "method": "get",
+    "id": "showcase_picture_worlds_showcase__showcase__picture_get",
+    "title": "A showcase world's card picture, while the digest named is its own.",
+    "description": "The card picture's bytes, while ``sha256`` is their digest: the address names the bytes, so\na browser keeps them as long as it likes.",
+    "group": "worlds",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "showcase",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "title": "Showcase"
+        }
+      },
+      {
+        "name": "sha256",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {}
+          }
+        }
+      },
+      "404": {
+        "description": "No showcase world of that key, or no picture of that digest"
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/worlds/showcase/{showcase}",
     "method": "post",
     "id": "open_showcase_world_worlds_showcase__showcase__post",

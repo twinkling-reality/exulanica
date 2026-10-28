@@ -812,6 +812,9 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /worlds/references/{reference_id}/pictures/{n}/keep": {
         "json": {"answer": "private_world_only"}
     },
+    # A digest of the shape a picture's address takes, so the route looks the world up rather than
+    # its validator refusing the request. What it serves is tests/test_showcase_worlds.py.
+    "GET /worlds/showcase/{showcase}/picture": {"params": {"sha256": _ZERO_DIGEST}},
     # A realistic body with a reference id nobody made. The sweeps run without a model, so they stop
     # at 503 before the notes are read; tests/test_world_draft_notes_api.py holds the id's answer.
     "POST /worlds/specification/drafts": {

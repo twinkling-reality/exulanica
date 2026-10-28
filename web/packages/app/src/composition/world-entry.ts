@@ -42,12 +42,29 @@ export interface WorldEntryCreateState {
   readonly words: { readonly happened: string } | null;
 }
 
+/**
+ * A world the workspace does not hold yet that Your worlds offers after its saved worlds, such as a showcase world
+ * the installation serves: a card of its picture and title, chosen as a saved world's card is. Open makes the world
+ * the workspace's own and opens it.
+ */
+export interface WorldOffer {
+  /** What names it among the offers, on its card as `data-offer`. */
+  readonly key: string;
+  readonly title: string;
+  /** Its picture, or null where there is none to show. */
+  readonly picture: string | null;
+  /** Makes the world the workspace's own and opens it; rejects, saying why, where it could not. */
+  readonly open: () => Promise<void>;
+}
+
 export interface WorldEntrySurfaceHandle {
   readonly root: HTMLElement;
   /** Whether Create a world is offered, and why not where it is refused. */
   setCreate(state: WorldEntryCreateState): void;
   /** Draw each card's picture again, as `picture` answers now. */
   refreshPictures(): void;
+  /** Offer `offers` after the saved worlds, in place of any offered before. */
+  offer(offers: readonly WorldOffer[]): void;
 }
 
 /** The values a generated world was made with, as its entry serves them, or null where there are none. */
@@ -75,7 +92,8 @@ function typing(target: EventTarget | null): boolean {
  * Your worlds: the first thing a signed-in person sees, before any world opens.
  *
  * The chosen world is named large with Open World and View Parameters. A strip holds saved
- * worlds newest first. Create World sits below the selected world's actions. Clicking a card selects it; Open World, Enter or a double click opens it. Keys: arrows choose, Enter opens, N creates; none fires in a field.
+ * worlds newest first, then any world offered that the workspace does not hold yet (`offer`),
+ * whose Open makes it the workspace's own first. Create World sits below the selected world's actions. Clicking a card selects it; Open World, Enter or a double click opens it. Keys: arrows choose, Enter opens, N creates; none fires in a field.
  *
  * Opening a world that fails says why in the status line under the title and leaves the choice
  * open. A world changed elsewhere keeps its reconciliation: the acknowledgement and the adopt
@@ -128,12 +146,19 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
   }, [corner, list, lede]);
 
   const cards: HTMLButtonElement[] = [];
+  /** The offered worlds' cards, after the saved worlds' (`offer`). */
+  let offerCards: HTMLButtonElement[] = [];
   let chosen: SavedWorldEntry | null = null;
+  /** The offered world chosen in place of a saved one, or null. */
+  let chosenOffer: WorldOffer | null = null;
   let createState: WorldEntryCreateState = { state: deps.create === undefined ? 'unsupported' : 'unknown', words: null };
   let busy = false;
 
   const createOffered = (): boolean => deps.create !== undefined
     && (createState.state === 'available' || createState.state === 'unknown');
+
+  /** Whether Open opens nothing for what is chosen: a saved world that cannot open, or no choice at all. */
+  const openRefused = (): boolean => (chosen === null ? chosenOffer === null : chosen.availability !== 'available');
 
   const openEntry = (entry: SavedWorldEntry, control: HTMLButtonElement): void => {
     if (busy) return;
@@ -153,7 +178,25 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
     }).finally(() => {
       busy = false;
       control.removeAttribute('aria-busy');
-      openButton.disabled = chosen === null || chosen.availability !== 'available';
+      openButton.disabled = openRefused();
+      delete root.dataset['state'];
+    });
+  };
+
+  const openOffer = (offer: WorldOffer, control: HTMLButtonElement): void => {
+    if (busy) return;
+    busy = true;
+    status.hidden = true;
+    control.setAttribute('aria-busy', 'true');
+    openButton.disabled = true;
+    root.dataset['state'] = 'opening';
+    void offer.open().catch((error: unknown) => {
+      status.hidden = false;
+      status.textContent = entryFailure(error, 'This world could not be opened.');
+    }).finally(() => {
+      busy = false;
+      control.removeAttribute('aria-busy');
+      openButton.disabled = openRefused();
       delete root.dataset['state'];
     });
   };
@@ -191,7 +234,8 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
   const choose = (entry: SavedWorldEntry): void => {
     if (chosen === entry) return;
     chosen = entry;
-    for (const card of cards) card.setAttribute('aria-current', String(card.dataset['entryId'] === entry.entryId));
+    chosenOffer = null;
+    for (const card of [...cards, ...offerCards]) card.setAttribute('aria-current', String(card.dataset['entryId'] === entry.entryId));
     openButton.setAttribute('aria-label', `Open ${entry.title}`);
     openButton.disabled = entry.availability !== 'available';
 
@@ -207,6 +251,21 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
     values.setAttribute('aria-disabled', String(!viewable));
     valuesWhy.hidden = values.hidden || viewable;
     showReconcile(entry);
+  };
+
+  // An offered world is not the workspace's yet: it has no saved values to view and nothing to reconcile.
+  const chooseOffer = (offer: WorldOffer): void => {
+    if (chosenOffer === offer) return;
+    chosen = null;
+    chosenOffer = offer;
+    for (const card of [...cards, ...offerCards]) card.setAttribute('aria-current', String(card.dataset['offer'] === offer.key));
+    openButton.setAttribute('aria-label', `Open ${offer.title}`);
+    openButton.disabled = false;
+    status.hidden = arrivalFailure === null;
+    status.textContent = arrivalFailure ?? '';
+    values.hidden = true;
+    valuesWhy.hidden = true;
+    reconcile.replaceChildren();
   };
 
   for (const entry of entries) {
@@ -243,6 +302,12 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
   };
   createButton.addEventListener('click', create);
   openButton.addEventListener('click', () => {
+    if (chosenOffer !== null) {
+      const offer = chosenOffer;
+      const card = offerCards.find((one) => one.dataset['offer'] === offer.key);
+      if (card !== undefined) openOffer(offer, card);
+      return;
+    }
     if (chosen === null) return;
     const card = cards.find((one) => one.dataset['entryId'] === chosen!.entryId);
     if (card !== undefined) openEntry(chosen, card);
@@ -263,12 +328,12 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
 
   root.addEventListener('keydown', (event) => {
     if (event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) return;
-    const all = [...cards, createButton];
+    const all = [...cards, ...offerCards, createButton];
     const at = all.indexOf(document.activeElement as HTMLButtonElement);
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
       event.preventDefault();
       const step = event.key === 'ArrowRight' ? 1 : -1;
-      const from = at >= 0 ? at : Math.max(0, all.findIndex((card) => card.dataset['entryId'] === chosen?.entryId));
+      const from = at >= 0 ? at : Math.max(0, all.findIndex((card) => card.getAttribute('aria-current') === 'true'));
       all[Math.min(all.length - 1, Math.max(0, from + step))]?.focus();
       return;
     }
@@ -283,7 +348,7 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
       return;
     }
     // Enter on a focused control is that control's own press; elsewhere it opens the chosen world.
-    if (event.key === 'Enter' && (!(event.target instanceof HTMLButtonElement) || event.target.classList.contains('your-worlds-card')) && chosen !== null) {
+    if (event.key === 'Enter' && (!(event.target instanceof HTMLButtonElement) || event.target.classList.contains('your-worlds-card')) && (chosen !== null || chosenOffer !== null)) {
       event.preventDefault();
       openButton.click();
     }
@@ -317,8 +382,35 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
     }
   };
   const initial = entries.find(entry => entry.entryId === deps.initialEntryId) ?? entries[0];
+  const offer = (offers: readonly WorldOffer[]): void => {
+    for (const card of offerCards) card.closest('.world-entry-item')?.remove();
+    offerCards = offers.map((one) => {
+      const card = el('button', {
+        type: 'button', class: 'world-entry-choice your-worlds-card', 'data-offer': one.key, 'aria-current': 'false',
+      }, [
+        el('span', { class: 'your-worlds-picture', 'aria-hidden': 'true' }, one.picture === null ? [] : [
+          el('img', { src: one.picture, alt: '', loading: 'lazy', decoding: 'async' }),
+        ]),
+        el('span', { class: 'world-entry-choice-title', text: one.title }),
+      ]);
+      card.addEventListener('focus', () => chooseOffer(one));
+      card.addEventListener('click', () => chooseOffer(one));
+      card.addEventListener('dblclick', () => openOffer(one, card));
+      list.append(el('article', { class: 'world-entry-item' }, [card]));
+      return card;
+    });
+    // A chosen saved world stays chosen, and so does an offer still made; else the first saved world is, or with
+    // none the first offer.
+    if (chosen !== null) return;
+    const before = chosenOffer;
+    chosenOffer = null;
+    const again = before === null ? undefined : offers.find((one) => one.key === before.key);
+    if (again !== undefined) chooseOffer(again);
+    else if (initial !== undefined) choose(initial);
+    else if (offers[0] !== undefined) chooseOffer(offers[0]);
+  };
   if (initial !== undefined) choose(initial);
-  return { root, setCreate, refreshPictures };
+  return { root, setCreate, refreshPictures, offer };
 }
 
 /** How the choice to make a world from reviewed photographs reaches the server and the world. */

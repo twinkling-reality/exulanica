@@ -147,6 +147,71 @@ describe('Your worlds', () => {
   });
 });
 
+describe('a world Your worlds offers that the workspace does not hold yet', () => {
+  const settled = () => new Promise((done) => setTimeout(done, 0));
+  const cardsOf = (root: HTMLElement) => [...root.querySelectorAll<HTMLButtonElement>('.your-worlds-card')];
+  const openButton = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('.your-worlds-open')!;
+
+  it('stands after the saved worlds, chosen as theirs are, and Open asks for it alone', async () => {
+    const { root, open, offer } = build([quiet, entry()]);
+    const made = vi.fn(async () => undefined);
+    offer([{ key: 'harbour-town', title: 'Harbour town', picture: 'data:image/jpeg;base64,AAAA', open: made }]);
+    const cards = cardsOf(root);
+    expect(cards.map((card) => card.querySelector('.world-entry-choice-title')?.textContent))
+      .toEqual(['Saturday market', 'Quiet corner', 'Harbour town']);
+    expect(cards[2]!.dataset['offer']).toBe('harbour-town');
+    expect(cards[2]!.querySelector('img')?.getAttribute('src')).toBe('data:image/jpeg;base64,AAAA');
+    // The saved world chosen first stays chosen; the arrows go on from the saved worlds to the offered one.
+    expect(cards.map((card) => card.getAttribute('aria-current'))).toEqual(['true', 'false', 'false']);
+    cards[1]!.focus();
+    press(document.activeElement!, 'ArrowRight');
+    expect(document.activeElement).toBe(cards[2]);
+    expect(cards.map((card) => card.getAttribute('aria-current'))).toEqual(['false', 'false', 'true']);
+    expect(openButton(root).getAttribute('aria-label')).toBe('Open Harbour town');
+    expect(openButton(root).disabled).toBe(false);
+    // It has no saved values to view.
+    expect(root.querySelector<HTMLElement>('[data-action="worlds.values"]')!.hidden).toBe(true);
+    press(root, 'Enter');
+    expect(made).toHaveBeenCalledOnce();
+    expect(open).not.toHaveBeenCalled();
+    await settled();
+    // Back on a saved world, Open opens that world and asks for nothing else.
+    cards[1]!.click();
+    expect(cards.map((card) => card.getAttribute('aria-current'))).toEqual(['false', 'true', 'false']);
+    openButton(root).click();
+    expect(open).toHaveBeenCalledWith(quiet);
+    expect(made).toHaveBeenCalledOnce();
+  });
+
+  it('says why it could not be made the workspace\'s own, and stays on offer', async () => {
+    const { root, offer } = build([entry()]);
+    const refused = vi.fn(async () => { throw new Error('This workspace already holds as many worlds as it may.'); });
+    offer([{ key: 'harbour-town', title: 'Harbour town', picture: null, open: refused }]);
+    const card = root.querySelector<HTMLButtonElement>('[data-offer="harbour-town"]')!;
+    expect(card.querySelector('img')).toBeNull();
+    card.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    expect(card.getAttribute('aria-busy')).toBe('true');
+    expect(openButton(root).disabled).toBe(true);
+    await settled();
+    const status = root.querySelector<HTMLElement>('.your-worlds-status')!;
+    expect(status.hidden).toBe(false);
+    expect(status.textContent).toBe('This workspace already holds as many worlds as it may.');
+    expect(card.hasAttribute('aria-busy')).toBe(false);
+    expect(openButton(root).disabled).toBe(false);
+    expect(card.isConnected).toBe(true);
+  });
+
+  it('is chosen first where the workspace holds no saved world, and goes when no longer offered', () => {
+    const { root, offer } = build([]);
+    const one = { key: 'harbour-town', title: 'Harbour town', picture: null, open: vi.fn(async () => undefined) };
+    offer([one, { ...one, key: 'hill-farm', title: 'Hill farm' }]);
+    expect(cardsOf(root).map((card) => card.getAttribute('aria-current'))).toEqual(['true', 'false']);
+    expect(openButton(root).getAttribute('aria-label')).toBe('Open Harbour town');
+    offer([]);
+    expect(cardsOf(root)).toEqual([]);
+  });
+});
+
 describe('the pictures on Your worlds', () => {
   it('shows a world its own kept frame, else none: never another world\'s, not even one of its recipe', () => {
     expect(worldPicture(entry())).toBeNull();

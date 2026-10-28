@@ -575,7 +575,9 @@ EXULANICA_REVIEW_RUNTIME_STATE_FILE=/absolute/private/runtime.json \
 
 The world workspace uses loopback port 19974, or the port `EXULANICA_WORKSPACE_PORT` names, which
 the acceptance launcher's `--personal` sets to its slot's app port. Its start page is the front door: the chosen saved world
-drawn live behind its title, a filmstrip of saved worlds, Details (the world's kind, size and look) and
+drawn live behind its title, a filmstrip of saved worlds and then of each served showcase world the workspace does not
+hold yet (`GET /worlds/showcase`; its card is the world's picture and title, and its Open makes the workspace's own copy
+first, as `/?world=<key>` does), Details (the world's kind, size and look) and
 Open, which goes to the workspace's world view of that world at `?entry=<entry-id>`; Esc in the world
 returns to the front door with that world still chosen. The live background is the same saved world in
 an inert frame that only reads; the page refuses its other requests, and the development server refuses them too. An

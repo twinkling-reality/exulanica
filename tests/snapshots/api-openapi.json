@@ -25883,6 +25883,126 @@
     }
    }
   },
+  "/worlds/showcase": {
+   "get": {
+    "tags": [
+     "worlds"
+    ],
+    "summary": "The showcase worlds this installation serves, each with its card picture's digest.",
+    "description": "Every served showcase world's key, title, sentence, identity and card picture's record.",
+    "operationId": "showcase_catalog_worlds_showcase_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ShowcaseCatalogView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/showcase/{showcase}/picture": {
+   "get": {
+    "tags": [
+     "worlds"
+    ],
+    "summary": "A showcase world's card picture, while the digest named is its own.",
+    "description": "The card picture's bytes, while ``sha256`` is their digest: the address names the bytes, so\na browser keeps them as long as it likes.",
+    "operationId": "showcase_picture_worlds_showcase__showcase__picture_get",
+    "parameters": [
+     {
+      "name": "showcase",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Showcase"
+      }
+     },
+     {
+      "name": "sha256",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "404": {
+      "description": "No showcase world of that key, or no picture of that digest"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/worlds/showcase/{showcase}": {
    "post": {
     "tags": [
@@ -48461,6 +48581,95 @@
     ],
     "title": "SettingOfferView",
     "description": "The setting the words ask for, offered for the person to take or leave, or why there is none.\n\n``offered`` names a part for each axis the words speak of (``parts``, an axis's key to a\npart's key, both of the host's own list at ``parts_version``; ``GET /world/style-packs`` gives\ntheir titles) and the person's own words that chose them, as typed. ``none``: the step found\nno listed part in the words, or its answer was refused twice (``reason``\n``answer_refused``). ``unavailable``: the step could not be asked or did not answer. Either\nway the draft and its look offer are unchanged, and a world made with no setting is drawn as\nits look states. The parts are keys only: a request that takes them names them with the look\nit is made in (``style_pack.setting_parts`` on ``POST /worlds/generated``), and the host\ncomposes and checks the setting then."
+   },
+   "ShowcaseCatalogView": {
+    "properties": {
+     "worlds": {
+      "items": {
+       "$ref": "#/components/schemas/ShowcaseWorldView"
+      },
+      "type": "array",
+      "title": "Worlds"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "worlds"
+    ],
+    "title": "ShowcaseCatalogView",
+    "description": "Every showcase world the installation serves, by key."
+   },
+   "ShowcasePictureView": {
+    "properties": {
+     "sha256": {
+      "type": "string",
+      "title": "Sha256"
+     },
+     "media_type": {
+      "type": "string",
+      "title": "Media Type"
+     },
+     "width": {
+      "type": "integer",
+      "title": "Width"
+     },
+     "height": {
+      "type": "integer",
+      "title": "Height"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "sha256",
+     "media_type",
+     "width",
+     "height"
+    ],
+    "title": "ShowcasePictureView",
+    "description": "A showcase world's card picture: the engine's own first view of the world, by its digest."
+   },
+   "ShowcaseWorldView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "sentence": {
+      "type": "string",
+      "title": "Sentence"
+     },
+     "world_id": {
+      "type": "string",
+      "title": "World Id"
+     },
+     "picture": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ShowcasePictureView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "title",
+     "sentence",
+     "world_id",
+     "picture"
+    ],
+    "title": "ShowcaseWorldView",
+    "description": "A served showcase world, as a page offers it."
    },
    "SignalComparisonStartBody": {
     "properties": {

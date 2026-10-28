@@ -1,4 +1,13 @@
-"""A showcase world opened from a link: the caller's own copy of a world made from a sentence.
+"""The showcase worlds an installation serves, and the caller's own copy of one.
+
+``GET /worlds/showcase`` answers the catalog (:mod:`exulanica.world.showcase_worlds`) as the lock
+serves it, by key: each world's key, title, sentence, identity (the ``world_id`` every copy
+of it is made under, so a page knows a world its workspace holds by its entry's) and card picture's
+record, whose bytes ``GET /worlds/showcase/{showcase}/picture?sha256=`` answers while ``sha256`` is
+their digest, so a browser keeps them as long as it likes, and a digest that is not its picture's
+answers 404 ``picture_not_found``. Both read the installation's own files, the same for every
+caller, and name nothing of any workspace; they need a session (``world.read``), a guest's
+included.
 
 ``POST /worlds/showcase/{showcase}`` makes the served showcase world ``showcase`` names
 (:mod:`exulanica.world.showcase_worlds`) in the caller's own workspace, made again from what its
@@ -8,9 +17,9 @@ people, and the cast given their models), or 200 with the copy the workspace alr
 visitor left it. The answer's ``incomplete`` names each step of the dressing that did not happen,
 by code; the world stands either way.
 
-A key the installation does not serve answers 404 ``unknown_showcase_world``, the same for every
-caller: the catalog is the installation's, and nothing here reads or names another workspace's
-world. A world on land where the deployment makes no worlds on land answers 422
+A key the installation does not serve answers 404 ``unknown_showcase_world`` on each route here,
+the same for every caller: the catalog is the installation's, and nothing here reads or names
+another workspace's world. A world on land where the deployment makes no worlds on land answers 422
 ``landform_not_served``. Every refusal of the making is the one ``POST /worlds/generated`` or a
 kind's card answers, by name, with nothing written. The copy is held to the caller's own budgets
 (a guest's included), and what its cast's minds decide is paid from the caller's own allowance, so
@@ -22,8 +31,9 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 import psycopg
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, ConfigDict
 
 from exulanica.api.dependencies import (
     CurrentSession,
@@ -42,10 +52,47 @@ from exulanica.world.composers import GeneratedWorldRefused, UnknownWorldCompose
 from exulanica.world.kinds.samples import SiteRefused
 from exulanica.world.kinds.worker import KindWorkWaiting
 from exulanica.world.saved_entries import SavedWorldEntryRepository
-from exulanica.world.showcase_worlds import make_showcase_world, showcase_world
+from exulanica.world.showcase_worlds import make_showcase_world, showcase_world, showcase_worlds
 from exulanica.world.worlds import WorldLimitReached, WorldsReadOnly, require_world_registration
 
 router = APIRouter(prefix="/worlds", tags=["worlds"])
+
+_PRIVATE = {"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"}
+
+
+class ShowcasePictureView(BaseModel):
+    """A showcase world's card picture: the engine's own first view of the world, by its digest."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sha256: str
+    media_type: str
+    width: int
+    height: int
+
+
+class ShowcaseWorldView(BaseModel):
+    """A served showcase world, as a page offers it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    #: The made world's title, which its copy is given.
+    title: str
+    #: The words the world was made from.
+    sentence: str
+    #: The identity every copy is made under.
+    world_id: str
+    #: Its card picture, or null where its document names none.
+    picture: ShowcasePictureView | None
+
+
+class ShowcaseCatalogView(BaseModel):
+    """Every showcase world the installation serves, by key."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    worlds: list[ShowcaseWorldView]
 
 
 def _problem(
@@ -55,6 +102,65 @@ def _problem(
         status_code=status,
         content=sayable({"code": code, "detail": detail, **extra}),
         headers=headers,
+    )
+
+
+@router.get(
+    "/showcase",
+    response_model=ShowcaseCatalogView,
+    summary="The showcase worlds this installation serves, each with its card picture's digest.",
+)
+def showcase_catalog(_session: CurrentSession) -> JSONResponse:
+    """Every served showcase world's key, title, sentence, identity and card picture's record."""
+    catalog = ShowcaseCatalogView(
+        worlds=[
+            ShowcaseWorldView(
+                key=world.key,
+                title=world.title,
+                sentence=world.sentence,
+                world_id=world.world_id,
+                picture=None
+                if world.picture is None
+                else ShowcasePictureView(
+                    sha256=world.picture.sha256,
+                    media_type=world.picture.media_type,
+                    width=world.picture.width,
+                    height=world.picture.height,
+                ),
+            )
+            for world in showcase_worlds().values()
+        ]
+    )
+    return JSONResponse(content=catalog.model_dump(mode="json"), headers=_PRIVATE)
+
+
+@router.get(
+    "/showcase/{showcase}/picture",
+    summary="A showcase world's card picture, while the digest named is its own.",
+    responses={404: {"description": "No showcase world of that key, or no picture of that digest"}},
+)
+def showcase_picture(
+    showcase: str,
+    _session: CurrentSession,
+    sha256: Annotated[str, Query(pattern="^[0-9a-f]{64}$")],
+) -> Response:
+    """The card picture's bytes, while ``sha256`` is their digest: the address names the bytes, so
+    a browser keeps them as long as it likes."""
+    world = showcase_world(showcase)
+    if world is None:
+        return _problem(
+            404, "unknown_showcase_world", "No showcase world of that name is served here."
+        )
+    if world.picture is None or world.picture.sha256 != sha256:
+        return _problem(404, "picture_not_found", "no picture with this digest")
+    return Response(
+        content=world.picture.data,
+        media_type=world.picture.media_type,
+        headers={
+            "ETag": f'"{sha256}"',
+            "Cache-Control": "private, max-age=31536000, immutable",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

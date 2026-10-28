@@ -11,25 +11,38 @@ look. Asked again, the workspace's copy is answered as the visitor left it. A do
 painting's or picture's bytes or look's setting the host cannot hold is refused when the catalog
 loads, never at a visitor's copy. A copy's painting is deleted with its world by G1's identity
 trigger, which ``test_world_erasure_postgres.py`` holds for every painting row.
+
+The catalog's reads (``GET /worlds/showcase`` and a card picture's bytes) answer the installation's
+own documents to any session, a guest's included, the same for every workspace; they take no
+connection, so those tests need no database.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import uuid
 
 import pytest
+from exulanica.api.app import create_app
+from exulanica.api.authorisation import load_token_directory
+from exulanica.api.permissions import GUEST_PERMISSIONS
+from exulanica.api.services import Services
 from exulanica.canonical import sha256_of_canonical
+from exulanica.db.session import Database
+from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world import showcase_worlds as catalog
 from exulanica.world.errors import StyleWriteBusy
 from exulanica.world.generated_worlds import generation_receipt
 from exulanica.world.saved_entries import SavedWorldEntryRepository
 from exulanica.world.saved_entry_pictures import checked_picture
 from exulanica.world.society_control_repository import open_session_receipt
+from fastapi.testclient import TestClient
 
 from personal_world_support import STRANGER_TOKEN
 from test_society_made_world import made as imported_made  # noqa: F401
+from tests_support_api import EVERY_PERMISSION
 
 CAST_MODEL = {
     "provider": "nebius_token_factory",
@@ -316,3 +329,107 @@ def test_the_shipped_showcase_worlds_read():
         # Each carries its card picture, the engine's own first view of it, at a card's largest.
         assert world.picture is not None and world.picture.media_type == "image/jpeg"
         assert checked_picture(world.picture.data, "image/jpeg")[:2] == (1280, 720)
+
+
+GUEST = "showcase-guest-token-long-enough-to-be-accepted"
+OWNER = "showcase-owner-token-long-enough-to-be-accepted"
+
+
+def _as(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _locked_documents() -> list[dict]:
+    """The documents the lock serves, read from the files, by key."""
+    lock = json.loads(catalog.SHOWCASE_LOCK.read_text(encoding="utf-8"))
+    return [
+        json.loads(
+            (catalog.SHOWCASE_DIRECTORY / f"{one['key']}.v{one['version']}.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        for one in sorted(lock["worlds"], key=lambda one: one["key"])
+    ]
+
+
+@pytest.fixture(name="reader")
+def _reader(tmp_path) -> TestClient:
+    # Never connected: the catalog's reads take no connection, and a token resolves without one.
+    unused = Database(url="postgresql://unused.invalid/none")
+    # A guest's browser session holds GUEST_PERMISSIONS; a token holding exactly those reaches
+    # what the guest's session reaches, since the floor decides from what is held. Each token is
+    # its own workspace.
+    grants = {GUEST: sorted(str(one) for one in GUEST_PERMISSIONS), OWNER: EVERY_PERMISSION}
+    tokens = load_token_directory(
+        {
+            "EXULANICA_API_TOKENS": json.dumps(
+                {
+                    token: {
+                        "workspace_id": str(uuid.uuid4()),
+                        "actor": str(uuid.uuid4()),
+                        "permissions": permissions,
+                    }
+                    for token, permissions in grants.items()
+                }
+            )
+        }
+    )
+    services = Services(
+        database=unused,
+        readonly_database=unused,
+        store=LocalContentAddressedStore(tmp_path / "store"),
+        tokens=tokens,
+        executor_shares_the_write_role=True,
+        model_client=None,
+    )
+    # Not entered as a context manager: the lifespan checks a database these routes never need.
+    return TestClient(create_app(services, verify=False))
+
+
+def test_the_catalog_is_the_installation_s_documents_alike_for_a_guest_and_an_owner(reader):
+    documents = _locked_documents()
+    assert documents, "the installation serves showcase worlds"
+    expected = {
+        "worlds": [
+            {
+                "key": document["key"],
+                "title": document["title"],
+                "sentence": document["sentence"],
+                "world_id": document["world"]["world_id"],
+                "picture": {
+                    name: document["picture"][name]
+                    for name in ("sha256", "media_type", "width", "height")
+                },
+            }
+            for document in documents
+        ]
+    }
+    assert reader.get("/worlds/showcase").status_code == 401
+    for token in (GUEST, OWNER):
+        listed = reader.get("/worlds/showcase", headers=_as(token))
+        assert listed.status_code == 200, listed.text
+        # Two workspaces read the same catalog: it names nothing of either.
+        assert listed.json() == expected
+        assert listed.headers["cache-control"] == "private, no-store"
+
+
+def test_a_card_picture_is_served_by_its_own_digest_alone(reader):
+    first, second = _locked_documents()[:2]
+    digest = first["picture"]["sha256"]
+    address = f"/worlds/showcase/{first['key']}/picture"
+    picture = reader.get(address, params={"sha256": digest}, headers=_as(GUEST))
+    assert picture.status_code == 200, picture.text
+    assert picture.headers["content-type"] == first["picture"]["media_type"]
+    kept = catalog.SHOWCASE_DIRECTORY / "pictures" / f"{digest}.jpg"
+    assert picture.content == kept.read_bytes()
+    assert hashlib.sha256(picture.content).hexdigest() == digest
+    assert picture.headers["etag"] == f'"{digest}"'
+    assert reader.get(address, params={"sha256": digest}).status_code == 401
+    # Another world's picture is not this world's, and a key the installation does not serve is
+    # refused as its copy is.
+    other = reader.get(address, params={"sha256": second["picture"]["sha256"]}, headers=_as(GUEST))
+    assert other.status_code == 404 and other.json()["code"] == "picture_not_found"
+    unknown = reader.get(
+        "/worlds/showcase/nowhere/picture", params={"sha256": digest}, headers=_as(GUEST)
+    )
+    assert unknown.status_code == 404 and unknown.json()["code"] == "unknown_showcase_world"

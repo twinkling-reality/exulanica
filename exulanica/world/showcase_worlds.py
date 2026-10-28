@@ -32,7 +32,9 @@ as it opens, the first view a page keeps for a world's card (:mod:`exulanica.wor
 saved_entry_pictures`), taken of a copy of that version, with how it was taken, and its bytes in
 ``pictures/<sha256>.jpg`` beside the documents. A copy keeps it as its own card picture when it is
 made, of the copy as it is then, so its card shows the world it opens on before any page has drawn
-it; a page puts its own once the copy has changed, as for any world.
+it; a page puts its own once the copy has changed, as for any world. Before a workspace holds a
+copy, the catalog's read serves the same bytes (``GET /worlds/showcase/{showcase}/picture``) for
+the card that offers the world.
 
 The lock (``showcase-worlds.lock.json``) names the one version of each world served, by digest:
 a served document never changes, a changed one is a new version, and a file the lock does not name
@@ -150,6 +152,9 @@ class ShowcasePicture:
     data: bytes
     #: How it was taken: by what, of which copy, and when.
     taken: Mapping[str, Any]
+    #: Its size in pixels, as its record states and its bytes were held to.
+    width: int
+    height: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -246,7 +251,14 @@ def _picture(where: str, raw: object, directory: Path) -> ShowcasePicture:
     data = _held_bytes(where, stated, directory)
     if not isinstance(stated["taken"], dict):
         raise _refuse(f"{where}.taken", "is how the picture was taken, an object")
-    return ShowcasePicture(stated["sha256"], stated["media_type"], data, stated["taken"])
+    return ShowcasePicture(
+        sha256=stated["sha256"],
+        media_type=stated["media_type"],
+        data=data,
+        taken=stated["taken"],
+        width=stated["width"],
+        height=stated["height"],
+    )
 
 
 def _painting(where: str, raw: object, directory: Path) -> ShowcasePainting:
