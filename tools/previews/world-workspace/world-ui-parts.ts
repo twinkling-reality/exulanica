@@ -44,7 +44,7 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
     // As the screen shows it: at a stand above the composer (one below its top is no stand).
     const over = add(standLabel(), layer); over.style.left = '62vw'; over.style.top = 'calc(50vh - 40px)';
   } else if (view === 'creature-making') {
-    const making = makingGroup({ words, priceUsdAtMost: price });
+    const making = makingGroup({ words });
     if (query.has('notes')) {
       making.root.classList.add('wu-creature-noted');
       for (const [step, time] of [['Choosing what to look up', '0:02'], ['Searching the web', '0:05'], ['Writing notes from what it found', '0:09']]) making.passed(step!, time!);
@@ -57,10 +57,13 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
       ], 3);
     }
     making.step('Making the creature', false, '0:14');
+    // What a read states it has spent so far: the notes' calls, the drafter's call under way not known yet.
+    const notesMost = '0.0453', most = query.has('notes') ? String(Number(price) + Number(notesMost)) : price;
+    making.spent(query.has('notes') ? { spentUsd: 0.0011, unknownUsd: Number(price) } : { spentUsd: 0, unknownUsd: Number(price) }, most);
     making.root.classList.toggle('wu-creature-left', query.has('left'));
     add(making.root, layer);
   } else {
-    const made = madeGroup({ label: 'yellow pond wader', words, modelName: 'Nemotron 3 Super 120B', spentUsd: '0.00420000', sketch: query.has('sketch'), placeable: true, notes: query.has('notes') ? 5 : 0 });
+    const made = madeGroup({ label: 'yellow pond wader', words, modelName: 'Nemotron 3 Super 120B', spentUsd: '0.00420000', placeable: true, notes: query.has('notes') ? 5 : 0 });
     made.classList.toggle('wu-creature-left', query.has('left'));
     add(made, layer);
   }

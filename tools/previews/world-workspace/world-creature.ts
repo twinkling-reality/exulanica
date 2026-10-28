@@ -10,6 +10,7 @@ import type { Credentials } from '../../../web/packages/app/src/config.ts';
 import { ReferencesClient, referenceFinished, referenceHasNotes, type ReferenceRequest } from '../../../web/packages/app/src/references-api.ts';
 import { CREATURE_WORDS, creatureField, leader, madeGroup, makingGroup, placeRow, standLabel, standLight, type MakingGroup } from './world-ui-creature.ts';
 import { priceUpTo, webTip } from './create-words.mjs';
+import { withNotesSpent } from './create-steps.mjs';
 import { ANCHOR_INSET } from './world-ui-layout.mjs';
 
 /** How far ahead of the eye the stand is looked for (the sheet's 8 m: 3 m falls under the field). */
@@ -237,7 +238,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
   function startMaking(): MakingGroup {
     state = 'making';
     field.root.remove();
-    const making = makingGroup({ words, priceUsdAtMost: mostUsd() });
+    const making = makingGroup({ words });
     // With web notes asked for, the group grows by the notes: it stands on the field's line and grows upward.
     making.root.classList.toggle('wu-creature-noted', withNotes && notesOffered() !== null);
     besideStand(making.root);
@@ -312,6 +313,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     const timeout = offer?.timing.timeoutSeconds ?? 50;
     const deadline = started + (2 * timeout + 10) * 1000;
     let current = draft, missed = 0;
+    showSpent(making, current);
     while (!ended && !draftEnded(current) && Date.now() < deadline && missed < READS_MISSED) {
       const seconds = Math.floor((Date.now() - started) / 1000);
       making.step(current.status === 'queued' ? CREATURE_WORDS.waiting : CREATURE_WORDS.drafting, false, clock(seconds * 1000));
@@ -320,7 +322,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
       const read = await readDraft(current.draftId);
       if (ended) return;
       missed = read === null ? missed + 1 : 0;
-      if (read !== null) current = read;
+      if (read !== null) { current = read; showSpent(making, current); }
     }
     if (ended) return;
     light.remove();
@@ -338,8 +340,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
       const card = madeGroup({
         label: current.label, words, modelName: current.model?.name ?? null, spentUsd: spentOf(current),
         notes: current.references?.state === 'used' ? current.references.notes : 0,
-        // Until its made look is made, the creature wears its sketch (M15).
-        sketch: current.lookStatus !== 'made', placeable: stand !== null, onBack: back,
+        placeable: stand !== null, onBack: back,
       });
       besideStand(card);
       layer.append(card);
@@ -381,6 +382,23 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     if (own === null) return null;
     if (notes === null) return notesAsked ? null : own;
     return notes.spentUsd === null ? null : addUsd(own, notes.spentUsd);
+  }
+
+  /**
+   * Under the steps, what the making has spent so far of the most it may, counted as Create's making view counts it
+   * (create-steps.mjs's withNotesSpent): what the draft's attempts settled at, what those under way hold as not known
+   * yet, and where web notes were asked for, what their model calls spent, or their most as not known yet where the
+   * read states none. Nothing where the draft states no spend or a part has no most to count, so the line never says
+   * less than may have been spent.
+   */
+  function showSpent(making: MakingGroup, draft: CreatureDraft): void {
+    const price = offer?.priceUsdAtMost ?? null;
+    if (draft.spentUsd === null || draft.spentUsd === undefined || price === null) return;
+    const own = { spentUsd: Number(draft.spentUsd), unknownUsd: Number(draft.heldUsd ?? 0) };
+    if (!notesAsked && (draft.references ?? null) === null) { making.spent(own, price); return; }
+    const notesMost = offer?.notes?.maximumUsd ?? null;
+    const spent = notesMost === null ? null : withNotesSpent(own, draft.references?.spentUsd ?? null, notesMost);
+    if (notesMost !== null && spent !== null) making.spent(spent, addUsd(price, notesMost));
   }
 
   /** Back to the field with the words kept, as Enter does where "[↵] Try again" shows. */

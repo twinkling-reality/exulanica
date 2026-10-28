@@ -7,6 +7,7 @@
 import { glyphRows, shade } from './world-ui.ts';
 import { scrollingColumn } from './world-page-frame.ts';
 import { composer, type Composer } from './world-ui-create.ts';
+import { spentUpTo } from './create-words.mjs';
 import './world-ui-creature.css';
 
 /** Each note aspect's label by its key, from the reference aspect catalogs (a later version's label wins). */
@@ -55,8 +56,6 @@ export const CREATURE_WORDS = Object.freeze({
   placingNow: 'Placing…',
   /** The made card where no stand was found ahead (rehearsal run 7): where the creature is and how to place it. */
   nowhereToStand: 'There is no open ground ahead to stand it on, so it waits in Creatures. Pick it there to place it.',
-  leave: 'You can leave this page: the making carries on, and the creature waits in Creatures.',
-  kept: 'kept in Creatures',
   /** The notes' steps before the drafting's (Create's frame 21), by the request's step names. */
   notesSteps: Object.freeze({ plan: 'Choosing what to look up', search: 'Searching the web', read: 'Writing notes from what it found' }) as Readonly<Record<string, string>>,
   fromWeb: 'From the web',
@@ -88,9 +87,12 @@ export function money(usd: string): string {
   return value >= 0.01 ? `$${value.toFixed(2)}` : `$${value.toFixed(4)}`;
 }
 
-/** The made group's small print, the one place the model is named: the model, the whole spend where served (M2), and where it is kept. */
+/**
+ * The made group's small print, the one place the model is named: "Made by <model> · spent $x", the whole spend where
+ * served (M2); empty where neither is.
+ */
 export function madeSmallPrint(modelName: string | null, spentUsd: string | null): string {
-  return [modelName === null ? null : `Made by ${modelName}`, spentUsd === null ? null : `spent ${money(spentUsd)}`, CREATURE_WORDS.kept]
+  return [modelName === null ? null : `Made by ${modelName}`, spentUsd === null ? null : `spent ${money(spentUsd)}`]
     .filter((part): part is string => part !== null).join(' · ');
 }
 
@@ -142,11 +144,16 @@ export interface MakingGroup {
   /** The one served step with its live dot and time, or, with no time, a refusal's sentence in the refused ink. */
   step(words: string, refused?: boolean, time?: string | null): void;
   /**
+   * What the making has spent so far of the most it may, under the steps, as Create's making view says it once a read
+   * states it: "Spent $0.0042 of up to $0.38", with what calls under way hold as not known yet.
+   */
+  spent(spent: { readonly spentUsd: number; readonly unknownUsd: number }, mostUsd: string): void;
+  /**
    * Ended with nothing made: the step becomes why, in the refused ink; "[↵] Try again" shows under it where making is
    * still offered (`onRetry`); the small print says what was spent before it stopped, or goes (DESIGN, 23 October).
    */
   ended(words: string, onRetry: (() => void) | null, spentUsd: string | null): void;
-  /** Still being made when the page stops following it: the step says so, and the small print keeps only the price. */
+  /** Still being made when the page stops following it: the step says so, and the small print keeps the spend last read. */
   late(words: string): void;
   /** A step that has ended, above the current one, with its time: done, or not done (`missed`) and drawn faint. */
   passed(words: string, time: string, missed?: boolean): void;
@@ -163,13 +170,14 @@ export function standLight(): HTMLDivElement {
   return made;
 }
 
-/** Making (r19t): the title, the person's words, the step with its time and the small print. */
-export function makingGroup({ words, priceUsdAtMost }: { readonly words: string; readonly priceUsdAtMost: string | null }): MakingGroup {
+/** Making (r19t): the title, the person's words, the step with its time and, once a read states it, the spend. */
+export function makingGroup({ words }: { readonly words: string }): MakingGroup {
   const root = shade();
   root.classList.add('wu-creature-group');
   const step = element('p', 'wu-creature-step');
-  const atMost = priceUsdAtMost === null ? null : `At most ${money(priceUsdAtMost)}.`;
-  const small = element('p', 'wu-creature-small', [atMost, CREATURE_WORDS.leave].filter(Boolean).join(' '));
+  const small = element('p', 'wu-creature-small');
+  small.setAttribute('role', 'status');
+  small.hidden = true;
   groupBody(root).append(element('h2', 'wu-creature-title', CREATURE_WORDS.making), element('p', 'wu-creature-quote', quoted(words)), step, small);
   // The notes from the web, or why there are none, between the steps and the small print once the request ends.
   const fromWeb = element('div', 'wu-creature-notes');
@@ -183,6 +191,10 @@ export function makingGroup({ words, priceUsdAtMost }: { readonly words: string;
       dot.setAttribute('aria-hidden', 'true');
       step.replaceChildren(dot, element('span', '', words), element('span', 'wu-creature-time', time));
     },
+    spent(spent, mostUsd) {
+      small.textContent = spentUpTo(spent, mostUsd);
+      small.hidden = false;
+    },
     ended(words, onRetry, spentUsd) {
       step.classList.add('wu-refused');
       step.textContent = words;
@@ -192,7 +204,6 @@ export function makingGroup({ words, priceUsdAtMost }: { readonly words: string;
     late(words) {
       step.classList.remove('wu-refused');
       step.textContent = words;
-      if (atMost === null) small.remove(); else small.textContent = atMost;
     },
     passed(words, time, missed = false) {
       const done = element('p', missed ? 'wu-creature-step wu-creature-passed wu-creature-missed' : 'wu-creature-step wu-creature-passed');
@@ -223,17 +234,16 @@ export function makingGroup({ words, priceUsdAtMost }: { readonly words: string;
 }
 
 /**
- * Made (r19b): the name, how it was made, the quote, [Enter] Place and the small print. Place is said, not pressed
- * here: the creature is held at the stand by build mode, whose own Enter places it. With no stand the creature waits
- * in Creatures: the card says so and how to place it, and [Esc] Back opens Creatures with it in focus, as Esc does.
+ * Made (r19b), and only this (ROOT's sweep of 27 October): the name, "Made from your words", the quote, [Enter] Place
+ * and "Made by <model> · spent $x". Place is said, not pressed here: the creature is held at the stand by build mode,
+ * whose own Enter places it. With no stand the creature waits in Creatures: the card says so and how to place it, and
+ * [Esc] Back opens Creatures with it in focus, as Esc does.
  */
-export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable, notes = 0, onBack }: {
+export function madeGroup({ label, words, modelName, spentUsd, placeable, notes = 0, onBack }: {
   readonly label: string | null;
   readonly words: string;
   readonly modelName: string | null;
   readonly spentUsd: string | null;
-  /** True while the creature wears its sketch, its made look not ready yet (M15). */
-  readonly sketch: boolean;
   readonly placeable: boolean;
   /** How many web notes its drafter was handed; 0 or absent where it had none. */
   readonly notes?: number;
@@ -243,8 +253,7 @@ export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable
   const root = shade();
   root.classList.add('wu-creature-group', 'wu-creature-made');
   const name = label === null ? CREATURE_WORDS.untitled : label.charAt(0).toUpperCase() + label.slice(1);
-  const lines = [madeSmallPrint(modelName, spentUsd)];
-  if (sketch && label !== null) lines.push(`${name} wears a sketch until the made look is ready.`);
+  const small = madeSmallPrint(modelName, spentUsd);
   groupBody(root).append(
     element('h2', 'wu-creature-title', name),
     element('p', 'wu-creature-from', madeFromLine(notes)),
@@ -252,7 +261,7 @@ export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable
     ...(placeable
       ? [glyphRows([{ key: 'Enter', word: CREATURE_WORDS.place, shortcut: 'Enter' }])]
       : [element('p', 'wu-creature-from', CREATURE_WORDS.nowhereToStand), glyphRows([{ key: 'Esc', word: CREATURE_WORDS.back, shortcut: 'Escape', ...(onBack ? { onPress: onBack } : {}) }])]),
-    ...lines.map((line) => element('p', 'wu-creature-small', line)),
+    ...(small === '' ? [] : [element('p', 'wu-creature-small', small)]),
   );
   return root;
 }

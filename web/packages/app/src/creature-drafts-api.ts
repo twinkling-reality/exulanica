@@ -97,6 +97,8 @@ export interface CreatureDraft {
   readonly failure: string | null;
   /** What its calls were charged, a decimal string of dollars, as the server recorded them; null or absent where it records none. */
   readonly spentUsd?: string | null;
+  /** What its calls still under way hold, not known yet, as the server recorded them; null or absent where it records none. */
+  readonly heldUsd?: string | null;
   /** How its creature's made look stands once one is asked (`look_job.status`: queued, staged, made, ...); null or absent before. */
   readonly lookStatus?: string | null;
   /** The web notes it was asked with; null or absent where it was asked with none. */
@@ -216,6 +218,7 @@ export function parseCreatureDraft(raw: unknown): CreatureDraft {
     }),
     failure: maybe(held['failure'], (value) => text(value, 'creature failure code')),
     spentUsd: maybe(held['spend'], (value) => dollars(object(value, 'creature spend')['spent_usd'], 'creature spend')),
+    heldUsd: maybe(held['spend'], (value) => maybe(object(value, 'creature spend')['held_usd'], (usd) => dollars(usd, 'creature spend held'))),
     lookStatus: maybe(held['look_job'], (value) => text(object(value, 'creature look job')['status'], 'creature look job status')),
     references: maybe(held['references'], (value) => {
       const notes = object(value, 'creature notes');

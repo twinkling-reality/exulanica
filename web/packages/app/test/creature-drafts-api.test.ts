@@ -65,8 +65,13 @@ describe('a creature from words, as the server answers it', () => {
     expect(priced.model).toEqual({ modelId: 'nvidia/nemotron-3-super-120b-a12b', name: 'Nemotron 3 Super 120B' });
     expect(priced.priceUsdAtMost).toBe('0.37355520');
     expect(parseCreatureDraft({ ...kept, spend: { spent_usd: '0.00420000', held_usd: '0.00000000' } }).spentUsd).toBe('0.00420000');
+    // What its calls under way hold, not known yet, as the making view counts it (Create's line).
+    expect(parseCreatureDraft({ ...kept, spend: { spent_usd: '0.00000000', held_usd: '0.37355520' } }).heldUsd).toBe('0.37355520');
+    expect(parseCreatureDraft({ ...kept, spend: { spent_usd: '0.00420000' } }).heldUsd).toBeNull();
     expect(parseCreatureDraft({ ...kept, spend: null }).spentUsd).toBeNull();
+    expect(parseCreatureDraft({ ...kept, spend: null }).heldUsd).toBeNull();
     expect(parseCreatureDraft(kept).spentUsd).toBeNull();
+    expect(() => parseCreatureDraft({ ...kept, spend: { spent_usd: '0.00420000', held_usd: 0.37 } })).toThrow(TypeError);
     expect(parseCreatureDraft(kept).lookStatus).toBeNull();
     expect(parseCreatureDraft({ ...kept, look_job: { profile: 'exulanica.creature-look/v1', status: 'made' } }).lookStatus).toBe('made');
     expect(() => parseCreatureOffer({ ...offer, price: { usd_at_most: 0.37 } })).toThrow(TypeError);

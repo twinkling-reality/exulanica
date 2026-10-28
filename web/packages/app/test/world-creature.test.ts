@@ -118,10 +118,14 @@ describe('making a creature where it will stand', () => {
     expect(opened.key(press('Enter'))).toBe(true);
     await settle();
     expect(calls.ask).toEqual(['a round yellow body with a pale flat bill on two short legs']);
-    expect(root.textContent).toContain('Yellow pond wader');
-    expect(root.textContent).toContain('Made by Nemotron 3 Super 120B · spent $0.0042 · kept in Creatures');
-    // Its made look is not made yet, so it wears its sketch, said by its name.
-    expect(root.textContent).toContain('Yellow pond wader wears a sketch until the made look is ready.');
+    // The made card keeps only its name, how it was made, the words, Place, and who made it for how much (ROOT's sweep).
+    const card = root.querySelector('.wu-creature-made')!;
+    const parts = [...card.querySelectorAll('.wu-creature-title, .wu-creature-from, .wu-creature-quote, [aria-keyshortcuts], .wu-creature-small')].map((part) => part.textContent);
+    expect(parts).toEqual([
+      'Yellow pond wader', 'Made from your words', '“a round yellow body with a pale flat bill on two short legs”', 'Place',
+      'Made by Nemotron 3 Super 120B · spent $0.0042',
+    ]);
+    expect(card.textContent).toBe(parts.join(''));
     // Made, it is held at the stand at once and the keys go back to build mode, which places it; the step then ends.
     expect(calls.hold).toEqual([{ kind: { source: 'workspace', sha256: 'a'.repeat(64) }, at: { xMm: 4200, zMm: -1800 } }]);
     expect(calls.released).toBe(1);
@@ -134,17 +138,58 @@ describe('making a creature where it will stand', () => {
     expect(root.querySelector('.wu-creature-layer')).toBeNull();
   });
 
-  it('says nothing of a sketch once the made look is made', async () => {
+  it('says nothing on the made card of a sketch or of where it is kept, its made look made or not', async () => {
     const { openCreatureScreen } = await screen();
-    const { deps, root } = world({ reads: [{ ...kept, lookStatus: 'made' }] });
-    const opened = await openCreatureScreen(deps);
+    for (const lookStatus of ['queued', 'made', null]) {
+      const { deps, root } = world({ reads: [{ ...kept, lookStatus }] });
+      const opened = await openCreatureScreen(deps);
+      const field = root.querySelector('textarea')!;
+      field.value = 'a round yellow body';
+      field.dispatchEvent(new Event('input'));
+      opened.key(press('Enter'));
+      await settle();
+      expect(root.querySelector('.wu-creature-made .wu-creature-title')?.textContent).toBe('Yellow pond wader');
+      expect(root.textContent).not.toContain('sketch');
+      expect(root.textContent).not.toContain('kept in Creatures');
+      document.body.replaceChildren();
+    }
+  });
+
+  it('says under the steps what the making has spent so far of the most it may, as Create does, from each read', async () => {
+    const { openCreatureScreen } = await screen();
+    const line = (root: HTMLElement): string | null => {
+      const small = root.querySelector<HTMLElement>('.wu-creature-group .wu-creature-small');
+      return small === null || small.hidden ? null : small.textContent;
+    };
+    // What the draft's attempts settled at, and what its call under way holds, not known yet (Create's N10).
+    const { deps, root } = world({ reads: [
+      { ...queued, status: 'running', heldUsd: '0.37355520' },
+      { ...queued, status: 'running', spentUsd: '0.00420000', heldUsd: '0.00000000' },
+      kept,
+    ] });
+    const seen: (string | null)[] = [];
+    const opened = await openCreatureScreen({ ...deps, wait: async () => { seen.push(line(root)); } });
     const field = root.querySelector('textarea')!;
     field.value = 'a round yellow body';
     field.dispatchEvent(new Event('input'));
     opened.key(press('Enter'));
     await settle();
-    expect(root.textContent).toContain('Yellow pond wader');
-    expect(root.textContent).not.toContain('wears a sketch');
+    expect(seen).toEqual(['Spent $0 of up to $0.38', 'Spent $0 of up to $0.38, and up to $0.37 not known yet', 'Spent $0.0042 of up to $0.38']);
+    expect(root.textContent).not.toContain('You can leave this page');
+    expect(root.textContent).not.toContain('At most');
+    document.body.replaceChildren();
+    // A read that states no spend says none: no figure is ever made up.
+    const silent = world({ reads: [{ ...queued, status: 'running', spentUsd: null }, kept] });
+    const unread: (string | null)[] = [];
+    const again = await openCreatureScreen({
+      ...silent.deps, client: { ...silent.deps.client, ask: async () => ({ ...queued, spentUsd: null }) }, wait: async () => { unread.push(line(silent.root)); },
+    });
+    const words = silent.root.querySelector('textarea')!;
+    words.value = 'a round yellow body';
+    words.dispatchEvent(new Event('input'));
+    again.key(press('Enter'));
+    await settle();
+    expect(unread).toEqual([null, null]);
   });
 
   it('has no stand where the stand is out of view: the made creature waits in Creatures, the card says how to place it, and Back goes there', async () => {
@@ -313,9 +358,8 @@ describe('making a creature where it will stand', () => {
       opened.key(press('Enter'));
       await settle();
       expect(root.querySelector('.wu-creature-step.wu-refused')?.textContent).toBe(words);
-      // Nothing carries on at the server, so the small print saying it does goes; nothing was spent, so no spend.
-      expect(root.textContent).not.toContain('You can leave this page');
-      expect(root.textContent).not.toContain('At most');
+      // Nothing carries on at the server, so the live spend goes; nothing was spent, so no spend.
+      expect(root.textContent).not.toContain('of up to');
       expect(root.textContent).not.toContain('Spent');
       expect(root.querySelector('.wu-creature-group [aria-keyshortcuts="Enter"]')?.textContent ?? null).toBe(retry ? 'Try again' : null);
       // Enter tries again only where Try again shows: back to the field, the words kept.
@@ -417,8 +461,8 @@ describe('making a creature where it will stand', () => {
       const late = 'This is taking longer than usual. The creature waits in Creatures when it\'s done.';
       await vi.waitFor(() => expect(root.querySelector('.wu-creature-step')?.textContent).toBe(late));
       expect(root.querySelector('.wu-refused')).toBeNull();
-      // The line says it may still finish; the small print keeps only the price.
-      expect(root.querySelector('.wu-creature-group .wu-creature-small')?.textContent).toBe('At most $0.37.');
+      // The line says it may still finish; the small print keeps the spend last read.
+      expect(root.querySelector('.wu-creature-group .wu-creature-small')?.textContent).toBe('Spent $0 of up to $0.38');
       expect(opened.key(press('Enter'))).toBe(false);
     } finally {
       vi.restoreAllMocks();
@@ -556,7 +600,7 @@ describe('the creature panel inside the window', () => {
       Object.defineProperty(part, 'scrollHeight', { configurable: true, value: words });
       Object.defineProperty(part, 'clientHeight', { configurable: true, value: room });
     };
-    const making = makingGroup({ words: 'a round yellow body', priceUsdAtMost: '0.37355520' });
+    const making = makingGroup({ words: 'a round yellow body' });
     const group: HTMLElement = making.root;
     document.body.append(group);
     const body = group.querySelector<HTMLElement>('.wu-creature-group > .wu-frame-col > .wu-creature-body.wu-frame-scroll')!;
@@ -572,7 +616,7 @@ describe('the creature panel inside the window', () => {
     await vi.waitFor(() => expect(body.dataset.below).toBe('false'));
     expect(track.hidden).toBe(true);
     // The made card's words too, read again as its Place row changes.
-    const made: HTMLElement = madeGroup({ label: 'yellow pond wader', words: 'a round yellow body', modelName: null, spentUsd: null, sketch: false, placeable: true });
+    const made: HTMLElement = madeGroup({ label: 'yellow pond wader', words: 'a round yellow body', modelName: null, spentUsd: null, placeable: true });
     document.body.append(made);
     const madeBody = made.querySelector<HTMLElement>('.wu-creature-made > .wu-frame-col > .wu-creature-body.wu-frame-scroll')!;
     expect(madeBody.querySelector('.wu-creature-title')?.textContent).toBe('Yellow pond wader');
@@ -646,15 +690,19 @@ describe('web notes before a creature is made', () => {
       [request('running', [step('plan', 'running'), step('search', 'waiting'), step('read', 'waiting'), step('bundle', 'waiting')]), done],
       { ...kept, spentUsd: '0.00420000', references: { referenceId: 'ref-1', state: 'used', code: null, notes: 7, searches: 3, spentUsd: '0.00110000' } },
     );
-    const opened = await openCreatureScreen(deps);
+    // While it is made, the live spend counts the notes' most as not known yet until a read states what they spent.
+    const seen: (string | null)[] = [];
+    const small = (): string | null => { const line = root.querySelector<HTMLElement>('.wu-creature-group .wu-creature-small'); return line === null || line.hidden ? null : line.textContent; };
+    const opened = await openCreatureScreen({ ...deps, wait: async () => { seen.push(small()); } });
     type(root, '  a little yellow robot duck ');
     tick(root);
     opened.key(press('Enter'));
     await settle();
+    expect(seen).toEqual([null, null, 'Spent $0 of up to $0.12, and up to $0.02 not known yet']);
     expect(requested).toEqual([{ purpose: 'things', description: 'a little yellow robot duck', idempotencyKey: 'key-1' }]);
     expect(asked).toEqual([{ words: 'a little yellow robot duck', referenceId: 'ref-1' }]);
     expect(root.textContent).toContain('Made from your words and 7 notes from the web');
-    expect(root.textContent).toContain('Made by Nemotron 3 Super 120B · spent $0.0053 · kept in Creatures');
+    expect(root.querySelector('.wu-creature-made .wu-creature-small')?.textContent).toBe('Made by Nemotron 3 Super 120B · spent $0.0053');
   });
 
   it('shows at most four notes in the making group, counts the rest, and says what wrote them', async () => {
@@ -703,7 +751,7 @@ describe('web notes before a creature is made', () => {
     tick(root);
     opened.key(press('Enter'));
     await settle();
-    expect(root.textContent).toContain('Made by Nemotron 3 Super 120B · kept in Creatures');
+    expect(root.querySelector('.wu-creature-made .wu-creature-small')?.textContent).toBe('Made by Nemotron 3 Super 120B');
     expect(root.textContent).not.toContain('spent');
   });
 });
