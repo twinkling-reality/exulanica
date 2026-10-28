@@ -1,8 +1,10 @@
 #contextual-world { position:fixed; inset:0; z-index:25; pointer-events:none; color:#fff; font:400 14px/1.45 "IBM Plex Sans",sans-serif; }
 #contextual-world * { box-sizing:border-box; }
 #contextual-world [hidden] { display:none !important; }
-#contextual-world button:not(.wu-prompt):not(.wu-orb) { color:inherit; font:inherit; }
-#contextual-world button:not(.wu-prompt):not(.wu-orb):focus-visible { outline:2px solid #fff; outline-offset:5px; }
+/* The world's own buttons take its ink, type and white focus ring. Create's composer (world-ui-create.ts, a creature's
+   field) brings its own, as on Create, so these leave its controls alone; :where() adds no weight to them. */
+#contextual-world button:not(.wu-prompt):not(.wu-orb):not(:where(.wu-composer *)) { color:inherit; font:inherit; }
+#contextual-world button:not(.wu-prompt):not(.wu-orb):not(:where(.wu-composer *)):focus-visible { outline:2px solid #fff; outline-offset:5px; }
 /* Beside a character or thing: the tag, prompt, ring and cards (character-presence.ts, world-ui.css). */
 #contextual-world .cw-beside { position:absolute; inset:0; pointer-events:none; }
 /* A page hides the corners (spec 5.7); the Running strip stays over it (5.9). */

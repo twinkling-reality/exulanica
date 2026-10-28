@@ -29,7 +29,8 @@
 .wu-creature-heading { margin: 0; font: 500 clamp(30px, 2.3vw, 40px)/1.1 var(--font-sans); letter-spacing: -.022em; color: var(--c-ink); text-shadow: 0 1px 14px rgb(0 0 0 / 55%); }
 /* The world's layer takes no pointer; the composer takes its clicks and keys. */
 .wu-creature-field .wu-composer { pointer-events: auto; background: rgb(10 13 15 / 62%); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
-.wu-creature-field :focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
+/* Create's focus ring on the composer's buttons; its words keep create-world.css's none, as on Create. */
+.wu-creature-field button:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
 /* The toggle's details over it, the composer standing low in the view. */
 .wu-creature-field .wu-composer-tip { top: auto; bottom: calc(100% + 12px); }
 .wu-creature-stand { color: var(--ink); font: 450 calc(14 * var(--u))/1.43 var(--font-sans); transform: translate(-50%, calc(-100% - 36 * var(--u))); white-space: nowrap; }
