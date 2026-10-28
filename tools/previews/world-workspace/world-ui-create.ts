@@ -135,25 +135,35 @@ export interface Composer {
   offerWeb(web: ComposerWeb | null): void;
 }
 
+/** What a composer says of itself: the field's placeholder and name, and the pill's word. Create's by default. */
+export interface ComposerWords {
+  readonly placeholder: string;
+  readonly label: string;
+  readonly pill: string;
+}
+
 /**
  * The composer (the mock's one box): the words above, in the field's own type, with the placeholder in the muted
  * ink; in its foot the web search toggle, then why Create cannot start where it cannot, the price, and the white
- * Create pill with its key. Enter in the field and a press of the pill are the caller's.
+ * Create pill with its key. Enter in the field and a press of the pill are the caller's. Making a creature in the
+ * world is the same box with its own words (world-ui-creature.ts).
  */
-export function composer({ value = '', onInput, onCreate }: { readonly value?: string; readonly onInput?: (words: string) => void; readonly onCreate: () => void }): Composer {
+export function composer({ value = '', onInput, onCreate, wording = { placeholder: CREATE_WORDS.placeholder, label: CREATE_WORDS.describeIt, pill: CREATE_WORDS.create } }: {
+  readonly value?: string; readonly onInput?: (words: string) => void; readonly onCreate: () => void; readonly wording?: ComposerWords;
+}): Composer {
   const root = element('div', 'wu-composer');
   const field = element('textarea', 'wu-composer-words');
   field.rows = 2;
-  field.placeholder = CREATE_WORDS.placeholder;
+  field.placeholder = wording.placeholder;
   field.spellcheck = true;
-  field.setAttribute('aria-label', CREATE_WORDS.describeIt);
+  field.setAttribute('aria-label', wording.label);
   const foot = element('div', 'wu-composer-foot');
   const web = element('span', 'wu-composer-web');
   // What the foot says changes while the page is open: the reason and the price, each a polite status.
   const said = element('span', 'wu-composer-why');
   const price = element('span', 'wu-composer-price');
   for (const status of [said, price]) status.setAttribute('role', 'status');
-  const pill = element('button', 'wu-composer-pill', CREATE_WORDS.create);
+  const pill = element('button', 'wu-composer-pill', wording.pill);
   pill.type = 'button';
   pill.setAttribute('aria-keyshortcuts', 'Enter');
   const key = element('span', 'wu-composer-key', '↵');

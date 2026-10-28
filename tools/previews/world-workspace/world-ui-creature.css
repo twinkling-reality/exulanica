@@ -8,43 +8,30 @@
 @media (max-width: 1279px) { .wu-creature-layer { --frame-side: 32px; } }
 @media (max-width: 1699px), (max-height: 899px) { .wu-creature-layer { --frame-top: 56px; } }
 @media (max-height: 699px) { .wu-creature-layer { --frame-top: 28px; --frame-bottom: 44px; } }
+/* Making a creature as Create makes a world (ROOT's sweep, 27 October): "Make a creature" over Create's composer, low
+   in the middle of the view, in Create's type and ink (create-world.css's, its colours set here as Create's page sets
+   them), the composer on a dark glass so its white type holds over any world. */
 .wu-creature-field {
+  --c-ink: #ffffff;
+  --c-ink-2: rgb(255 255 255 / 72%);
+  --c-ink-3: rgb(255 255 255 / 48%);
+  --c-hair: rgb(255 255 255 / 16%);
+  --c-focus: #b9d6e0;
+  --c-ease: cubic-bezier(.25, .46, .45, .94);
   position: absolute;
   left: 50%;
   bottom: calc(136 * var(--u));
   width: min(max(640px, calc(800 * var(--u))), calc(100vw - 2 * var(--frame-side)));
   transform: translateX(-50%);
   display: grid;
-  gap: calc(16 * var(--u));
-  justify-items: center;
+  gap: calc(14 * var(--u));
 }
-.wu-creature-glass {
-  width: 100%;
-  box-sizing: border-box;
-  padding: calc(24 * var(--u)) calc(24 * var(--u)) calc(20 * var(--u)) calc(28 * var(--u));
-  border-radius: calc(16 * var(--u));
-  display: grid;
-  gap: calc(8 * var(--u));
-  color: var(--ink);
-}
-.wu-creature-label { font: 400 calc(15 * var(--u))/1.6 var(--font-sans); opacity: .8; }
-.wu-creature-words {
-  font: 300 max(20px, calc(24 * var(--u)))/1.42 var(--font-sans);
-  color: inherit;
-  background: transparent;
-  border: 0;
-  outline: 0;
-  padding: 0;
-  resize: none;
-  field-sizing: content;
-  max-height: 5.7em;
-  text-wrap: pretty;
-}
-.wu-creature-row { display: flex; justify-content: flex-end; align-items: center; gap: calc(16 * var(--u)); margin-top: calc(16 * var(--u)); }
-.wu-creature-count { font: 400 calc(12 * var(--u))/1 var(--font-mono); opacity: .58; }
-.wu-creature-quiet { opacity: .55; }
-/* The line under the field keeps its place in the column; its shade is only its backing. */
-.wu-creature-line { position: relative; color: var(--ink); font: 400 calc(15 * var(--u))/1.6 var(--font-sans); }
+.wu-creature-heading { margin: 0; font: 500 clamp(30px, 2.3vw, 40px)/1.1 var(--font-sans); letter-spacing: -.022em; color: var(--c-ink); text-shadow: 0 1px 14px rgb(0 0 0 / 55%); }
+/* The world's layer takes no pointer; the composer takes its clicks and keys. */
+.wu-creature-field .wu-composer { pointer-events: auto; background: rgb(10 13 15 / 62%); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.wu-creature-field :focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
+/* The toggle's details over it, the composer standing low in the view. */
+.wu-creature-field .wu-composer-tip { top: auto; bottom: calc(100% + 12px); }
 .wu-creature-stand { color: var(--ink); font: 450 calc(14 * var(--u))/1.43 var(--font-sans); transform: translate(-50%, calc(-100% - 36 * var(--u))); white-space: nowrap; }
 /* The making group and the made card: at the sheet's place and width where the window has room, else moved in and
    narrowed to stand between the frame's sides. */
@@ -90,18 +77,8 @@
 .wu-creature-leader line { stroke: var(--ink); stroke-opacity: .7; stroke-width: max(1px, calc(1.2 * var(--u))); }
 /* While a creature step shows, the reticle and the look tag give way (as under a scene, T13). */
 #contextual-world:has(> .wu-creature-layer) :is(.wu-reticle, .wu-tag, .cg-look) { visibility: hidden; }
-/* Web notes (Create's frames 20 and 21 with "creature", WORDS.md 12:34): the box under the line, off until ticked, its
-   label in the line's ink and its line in the faint ink; in the making group, each passed step with its time, then the
-   notes under "From the web" in the over-label's mono, each aspect first in the faint ink. */
-.wu-creature-notes-ask {
-  position: relative; display: grid; grid-template-columns: calc(18 * var(--u)) 1fr; column-gap: calc(12 * var(--u));
-  row-gap: calc(4 * var(--u)); align-items: start; justify-self: stretch; color: var(--ink);
-  /* The world's layer takes no pointer; the box takes its click, as the field does. */
-  pointer-events: auto;
-}
-.wu-creature-notes-label { display: contents; cursor: pointer; font: 400 max(12px, calc(15 * var(--u)))/1.5 var(--font-sans); }
-.wu-creature-notes-box { width: calc(18 * var(--u)); height: calc(18 * var(--u)); margin: calc(3 * var(--u)) 0 0; accent-color: var(--accent); cursor: pointer; }
-.wu-creature-notes-ask .wu-creature-notes-line { grid-column: 2; }
+/* Web notes in the making group (Create's frame 21 with "creature", WORDS.md 12:34): each passed step with its time, then
+   the notes under "From the web" in the over-label's mono, each aspect first in the faint ink. */
 .wu-creature-notes-line { margin: 0; font: 400 max(12px, calc(13 * var(--u)))/1.45 var(--font-sans); color: var(--ink-2); text-wrap: pretty; }
 .wu-creature-passed { color: var(--ink-2); }
 .wu-creature-missed { color: var(--ink-3); }

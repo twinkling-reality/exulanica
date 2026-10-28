@@ -54,9 +54,7 @@ export function buildCreatureSheet(handlers: CreatureSheetHandlers): CreatureShe
   const timing = el('p', { class: 'creature-sheet-timing' });
   const status = el('p', { class: 'creature-sheet-status', role: 'status', 'aria-live': 'polite' });
   const root = el('section', { class: 'creature-sheet', 'aria-label': 'Make a creature', hidden: '' }, [
-    el('p', { class: 'creature-sheet-eyebrow', text: 'MAKE A CREATURE' }),
-    el('h2', { class: 'creature-sheet-title', text: 'Describe a creature' }),
-    el('p', { class: 'creature-sheet-lede', text: 'In your own words. The world drafts its body and it comes to stand in front of you.' }),
+    el('h2', { class: 'creature-sheet-title', text: 'Make a creature' }),
     unavailable,
     el('div', { class: 'creature-sheet-row' }, [input, make]),
     timing,

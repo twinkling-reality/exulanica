@@ -20,9 +20,7 @@
   box-shadow: 0 1.5rem 3rem color-mix(in srgb, black 35%, transparent);
 }
 #shell section.creature-sheet[hidden] { display: none; }
-#shell .creature-sheet-eyebrow { margin: 0; font-size: 0.7rem; letter-spacing: 0.14em; color: var(--color-text-muted); }
 #shell .creature-sheet-title { margin: 0; font-size: 1.6rem; font-weight: 300; }
-#shell .creature-sheet-lede,
 #shell .creature-sheet-timing,
 #shell .creature-sheet-unavailable { margin: 0; color: var(--color-text-muted); }
 #shell .creature-sheet-row { display: flex; gap: 0.5rem; }

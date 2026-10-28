@@ -339,10 +339,10 @@ export const webColumn = (notes, searches) => `${counted(notes, 'note', 'notes')
 
 /**
  * The toggle's details, shown on hover and keyboard focus (the composer page's mock): the planner's limit and the most
- * the notes' two model calls add, from the offer.
+ * the notes' two model calls add, from the offer. A creature's composer says "creature" for "place".
  */
-export const webTip = (searches, mostUsd) =>
-  `Looks up what such a place looks like before it is made: up to ${counted(searches, 'search', 'searches')} with ${NOTES_SOURCE}, which keeps ${searches === 1 ? 'it' : 'them'}. Adds at most ${ceilingAmount(mostUsd)}.`;
+export const webTip = (searches, mostUsd, made = 'place') =>
+  `Looks up what such a ${made} looks like before it is made: up to ${counted(searches, 'search', 'searches')} with ${NOTES_SOURCE}, which keeps ${searches === 1 ? 'it' : 'them'}. Adds at most ${ceilingAmount(mostUsd)}.`;
 
 /** Over the notes in the making view's second column: "FROM THE WEB, 3 SEARCHES", the searches sent, where any were. */
 export const webNotesLabel = (searches) =>

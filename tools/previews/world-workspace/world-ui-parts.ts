@@ -5,7 +5,7 @@
 // composer empty, ?chosen=<n> makes a card current and ?thumbs=<folder> draws the cards' pictures.
 // ?view=creature-describe, creature-making and creature-made show making a creature where it will
 // stand (world-ui-creature.ts) with the sheet's example words, over ?picture= as the world; ?notes adds the web notes
-// (the box under the line, and the making group's steps and notes, standing on the field's line), ?left the groups'
+// ("Search the web" pressed, and the making group's steps and notes, standing on the field's line), ?left the groups'
 // place beside a stand right of the middle.
 import {
   areaBanner, cardWords, chip, glyphRows, keyWord, label, mountUiScale, notes, orb, page, pill, promptColumn, promptRow,
@@ -14,7 +14,7 @@ import {
 import { composer, createPage, createTitle, madeNote, makingSteps, quietCommand, webNotes, worldStrip } from './world-ui-create.ts';
 import { CREATE_WORDS, madeSpent, priceUpTo, refusalSpent, refusalWords, setValue, spentUpTo, webNotesLabel, webTip } from './create-words.mjs';
 import { draftSteps, madeColumns, startCards } from './create-steps.mjs';
-import { creatureField, madeGroup, makerLine, makingGroup, notesAsk, standLabel } from './world-ui-creature.ts';
+import { creatureField, madeGroup, makingGroup, standLabel } from './world-ui-creature.ts';
 // The product's fonts and their tokens, as the app loads them (bootstrap.ts).
 import '../../../web/packages/presentation/src/tokens.css';
 
@@ -33,12 +33,16 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
   const words = 'a round yellow body with a pale flat bill on two short legs', price = '0.37355520';
   const layer = add(div('wu-creature-layer'));
   if (view === 'creature-describe') {
-    add(creatureField({ maximum: 400, onMake: press }).root, layer);
-    const made = layer.querySelector('textarea')!; made.value = query.has('empty') ? '' : words;
-    const under = layer.querySelector('.wu-creature-line')!; under.textContent = makerLine(price, 18);
-    const count = layer.querySelector('.wu-creature-count')!; count.textContent = `${made.value.length} of 400`;
-    if (query.has('notes')) layer.querySelector('.wu-creature-field')!.append(notesAsk({ searchesAtMost: 3, maximumUsd: '0.0453', onChange: press }).root);
-    const over = add(standLabel(), layer); over.style.left = 'calc(960 * var(--u))'; over.style.top = 'calc(640 * var(--u))';
+    const shown = creatureField({ maximum: 400, onInput: press, onMake: press });
+    add(shown.root, layer);
+    shown.composer.set(query.has('empty') ? '' : words);
+    // The drafter's most, and with "Search the web" pressed, the notes' added (Create's words).
+    const notesMost = '0.0453', on = query.has('notes');
+    shown.composer.offerWeb({ on, tip: webTip(3, notesMost, 'creature'), onChange: press });
+    shown.composer.say(null, priceUpTo(on ? String(Number(price) + Number(notesMost)) : price));
+    shown.composer.ready(!query.has('empty'));
+    // As the screen shows it: at a stand above the composer (one below its top is no stand).
+    const over = add(standLabel(), layer); over.style.left = '62vw'; over.style.top = 'calc(50vh - 40px)';
   } else if (view === 'creature-making') {
     const making = makingGroup({ words, priceUsdAtMost: price });
     if (query.has('notes')) {

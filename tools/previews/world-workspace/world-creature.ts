@@ -8,7 +8,8 @@
 import { CreatureDraftsClient, draftEnded, type CreatureDraft, type CreatureNotesOffer, type CreatureOffer, type SocietyStand } from '../../../web/packages/app/src/creature-drafts-api.ts';
 import type { Credentials } from '../../../web/packages/app/src/config.ts';
 import { ReferencesClient, referenceFinished, referenceHasNotes, type ReferenceRequest } from '../../../web/packages/app/src/references-api.ts';
-import { CREATURE_WORDS, creatureField, leader, madeGroup, makerLine, makingGroup, notesAsk, placeRow, standLabel, standLight, type MakingGroup } from './world-ui-creature.ts';
+import { CREATURE_WORDS, creatureField, leader, madeGroup, makingGroup, placeRow, standLabel, standLight, type MakingGroup } from './world-ui-creature.ts';
+import { priceUpTo, webTip } from './create-words.mjs';
 import { ANCHOR_INSET } from './world-ui-layout.mjs';
 
 /** How far ahead of the eye the stand is looked for (the sheet's 8 m: 3 m falls under the field). */
@@ -142,7 +143,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
   // Ended with nothing made, whether trying again can help (Try again shows, and Enter does it).
   let retryable = false;
   let ended = false;
-  const field = creatureField({ maximum: WORDS_MAXIMUM, onMake: () => { void make(); } });
+  const field = creatureField({ maximum: WORDS_MAXIMUM, onInput: (typed) => { words = typed; foot(); }, onMake: () => { void make(); } });
   // Whether the person ticked the web notes box for this creature (off until ticked, each creature its own choice), and
   // whether a notes request was made for the creature being made (its spend is then part of the making's).
   let withNotes = false, notesAsked = false;
@@ -162,16 +163,20 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     const price = offer?.priceUsdAtMost ?? null, notes = withNotes ? notesOffered() : null;
     return price === null || notes === null ? price : addUsd(price, notes.maximumUsd);
   }
-  function lineUnder(): void {
-    if (offer !== null && !offer.offered) { field.line(REFUSED[offer.code ?? ''] ?? CREATURE_WORDS.notOffered, true); return; }
-    // Ticked, the line gives the whole most; no measured time covers the searches, so it gives no time then.
-    field.line(makerLine(mostUsd(), withNotes ? null : offer?.timing.typicalSeconds ?? null, offer?.model?.name ?? null));
+  /** The composer's foot as Create's: why it cannot make where it cannot, else the most it may cost; Make with words. */
+  function foot(): void {
+    const refused = offer !== null && !offer.offered ? REFUSED[offer.code ?? ''] ?? CREATURE_WORDS.notOffered : null;
+    // With "Search the web" pressed, the price is the whole most, the notes' with the drafter's.
+    const most = mostUsd();
+    field.composer.say(refused, refused !== null || most === null ? null : priceUpTo(most));
+    field.composer.ready(refused === null && offer !== null && sendableWords(words) !== '');
   }
+  /** "Search the web" where web notes are offered here, off until pressed (each creature its own choice), its details on hover. */
   function offerNotes(): void {
     const notes = notesOffered();
-    if (notes === null) return;
-    const ask = notesAsk({ searchesAtMost: notes.searchesAtMost, maximumUsd: notes.maximumUsd, onChange: (on) => { withNotes = on; lineUnder(); } });
-    field.root.append(ask.root);
+    field.composer.offerWeb(notes === null ? null : {
+      on: withNotes, tip: webTip(notes.searchesAtMost, notes.maximumUsd, 'creature'), onChange: (on) => { withNotes = on; foot(); },
+    });
   }
   function showStand(): void {
     const at = deps.mark(stand);
@@ -194,7 +199,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
    * (DESIGN's 13:59 ruling). A bound not laid out yet bounds nothing.
    */
   function inView(at: { readonly x: number; readonly y: number }): boolean {
-    const field = deps.root.querySelector('.wu-creature-glass')?.getBoundingClientRect();
+    const field = deps.root.querySelector('.wu-creature-field .wu-composer')?.getBoundingClientRect();
     const pill = deps.root.querySelector('.wu-top')?.getBoundingClientRect();
     return at.x >= ANCHOR_INSET && at.x <= innerWidth - ANCHOR_INSET
       && !(field && field.height > 0 && at.y > field.top)
@@ -227,8 +232,6 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
   function besideStand(group: HTMLElement): void {
     group.classList.toggle('wu-creature-left', standAt !== null && standAt.x > innerWidth / 2);
   }
-  field.input.addEventListener('input', () => { words = field.input.value; field.count(words.length, WORDS_MAXIMUM); });
-  field.count(0, WORDS_MAXIMUM);
 
   /** The making group, its light and the stand's label put away: the field gives way to the steps. */
   function startMaking(): MakingGroup {
@@ -385,8 +388,8 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
     if (state !== 'ended' || ended) return;
     state = 'describe';
     layer.replaceChildren(field.root);
-    lineUnder();
-    field.input.focus();
+    foot();
+    field.composer.field.focus();
   }
 
   async function make(): Promise<void> {
@@ -407,7 +410,7 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
       const running = code === 'creature_limit_reached' ? (await deps.client.drafts().catch(() => [])).find((draft) => !draftEnded(draft)) : undefined;
       if (running !== undefined) { await follow(running, making ?? undefined); return; }
       const refused = code === 'creature_limit_reached' ? CREATURE_WORDS.hourLimit : REFUSED[code ?? ''] ?? CREATURE_WORDS.wentWrong;
-      if (making === null) { field.line(refused, true); return; }
+      if (making === null) { field.composer.say(refused, null); return; }
       // Refused after the notes: the making group says why, and Try again goes back to the field with the words.
       state = 'ended';
       retryable = true;
@@ -432,13 +435,13 @@ export async function openCreatureScreen(deps: CreatureScreenDeps): Promise<Crea
   }
 
   offer = await deps.client.offer().catch(() => null);
-  lineUnder();
+  foot();
   offerNotes();
   await findStand();
   globalThis.requestAnimationFrame?.(track);
   const running = offer?.offered ? (await deps.client.drafts().catch(() => [])).find((draft) => !draftEnded(draft)) : undefined;
   if (running !== undefined) void follow(running);
-  else field.input.focus();
+  else field.composer.field.focus();
 
   return {
     key(event) {

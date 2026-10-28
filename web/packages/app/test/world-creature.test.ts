@@ -63,7 +63,7 @@ const settle = async (): Promise<void> => { for (let turn = 0; turn < 20; turn +
 afterEach(() => { document.body.replaceChildren(); });
 
 describe('making a creature where it will stand', () => {
-  it('marks the stand the society would take it in at, 8 m ahead, and says the price and time under the field', async () => {
+  it('marks the stand the society would take it in at, 8 m ahead, under Create\'s composer with its price and no model named', async () => {
     const { openCreatureScreen, STAND_AHEAD_MM } = await screen();
     const { deps, calls, root } = world();
     await openCreatureScreen(deps);
@@ -73,25 +73,39 @@ describe('making a creature where it will stand', () => {
     expect(calls.marked.length).toBeGreaterThan(0);
     expect(calls.marked.every((marked) => marked === stand)).toBe(true);
     expect(root.textContent).toContain('The creature appears here');
-    expect(root.textContent).toContain('An open model, Nemotron 3 Super 120B, makes the creature from your words: at most $0.37, about 18 seconds, and you see what it really spent.');
+    // "Make a creature" over Create's composer, its price in the foot; the model is named on the made card alone.
+    expect(root.querySelector('.wu-creature-field .wu-creature-heading')?.textContent).toBe('Make a creature');
+    expect(root.querySelector('.wu-creature-field .wu-composer-price')?.textContent).toBe('up to $0.38');
+    expect(root.querySelector('.wu-creature-field textarea')?.getAttribute('placeholder')).toBe('What does the creature look like?');
+    expect(root.textContent).not.toContain('Nemotron');
   });
 
-  it('with no stand open marks nothing, and with no price says only what makes it', async () => {
+  it('with no stand open marks nothing, and with no price shows none', async () => {
     const { openCreatureScreen } = await screen();
     const { deps, calls, root } = world({ stand: null, offer: { ...offer, priceUsdAtMost: null } });
     await openCreatureScreen(deps);
     expect(calls.marked).toEqual([null]);
     expect(root.textContent).not.toContain('The creature appears here');
-    expect(root.textContent).toContain('An open model, Nemotron 3 Super 120B, makes the creature from your words.');
-    expect(root.textContent).not.toContain('seconds');
-    expect(root.textContent).not.toContain('really spent');
+    expect(root.querySelector<HTMLElement>('.wu-creature-field .wu-composer-price')?.hidden).toBe(true);
   });
 
-  it('says an open model makes it without a name where the offer names none', async () => {
+  it('dims Make until there are words to send, and a press of Make makes as Enter does', async () => {
     const { openCreatureScreen } = await screen();
-    const { deps, root } = world({ offer: { ...offer, model: null } });
+    const { deps, calls, root } = world();
     await openCreatureScreen(deps);
-    expect(root.textContent).toContain('An open model makes the creature from your words: at most $0.37, about 18 seconds, and you see what it really spent.');
+    const pill = root.querySelector<HTMLButtonElement>('.wu-creature-field .wu-composer-pill')!;
+    expect(pill.textContent).toBe('Make↵');
+    expect(pill.getAttribute('aria-disabled')).toBe('true');
+    const field = root.querySelector('textarea')!;
+    field.value = '  ';
+    field.dispatchEvent(new Event('input'));
+    expect(pill.getAttribute('aria-disabled')).toBe('true');
+    field.value = 'a round yellow body';
+    field.dispatchEvent(new Event('input'));
+    expect(pill.getAttribute('aria-disabled')).toBeNull();
+    pill.click();
+    await settle();
+    expect(calls.ask).toEqual(['a round yellow body']);
   });
 
   it('makes the words into a draft, follows it until kept, and holds the kind at the stand for build mode to place', async () => {
@@ -426,7 +440,7 @@ describe('making a creature where it will stand', () => {
       opened.key(press('Enter'));
       await settle();
       if (running) expect(root.textContent).toContain('Yellow pond wader');
-      else expect(root.querySelector('.wu-creature-line.wu-refused')?.textContent).toBe('You\'ve made as many creatures as you can this hour. Try again later.');
+      else expect(root.querySelector('.wu-creature-field .wu-composer-why')?.textContent).toBe('You\'ve made as many creatures as you can this hour. Try again later.');
       document.body.replaceChildren();
     }
   });
@@ -439,7 +453,7 @@ describe('making a creature where it will stand', () => {
     ] as const) {
       const refused = world({ offer: { ...offer, offered: false, code } });
       await openCreatureScreen(refused.deps);
-      expect(refused.root.querySelector('.wu-refused')?.textContent).toBe(words);
+      expect(refused.root.querySelector('.wu-creature-field .wu-composer-why')?.textContent).toBe(words);
     }
     // Held closed after Make: the draft fails paused, and says so rather than spent.
     const { deps, root } = world({ reads: [{ ...queued, status: 'failed', failure: 'spending_suspended' }] });
@@ -601,20 +615,28 @@ describe('web notes before a creature is made', () => {
     field.value = words;
     field.dispatchEvent(new Event('input'));
   };
-  const tick = (root: HTMLElement): void => { root.querySelector<HTMLInputElement>('.wu-creature-notes-box')!.click(); };
+  const tick = (root: HTMLElement): void => { root.querySelector<HTMLButtonElement>('.wu-creature-field .wu-composer-chip')!.click(); };
 
-  it('offers the box only where notes are offered here, and ticked, the line gives the whole most and no time', async () => {
+  it('offers "Search the web" only where notes are offered here, its details on hover, and pressed, prices the whole most', async () => {
     const { openCreatureScreen } = await screen();
     const without = world();
     await openCreatureScreen(without.deps);
-    expect(without.root.querySelector('.wu-creature-notes-box')).toBeNull();
+    expect(without.root.querySelector('.wu-composer-chip')).toBeNull();
     const { deps, root } = noted([]);
     await openCreatureScreen(deps);
-    expect(root.textContent).toContain('Read the web first for what such a creature looks like');
-    expect(root.textContent).toContain('Up to 3 web searches go to Tavily, made from your words with the names and details this install holds as yours left out, and Tavily keeps them. Adds at most $0.02.');
-    expect(root.textContent).toContain('at most $0.10, about 18 seconds,');
+    const chip = root.querySelector<HTMLButtonElement>('.wu-creature-field .wu-composer-chip')!;
+    expect(chip.textContent).toBe('Search the web');
+    expect(chip.getAttribute('aria-pressed')).toBe('false');
+    expect(root.querySelector(`#${chip.getAttribute('aria-describedby')}`)?.textContent)
+      .toBe('Looks up what such a creature looks like before it is made: up to 3 searches with Tavily, which keeps them. Adds at most $0.02.');
+    const price = () => root.querySelector('.wu-creature-field .wu-composer-price')?.textContent;
+    expect(price()).toBe('up to $0.10');
     tick(root);
-    expect(root.textContent).toContain('An open model, Nemotron 3 Super 120B, makes the creature from your words: at most $0.12, and you see what it really spent.');
+    expect(chip.getAttribute('aria-pressed')).toBe('true');
+    expect(price()).toBe('up to $0.12');
+    // Nothing of the old box: no sentence on where the words go under the field, no model named.
+    expect(root.textContent).not.toContain('Read the web first');
+    expect(root.textContent).not.toContain('Nemotron');
   });
 
   it('ticked, asks for notes on the words, shows them, and asks the drafter with them; the spend counts the notes', async () => {

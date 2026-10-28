@@ -1,11 +1,12 @@
 // Making a creature where it will stand (DESIGN's R-CREATURE-BUILD-SHEET.md, pictures r-creature17t, 19t and
 // 19b; the money words of WORDS.md's unit 9 entry of 22 October; web notes in Create's words of 25 October, with
-// "creature" for "place", WORDS.md 12:34): the field low in the middle, the line under it and the web notes box,
-// the label over the stand, the making group with the notes from the web, and the made group beside it. They only
-// draw; what a key does is world-creature.ts's. Their look lives in world-ui-creature.css, from world-ui.css's
-// tokens.
+// "creature" for "place", WORDS.md 12:34): its title over Create's composer low in the middle (ROOT's sweep of 27
+// October), the label over the stand, the making group with the notes from the web, and the made group beside it.
+// They only draw; what a key does is world-creature.ts's. Their look lives in world-ui-creature.css, from
+// world-ui.css's tokens, and the composer's in create-world.css.
 import { glyphRows, shade } from './world-ui.ts';
 import { scrollingColumn } from './world-page-frame.ts';
+import { composer, type Composer } from './world-ui-create.ts';
 import './world-ui-creature.css';
 
 /** Each note aspect's label by its key, from the reference aspect catalogs (a later version's label wins). */
@@ -25,6 +26,8 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', 
 
 /** Every word these screens show, as DESIGN worded them. */
 export const CREATURE_WORDS = Object.freeze({
+  title: 'Make a creature',
+  /** The composer's placeholder, and the field's name. */
   fieldLabel: 'What does the creature look like?',
   appearsHere: 'The creature appears here',
   make: 'Make',
@@ -52,14 +55,8 @@ export const CREATURE_WORDS = Object.freeze({
   placingNow: 'Placing…',
   /** The made card where no stand was found ahead (rehearsal run 7): where the creature is and how to place it. */
   nowhereToStand: 'There is no open ground ahead to stand it on, so it waits in Creatures. Pick it there to place it.',
-  /** The line under the field begins with what makes it: an open model, named where the offer names one (DESIGN, A1). */
-  maker: 'An open model',
-  makes: 'makes the creature from your words',
-  seenSpend: 'and you see what it really spent',
   leave: 'You can leave this page: the making carries on, and the creature waits in Creatures.',
   kept: 'kept in Creatures',
-  /** The web notes box under the line (Create's frame 20 words). */
-  notesAsk: 'Read the web first for what such a creature looks like',
   /** The notes' steps before the drafting's (Create's frame 21), by the request's step names. */
   notesSteps: Object.freeze({ plan: 'Choosing what to look up', search: 'Searching the web', read: 'Writing notes from what it found' }) as Readonly<Record<string, string>>,
   fromWeb: 'From the web',
@@ -71,11 +68,6 @@ export const CREATURE_WORDS = Object.freeze({
 export const NOTES_SHOWN = 4;
 
 const searchesWord = (count: number): string => `${count} web ${count === 1 ? 'search' : 'searches'}`;
-
-/** Under the web notes box: where the person's words go and the most the notes add (Create's frame 20). */
-export function notesAskLine(searchesAtMost: number, maximumUsd: string): string {
-  return `Up to ${searchesWord(searchesAtMost)} ${searchesAtMost === 1 ? 'goes' : 'go'} to Tavily, made from your words with the names and details this install holds as yours left out, and Tavily keeps them. Adds at most ${money(maximumUsd)}.`;
-}
 
 /** Under the notes from the web: what wrote them and what they are (Create's frame 21). */
 export function notesWrote(searches: number): string {
@@ -96,21 +88,7 @@ export function money(usd: string): string {
   return value >= 0.01 ? `$${value.toFixed(2)}` : `$${value.toFixed(4)}`;
 }
 
-/**
- * The line under the field: what makes it (the model by its served name, where named), the most it
- * may cost and how long it takes, where served (M1), and that the made creature says what it really
- * spent (its small print does): "An open model, Nemotron 3 Super 120B, makes the creature from your
- * words: at most $0.10, about 18 seconds, and you see what it really spent."
- */
-export function makerLine(priceUsdAtMost: string | null, typicalSeconds: number | null, modelName: string | null = null): string {
-  const who = modelName === null ? CREATURE_WORDS.maker : `${CREATURE_WORDS.maker}, ${modelName},`;
-  if (priceUsdAtMost === null) return `${who} ${CREATURE_WORDS.makes}.`;
-  // With web notes asked for, no measured time covers the searches, so the line gives the most alone.
-  const about = typicalSeconds === null ? '' : ` about ${typicalSeconds} seconds,`;
-  return `${who} ${CREATURE_WORDS.makes}: at most ${money(priceUsdAtMost)},${about} ${CREATURE_WORDS.seenSpend}.`;
-}
-
-/** The made group's small print: the model, the whole spend where served (M2), and where it is kept. */
+/** The made group's small print, the one place the model is named: the model, the whole spend where served (M2), and where it is kept. */
 export function madeSmallPrint(modelName: string | null, spentUsd: string | null): string {
   return [modelName === null ? null : `Made by ${modelName}`, spentUsd === null ? null : `spent ${money(spentUsd)}`, CREATURE_WORDS.kept]
     .filter((part): part is string => part !== null).join(' · ');
@@ -135,61 +113,20 @@ function groupBody(root: HTMLElement): HTMLElement {
 
 export interface CreatureField {
   readonly root: HTMLElement;
-  readonly input: HTMLTextAreaElement;
-  /** The line under the field: the maker line, or a refusal in the refused ink. */
-  line(words: string, refused?: boolean): void;
-  /** The count "81 of 400" and the key at .55 with the field empty. */
-  count(characters: number, maximum: number): void;
+  /** Create's composer: the words, the web search toggle where offered, the price or why it cannot make, and Make. */
+  readonly composer: Composer;
 }
 
-/** The describe field (r17t): its label, the words, the count and the key, and the line under it. */
-export function creatureField({ maximum, onMake }: { readonly maximum: number; readonly onMake: () => void }): CreatureField {
+/** The describe field: "Make a creature" over Create's composer, with the creature's own placeholder and Make. */
+export function creatureField({ maximum, onInput, onMake }: { readonly maximum: number; readonly onInput: (words: string) => void; readonly onMake: () => void }): CreatureField {
   const root = element('section', 'wu-creature-field');
-  const glass = element('div', 'wu-glass-thin wu-creature-glass');
-  const label = element('label', 'wu-creature-label', CREATURE_WORDS.fieldLabel);
-  const input = element('textarea', 'wu-creature-words');
-  input.id = `wu-creature-words-${Math.random().toString(36).slice(2, 8)}`;
-  label.htmlFor = input.id;
-  input.maxLength = maximum;
-  input.rows = 1;
-  const row = element('div', 'wu-creature-row');
-  const counted = element('span', 'wu-creature-count');
-  const keys = glyphRows([{ key: 'Enter', word: CREATURE_WORDS.make, shortcut: 'Enter', onPress: onMake }]);
-  row.append(counted, keys);
-  glass.append(label, input, row);
-  const under = shade({ small: true });
-  under.classList.add('wu-creature-line');
-  root.append(glass, under);
-  return {
-    root,
-    input,
-    line(words, refused = false) { under.textContent = words; under.classList.toggle('wu-refused', refused); },
-    count(characters, most) {
-      counted.textContent = `${characters} of ${most}`;
-      keys.classList.toggle('wu-creature-quiet', characters === 0);
-    },
-  };
-}
-
-export interface NotesAsk {
-  readonly root: HTMLElement;
-  readonly input: HTMLInputElement;
-}
-
-/**
- * The web notes box under the line (Create's frame 20): off until the person ticks it, each creature its own choice;
- * a click, or Tab and Space, ticks it, and Enter still makes. Its line says where the words go and the most it adds.
- */
-export function notesAsk({ searchesAtMost, maximumUsd, onChange }: { readonly searchesAtMost: number; readonly maximumUsd: string; readonly onChange: (on: boolean) => void }): NotesAsk {
-  const root = shade({ small: true });
-  root.classList.add('wu-creature-notes-ask');
-  const label = element('label', 'wu-creature-notes-label');
-  const input = element('input', 'wu-creature-notes-box');
-  input.type = 'checkbox';
-  input.addEventListener('change', () => onChange(input.checked));
-  label.append(input, element('span', '', CREATURE_WORDS.notesAsk));
-  root.append(label, element('span', 'wu-creature-notes-line', notesAskLine(searchesAtMost, maximumUsd)));
-  return { root, input };
+  const title = element('h2', 'wu-creature-heading', CREATURE_WORDS.title);
+  title.id = `wu-creature-heading-${Math.random().toString(36).slice(2, 8)}`;
+  root.setAttribute('aria-labelledby', title.id);
+  const made = composer({ onInput, onCreate: onMake, wording: { placeholder: CREATURE_WORDS.fieldLabel, label: CREATURE_WORDS.fieldLabel, pill: CREATURE_WORDS.make } });
+  made.field.maxLength = maximum;
+  root.append(title, made.root);
+  return { root, composer: made };
 }
 
 /** The small label over the stand (r17t). */
