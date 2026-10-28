@@ -131,6 +131,7 @@ describe('the world workspace preview\'s edits to this app', () => {
     expect(SEAMS.map((one) => one.seam)).toEqual([
       'picker hook', 'start() deep link', 'begin() await', 'objects.begin mount',
       'Your worlds pictures', 'Your worlds open', 'Your worlds front door', 'Your worlds create', 'land drawn', 'opening first',
+      'old shell keys',
     ]);
     for (const one of SEAMS) expect(occurrences(source(one.file), one.target), `${one.seam} in ${one.file}`).toBe(1);
   });
@@ -145,6 +146,16 @@ describe('the world workspace preview\'s edits to this app', () => {
       expect(introduced(file, code, patched!), file).toEqual([]);
     }
   }, 60_000);
+
+  it("lets none of the old shell's keys act in the workspace's pages, its Settings (?) and Options (O) among them", async () => {
+    const { patchSource } = await seams();
+    const shell = 'web/packages/app/src/world-shell.ts';
+    const patched = patchSource(shell, source(shell), here)!;
+    // Its key routine answers no command at all, so no state of a page (a world still being made under its opening
+    // among them) opens the old overlays.
+    const routine = patched.slice(patched.indexOf('export function commandForKeystroke('));
+    expect(routine.split('\n')[1]).toBe('  return null;');
+  });
 
   it("draws a moment's kept preview its next society afresh, as when the world opened, so nobody walks there", async () => {
     const { patchSource } = await seams();

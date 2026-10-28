@@ -9,6 +9,7 @@ import { BAKING_STAGE, OPENING_EVENT, OPENING_STAGES } from './opening-steps.mjs
 const MAIN = 'web/packages/app/src/main.ts';
 const SELECTION = 'web/packages/app/src/composition/environment-selection.ts';
 const BOOTSTRAP = 'web/packages/app/src/bootstrap.ts';
+const SHELL = 'web/packages/app/src/world-shell.ts';
 
 /** Each target must occur exactly once in its file; `seam` names it in a refusal. */
 export const SEAMS = Object.freeze([
@@ -29,6 +30,7 @@ export const SEAMS = Object.freeze([
   { seam: 'Your worlds create', file: MAIN, target: '        creating = showWorldCreation(closeCreate);' },
   { seam: 'land drawn', file: MAIN, target: '  const geographicDistrict = renderer.atlas.binding.ownedDistrict !== null;' },
   { seam: 'opening first', file: BOOTSTRAP, target: "void import('./main.js')" },
+  { seam: 'old shell keys', file: SHELL, target: '  if (stroke.modified || stroke.typing) return null;' },
 ]);
 
 /** How often a town's page reads its entry again while its tiles bake, and how many times at most. */
@@ -73,6 +75,12 @@ export function patchSource(file, code, here) {
   for (const one of SEAMS.filter(each => each.file === file)) {
     const found = occurrences(code, one.target);
     if (found !== 1) throw Error(`World workspace seam "${one.seam}" occurs ${found} times in ${file}; it must occur exactly once.`);
+  }
+  if (file === SHELL) {
+    // The workspace's pages have keys of their own (world-keys.mjs, Create's, the front door's): the old shell's keys
+    // open nothing in them, its Settings and Options overlays among them, whatever the page is doing, a world still
+    // being made under its opening included (ROOT's sweep of 27 October).
+    return code.replace(seam('old shell keys'), '  return null;');
   }
   if (file === BOOTSTRAP) {
     return code.replace(seam('opening first'), `void import('/@fs/${here}/world-opening.ts').then((opening) => opening.mountOpening(), () => {});\n` + seam('opening first'));
