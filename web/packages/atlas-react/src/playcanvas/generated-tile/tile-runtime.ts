@@ -1,6 +1,6 @@
 import { rayTriangle } from '../mesh-picking.js';
 import * as pc from 'playcanvas';
-import { renderCapsFor, type FurnitureForms, type RenderBudget, type RenderCaps, type TextureSetDigest, type TextureSetManifest, type TextureSetManifestEntry } from '@exulanica/atlas-core';
+import { renderCapsFor, type DecodedTextureSet, type FurnitureForms, type RenderBudget, type RenderCaps, type TextureSetDigest, type TextureSetManifest, type TextureSetManifestEntry } from '@exulanica/atlas-core';
 import {
   IDENTITY_NOT_STATED,
   MATERIAL_NONE_EXISTS,
@@ -30,6 +30,7 @@ import { obstructionRings, type ObstructionRings } from './obstruction-rings.js'
 import { composedObstructionRings, type StatingTile } from './walk-world.js';
 import { TILE_LOOK_V1, type TileLook } from './look.js';
 import { buildSurfaceMesh } from './surface-mesh.js';
+import { innerCrownMaterial, innerCrownMesh, innerShells } from './inner-crown.js';
 import { madeStreetFurniture, type MadeFurnitureSurface } from './street-furniture-drawing.js';
 import {
   TileTextureUploads,
@@ -841,6 +842,8 @@ function attachTile(
   const roots: pc.Entity[] = [];
   const meshes: pc.Mesh[] = [];
   const drawn: DrawnTileMetrics[] = [];
+  // A cutout set's inner crowns (`inner-crown.ts`) share one material a set, made when a tile first draws it.
+  const crownMaterials = new Map<string, pc.StandardMaterial | null>();
 
   for (const one of tiles) {
     const root = new pc.Entity(`generated-tile:${one.name}`);
@@ -857,12 +860,14 @@ function attachTile(
       let material: pc.Material = uploads.unavailableMaterial;
       let shadows = true;
       let bucket: number | null = null;
+      let cutout: DecodedTextureSet | null = null;
       if (batch.key !== '') {
         const resolution = uploads.adopt(prepared.get(batch.key)!);
         if (resolution.state !== 'available') throw new Error(`Texture set ${batch.key} was prepared and then refused`);
         material = resolution.material;
         shadows = castsShadow(resolution.set);
         bucket = drawBucket(resolution.set);
+        if (resolution.set.materialClass === 'cutout') cutout = resolution.set;
       }
       // The UV is already final, so the builder is handed it as the surface pair and passes it on.
       const mesh = buildSurfaceMesh(device, { ...batch, surfaceMm: batch.uvs }, (u, v) => [u, v]);
@@ -877,6 +882,23 @@ function attachTile(
         receiveShadows: batch.key !== '',
       });
       root.addChild(entity);
+      // Under a cutout set's closed shells, leaves in shade, so a gap between leaves shows more leaves.
+      if (cutout !== null) {
+        if (!crownMaterials.has(batch.key)) crownMaterials.set(batch.key, innerCrownMaterial(cutout, look));
+        const crownMaterial = crownMaterials.get(batch.key)!;
+        const shells = crownMaterial === null ? null : innerShells(batch.positions, batch.normals, batch.indices);
+        if (crownMaterial !== null && shells !== null) {
+          const crownMesh = innerCrownMesh(device, shells);
+          meshes.push(crownMesh);
+          const crown = new pc.Entity(`generated-tile-crown:${batch.key}`);
+          crown.addComponent('render', {
+            meshInstances: [new pc.MeshInstance(crownMesh, crownMaterial, crown)],
+            castShadows: false,
+            receiveShadows: true,
+          });
+          root.addChild(crown);
+        }
+      }
     }
 
     drawn.push({
@@ -912,6 +934,7 @@ function attachTile(
       disposed = true;
       for (const root of roots) root.destroy();
       for (const mesh of meshes) mesh.destroy();
+      for (const crownMaterial of crownMaterials.values()) crownMaterial?.destroy();
       uploads.destroy();
       environment.dispose();
     },

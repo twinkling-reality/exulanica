@@ -139,6 +139,16 @@ test-only field thinned instead, by 4.2 per cent kept against 10.1 plain). Its s
 opaque), and its back face is lit (92.6 against 36.7 without two-sided lighting, where the front face
 in shade reads 36.6).
 
+Under every closed shell a cutout set draws, such as a street tree's crown, the runtime draws an inner
+crown (`inner-crown.ts`): the same shell moved in 0.3 m along its normals, opaque, in the set's own
+leaf colour (the mean of its texels at or above the cutoff, in linear light) at 0.6 of its light, so a
+gap between the outer leaves shows leaves in shade rather than the sky or the wall behind the tree. A
+shell closes where every edge of its triangles, matched by its end points to a tenth of a millimetre,
+is shared by exactly two of them; a cutout on an open card keeps its holes. The inner crown casts no
+shadow, so the dappled shadow stays the leaves'; its entity is named `generated-tile-crown:<set id>`,
+so neither a look's ink nor a pack's dressing of the set reaches it; and it is drawn in every world,
+whatever look or setting it wears. Its two figures were judged from pictures of generated towns.
+
 A `decal` set is glTF's `alphaMode: BLEND` over the surface it lies on: road paint, a stain, a patch
 of grime, geometry that is part of the surface under it rather than a thing of its own. Its
 `base_color_coverage` map is uploaded as sRGB colour with linear coverage, level 0 only, so the device
