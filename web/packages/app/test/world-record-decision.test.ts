@@ -38,10 +38,9 @@ interface DecisionPageState {
   readonly portraits?: readonly { readonly name: string; readonly url: string | null }[];
   readonly ground?: string | null;
   readonly personality?: { readonly name: string | null; readonly about: string | null } | null;
-  readonly notes?: { readonly by: string | null; readonly told: string | null; readonly choices: string | null;
-    readonly happened: string | null; readonly compare: string | null; readonly ring?: string | null } | null;
+  readonly why?: string | null;
 }
-interface DecisionPage { draw(state: DecisionPageState): void; close(): void; hide(hidden: boolean): void; notes(): void }
+interface DecisionPage { draw(state: DecisionPageState): void; close(): void; hide(hidden: boolean): void }
 // A joined path: the test runner still finds the file, and the type checker leaves the preview
 // module (outside this package) out of the program.
 const module = async (): Promise<{ openDecisionPage(host: HTMLElement, act: (action: string) => void): DecisionPage }> =>
@@ -143,8 +142,8 @@ describe('A decision (r10)', () => {
       'M 762 614 C 800 614, 812 438, 852 438', expect.stringMatching(/^M 11\d\d 438 L 1380 438$/)]);
     expect(lines.querySelectorAll('circle.end')).toHaveLength(9);
     expect([...lines.querySelectorAll('circle.end.lit')].map((dot) => [dot.getAttribute('cx'), dot.getAttribute('cy')])).toEqual([['852', '438']]);
-    // Under the ring: the model's name and how many choices it had.
-    expect(all(page, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose 1 of 9', 'answered in 0.9\u00a0s · $0.0003']);
+    // Under the ring: how many choices it had and what the answer took; who decided is the head's alone.
+    expect(all(page, '.wu-rd-caption > span')).toEqual(['chose 1 of 9', 'answered in 0.9\u00a0s · $0.0003']);
     // What the model was told is the first heading after the title.
     expect(page.querySelector('.wu-rd-told > h2.wu-rd-told-heading')?.textContent).toBe("What Teo's model was told");
     expect(at(page.querySelector('.wu-rd-caption'))).toEqual(['740px', '650px']);
@@ -182,7 +181,7 @@ describe('A decision (r10)', () => {
     const { root, page } = await open(teo({ choices: choices(words, 1), choicesHeading: "Teo's choices" }));
     expect(numbers(root)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect([...root.querySelectorAll<HTMLElement>('.wu-rd-choice')].map((row) => Number.parseFloat(row.style.top))).toEqual(Array.from({ length: 12 }, (_, step) => 372 + 44 * step));
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose 1 of 14', 'answered in 0.9\u00a0s · $0.0003']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 14', 'answered in 0.9\u00a0s · $0.0003']);
     // Only the down arrow while more lie below; the up arrow once more lie above.
     expect(all(root, '.wu-rd-more')).toEqual(['↓']);
     expect(press('ArrowDown').defaultPrevented).toBe(true);
@@ -220,7 +219,7 @@ describe('A decision (r10)', () => {
     }));
     expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Decided by a person playing');
     expect(root.querySelector('.wu-hr-model')).toBeNull();
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['A person playing', 'chose 1 of 3']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 3']);
     // Nothing told: no column of it and no bracket; the choices and the card stay.
     expect(root.querySelector('.wu-rd-told')).toBeNull();
     expect(root.querySelector('path.in')).toBeNull();
@@ -242,9 +241,9 @@ describe('A decision (r10)', () => {
     expect(root.querySelector('.wu-rd-title')?.textContent).toBe('Wait here a minute');
     expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Decided by Nemotron 3 Nano 30B');
     expect(root.querySelector('.wu-rd-over .wu-rd-label')?.textContent).toBe("Teo's choices (3)");
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose 1 of 3', 'answered in 1.3 s · cost at most $0.0014']);
-    // What happened: what was chosen, then what came of it; the quiet tile where no picture exists.
-    expect(root.querySelector('.wu-rd-moment .wu-rd-action')?.textContent).toBe('Wait here a minute');
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 3', 'answered in 1.3 s · cost at most $0.0014']);
+    // What happened: what came of it, the choice itself being the title already; the quiet tile where no picture exists.
+    expect(root.querySelector('.wu-rd-moment .wu-rd-action')).toBeNull();
     expect(root.querySelector('.wu-rd-moment .wu-rd-verdict')?.textContent).toBe('Accepted; no minute has acted on it yet.');
     expect(root.querySelector('.wu-rd-moment .wu-hr-pic img')).toBeNull();
     expect(keys(root)).toEqual(['←→Earlier, later', 'JFull record', 'EscBack']);
@@ -379,7 +378,7 @@ describe('A decision (r10)', () => {
 describe('Under the ring, the answer and what it cost (D5)', () => {
   it("shows no cost line for an outside program's answer, and the figures keep their space unbroken", async () => {
     const { root } = await open(teo({ decider: 'external', model: null }));
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['An outside program', 'chose 1 of 9']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 9']);
     document.body.replaceChildren();
     const model = await open(teo());
     expect(model.root.querySelector('.wu-rd-caption > .wu-rd-paid')?.textContent).toBe('answered in 0.9\u00a0s · $0.0003');
@@ -391,46 +390,52 @@ describe('Under the ring, the answer and what it cost (D5)', () => {
 
 describe("A model's decision whose choice was not taken (U3)", () => {
   const unanswered = { asks: 1, latencyMs: 2100, costUsd: '0.01214400', costKnown: true, reason: 'spending_limit_reached' };
-  const notes = { by: "Its answer was not one of the actions, and asking it again would have gone over the money left, so Teo's routine acted.",
-    ring: 'How long its one ask took and what it cost.', told: null,
-    choices: "The actions the world allowed Teo there. The model's answer was not one of them, so none was taken.", happened: null, compare: null };
+  const why = 'Its answer was not one of the actions, and asking it again would have gone over the money left.';
 
   it('says the model was asked with no usable answer, what the ask took and cost, and marks no choice taken', async () => {
-    const { root } = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, -1), answered: null, unanswered, notes, canCompare: false }));
+    const { root } = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, -1), answered: null, unanswered, why, canCompare: false }));
     expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Asked Nemotron 3 Nano 30B · no usable answer · the routine acted');
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'no usable answer', 'asked once in 2.1\u00a0s · $0.0121']);
-    expect(all(root, '.wu-rd-hint')).toEqual(expect.arrayContaining([notes.by, notes.ring, notes.choices]));
+    // Under the ring what the ask took and cost; how it ended is the head's. Why the routine acted, under the head, alone.
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['asked once in 2.1\u00a0s · $0.0121']);
+    expect(all(root, '.wu-rd-hint')).toEqual([why]);
+    expect(root.querySelector('.wu-rd-head .wu-rd-hint')?.textContent).toBe(why);
     expect(root.textContent).not.toMatch(/Decided by|chose 1 of|Chosen|picked/u);
   });
 
   it('says the model was not asked where nothing was sent, with why, and no cost or note under the ring', async () => {
     const { root } = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, -1), answered: null, canCompare: false,
-      unanswered: { ...unanswered, asks: 0, latencyMs: null, costUsd: null }, notes: { ...notes, ring: null } }));
+      unanswered: { ...unanswered, asks: 0, latencyMs: null, costUsd: null }, why: 'Asking it would have gone over the money left.' }));
     expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Nemotron 3 Nano 30B not asked · the routine acted');
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'not asked: over the money left']);
-    expect(root.querySelector('.wu-rd-caption .wu-rd-hint')).toBeNull();
+    // The money is the line under the head's to say: nothing under the ring repeats it.
+    expect(all(root, '.wu-rd-caption > span')).toEqual([]);
+    expect(all(root, '.wu-rd-hint')).toEqual(['Asking it would have gone over the money left.']);
+    document.body.replaceChildren();
+    // A reason that line does not name stands under the ring, in four words or fewer.
+    const paused = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, -1), answered: null, canCompare: false,
+      unanswered: { ...unanswered, asks: 0, latencyMs: null, costUsd: null, reason: 'spending_suspended' }, why: 'It could not be asked just then.' }));
+    expect(all(paused.root, '.wu-rd-caption > span')).toEqual(['spending was paused']);
   });
 
   it('says a choice the world had moved past was made too late: marked Chosen, not done, its answer under the ring', async () => {
     const { root } = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, 4), late: true }));
     expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Asked Nemotron 3 Nano 30B · chose too late · the routine acted');
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['Nemotron 3 Nano 30B', 'chose too late', 'answered in 0.9\u00a0s · $0.0003']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 9', 'answered in 0.9\u00a0s · $0.0003']);
     expect(all(root, '.wu-rd-choice .wu-hr-tag')).toEqual(['Chosen, not done']);
   });
 });
 
 describe('A decision an outside AI agent made (AG1d 4, 5)', () => {
-  it("says it decided, and under the ring what it is, its choice of nine and its time, never a cost", async () => {
+  it("says it decided, and under the ring its choice of nine and its time, never a cost", async () => {
     const { root } = await open(teo({ decider: 'agent', model: null, answered: { latencyMs: 1600, costUsd: null, costKnown: true } }));
     expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Decided by an outside AI agent');
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['An outside AI agent', 'chose 1 of 9', 'answered in 1.6\u00a0s']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 9', 'answered in 1.6\u00a0s']);
   });
 
   it('says a turn it did not answer was asked with no answer, and the routine acted', async () => {
     const { root } = await open(teo({ decider: 'agent', model: null, title: 'Stood a while', choices: choices(NINE, -1), answered: null, canCompare: false,
       unanswered: { asks: 1, latencyMs: null, costUsd: null, costKnown: true, reason: 'no_answer_in_time' } }));
     expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Asked the outside AI agent · no answer · the routine acted');
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['An outside AI agent', 'no answer']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual([]);
     expect(root.textContent).not.toMatch(/Chosen|chose 1 of/u);
   });
 });
@@ -471,58 +476,15 @@ describe('A long choice wraps rather than losing its end (D3)', () => {
   });
 });
 
-describe('A decision explains itself to a newcomer (A7)', () => {
-  afterEach(() => { localStorage.clear(); });
-  const NOTES = {
-    by: 'The open model that chose for Teo.',
-    ring: 'How long it took to answer and what this one choice cost.',
-    told: "The prompt Teo's model was given: everything it was told about that moment, and nothing more. Full record shows it as it was sent.",
-    choices: 'The actions the world allowed Teo there. The model picked one, and the world checked it before it happened.',
-    happened: 'What the choice did in the world, at that minute.',
-    compare: 'Compare asks another open model the same moment, to see what it would choose.',
-  };
-
-  it('notes the four parts under their labels and Compare in the key row, and N hides them on every later decision', async () => {
-    const { root, page } = await open(teo({ notes: NOTES }));
-    expect(all(root, '.wu-rd-head .wu-rd-hint')).toEqual([NOTES.by]);
-    expect(all(root, '.wu-rd-caption > .wu-rd-hint')).toEqual([NOTES.ring]);
-    expect(all(root, '.wu-rd-told .wu-rd-hint')).toEqual([NOTES.told]);
-    expect(all(root, '.wu-rd-over-hint')).toEqual([NOTES.choices]);
-    expect(all(root, '.wu-rd-text .wu-rd-hint')).toEqual([NOTES.happened]);
-    expect(all(root, '.wu-hr-keys .wu-rd-key-hint')).toEqual([NOTES.compare]);
-    expect(keys(root)).toEqual(['←→Earlier, later', 'JFull record', 'CCompare this moment', 'NHide notes', 'EscBack']);
-    // Each note is under its own label, never over the rows: the choices' note stands above the first row.
-    const note = root.querySelector('.wu-rd-over-hint') as HTMLElement;
-    const firstRow = root.querySelector('.wu-rd-choice') as HTMLElement;
-    expect(Number.parseFloat(note.style.top)).toBeLessThan(Number.parseFloat(firstRow.style.top));
-    // N (the host hears the key and asks the page) hides them and keeps it so for this person on this computer.
-    page.notes();
-    expect(root.querySelectorAll('.wu-rd-hint')).toHaveLength(0);
-    expect(keys(root)).toContain('NNotes');
-    page.close();
-    const later = await open(teo({ notes: NOTES }));
-    expect(later.root.querySelectorAll('.wu-rd-hint')).toHaveLength(0);
-    // Its key in the row brings them back.
-    (later.root.querySelector('[aria-keyshortcuts="N"]') as HTMLButtonElement).click();
-    expect(later.root.querySelectorAll('.wu-rd-hint')).toHaveLength(6);
-    expect(keys(later.root)).toContain('NHide notes');
-  });
-
-  it("notes a person playing's decision with who picked and What happened, and Compare only where C shows", async () => {
-    const picked = 'The actions the world allowed Teo there. A person playing picked one, and the world checked it before it happened.';
-    const played = { by: null, told: null, choices: picked, happened: NOTES.happened, compare: null };
-    const { root } = await open(teo({ notes: played, decider: 'person', model: null, answered: null, toldLabel: 'What the person playing Teo was shown', canCompare: false }));
-    expect(all(root, '.wu-rd-head .wu-rd-hint, .wu-rd-told .wu-rd-hint')).toEqual([]);
-    expect(all(root, '.wu-rd-over-hint')).toEqual([picked]);
-    expect(all(root, '.wu-rd-text .wu-rd-hint')).toEqual([NOTES.happened]);
-    document.body.replaceChildren();
-    const quiet = await open(teo({ notes: NOTES, canCompare: false }));
-    expect(all(quiet.root, '.wu-rd-key-hint')).toEqual([]);
-    // Without notes from the host, the page draws none and offers no N.
-    document.body.replaceChildren();
-    const none = await open(teo());
-    expect(none.root.querySelectorAll('.wu-rd-hint')).toHaveLength(0);
-    expect(keys(none.root)).not.toContain('NHide notes');
+describe('A decision says nothing of what its parts are (ROOT\'s sweep of 27 October)', () => {
+  it('draws no notes and offers no N, whoever decided', async () => {
+    for (const state of [teo(), teo({ decider: 'person', model: null, answered: null, toldLabel: 'What the person playing Teo was shown', canCompare: false })]) {
+      const { root } = await open(state);
+      expect(root.querySelectorAll('.wu-rd-hint')).toHaveLength(0);
+      expect(root.querySelector('.wu-rd-over-hint, .wu-rd-key-hint')).toBeNull();
+      expect(keys(root).some((key) => key.startsWith('N'))).toBe(false);
+      document.body.replaceChildren();
+    }
   });
 });
 

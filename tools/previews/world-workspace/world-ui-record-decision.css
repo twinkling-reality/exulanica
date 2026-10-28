@@ -40,10 +40,7 @@
 .wu-rd-flow .end.lit { fill: var(--hr-line); stroke: none; opacity: 1; }
 .wu-record-decision .wu-rd-caption { position: absolute; transform: translateX(-50%); text-align: center; font: 400 13px/1.35 var(--font-sans); color: var(--hr-quiet); white-space: nowrap; }
 .wu-record-decision .wu-rd-caption > span { display: block; }
-.wu-record-decision .wu-rd-caption > .wu-rd-hint { width: 200px; margin: 6px auto 0; white-space: normal; text-align: center; }
-/* Under the ring, three lines each whole (DESIGN 04:04): a long model name wraps on its own lines, never joining the
-   others; the time and cost in the faint ink. */
-.wu-record-decision .wu-rd-caption > .wu-rd-who { max-width: 200px; margin: 0 auto; white-space: normal; }
+/* Under the ring, each line whole (DESIGN 04:04); the time and cost in the faint ink. */
 .wu-record-decision .wu-rd-caption > .wu-rd-paid { opacity: .78; }
 /* A soft halo of the page's own ground round the caption's words (DESIGN 04:25): the fan's curves break around them. */
 .wu-record-decision .wu-rd-caption > * { text-shadow: 0 0 2px var(--hr-ground), 0 0 4px var(--hr-ground), 0 0 4px var(--hr-ground); }
@@ -80,11 +77,5 @@
 .wu-record-decision .wu-rd-record { position: absolute; margin: 0; overflow: auto; font: 400 14px/1.5 var(--font-mono); color: var(--hr-quiet); white-space: pre-wrap; overflow-wrap: anywhere; }
 .wu-record-decision .wu-rd-record:focus { outline: none; }
 
-/* A newcomer's notes (A7): one line in the faint ink under a part's label, the parts after it moving down by that line;
-   the choices' note stands where their label stood (decision-page.ts raises the label), and Compare's sits in the key
-   row before its key. N hides them. */
+/* Why the routine acted (U3): one line in the faint ink under the head's small print. */
 .wu-record-decision .wu-rd-hint { margin: 6px 0 0; font: 400 13px/1.35 var(--font-sans); color: var(--hr-quiet); opacity: .78; text-wrap: pretty; }
-.wu-record-decision .wu-rd-told > .wu-rd-label + .wu-rd-hint { margin: -14px 0 14px; }
-.wu-record-decision .wu-rd-over-hint { position: absolute; margin: 0; }
-.wu-record-decision .wu-rd-text > .wu-rd-label + .wu-rd-hint { margin: 6px 0 4px; }
-.wu-record .wu-hr-keys .wu-rd-key-hint { margin: 0 -18px 0 0; max-width: 380px; white-space: normal; }

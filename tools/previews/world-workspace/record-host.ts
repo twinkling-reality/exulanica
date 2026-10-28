@@ -3,7 +3,7 @@
 // the pages draw from them: each moment's title in JOURNEY's moment words, its picture and its people's portraits
 // (MOTION's, through history-host.ts). contextual-world.ts opens the pages, asks and answers keys; this says what
 // each page shows.
-import { agentUnansweredNotes, choiceRows, choicesLabel, choicesOver, decisionNotes, decisionTitle, lateNotes, overLabel, resultLines, toldLabel, toldSections, unansweredNotes } from './decision-words.mjs';
+import { agentUnansweredWhy, choiceRows, choicesLabel, choicesOver, decisionTitle, overLabel, resultLines, toldLabel, toldSections, unansweredWhy } from './decision-words.mjs';
 import { COMPARE_WORDS, again as againName, answerTag, askLine, asking as askingWords, atMoment, atMost, cannotAskAgain, choseWords, compareMoments, laneMarks, nothingToAsk, resultOver, resultTitle, sameCounts, spentAsking, spentOf, useFor, whatEachChose } from './compare-words.mjs';
 import { CHARACTER_WORDS, decidesPrint, declaredParts, modelRefusalWords, quoted } from './character-words.mjs';
 import { deciderOf } from './character-group.mjs';
@@ -349,9 +349,8 @@ export function recordStates(host: RecordHost) {
           : decider === 'agent' && provider && !unanswered ? { latencyMs: provider.latency_ms ?? null, costUsd: null, costKnown: true } : null,
         unanswered, late,
         choicesHeading: choicesOver(who),
-        // What each part is, for a newcomer (A7); the page shows them until the person hides them.
-        notes: { ...decisionNotes({ who, decider, canCompare }),
-          ...(unanswered ? (decider === 'agent' ? agentUnansweredNotes({ who, reason: unanswered.reason }) : unansweredNotes({ who, ...unanswered })) : late ? lateNotes({ who }) : {}) },
+        // Why the routine acted where the choice was not taken.
+        why: unanswered ? (decider === 'agent' ? agentUnansweredWhy(unanswered.reason) : unansweredWhy(unanswered)) : null,
         // The open page's own picture, drawn ahead of those its day's rows asked for first.
         picture: moment ? host.pictures.momentNow(moment as never, true) : null,
         // Whether a moment stands behind the decision, once the moments read is in (U3c): with none, no picture is ever made.

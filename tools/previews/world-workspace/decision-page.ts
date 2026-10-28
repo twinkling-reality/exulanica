@@ -9,7 +9,7 @@
 import { CHARACTER_WORDS } from './character-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
 import { FLOW_LAYOUTS, choiceEnd, choiceLines, flowLayout, flowSize, headBottom, rowMost, titleLines, toldHeight } from './decision-flow.mjs';
-import { DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, UNANSWERED_WORDS, agentUnansweredParts, agentUnansweredRing, askedPrint, choseOneOf, decidedByParts, notAskedWords, ringPrint, unansweredParts } from './decision-words.mjs';
+import { DECISION_FLOW_WORDS, DECISION_WORDS, UNANSWERED_WORDS, agentUnansweredParts, askedPrint, choseOneOf, decidedByParts, notAskedWhy, ringPrint, unansweredParts } from './decision-words.mjs';
 import { page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orbs, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
 import './world-ui-record-decision.css';
@@ -73,10 +73,9 @@ export interface DecisionPageState {
   /** The personality as written (the context's character): its name and its words, so the page keeps them apart.
    * Absent: read from the Personality section's lines, name then words. */
   readonly personality?: { readonly name: string | null; readonly about: string | null } | null;
-  /** What each part is, for a newcomer (A7): a line under the small print, what was told, the choices and What
-   * happened, and the Compare key's; null where a part has none. Absent: no notes. */
-  readonly notes?: { readonly by: string | null; readonly ring?: string | null; readonly told: string | null; readonly choices: string | null;
-    readonly happened: string | null; readonly compare: string | null } | null;
+  /** Why the routine acted where its choice was not taken (U3), under the small print: "Asking it failed."; absent or
+   * null otherwise. */
+  readonly why?: string | null;
 }
 
 export interface DecisionPage {
@@ -84,9 +83,6 @@ export interface DecisionPage {
   close(): void;
   /** Hides the page while another stands over it, keeping what it shows. */
   hide(hidden: boolean): void;
-  /** Hides the newcomer's notes or brings them back (A7, N): the host hears the key, as it hears every key but the
-   * arrows. */
-  notes(): void;
 }
 
 /** The parts of decision-flow.mjs's sizes the page reads. */
@@ -123,14 +119,8 @@ type Written = NonNullable<DecisionPageState['personality']>;
 interface Block { readonly words: string; readonly quote: boolean; readonly faint?: boolean }
 
 const SVG = 'http://www.w3.org/2000/svg';
-/** Where the person's choice to hide the newcomer's notes is kept on this computer (A7): a convenience, so where it
- * cannot be read the notes show. */
-export const NOTES_HIDDEN_KEY = 'exulanica.decision-notes';
 /** Taller than this, a drawn choice row runs to a second line (one line is 22px). */
 const ROW_TWO_LINES = 33;
-const notesHiddenNow = (): boolean => { try { return localStorage.getItem(NOTES_HIDDEN_KEY) === 'hidden'; } catch { return false; } };
-/** The gap between the choices' label and its note, and between the note and the first choice's line. */
-const NOTE_GAP = 8;
 const kept = (words: string | null | undefined): string | null => words?.trim() || null;
 
 /**
@@ -222,12 +212,6 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
   // Each choice's lines as drawn in a window of this key (D3): measured once laid out, so the column is laid again by
   // the rows' own heights; another window or decision starts from the estimate.
   let rowLines: { key: string; lines: number[] } | null = null;
-  let notesHidden = notesHiddenNow();
-  const toggleNotes = (): void => {
-    notesHidden = !notesHidden;
-    try { if (notesHidden) localStorage.setItem(NOTES_HIDDEN_KEY, 'hidden'); else localStorage.removeItem(NOTES_HIDDEN_KEY); } catch { /* For this page only. */ }
-    if (last) render(last);
-  };
   const windowOf = () => {
     const layout: Size = flowSize(host.clientWidth || innerWidth);
     const height = host.clientHeight || innerHeight;
@@ -258,7 +242,6 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     }
     const blocks = sections.map((section) => blocksOf(section, state.personality ?? null));
     const by = smallPrint(state);
-    const notes = read && state.notes && !notesHidden ? state.notes : null;
     // Where the page cannot measure (before layout, or without one), the head, the told column and the taken row's
     // words are estimated; laid out, they are measured below and the places follow.
     const estimate = {
@@ -282,11 +265,10 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     title.tabIndex = -1;
     head.append(title);
     if (by.length) head.append(sentence('p', 'wu-rd-by', by));
-    if (notes?.by && by.length) head.append(element('p', 'wu-rd-hint', notes.by));
+    if (read && state.why && by.length) head.append(element('p', 'wu-rd-hint', state.why));
     nodes.push(head);
 
     let told: HTMLElement | null = null, record: HTMLElement | null = null, takenRow: HTMLElement | null = null, lines: SVGSVGElement | null = null;
-    let over: HTMLElement | null = null, choiceNote: HTMLElement | null = null;
     const drawnRows: { index: number; item: HTMLElement }[] = [];
     if (state.record !== null) {
       record = element('pre', 'wu-rd-record', state.record);
@@ -300,7 +282,6 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         told = element('section', 'wu-rd-told');
         placeTold(told, drawn.told);
         told.append(element('h2', 'wu-rd-label wu-rd-told-heading', state.toldLabel));
-        if (notes?.told) told.append(element('p', 'wu-rd-hint', notes.told));
         if (state.failure) {
           const note = element('p', 'wu-rd-note', state.failure);
           note.dataset['refused'] = 'true';
@@ -324,38 +305,26 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         lines.innerHTML = flowMarkup(drawn);
         nodes.push(lines);
 
-        // Under the ring: who decided and how many choices there were.
+        // Under the ring: how many choices there were, or why nothing was sent where the head does not say it; who
+        // decided and how it ended are the head's.
         const decider = state.decider ?? (state.model ? 'model' : null);
         const caption = element('div', 'wu-rd-caption');
         px(caption, drawn.caption.x, drawn.caption.y);
-        if (decider === 'person' || decider === 'external') caption.append(element('span', 'wu-rd-who', decider === 'person' ? CHARACTER_WORDS.personPlaying : CHARACTER_WORDS.outsideProgram));
-        else if (decider === 'agent') caption.append(element('span', 'wu-rd-who', CHARACTER_WORDS.outsideAgent));
-        else if (state.model) caption.append(element('span', 'wu-rd-who wu-hr-model', state.model));
-        if (state.late) caption.append(element('span', 'wu-rd-count', UNANSWERED_WORDS.late));
-        else if (taken >= 0) caption.append(element('span', 'wu-rd-count', choseOneOf(choices.length)));
-        else if (state.unanswered && decider === 'agent') caption.append(element('span', 'wu-rd-count', agentUnansweredRing(state.unanswered.reason)));
-        else if (state.unanswered) caption.append(element('span', 'wu-rd-count', state.unanswered.asks > 0 ? UNANSWERED_WORDS.none : notAskedWords(state.unanswered.reason)));
+        const notAsked = state.unanswered && decider !== 'agent' && state.unanswered.asks < 1 ? notAskedWhy(state.unanswered.reason) : null;
+        if (taken >= 0) caption.append(element('span', 'wu-rd-count', choseOneOf(choices.length)));
+        else if (notAsked) caption.append(element('span', 'wu-rd-count', notAsked));
         // An outside program's answer shows no cost line (DESIGN 04:04); a person playing records none.
         const paid = decider === 'external' || decider === 'person' ? null : paidPrint(state);
         if (paid) caption.append(element('span', 'wu-rd-paid', paid));
-        if (notes?.ring && paid) caption.append(element('p', 'wu-rd-hint', notes.ring));
         if (caption.childElementCount) nodes.push(caption);
 
         // The choices as they were offered, the taken one in the ink with its tag; the arrows' caps where more lie.
         if (choices.length) {
           const columnLabel = state.choicesHeading || state.choicesLabel;
           const column = element('div', 'wu-rd-choices');
-          over = element('div', 'wu-rd-over');
+          const over = element('div', 'wu-rd-over');
           px(over, drawn.over.x, drawn.over.y);
           over.append(element('p', 'wu-rd-label', columnLabel));
-          // The note stands where the label stood, the label one note higher (placed once measured, below), so the
-          // rows and the lines into them never move.
-          if (notes?.choices) {
-            choiceNote = element('p', 'wu-rd-hint wu-rd-over-hint', notes.choices);
-            px(choiceNote, drawn.over.x, drawn.over.y);
-            choiceNote.style.maxWidth = `${rowMost(layout)}px`;
-            column.append(choiceNote);
-          }
           if (drawn.above) over.append(moreButton('↑', () => scroll(-1)));
           const list = element('ol', 'wu-rd-rows');
           list.setAttribute('aria-label', columnLabel);
@@ -396,9 +365,9 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         if (picture && portraits) picture.append(portraits);
         const text = element('div', people.length && framed ? 'wu-rd-text' : 'wu-rd-text wu-rd-bare');
         text.append(element('div', 'wu-rd-label', DECISION_FLOW_WORDS.whatHappened));
-        if (notes?.happened) text.append(element('p', 'wu-rd-hint', notes.happened));
-        if (state.said) text.append(element('div', 'wu-hr-said wu-rd-said', state.said));
-        else if (state.action || state.title) text.append(element('div', 'wu-rd-action', state.action || state.title));
+        // What was said or done, where it is not the title said again.
+        if (state.said) { if (state.said !== heading) text.append(element('div', 'wu-hr-said wu-rd-said', state.said)); }
+        else if ((state.action || state.title) && (state.action || state.title) !== heading) text.append(element('div', 'wu-rd-action', state.action || state.title));
         if (state.verdict) text.append(element('p', 'wu-rd-verdict', state.verdict));
         card.append(...(picture ? [picture] : portraits ? [portraits] : []), text);
         nodes.push(card);
@@ -410,13 +379,8 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     if (state.earlier || state.later) keys.push(shortcut(keyButton(['←', '→'], DECISION_WORDS.earlierLater, () => act(state.later ? 'later' : 'earlier')), 'ArrowLeft ArrowRight'));
     if (state.title) keys.push(shortcut(keyButton(['J'], DECISION_WORDS.fullRecord, () => act('record')), 'J'));
     if (state.title && state.canCompare && state.record === null) keys.push(shortcut(keyButton(['C'], COMPARE_WORDS.compareThisMoment, () => act('compare')), 'C'));
-    if (read && state.notes) keys.push(shortcut(keyButton(['N'], notesHidden ? DECISION_NOTE_WORDS.show : DECISION_NOTE_WORDS.hide, toggleNotes), 'N'));
     keys.push(shortcut(keyButton(['Esc'], CHARACTER_WORDS.back, () => act('back')), 'Escape'));
-    const row = keyRow(keys);
-    // Compare's note stands just before the key row's Compare, in the row (A7).
-    const compareKey = keys.find((key) => key.getAttribute('aria-keyshortcuts') === 'C');
-    if (notes?.compare && compareKey) compareKey.before(element('span', 'wu-rd-hint wu-rd-key-hint', notes.compare));
-    nodes.push(row);
+    nodes.push(keyRow(keys));
     sheet.content.replaceChildren(...nodes);
 
     // Laid out: where the head ends places what was told and the record under it; then the told column's height and
@@ -437,14 +401,6 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
 
     // A told column taller than its box fades at its foot until it is scrolled to its end (D4).
     if (told) { const box = told; const more = () => { box.dataset['more'] = String(box.scrollHeight - box.scrollTop - box.clientHeight > 1); }; more(); box.addEventListener('scroll', more, { passive: true }); }
-
-    // The choices' note measured: it stands where the label stood and the label rises above it, so neither touches a row.
-    if (over && choiceNote && choiceNote.offsetHeight > 0) {
-      const placed = flow ?? drawn;
-      const noteTop = placed.over.y + over.offsetHeight - choiceNote.offsetHeight;
-      px(choiceNote, placed.over.x, noteTop);
-      px(over, placed.over.x, noteTop - NOTE_GAP - over.offsetHeight);
-    }
 
     // The rows measured: where one takes another number of lines than the column was laid for, it is laid again (D3).
     const measured = [...rowCounts];
@@ -485,6 +441,5 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
       flow = null;
     },
     hide(hidden) { sheet.root.hidden = hidden; },
-    notes() { if (last?.notes && last.record === null) toggleNotes(); },
   };
 }

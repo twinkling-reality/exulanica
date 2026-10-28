@@ -4,7 +4,7 @@
 // context does not carry leaves its line or section out. The stored text itself is the Full record.
 // What came of a choice is the choice account's verdict (web/packages/app/src/decision-record.ts),
 // passed in, so the page and the account never disagree. verify-decision-words.mjs holds these.
-import { amount, deciderWords, finer, possessive } from './character-words.mjs';
+import { amount, finer, possessive } from './character-words.mjs';
 import { personalityRecordLines } from './personality-words.mjs';
 import { worldTime } from './world-clock.mjs';
 
@@ -12,7 +12,6 @@ export const DECISION_WORDS = Object.freeze({
   personality: 'Personality, as you wrote it',
   whereWhen: 'Where and when',
   /** After the world's title in Where and when: whose words the title is (DESIGN 11:25). */
-  namedByOwner: 'named by its owner',
   heard: 'Heard',
   remembers: 'Remembers',
   chosen: 'Chosen',
@@ -107,29 +106,6 @@ export const DECISION_FLOW_WORDS = Object.freeze({
   decidedByAgent: 'Decided by an outside AI agent',
 });
 
-/** The keys that hide the newcomer's notes and bring them back (A7). */
-export const DECISION_NOTE_WORDS = Object.freeze({ hide: 'Hide notes', show: 'Notes' });
-
-/**
- * The decision page's notes for a newcomer (A7, DESIGN 17:13): one plain line under the head's small print, what
- * was told, the choices and What happened, the ring's under its time and cost (D5), and the Compare key's where it
- * shows, each claiming nothing the page does
- * not show. A model's words where a model decided; where a person playing or an outside program did, the choices'
- * naming who picked (the world checks every choice, whoever makes it) and What happened's. `who` is the being as a
- * sentence calls it.
- */
-export function decisionNotes({ who, decider = null, canCompare = false }) {
-  const name = who.within, model = decider === 'model', picker = model ? 'The model' : deciderWords(decider);
-  return Object.freeze({
-    by: model ? `The open model that chose for ${name}.` : decider === 'agent' ? `The outside AI agent that chose for ${name}.` : null,
-    ring: model ? 'How long it took to answer and what this one choice cost.' : null,
-    told: model ? `The prompt ${possessive(name)} model was given: everything it was told about that moment, and nothing more. Full record shows it as it was sent.` : null,
-    choices: picker ? `The actions the world allowed ${name} there. ${picker} picked one, and the world checked it before it happened.` : null,
-    happened: 'What the choice did in the world, at that minute.',
-    compare: model && canCompare ? 'Compare asks another open model the same moment, to see what it would choose.' : null,
-  });
-}
-
 /**
  * A model's decision with no usable answer (U3, DESIGN's WORDS.md 12:57): its receipt states no proposal, and the
  * routine acted. It was asked where its receipt names a provider (an attempt left this computer), not asked where it
@@ -147,8 +123,6 @@ export const UNANSWERED_REASONS = Object.freeze({
 /** Such a decision's own words under the ring and in its head: no usable answer, or a choice the world moved past. */
 export const UNANSWERED_WORDS = Object.freeze({
   none: 'no usable answer', late: 'chose too late', routine: 'the routine acted', notAsked: 'not asked',
-  /** What happened's note where the routine acted (DESIGN 15:58). */
-  happened: 'What the routine did in the world, at that minute.',
 });
 
 /** Why a model was not asked, in four words or fewer, by its receipt's reason; absent where the reason has none. */
@@ -169,9 +143,13 @@ const NOT_ASKED = Object.freeze({
   decision_context_changed: 'the world moved on',
 });
 
-/** Under the ring where nothing was sent: "not asked: over the money left", or "not asked" alone. */
-export function notAskedWords(reason) {
-  return Object.hasOwn(NOT_ASKED, reason ?? '') ? `${UNANSWERED_WORDS.notAsked}: ${NOT_ASKED[reason]}` : UNANSWERED_WORDS.notAsked;
+/**
+ * Under the ring where nothing was sent, why, where the line under the head does not already say it: "spending was
+ * paused"; null for the money and the time, which that line names, and for a reason with no words.
+ */
+export function notAskedWhy(reason) {
+  if (UNANSWERED_REASONS.money.includes(reason) || UNANSWERED_REASONS.noTime.includes(reason)) return null;
+  return Object.hasOwn(NOT_ASKED, reason ?? '') ? NOT_ASKED[reason] : null;
 }
 
 /**
@@ -199,19 +177,14 @@ export function askedPrint({ asks = 1, latencyMs = null, costUsd = null, costKno
 }
 
 /**
- * The newcomer's notes for a decision with no usable answer, in place of a choice's: under the head, why the routine
- * acted, by the receipt's reason and whether it was asked; the ring's, what the asks sent took and cost (none where
- * nothing was sent); the choices', that none was taken and why; What happened's, that the routine acted.
+ * Why the routine acted for a decision with no usable answer, under the head's small print (U3): by the receipt's reason
+ * and whether it was asked, "Asking it failed."
  */
-export function unansweredNotes({ who, asks = 0, reason = null }) {
-  const name = who.within, routine = `so ${possessive(name)} routine acted.`, allowed = `The actions the world allowed ${name} there.`;
+export function unansweredWhy({ asks = 0, reason = null }) {
   const has = kind => UNANSWERED_REASONS[kind].includes(reason);
-  if (asks < 1) {
-    const by = has('money') ? 'Asking it would have gone over the money left' : has('noTime') ? 'There was no time to ask it' : 'It could not be asked just then';
-    return Object.freeze({ by: `${by}, ${routine}`, ring: null, choices: `${allowed} The model was not asked, so none was taken.`, happened: UNANSWERED_WORDS.happened });
-  }
+  if (asks < 1) return `${has('money') ? 'Asking it would have gone over the money left' : has('noTime') ? 'There was no time to ask it' : 'It could not be asked just then'}.`;
   const off = 'Its answer was not one of the actions';
-  const by = has('money') ? `${off}, and asking it again would have gone over the money left`
+  const why = has('money') ? `${off}, and asking it again would have gone over the money left`
     : reason === 'no_time_to_ask' ? `${off}, and there was no time to ask it again`
       : has('notAgain') ? `${off}, and it could not be asked again just then`
         : reason === 'model_timed_out' ? 'It did not answer in time'
@@ -220,25 +193,7 @@ export function unansweredNotes({ who, asks = 0, reason = null }) {
               : reason === 'provider_configuration_changed' ? "The model's settings changed while it was asked"
                 : reason === 'decision_context_changed' ? 'The world had moved on while it was asked'
                   : 'Its answer could not be used';
-  // An answer that was not an action: answer_not_offered, or one asked again and refused before it was sent.
-  const notAnAction = reason === 'answer_not_offered' || has('money') || reason === 'no_time_to_ask' || has('notAgain');
-  const choices = !notAnAction ? 'No usable answer came back from the model, so none was taken.'
-    : reason === 'answer_not_offered' && asks > 1 ? "The model's answers were not among them, so none was taken."
-      : "The model's answer was not one of them, so none was taken.";
-  const ring = asks === 1 ? 'How long its one ask took and what it cost.' : asks === 2 ? 'How long its two asks took and what they cost.'
-    : 'How long its asks took and what they cost.';
-  return Object.freeze({ by: `${by}, ${routine}`, ring, choices: `${allowed} ${choices}`, happened: UNANSWERED_WORDS.happened });
-}
-
-/** The notes for a choice the world had moved past before it could happen (U3): the head's, the choices' and What
- * happened's; the ring keeps its answer's own. */
-export function lateNotes({ who }) {
-  const name = who.within;
-  return Object.freeze({
-    by: `The world had moved on before its choice could be acted on, so ${possessive(name)} routine acted.`,
-    choices: `The actions the world allowed ${name} there. The model picked one, but the world had moved on before it could happen.`,
-    happened: UNANSWERED_WORDS.happened,
-  });
+  return `${why}.`;
 }
 
 /** A turn an outside program did not answer at all (AG1d 5): its program silent past the deadline, or not connected. */
@@ -251,18 +206,10 @@ export function agentUnansweredParts(reason) {
   return [`Asked the outside AI agent · ${NO_ANSWER.includes(reason) ? 'no answer' : UNANSWERED_WORDS.none} · ${UNANSWERED_WORDS.routine}`];
 }
 
-/** Under the ring for such a turn, after "An outside AI agent": "no answer", or "no usable answer". */
-export const agentUnansweredRing = reason => (NO_ANSWER.includes(reason) ? 'no answer' : UNANSWERED_WORDS.none);
-
-/** The notes for such a turn (AG1d 5): why the routine acted, by its reason; that none was taken; the routine's What
- * happened. Nothing under the ring: the agent was not paid for and an unanswered turn took no time of its own. */
-export function agentUnansweredNotes({ who, reason = null }) {
-  const name = who.within, routine = `so ${possessive(name)} routine acted.`, allowed = `The actions the world allowed ${name} there.`;
-  const by = reason === 'no_answer_in_time' ? 'It did not answer in time' : reason === 'decider_disconnected' ? 'It was not connected'
-    : 'Its answer could not be used';
-  const choices = NO_ANSWER.includes(reason) ? 'No answer came back from the outside AI agent, so none was taken.'
-    : 'No usable answer came back from the outside AI agent, so none was taken.';
-  return Object.freeze({ by: `${by}, ${routine}`, ring: null, choices: `${allowed} ${choices}`, happened: UNANSWERED_WORDS.happened });
+/** Why the routine acted for such a turn (AG1d 5), under the head's small print: "It did not answer in time." */
+export function agentUnansweredWhy(reason = null) {
+  return reason === 'no_answer_in_time' ? 'It did not answer in time.' : reason === 'decider_disconnected' ? 'It was not connected.'
+    : 'Its answer could not be used.';
 }
 
 /** Over the column of choices (r10): "Teo's choices", "The resident's choices". */
@@ -338,7 +285,7 @@ export function toldSections(context, who) {
   // Where the character lives, the world's title quoted as its owner's words, on its own line above the spot and minute
   // (T1b, DESIGN 11:25); the told words' "not instructions" stays in the Full record, as sent.
   const home = plain(context?.world?.title);
-  add(DECISION_WORDS.whereWhen, [home ? `\u201c${home}\u201d, ${DECISION_WORDS.namedByOwner}` : null, whereWhen(context)], Boolean(home));
+  add(DECISION_WORDS.whereWhen, [home ? `\u201c${home}\u201d` : null, whereWhen(context)], Boolean(home));
   const how = list(context?.needs).map(need => needLine(need.label, need.milli, need.seen_to_at_milli));
   if (Number.isFinite(context?.need_milli)) how.push(needLine(DECISION_WORDS.rest, context.need_milli, context.rest_at_need_milli));
   if (list(context?.holding).length) how.push(sentence(`holding the ${context.holding.join(', the ')}`));

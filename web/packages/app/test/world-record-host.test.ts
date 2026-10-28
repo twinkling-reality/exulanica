@@ -374,14 +374,14 @@ describe('a decision, filled', () => {
     answered.request = { ...answered.request, provider_config: config } as never;
     const state = records.decision(showing, { requestId: 'r1', detail: answered, failure: null, record: false });
     expect([state.decider, state.answered, state.toldLabel, state.unanswered]).toEqual(['agent', { latencyMs: 1600, costUsd: null, costKnown: true }, 'What the outside AI agent was told', null]);
-    expect(state.notes.by).toBe('The outside AI agent that chose for Teo.');
+    // No note on who chose: the head says it (ROOT's sweep of 27 October).
+    expect(state.why).toBeNull();
     // Its program silent past the deadline: asked, no answer, the routine acted.
     const silent = { ...detail('leave', null), decision: { status: 'unavailable', reason: 'no_answer_in_time', proposal: null, provider: null } };
     silent.request = { ...silent.request, provider_config: config } as never;
     const quiet = records.decision(showing, { requestId: 'r5', detail: silent, failure: null, record: false });
     expect([quiet.decider, quiet.unanswered?.reason, quiet.answered, quiet.choices.some((choice: Json) => choice.chosen)]).toEqual(['agent', 'no_answer_in_time', null, false]);
-    expect(quiet.notes).toMatchObject({ by: "It did not answer in time, so Teo's routine acted.", ring: null,
-      choices: 'The actions the world allowed Teo there. No answer came back from the outside AI agent, so none was taken.' });
+    expect(quiet.why).toBe('It did not answer in time.');
     // Its day page: its own words from its door entry.
     expect(records.day(showing, agentView(showing.row), true).declared.map((part: Json) => part.words).join('')).toBe('In its own words: Scout, made by Harbour Lab.');
   });
@@ -443,11 +443,9 @@ describe('a decision, filled', () => {
     const state = records.decision(showing, { requestId: 'r5', detail: refused, failure: null, record: false });
     expect(state.unanswered).toEqual({ asks: 1, latencyMs: 2100, costUsd: '0.01214400', costKnown: true, reason: 'spending_limit_reached' });
     expect([state.answered, state.late, state.choices.some((choice: Json) => choice.chosen)]).toEqual([null, false, false]);
-    expect(state.notes).toMatchObject({
-      by: "Its answer was not one of the actions, and asking it again would have gone over the money left, so Teo's routine acted.",
-      ring: 'How long its one ask took and what it cost.',
-      choices: "The actions the world allowed Teo there. The model's answer was not one of them, so none was taken.",
-    });
+    // Why the routine acted, the reason alone.
+    expect(state.why).toBe('Its answer was not one of the actions, and asking it again would have gone over the money left.');
+    expect(state.notes).toBeUndefined();
     // Nothing sent: the receipt names no provider, so it was not asked.
     const unasked = { ...detail('leave', null), decision: { status: 'unavailable', reason: 'spending_limit_reached', proposal: null, provider: null } };
     expect(records.decision(showing, { requestId: 'r5', detail: unasked, failure: null, record: false }).unanswered).toMatchObject({ asks: 0 });
@@ -473,10 +471,8 @@ describe('a decision, filled', () => {
     // The model picked one: its row stays marked, and its answer's time and cost stand under the ring.
     expect(state.choices.find((choice: Json) => choice.chosen)?.words).toMatch(/bench/i);
     expect(state.answered).toEqual({ latencyMs: 900, costUsd: '0.0003', costKnown: true });
-    expect(state.notes).toMatchObject({
-      by: "The world had moved on before its choice could be acted on, so Teo's routine acted.",
-      choices: 'The actions the world allowed Teo there. The model picked one, but the world had moved on before it could happen.',
-    });
+    // Chose too late is the head's to say: no line under it restates it.
+    expect(state.why).toBeNull();
   });
 });
 

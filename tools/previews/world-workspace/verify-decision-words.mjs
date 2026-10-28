@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  DECISION_FLOW_WORDS, DECISION_NOTE_WORDS, DECISION_WORDS, answeredIn, askedAt, choiceRows, choicesLabel, choicesOver, choseOneOf, costWords, decidedByParts, ringPrint, decisionNotes, decisionTitle,
-  needLine, overLabel, resultLines, toldLabel, toldSections, DECISION_WORDS as WORDS, NO_ANSWER, UNANSWERED_REASONS, agentUnansweredNotes, agentUnansweredParts, agentUnansweredRing, askedPrint, lateNotes, notAskedWords, unansweredNotes, unansweredParts,
+  DECISION_FLOW_WORDS, DECISION_WORDS, answeredIn, askedAt, choiceRows, choicesLabel, choicesOver, choseOneOf, costWords, decidedByParts, ringPrint, decisionTitle,
+  needLine, overLabel, resultLines, toldLabel, toldSections, DECISION_WORDS as WORDS, NO_ANSWER, UNANSWERED_REASONS, agentUnansweredParts, agentUnansweredWhy, askedPrint, notAskedWhy, unansweredParts, unansweredWhy,
 } from './decision-words.mjs';
 import { called } from './character-words.mjs';
 
@@ -45,25 +45,8 @@ assert.equal(resultLines({ verdict: { kind: 'applied' }, latencyMs: 100 }).done,
 // The record page's words (r10): the column's label, the ring's count, the card's label and the head's small print,
 // who decided first (T7's words where no model did), then the answer's time and cost as resultLines says them.
 assert.equal(choicesOver(teo), "Teo's choices");
-// A newcomer's notes (A7): a model's decision names the model's parts; a person playing's, What happened's alone; Compare's
-// only where C shows; an unnamed being inside the sentence.
-const noted = decisionNotes({ who: teo, decider: 'model', canCompare: true });
-assert.equal(noted.by, 'The open model that chose for Teo.');
-assert.equal(noted.ring, 'How long it took to answer and what this one choice cost.');
-assert.equal(noted.told, "The prompt Teo's model was given: everything it was told about that moment, and nothing more. Full record shows it as it was sent.");
-assert.equal(noted.choices, 'The actions the world allowed Teo there. The model picked one, and the world checked it before it happened.');
-assert.equal(noted.happened, 'What the choice did in the world, at that minute.');
-assert.equal(noted.compare, 'Compare asks another open model the same moment, to see what it would choose.');
-assert.equal(decisionNotes({ who: teo, decider: 'model' }).compare, null);
-assert.deepEqual({ ...decisionNotes({ who: teo, decider: 'person', canCompare: true }) }, { by: null, ring: null, told: null,
-  choices: 'The actions the world allowed Teo there. A person playing picked one, and the world checked it before it happened.',
-  happened: 'What the choice did in the world, at that minute.', compare: null });
-assert.equal(decisionNotes({ who: teo, decider: 'external' }).by, null);
-assert.equal(decisionNotes({ who: teo, decider: 'external' }).choices,
-  'The actions the world allowed Teo there. An outside program picked one, and the world checked it before it happened.');
-assert.equal(decisionNotes({ who: teo }).choices, null);
-assert.match(decisionNotes({ who: resident, decider: 'model' }).told, /^The prompt the resident's model was given/);
-assert.deepEqual({ ...DECISION_NOTE_WORDS }, { hide: 'Hide notes', show: 'Notes' });
+// No newcomer's notes: what each part is goes unsaid (ROOT's sweep of 27 October).
+assert.doesNotMatch(repository('tools/previews/world-workspace/decision-words.mjs'), /export (const|function) (DECISION_NOTE_WORDS|decisionNotes|lateNotes|unansweredNotes)\b/u);
 assert.equal(choicesOver(resident), "The resident's choices");
 assert.equal(choseOneOf(9), 'chose 1 of 9');
 assert.equal(DECISION_FLOW_WORDS.whatHappened, 'What happened');
@@ -109,7 +92,7 @@ assert.deepEqual(toldSections(town, resident), [
 assert.deepEqual(toldSections({ here: 'on the quay', tick: 27, world_clock: { minute_of_day: 1108, day: 0 } }, resident)[0].lines, ['On the quay · 18:28 · Day 1']);
 // Where the character lives, the world's title its owner named (world_named), on its own line above the spot and minute.
 assert.deepEqual(toldSections({ world: { title: 'A cozy little town by the sea at dusk' }, here: 'on the quay', tick: 27, world_clock: { minute_of_day: 1108, day: 0 } }, resident)[0],
-  { label: 'Where and when', lines: ['\u201cA cozy little town by the sea at dusk\u201d, named by its owner', 'On the quay · 18:28 · Day 1'], apart: true });
+  { label: 'Where and when', lines: ['\u201cA cozy little town by the sea at dusk\u201d', 'On the quay · 18:28 · Day 1'], apart: true });
 assert.deepEqual(toldSections({ here: 'on the quay', tick: 27 }, resident)[0].lines, ['On the quay · Minute 27']);
 // A town's premises told by name (places_named, P3): the page shows where the model stood and what it remembered as
 // told, at a premises' door, inside one, and a premises remembered by what the being did there.
@@ -173,7 +156,7 @@ const grouped = Object.values(UNANSWERED_REASONS).flat();
 for (const reason of grouped) assert.ok(stated.has(reason), reason);
 assert.equal(new Set(grouped).size, grouped.length);
 // The head, the model's name its own part: asked, not asked where nothing was sent, or a choice made too late.
-const ultra = 'Nemotron 3 Ultra 550B', mara = called({ name: 'Mara Vale' });
+const ultra = 'Nemotron 3 Ultra 550B';
 assert.deepEqual(unansweredParts({ model: ultra, asks: 1 }), ['Asked ', { model: ultra }, ' · no usable answer · the routine acted']);
 assert.deepEqual(unansweredParts({ model: ultra, asks: 0 }), [{ model: ultra }, ' not asked · the routine acted']);
 assert.deepEqual(unansweredParts({ model: ultra, asks: 1, late: true }), ['Asked ', { model: ultra }, ' · chose too late · the routine acted']);
@@ -183,51 +166,36 @@ assert.deepEqual(unansweredParts({ model: null, asks: 1 }), []);
 assert.equal(askedPrint({ asks: 1, latencyMs: 2100, costUsd: '0.01214400', costKnown: true }), 'asked once in 2.1 s · $0.0121');
 assert.equal(askedPrint({ asks: 2, latencyMs: 4300, costUsd: '0.02420000', costKnown: true }), 'asked twice in 4.3 s · $0.0242');
 assert.equal(askedPrint({ asks: 1, latencyMs: 20, costUsd: '0.0121', costKnown: false }), 'asked once in under 0.1 s · at most $0.0121');
-assert.equal(notAskedWords('spending_limit_reached'), 'not asked: over the money left');
-assert.equal(notAskedWords('no_time_to_ask'), 'not asked: no time to ask');
-assert.equal(notAskedWords('provider_credential_absent'), 'not asked: its service not connected');
-assert.equal(notAskedWords('line_out_of_bounds'), 'not asked');
-assert.equal(notAskedWords('spending_unavailable'), 'not asked: spending check failed');
-for (const reason of stated) assert.ok(notAskedWords(reason).replace(/^not asked(: )?/u, '').split(' ').filter(Boolean).length <= 4, reason);
-// The notes by reason (DESIGN's list), each ending with the routine; none says the model chose.
-const by = (reason, asks = 1) => unansweredNotes({ who: mara, asks, reason }).by;
-assert.equal(by('spending_limit_reached'), "Its answer was not one of the actions, and asking it again would have gone over the money left, so Mara Vale's routine acted.");
-assert.equal(by('no_time_to_ask'), "Its answer was not one of the actions, and there was no time to ask it again, so Mara Vale's routine acted.");
-assert.equal(by('spending_suspended'), "Its answer was not one of the actions, and it could not be asked again just then, so Mara Vale's routine acted.");
-assert.equal(by('model_timed_out'), "It did not answer in time, so Mara Vale's routine acted.");
-assert.equal(by('answer_not_offered', 2), "Its answers were not among the actions, so Mara Vale's routine acted.");
-assert.equal(by('answer_not_offered'), "Its answer was not one of the actions, so Mara Vale's routine acted.");
-assert.equal(by('model_call_failed'), "Asking it failed, so Mara Vale's routine acted.");
-assert.equal(by('provider_configuration_changed'), "The model's settings changed while it was asked, so Mara Vale's routine acted.");
-assert.equal(by('decision_context_changed'), "The world had moved on while it was asked, so Mara Vale's routine acted.");
-assert.equal(by('line_out_of_bounds'), "Its answer could not be used, so Mara Vale's routine acted.");
-assert.equal(by('spending_limit_reached', 0), "Asking it would have gone over the money left, so Mara Vale's routine acted.");
-assert.equal(by('no_time_to_ask', 0), "There was no time to ask it, so Mara Vale's routine acted.");
-assert.equal(by('provider_credential_absent', 0), "It could not be asked just then, so Mara Vale's routine acted.");
-// The ring's note where it was asked, none where not; the choices' note by whether an answer was not an action.
-const money = unansweredNotes({ who: mara, asks: 1, reason: 'spending_limit_reached' });
-assert.equal(money.ring, 'How long its one ask took and what it cost.');
-assert.equal(unansweredNotes({ who: mara, asks: 2, reason: 'answer_not_offered' }).ring, 'How long its two asks took and what they cost.');
-assert.equal(unansweredNotes({ who: mara, asks: 0, reason: 'spending_limit_reached' }).ring, null);
-assert.equal(money.choices, "The actions the world allowed Mara Vale there. The model's answer was not one of them, so none was taken.");
-assert.equal(unansweredNotes({ who: mara, asks: 2, reason: 'answer_not_offered' }).choices, "The actions the world allowed Mara Vale there. The model's answers were not among them, so none was taken.");
-assert.equal(unansweredNotes({ who: mara, asks: 1, reason: 'model_timed_out' }).choices, 'The actions the world allowed Mara Vale there. No usable answer came back from the model, so none was taken.');
-assert.equal(unansweredNotes({ who: mara, asks: 0, reason: 'spending_limit_reached' }).choices, 'The actions the world allowed Mara Vale there. The model was not asked, so none was taken.');
-// A choice its minute found the world had moved past: made, not done.
-assert.deepEqual({ ...lateNotes({ who: mara }) }, {
-  by: "The world had moved on before its choice could be acted on, so Mara Vale's routine acted.",
-  choices: 'The actions the world allowed Mara Vale there. The model picked one, but the world had moved on before it could happen.',
-  happened: 'What the routine did in the world, at that minute.',
-});
-// What happened's note says the routine acted wherever it did (U3b, DESIGN 15:58).
-for (const asks of [0, 1, 2]) assert.equal(unansweredNotes({ who: mara, asks, reason: 'spending_limit_reached' }).happened, 'What the routine did in the world, at that minute.');
+// Under the ring where nothing was sent, why, where the line under the head does not say it; nothing for the money or
+// the time, which that line names, or a reason with no words.
+assert.equal(notAskedWhy('spending_limit_reached'), null);
+assert.equal(notAskedWhy('no_time_to_ask'), null);
+assert.equal(notAskedWhy('provider_credential_absent'), 'its service not connected');
+assert.equal(notAskedWhy('line_out_of_bounds'), null);
+assert.equal(notAskedWhy('spending_unavailable'), 'spending check failed');
+for (const reason of stated) assert.ok((notAskedWhy(reason) ?? '').split(' ').filter(Boolean).length <= 4, reason);
+// Why the routine acted, by reason (DESIGN's list): the reason alone, with no "so the routine acted" after it (ROOT's
+// sweep of 27 October).
+const by = (reason, asks = 1) => unansweredWhy({ asks, reason });
+assert.equal(by('spending_limit_reached'), 'Its answer was not one of the actions, and asking it again would have gone over the money left.');
+assert.equal(by('no_time_to_ask'), 'Its answer was not one of the actions, and there was no time to ask it again.');
+assert.equal(by('spending_suspended'), 'Its answer was not one of the actions, and it could not be asked again just then.');
+assert.equal(by('model_timed_out'), 'It did not answer in time.');
+assert.equal(by('answer_not_offered', 2), 'Its answers were not among the actions.');
+assert.equal(by('answer_not_offered'), 'Its answer was not one of the actions.');
+assert.equal(by('model_call_failed'), 'Asking it failed.');
+assert.equal(by('provider_configuration_changed'), "The model's settings changed while it was asked.");
+assert.equal(by('decision_context_changed'), 'The world had moved on while it was asked.');
+assert.equal(by('line_out_of_bounds'), 'Its answer could not be used.');
+assert.equal(by('spending_limit_reached', 0), 'Asking it would have gone over the money left.');
+assert.equal(by('no_time_to_ask', 0), 'There was no time to ask it.');
+assert.equal(by('provider_credential_absent', 0), 'It could not be asked just then.');
 assert.equal(WORDS.chosenNotDone, 'Chosen, not done');
 for (const reason of [...stated, null]) {
   for (const asks of [0, 1, 2]) {
-    const notes = unansweredNotes({ who: resident, asks, reason });
-    for (const words of Object.values(notes).filter(Boolean)) assert.doesNotMatch(words, /\u2014|_|picked|Decided by|chose for/u, words);
-    assert.match(notes.by, /, so the resident's routine acted\.$/u, String(reason));
-    assert.match(notes.choices, /^The actions the world allowed the resident there\. .*so none was taken\.$/u);
+    const why = unansweredWhy({ asks, reason });
+    assert.doesNotMatch(why, /\u2014|_|picked|Decided by|chose for|routine acted/u, why);
+    assert.match(why, /\.$/u, String(reason));
   }
 }
 // An outside AI agent decided (AG1d 4, 5): who decided and nothing else; its told heading; its note; a turn it did not
@@ -235,18 +203,11 @@ for (const reason of [...stated, null]) {
 assert.deepEqual(decidedByParts({ decider: 'agent' }), ['Decided by an outside AI agent']);
 assert.equal(toldLabel(called({ name: null, kind: 'visitor' }), 'agent'), 'What the outside AI agent was told');
 const visitor = called({ name: null, kind: 'visitor' });
-assert.equal(decisionNotes({ who: visitor, decider: 'agent' }).by, 'The outside AI agent that chose for the visitor.');
-assert.equal(decisionNotes({ who: visitor, decider: 'agent' }).choices, 'The actions the world allowed the visitor there. An outside AI agent picked one, and the world checked it before it happened.');
 assert.deepEqual([...NO_ANSWER], ['no_answer_in_time', 'decider_disconnected']);
 for (const reason of NO_ANSWER) assert.ok(stated.has(reason), reason);
 assert.deepEqual(agentUnansweredParts('no_answer_in_time'), ['Asked the outside AI agent · no answer · the routine acted']);
 assert.deepEqual(agentUnansweredParts('answer_not_offered'), ['Asked the outside AI agent · no usable answer · the routine acted']);
-assert.deepEqual([agentUnansweredRing('decider_disconnected'), agentUnansweredRing('answer_not_offered')], ['no answer', 'no usable answer']);
-assert.deepEqual({ ...agentUnansweredNotes({ who: visitor, reason: 'no_answer_in_time' }) }, {
-  by: "It did not answer in time, so the visitor's routine acted.", ring: null,
-  choices: 'The actions the world allowed the visitor there. No answer came back from the outside AI agent, so none was taken.',
-  happened: 'What the routine did in the world, at that minute.',
-});
-assert.equal(agentUnansweredNotes({ who: visitor, reason: 'decider_disconnected' }).by, "It was not connected, so the visitor's routine acted.");
-assert.equal(agentUnansweredNotes({ who: visitor, reason: 'answer_not_offered' }).by, "Its answer could not be used, so the visitor's routine acted.");
+assert.equal(agentUnansweredWhy('no_answer_in_time'), 'It did not answer in time.');
+assert.equal(agentUnansweredWhy('decider_disconnected'), 'It was not connected.');
+assert.equal(agentUnansweredWhy('answer_not_offered'), 'Its answer could not be used.');
 console.log('decision words: ok');
