@@ -621,6 +621,24 @@ describe('the creature panel inside the window', () => {
     expect(rule('.wu-creature-body', 'max-height')).toMatch(/^calc\(100vh - .+ - var\(--frame-bottom\)\)$/);
   });
 
+  it("draws the composer's Make and its toggle as Create draws them under the world view's button reset, in either order", () => {
+    // The live server drew Make white on its white pill: the world's reset outweighed the composer's own type and ink.
+    const sheets = ['contextual-world.css', 'create-world.css', 'world-ui-creature.css'].map((name) => readFileSync(`${process.cwd()}/../tools/previews/world-workspace/${name}`, 'utf8'));
+    const composer = '<div class="wu-composer"><div class="wu-composer-foot"><button class="wu-composer-chip" aria-pressed="false">Search the web</button><button class="wu-composer-pill">Make</button></div></div>';
+    for (const order of [sheets, [...sheets].reverse()]) {
+      document.body.innerHTML = `<div class="wu-create" style="--font-sans: Plex">${composer}</div>`
+        + `<div id="contextual-world" style="--font-sans: Plex"><div class="wu-creature-layer"><section class="wu-creature-field">${composer}</section></div></div>`;
+      for (const text of order) { const style = document.createElement('style'); style.textContent = text; document.head.append(style); }
+      const looks = (scope: string): string[][] => ['.wu-composer-pill', '.wu-composer-chip'].map((part) => {
+        const style = getComputedStyle(document.querySelector(`${scope} ${part}`)!);
+        return [style.color, style.fontWeight, style.fontSize];
+      });
+      expect(looks('#contextual-world')).toEqual(looks('.wu-create'));
+      expect(looks('#contextual-world').flat()).not.toContain('inherit');
+      document.head.querySelectorAll('style').forEach((style) => style.remove());
+    }
+  });
+
   it("keeps the making group's and the made card's words in a part that scrolls with the frame's fades and track where they take more room than the window leaves", async () => {
     const { CREATURE_WORDS, madeGroup, makingGroup, placeRow } = await ui();
     // happy-dom lays nothing out: a part is given the height its words take and the room it has.

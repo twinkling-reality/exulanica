@@ -75,11 +75,11 @@
 .wu-composer-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .wu-composer-web { position: relative; display: inline-flex; flex: none; margin-right: auto; }
 .wu-composer-chip { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 10px; border: 1px solid rgb(255 255 255 / 18%); border-radius: 999px; background: none;
-  color: var(--c-ink-2); font: 400 13px/1 var(--font-sans); white-space: nowrap; cursor: pointer;
+  --chip-ink: var(--c-ink-2); --chip-font: 400 13px/1 var(--font-sans); color: var(--chip-ink); font: var(--chip-font); white-space: nowrap; cursor: pointer;
   transition: background 160ms var(--c-ease), color 160ms var(--c-ease), border-color 160ms var(--c-ease); }
 .wu-composer-chip svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.4; }
-.wu-composer-chip:hover { background: rgb(255 255 255 / 8%); color: var(--c-ink); }
-.wu-composer-chip[aria-pressed="true"] { border-color: rgb(143 183 198 / 70%); background: rgb(143 183 198 / 18%); color: var(--c-ink); }
+.wu-composer-chip:hover { background: rgb(255 255 255 / 8%); --chip-ink: var(--c-ink); }
+.wu-composer-chip[aria-pressed="true"] { border-color: rgb(143 183 198 / 70%); background: rgb(143 183 198 / 18%); --chip-ink: var(--c-ink); }
 .wu-composer-chip[aria-pressed="true"] svg { stroke: #b9d6e0; }
 /* The toggle's details: a small tip under it, in the page's type, on hover and keyboard focus. */
 .wu-composer-tip { position: absolute; left: 0; top: calc(100% + 25px); z-index: 2; box-sizing: border-box; width: max-content; max-width: 340px; padding: 10px 12px; border: 1px solid var(--c-hair); border-radius: 10px;
@@ -93,9 +93,11 @@
 /* The price in the second ink, not the mock's third: at 48% white no dim short of black holds it at 4.5:1. */
 .wu-composer-price { flex: none; font: 400 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--c-ink-2); white-space: nowrap; }
 .wu-composer-why[hidden], .wu-composer-price[hidden] { display: none; }
-/* Linear's one pill: white, its key inside it; dimmed while it cannot start, and still a button that says why. */
+/* Linear's one pill: white, its key inside it; dimmed while it cannot start, and still a button that says why. The
+   pill's and the toggle's ink and type are each said once, in properties of their own, so a page whose buttons take
+   its own ink and type gives them back (the world view's, world-ui-creature.css). */
 .wu-composer-pill { display: inline-flex; flex: none; align-items: center; gap: 10px; height: 36px; padding: 0 7px 0 16px; border: 0; border-radius: 999px; background: #ffffff;
-  color: #101416; font: 500 14px/1 var(--font-sans); cursor: pointer; box-shadow: 0 1px 0 rgb(255 255 255 / 40%) inset, 0 8px 24px rgb(0 0 0 / 22%);
+  --pill-ink: #101416; --pill-font: 500 14px/1 var(--font-sans); color: var(--pill-ink); font: var(--pill-font); cursor: pointer; box-shadow: 0 1px 0 rgb(255 255 255 / 40%) inset, 0 8px 24px rgb(0 0 0 / 22%);
   transition: transform 160ms var(--c-ease), background 160ms var(--c-ease), opacity 160ms var(--c-ease); }
 .wu-composer-pill:hover { background: #eef3f5; }
 .wu-composer-pill:active { transform: scale(.98); }
