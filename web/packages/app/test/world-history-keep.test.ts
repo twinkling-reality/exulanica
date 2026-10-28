@@ -71,12 +71,9 @@ describe('Keep on GitHub, from History', () => {
     expect((card.element.querySelector('.wu-hr-keep-reviewed') as HTMLElement).hidden).toBe(false);
     expect(card.element.querySelector('.wu-hr-keep-value')?.textContent).toBe('learner');
     expect([field(card).value, card.element.querySelector('.wu-hr-keep-count')?.textContent]).toEqual(['exulanica-terraces-on-the-bay', '29 of 100']);
-    expect(text(card)).toEqual([
-      'Private: only you can see it.',
-      "What goes there: this world's kept changes, without names or the words people wrote.",
-      'From then on each change is sent by itself, at most 4 times a day. If anything looks wrong, sending stops and History says so.',
-      'Exulanica uses your own GitHub sign-in on this computer and never sees or keeps it.',
-    ]);
+    // What goes there, and nothing that explains the card (ROOT's sweep of 27 October).
+    expect(text(card)).toEqual(["What goes there: this world's kept changes, without names or the words people wrote."]);
+    expect(card.element.querySelector('.wu-hr-keep-question, .wu-hr-keep-once')).toBeNull();
     expect(card.keys().map((key) => `${key.keys.join('')} ${key.word}`)).toEqual(['Enter Create', 'Esc Back']);
     expect(card.key(new KeyboardEvent('keydown', { code: 'Enter', cancelable: true }))).toBe(true);
     await vi.waitFor(() => expect(done.created).toHaveBeenCalledTimes(1));
@@ -102,8 +99,6 @@ describe('Keep on GitHub, from History', () => {
     expect(orb(card).disabled).toBe(true);
     await vi.waitFor(() => expect(writes.at(-1)).toEqual(['POST', `/world/github-projects/publications${SCOPE}`, { project_id: 'project:demo', name: 'bay-terraces' }]));
     await vi.waitFor(() => expect(orb(card).disabled).toBe(false));
-    // Without a served bound the sentence names no number.
-    expect(text(card)[2]).toBe('From then on each change is sent by itself. If anything looks wrong, sending stops and History says so.');
     card.close();
   });
 
@@ -114,9 +109,8 @@ describe('Keep on GitHub, from History', () => {
     document.body.append(card.element);
     await vi.waitFor(() => expect(status(card).textContent).toBe("GitHub's command line tool, gh, is not on this computer. Install it and sign in once, then try again."));
     expect([status(card).dataset.refused, orb(card).disabled]).toEqual(['true', true]);
-    // Refused before any review: the account and name rows stay out; the sign-in sentence stays.
+    // Refused before any review: the account and name rows stay out.
     expect((card.element.querySelector('.wu-hr-keep-reviewed') as HTMLElement).hidden).toBe(true);
-    expect(text(card)).toContain('Exulanica uses your own GitHub sign-in on this computer and never sees or keeps it.');
     card.close();
 
     const changing = follower((request) => (request.request_id === 'q1' ? { refused: { code: 'changed', at: '2026-10-16T10:00:00Z' } } : { review: review('exulanica-world-3f9a12b4c5d6') }));

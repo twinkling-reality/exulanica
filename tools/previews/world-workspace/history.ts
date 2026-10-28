@@ -731,8 +731,9 @@ export function mountHistory(host: HistoryHost): History {
 
     const note = state === 'offline' || (state === 'ready' && momentsFailed)
       ? { words: PATH_WORDS.momentsFailed, refused: true }
-      : state === 'ready' && !items.some((item) => item.kind === 'moment' || item.kind === 'change')
-        ? { words: lived ? PATH_WORDS.nothingDrawn : PATH_WORDS.nothingYet, refused: false }
+      // Nothing yet, where the town has not lived; where it has and its line holds none of it, no words (ROOT's sweep of 27 October).
+      : state === 'ready' && !lived && !items.some((item) => item.kind === 'moment' || item.kind === 'change')
+        ? { words: PATH_WORDS.nothingYet, refused: false }
         : null;
     if (note) {
       // Centred between the creation card's right edge and Now, 40px under the line (sheet "States").

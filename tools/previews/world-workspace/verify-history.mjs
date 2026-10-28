@@ -389,7 +389,8 @@ assert.deepEqual([
 assert.ok([would('went'), would('left'), would('talked', { withName: 'Ines' })].every((words) => !words.endsWith('.')));
 assert.deepEqual([byParts({ kind: 'external' }), byParts({ kind: 'routine' }), byParts(null)], [[PATH_WORDS.outsideProgram], null, null]);
 // A town that has lived with nothing of this person's story on the line yet (H18 item 4), and one where nothing happened.
-assert.deepEqual([PATH_WORDS.nothingDrawn, PATH_WORDS.nothingYet], ['When you change this world or give someone an AI model, it shows here.', 'Nothing has happened here yet.']);
+assert.equal(PATH_WORDS.nothingYet, 'Nothing has happened here yet.');
+assert.equal('nothingDrawn' in PATH_WORDS, false, 'no line on what would show here');
 // What a person did at a choice of their day (R5e), in the past with no full stop; null for a kind with no words.
 const did = (kind, extra = {}) => didWords({ kind, ...extra });
 assert.deepEqual([

@@ -384,8 +384,8 @@ describe('History', () => {
     const made = host(async (path: string) => { asked.push(path); return read(path); });
     await (await module()).mountHistory(made).open();
     expect(asked.filter((path) => path.includes('/history/moments')).every((path) => path.includes('&story=true'))).toBe(true);
-    expect(made.root.querySelector('.wu-hr-note')?.textContent).toBe('When you change this world or give someone an AI model, it shows here.');
-    expect(made.root.querySelector('.wu-hr-note')?.getAttribute('data-refused')).toBe('false');
+    // A town that lived with nothing of its story on the line says nothing: no line on what would show here.
+    expect(made.root.querySelector('.wu-hr-note')).toBeNull();
   });
 
   it('says the moments could not be read in the refusal ink, keeps the rest of the page and Now on the live clock', async () => {
@@ -524,7 +524,7 @@ describe('History', () => {
     expect(keys(made.root)).toContain('GKeep on GitHub');
     history.key(press('KeyG'));
     const card = made.root.querySelector('.wu-hr-keepcard') as HTMLElement;
-    expect(card.querySelector('.wu-hr-keep-question')?.textContent).toBe('Keep this world in a new private repository on your GitHub account');
+    expect(card.querySelector('.wu-hr-keep-label')?.textContent).toBe('Keep on GitHub');
     // Only what works now (GH4): while Create is pale the row offers no Enter.
     expect(keys(made.root)).toEqual(['EscBack']);
     await vi.waitFor(() => expect(write).toHaveBeenCalledWith('POST', `/world/github-projects/publications?world_id=${encodeURIComponent(WORLD)}`, { project_id: 'project:demo', name: null }));

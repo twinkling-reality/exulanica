@@ -8,14 +8,10 @@ export const KEEP_WORDS = Object.freeze({
   create: 'Create',
   tryAgain: 'Try again',
   back: 'Back',
-  question: 'Keep this world in a new private repository on your GitHub account',
   account: 'GitHub account',
   name: 'Repository name',
-  private: 'Private: only you can see it.',
   readable: 'What goes there: this world\'s kept changes, with names and the words people wrote.',
   notReadable: 'What goes there: this world\'s kept changes, without names or the words people wrote.',
-  signIn: 'Exulanica uses your own GitHub sign-in on this computer and never sees or keeps it.',
-  madeOnce: 'A private repository, made once.',
   checking: 'Checking your GitHub account…',
   putting: 'Putting it on GitHub…',
   refusals: Object.freeze({
@@ -41,16 +37,6 @@ export function nameAllowed(name) {
 /** The name field's count: "28 of 100". */
 export function nameCount(name) {
   return `${name.length} of ${NAME_MOST}`;
-}
-
-/**
- * How often changes go once the repository exists: "From then on each change is sent by itself, at most 4 times a
- * day. If anything looks wrong, sending stops and History says so." The bound is the follower's own, as its status
- * serves it; where it serves none the sentence says no number.
- */
-export function sendingWords(perDay) {
-  const bound = Number.isSafeInteger(perDay) && perDay > 0 ? `, at most ${perDay === 1 ? 'once' : `${perDay} times`} a day` : '';
-  return `From then on each change is sent by itself${bound}. If anything looks wrong, sending stops and History says so.`;
 }
 
 /** Why a publication could not go on, by its code; an unknown code says the general failure. */

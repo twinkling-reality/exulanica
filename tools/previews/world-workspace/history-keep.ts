@@ -4,7 +4,7 @@
 // review (the account, the proposed name, what goes there) and Create says yes to it (POST .../{request_id}/create).
 // The follower does the rest with the person's own gh sign-in; nothing here sees a token. Back withdraws the request.
 import './world-ui-history-keep.css';
-import { KEEP_WORDS, nameAllowed, nameCount, refusalWords, sendingWords } from './history-keep-words.mjs';
+import { KEEP_WORDS, nameAllowed, nameCount, refusalWords } from './history-keep-words.mjs';
 
 type Json = Record<string, any>;
 
@@ -96,20 +96,16 @@ export function openKeepCard(host: KeepHost, project: KeepProject, done: { creat
   const reviewed = element('div', 'wu-hr-keep-reviewed');
   reviewed.append(
     element('div', 'wu-hr-keep-name', KEEP_WORDS.account), accountValue,
-    element('div', 'wu-hr-keep-name', KEEP_WORDS.name), field, count,
-    element('p', 'wu-hr-keep-line', KEEP_WORDS.private), what,
-    element('p', 'wu-hr-keep-line', sendingWords(project.publications_per_day ?? null)),
+    element('div', 'wu-hr-keep-name', KEEP_WORDS.name), field, count, what,
   );
   card.append(
     label,
-    element('h2', 'wu-hr-keep-question', KEEP_WORDS.question),
     reviewed,
-    element('p', 'wu-hr-keep-line', KEEP_WORDS.signIn),
     status,
     element('div', 'wu-hr-keep-make', ''),
   );
   const make = card.lastElementChild as HTMLElement;
-  make.append(orb, element('div', 'wu-hr-keep-once', KEEP_WORDS.madeOnce));
+  make.append(orb);
 
   function draw() {
     // The follower's proposed name fills the field until the person types one of their own.
