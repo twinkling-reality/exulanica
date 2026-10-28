@@ -103,6 +103,7 @@ from exulanica.api.routes import (
     health,
     identity,
     intake,
+    integrations,
     interaction,
     materials,
     models,
@@ -607,6 +608,7 @@ def create_app(
     app.include_router(character_appearance.router)
     app.include_router(materials.router)
     app.include_router(models.router)
+    app.include_router(integrations.router)
     app.include_router(workspace_assets.router)
     app.include_router(workspace_style_packs.router)
     app.include_router(tiles.router)

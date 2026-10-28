@@ -659,14 +659,15 @@ _OPERATIONS_WRITES: Final = _every(
 
 #: The authored world, read. The generation grammar catalog is a read of declared data and
 #: materialises nothing, so it is a world read like the style catalog; the material catalog and
-#: recipe reads are world reads for the same reason, and so are the committed style pack library
-#: and the shipped thing library.
+#: recipe reads are world reads for the same reason, and so are the committed style pack library,
+#: the shipped thing library and the integrations catalog.
 _WORLD_READS: Final = _every(
     _WORLD_READ,
     "GET /door/bridges",
     "GET /door/crossings/{arrival_id}/manifest",
     "GET /door/grants",
     "GET /door/grants/{grant_id}",
+    "GET /integrations",
     "GET /materials/library",
     "GET /materials/makers",
     "GET /materials/recipes",
@@ -856,6 +857,7 @@ _WORLD_WRITES: Final = _every(
     "POST /world-write/scenes/{scene_id}/generated",
     "GET /world/github-projects",
     "POST /world/github-projects",
+    "GET /world/github-projects/kept",
     "POST /world/github-projects/publications",
     "POST /world/github-projects/publications/{request_id}/create",
     "DELETE /world/github-projects/requests/{request_id}",

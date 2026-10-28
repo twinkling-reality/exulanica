@@ -11,6 +11,7 @@ from exulanica.world.project_status import (
     STATUS_FILE,
     StatusRefused,
     projects_directory,
+    read_every_status,
     read_statuses,
     status_document,
     write_status,
@@ -96,6 +97,10 @@ def test_only_the_configured_directory_s_own_folders_are_read(tmp_path):
     found = read_statuses(projects, WORLD)
     assert [s["written_at"] for s in found] == ["2026-10-15T02:00:00Z", "2026-10-15T00:00:00Z"]
     assert read_statuses(None, WORLD) == [] and read_statuses(tmp_path / "absent", WORLD) == []
+    # Every world's status is read by the same rules: the other world's beside this one's.
+    every = read_every_status(projects)
+    assert [s["world_id"] for s in every] == [WORLD, "world:another", WORLD]
+    assert read_every_status(None) == [] and read_every_status(tmp_path / "absent") == []
 
 
 def test_a_crafted_world_id_never_reaches_outside_the_configured_directory(tmp_path):

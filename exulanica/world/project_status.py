@@ -8,10 +8,11 @@ never committed and never published, and the server reads those documents here f
 directory it is configured with (``EXULANICA_PROJECTS_DIRECTORY``, the directory the worker
 follows); a hosted deployment configures none and keeps no project.
 
-No value a caller sends becomes a path: :func:`read_statuses` lists the configured directory's own
-folders, reads each one's status file (a regular file, never a link, bounded in size) and keeps the
-ones that name the world asked about. A document holds no path, token or credential; the one free
-text it holds is the pull request's title, which the project wrote.
+No value a caller sends becomes a path: :func:`read_every_status` lists the configured directory's
+own folders and reads each one's status file (a regular file, never a link, bounded in size), and
+:func:`read_statuses` keeps the ones that name the world asked about. A document holds no path,
+token or credential; the one free text it holds is the pull request's title, which the project
+wrote.
 """
 
 from __future__ import annotations
@@ -150,8 +151,8 @@ def _read(path: Path) -> dict[str, Any] | None:
         return None
 
 
-def read_statuses(directory: Path | None, world_id: str) -> list[dict[str, Any]]:
-    """The status of every project in `directory` that follows `world_id`, newest written first.
+def read_every_status(directory: Path | None) -> list[dict[str, Any]]:
+    """The status of every project in `directory`, whatever world it follows, newest written first.
 
     Only the directory's own folders are read (never a link, never a path a caller names); a
     folder whose status is missing, too large or not a status document is passed over."""
@@ -166,6 +167,12 @@ def read_statuses(directory: Path | None, world_id: str) -> list[dict[str, Any]]
         if folder.name.startswith(".") or folder.is_symlink() or not folder.is_dir():
             continue
         status = _read(folder / STATUS_FILE)
-        if status is not None and status["world_id"] == world_id:
+        if status is not None:
             found.append(status)
     return sorted(found, key=lambda status: status["written_at"], reverse=True)
+
+
+def read_statuses(directory: Path | None, world_id: str) -> list[dict[str, Any]]:
+    """The status of every project in `directory` that follows `world_id`, newest written first,
+    read as :func:`read_every_status` reads them."""
+    return [status for status in read_every_status(directory) if status["world_id"] == world_id]

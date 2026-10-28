@@ -13,6 +13,14 @@ workspace (its follower holds one bearer and is told none), so it is answered on
 requester's workspace holds the version it follows: version identities are the server's own, so
 one install's projects of another workspace's world under the same id are never shown.
 
+``GET /world/github-projects/kept`` names no world and answers
+``exulanica.world-github-keeping/v1`` for the requester's workspace: whether this instance keeps
+worlds in projects at all (``kept_here``: a projects directory is configured, as the routes below
+decide it) and how many of the workspace's worlds a project linked to a GitHub repository keeps
+(``on_github``). It reads the statuses a world's own read reads and, as that read does, keeps only
+those following a version the workspace holds, so another workspace's world under the same id is
+never counted; a world counts once however many projects keep it, and none is 0.
+
 ``POST /world/github-projects`` asks the follower to keep a version of the world in a project, its
 readable text kept or not, and answers the request (202): the follower takes it on its next scan,
 makes the project's folder itself and removes the request, or marks it refused by a code. A world
@@ -67,7 +75,7 @@ from exulanica.world.project_requests import (
     request_publication,
     withdraw_request,
 )
-from exulanica.world.project_status import projects_directory, read_statuses
+from exulanica.world.project_status import projects_directory, read_every_status, read_statuses
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world", tags=["world"])
@@ -87,10 +95,11 @@ def _not_kept() -> JSONResponse:
     )
 
 
-def _held_versions(
-    connection: ScopedConnection, session: CurrentSession, world_id: str, statuses: list[dict]
-) -> set[str]:
-    """Which of the versions these statuses follow the requester's workspace holds in the world."""
+def _held(
+    connection: ScopedConnection, session: CurrentSession, statuses: list[dict]
+) -> list[dict]:
+    """The statuses that follow a version the requester's workspace holds, in the world each
+    names."""
     asked = []
     for status in statuses:
         try:
@@ -98,13 +107,14 @@ def _held_versions(
         except ValueError:
             continue  # not a version identity the server made: held by nobody here
     if not asked:
-        return set()
+        return []
     rows = connection.execute(
-        "select version_id from world_alternate_version where workspace_id=%s and world_id=%s "
+        "select world_id, version_id from world_alternate_version where workspace_id=%s "
         "and version_id = any(%s)",
-        (session.workspace_id, world_id, asked),
+        (session.workspace_id, asked),
     ).fetchall()
-    return {str(row["version_id"]) for row in rows}
+    held = {(row["world_id"], str(row["version_id"])) for row in rows}
+    return [status for status in statuses if (status["world_id"], status["version_id"]) in held]
 
 
 class ProjectRequestBody(BaseModel):
@@ -142,15 +152,30 @@ def world_github_projects(
 ) -> JSONResponse:
     require_world(connection, session.workspace_id, world_id)
     directory = projects_directory()
-    statuses = read_statuses(directory, world_id)
-    held = _held_versions(connection, session, world_id, statuses)
     return JSONResponse(
         content={
             "profile": "exulanica.world-github-projects/v1",
             "world_id": world_id,
-            "projects": [status for status in statuses if status["version_id"] in held],
+            "projects": _held(connection, session, read_statuses(directory, world_id)),
             "requests": read_requests(directory, (str(session.workspace_id), world_id)),
             "publications": read_publications(directory, (str(session.workspace_id), world_id)),
+        },
+        headers=_NO_STORE,
+    )
+
+
+@router.get(
+    "/github-projects/kept",
+    summary="Whether this server keeps worlds, and how many of the workspace's are on GitHub.",
+)
+def world_github_keeping(connection: ScopedConnection, session: CurrentSession) -> JSONResponse:
+    directory = projects_directory()
+    linked = [status for status in read_every_status(directory) if status["link"] is not None]
+    return JSONResponse(
+        content={
+            "profile": "exulanica.world-github-keeping/v1",
+            "kept_here": directory is not None,
+            "on_github": len({status["world_id"] for status in _held(connection, session, linked)}),
         },
         headers=_NO_STORE,
     )
@@ -236,13 +261,15 @@ def request_world_github_publication(
     if directory is None:
         return _not_kept()
     require_world(connection, session.workspace_id, world_id)
-    statuses = [
-        status
-        for status in read_statuses(directory, world_id)
-        if status["project_id"] == body.project_id
-    ]
-    held = _held_versions(connection, session, world_id, statuses)
-    statuses = [status for status in statuses if status["version_id"] in held]
+    statuses = _held(
+        connection,
+        session,
+        [
+            status
+            for status in read_statuses(directory, world_id)
+            if status["project_id"] == body.project_id
+        ],
+    )
     if not statuses:
         raise UnknownWorldResource("no such project")
     if any(status["link"] is not None for status in statuses):

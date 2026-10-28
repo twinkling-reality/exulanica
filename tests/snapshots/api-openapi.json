@@ -7670,6 +7670,55 @@
     }
    }
   },
+  "/integrations": {
+   "get": {
+    "tags": [
+     "integrations"
+    ],
+    "summary": "What a person's worlds can connect to: each one's words, mark and guide, by kind.",
+    "operationId": "integrations_catalog_integrations_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Integrations Catalog Integrations Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/workspace-assets": {
    "post": {
     "tags": [
@@ -16861,6 +16910,53 @@
     },
     "responses": {
      "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/github-projects/kept": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Whether this server keeps worlds, and how many of the workspace's are on GitHub.",
+    "operationId": "world_github_keeping_world_github_projects_kept_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
       "description": "Successful Response",
       "content": {
        "application/json": {

@@ -12,7 +12,7 @@ import pytest
 from exulanica.world.project_requests import review_publication, start_publication
 from exulanica.world.project_status import write_status
 
-from personal_world_support import OWNER_TOKEN
+from personal_world_support import OWNER_TOKEN, STRANGER_TOKEN
 from test_saved_world_holding_things_postgres import _query, _scope
 from test_society_made_world import made as imported_made  # noqa: F401
 from test_thing_characters_postgres import CHARACTER, _a_society_with_a_knight, _knight, _write
@@ -116,6 +116,69 @@ def test_where_the_world_is_kept_on_github_reads_the_configured_directory_alone(
     )
     assert kept["link"] == {"repository": "learner/world", "publish": "automatic"}
     assert str(projects) not in read.text  # no path is ever answered
+
+
+KEPT = "/world/github-projects/kept"
+
+
+def _keeping(kept_here: bool, on_github: int) -> dict:
+    return {
+        "profile": "exulanica.world-github-keeping/v1",
+        "kept_here": kept_here,
+        "on_github": on_github,
+    }
+
+
+def _keep(projects, name: str, world_id: str, version_id: str, *, linked: bool) -> None:
+    folder = projects / name
+    folder.mkdir(parents=True)
+    write_status(
+        folder,
+        {
+            "profile": "exulanica.world-project-status/v1",
+            "world_id": world_id,
+            "version_id": version_id,
+            "written_at": "2026-10-15T01:00:00Z",
+            "checkpoints": 2,
+            "last_checkpoint_at": "2026-10-15T00:59:00Z",
+            "pending": False,
+            "link": {"repository": "learner/world", "publish": "automatic"} if linked else None,
+            "github": None,
+        },
+    )
+
+
+def test_a_server_with_no_projects_directory_keeps_no_world_and_none_on_github(made):
+    read = made.get(KEPT)
+    assert read.status_code == 200, read.text
+    assert read.headers["cache-control"] == "private, no-store"
+    assert read.json() == _keeping(False, 0)
+
+
+def test_only_this_workspace_s_worlds_in_a_linked_project_are_counted_on_github(
+    made, tmp_path, monkeypatch
+):
+    api = made
+    entry, _society = _a_society_with_a_knight(api)
+    world, version = entry["world_id"], entry["authored_version_id"]
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    monkeypatch.setenv("EXULANICA_PROJECTS_DIRECTORY", str(projects))
+    assert api.get(KEPT).json() == _keeping(True, 0)  # kept here, and nothing in it yet
+    _keep(projects, "unlinked", world, version, linked=False)
+    assert api.get(KEPT).json() == _keeping(True, 0)  # in a project, not on GitHub
+    # Another workspace's project of a world under the same id: its version is not one this
+    # workspace holds, so it is never counted here.
+    _keep(projects, "elsewhere", world, str(uuid.uuid4()), linked=True)
+    assert api.get(KEPT).json() == _keeping(True, 0)
+    # This world's project linked to a repository counts it once, however many projects keep it.
+    _keep(projects, "linked", world, version, linked=True)
+    _keep(projects, "linked-again", world, version, linked=True)
+    read = api.get(KEPT)
+    assert read.json() == _keeping(True, 1)
+    assert str(projects) not in read.text  # no path is ever answered
+    # A stranger's workspace holds none of these versions.
+    assert api.get(KEPT, token=STRANGER_TOKEN).json() == _keeping(True, 0)
 
 
 def _delete(api, path):
