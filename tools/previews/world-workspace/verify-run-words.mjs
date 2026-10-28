@@ -27,6 +27,8 @@ assert.equal(runRefusalWords('provider_credential_absent'), 'No AI model is conn
 assert.match(python('exulanica/world/decision_roles.py'), /"provider_credential_absent"/);
 assert.equal(runRefusalWords('provider_not_running', 'Qwen3 4B Instruct'), 'Qwen3 4B Instruct is not running on this computer now. Start it, then try again.');
 assert.equal(runRefusalWords('provider_not_running'), 'The model is not running on this computer now. Start it, then try again.');
+// Two or more models named are not running, and are started (ROOT's sweep of 27 October).
+assert.equal(runRefusalWords('provider_not_running', 'Qwen3 4B Instruct and Granite 4.1 8B', true), 'Qwen3 4B Instruct and Granite 4.1 8B are not running on this computer now. Start them, then try again.');
 assert.match(python('exulanica/models/client.py'), /PROVIDER_NOT_RUNNING: Final = "provider_not_running"/);
 // The host's money for models spent (J22); a run's own cap stays its spending limit.
 for (const code of ['process_budget_spent', 'process_share_spent']) {

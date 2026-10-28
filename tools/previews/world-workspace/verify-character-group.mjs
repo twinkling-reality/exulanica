@@ -190,6 +190,13 @@ const refusedRun = questionGroup({ who: teo, models: ['M'], limits, refusal: 'st
 assert.equal(refusedRun.print, 'The world changed a moment ago. Press Run again.');
 assert.equal(refusedRun.refused, true);
 assert.equal(refusedRun.rows[0].disabled, false);
+// Models on this computer not running: one model is, two or more are (ROOT's sweep of 27 October).
+assert.equal(questionGroup({ who: teo, askers: [teo], models: ['Qwen3 4B Instruct'], limits, refusal: 'provider_not_running' }).print,
+  'Qwen3 4B Instruct is not running on this computer now. Start it, then try again.');
+assert.equal(questionGroup({ who: teo, askers: [teo, ari], models: ['Qwen3 4B Instruct', 'Granite 4.1 8B'], limits, refusal: 'provider_not_running' }).print,
+  'Qwen3 4B Instruct and Granite 4.1 8B are not running on this computer now. Start them, then try again.');
+assert.equal(questionGroup({ who: teo, askers: [teo, ari], models: ['Qwen3 4B Instruct', ' Qwen3 4B Instruct '], limits, refusal: 'provider_not_running' }).print,
+  'Qwen3 4B Instruct is not running on this computer now. Start it, then try again.', 'one model for two people is one model');
 assert.equal(questionGroup({ who: teo, models: ['M'], limits, refusal: 'unheard_of' }).print, 'The run did not start. Nothing was spent.');
 assert.equal(questionGroup({ who: teo, askers: [], models: ['M'], limits }).note, whole("Teo's M decides."), 'the chosen one at least');
 assert.equal(questionGroup({ who: teo, models: ['M'], limits: { wallSeconds: 300, usd: '0.02000000' } }).doing, 'Run for 5 minutes');

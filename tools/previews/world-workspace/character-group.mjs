@@ -2,7 +2,7 @@
 // BUILD-SHEETS-CHARACTER-TALKING-BUILDING.md section 1): what it says, from the reads the page holds, and where
 // it stands. Pure: the reads come in as data and the words from character-words.mjs; character-group.ts draws
 // the answer. verify-character-group.mjs holds it.
-import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, decidesPrint, declaredParts, makerLine, modelsDecide, modelsNamed, overLine, quoted, readingRecord, saidUnder } from './character-words.mjs';
+import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, decidesPrint, declaredParts, makerLine, modelsDecide, modelsNamed, namedModels, overLine, quoted, readingRecord, saidUnder } from './character-words.mjs';
 import { RUN_WORDS, atMost, runFor, runRefusalWords } from './run-words.mjs';
 import { dayWord } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -147,7 +147,7 @@ export function questionGroup({ who, askers = [who], models = [], limits, refusa
     note: modelsDecide(askers.length ? askers : [who], { models }),
     rows: Object.freeze(rows.map(row => Object.freeze(row))),
     // A run whose every model is on this computer costs nothing: it says so in place of its cap (A2).
-    print: refusal ? runRefusalWords(refusal, modelsNamed(models)) : free ? CHARACTER_WORDS.freeHere : atMost(limits, true),
+    print: refusal ? runRefusalWords(refusal, modelsNamed(models), namedModels(models).length > 1) : free ? CHARACTER_WORDS.freeHere : atMost(limits, true),
     refused: Boolean(refusal),
   });
 }

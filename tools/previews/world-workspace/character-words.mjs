@@ -385,12 +385,15 @@ export function modelsDecide(whos, { models = [] } = {}) {
       : `${own(first, 0)} and ${rest.length} more people's models decide.`;
 }
 
+/** The models a run asks, each named once in the order given, trimmed; none for a name not read. */
+export const namedModels = names => [...new Set((names ?? []).map(name => (typeof name === 'string' ? name.trim() : '')).filter(Boolean))];
+
 /**
  * The models a run asks (r08, DESIGN's aha 20), the chosen character's first, each named once: one by its name, two
  * joined with "and", more than two the first "and 2 other models"; null when none has a name.
  */
 export function modelsNamed(names) {
-  const named = [...new Set((names ?? []).map(name => (typeof name === 'string' ? name.trim() : '')).filter(Boolean))];
+  const named = namedModels(names);
   if (named.length <= 2) return named.join(' and ') || null;
   return `${named[0]} and ${named.length - 1} other models`;
 }
