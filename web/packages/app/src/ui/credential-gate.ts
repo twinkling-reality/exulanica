@@ -46,7 +46,9 @@ function laterWords(seconds: number): string {
 
 /**
  * The gate a person meets before a world: an entry code where this server lets guests in, Google
- * sign-in where it has accounts, and the developer-token entry.
+ * sign-in where it has accounts, and the developer-token entry, on Create's pattern (ROOT's sweep of
+ * 27 October): the wordmark, the guest's white pill with the host's day under it, and the token
+ * behind one quiet link where there is another way in.
  *
  * WHAT IS OFFERED IS WHAT THE SERVER STATES. A signed-out answer may state its sign-in modes
  * (`sign_in`: Google on or off, a guest entry asking a code, taking none, or off); where it does,
@@ -130,15 +132,21 @@ export function buildCredentialGate(deps: {
     guestFailure,
   ]);
 
-  // "Or" only where there is something for it to be the alternative to.
-  const operator = el('div', { class: 'credential-operator' }, configured || guest !== null
-    ? [
-      el('div', { class: 'credential-divider', role: 'separator' }, [
-        el('span', { text: 'or, for developers' }),
-      ]),
-      controls,
-    ]
-    : [controls]);
+  // Where there is another way in, the developer token waits behind one quiet link that opens its field; where it is
+  // the only way in, its field shows.
+  const otherWay = configured || guest !== null;
+  controls.id = 'credential-token';
+  controls.hidden = otherWay;
+  const tokenOpen = el('button', {
+    type: 'button', class: 'gate-token-open', 'aria-controls': controls.id, 'aria-expanded': 'false', text: 'Sign in with a token',
+  }) as HTMLButtonElement;
+  tokenOpen.addEventListener('click', () => {
+    const opening = controls.hidden;
+    controls.hidden = !opening;
+    tokenOpen.setAttribute('aria-expanded', String(opening));
+    if (opening) input.focus();
+  });
+  const operator = el('div', { class: 'credential-operator' }, [controls]);
 
   const google = el('button', { type: 'button', class: 'account-sign-in' }, [
     el('span', { class: 'account-sign-in-label', text: 'Continue with Google' }),
@@ -147,16 +155,14 @@ export function buildCredentialGate(deps: {
   google.addEventListener('click', () => deps.signIn());
 
   form.append(
-    el('p', { class: 'gate-wordmark', text: 'Exulanica' }),
-    ...(guest !== null
-      ? [el('p', { class: 'gate-note', text: guestMode === 'code' ? 'Enter with the code you were given.' : 'Come in as a guest.' })]
-      : configured ? [el('p', { class: 'gate-note', text: 'Enter your personal world.' })] : []),
+    el('p', { class: 'gate-wordmark', text: 'exulanica' }),
     el('div', { class: 'credential-action' }, [
       ...(guest !== null ? [guest] : []),
       ...(configured ? [google] : []),
       operator,
       failure,
     ]),
+    ...(otherWay ? [tokenOpen] : []),
   );
   form.addEventListener('submit', (event) => {
     event.preventDefault();

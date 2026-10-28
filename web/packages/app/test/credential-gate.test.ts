@@ -29,8 +29,17 @@ describe('the credential gate', () => {
     expect(google?.disabled).toBe(false);
     google?.click();
     expect(signIn).toHaveBeenCalledTimes(1);
-    expect(gate.querySelector('[role="separator"]')?.textContent).toBe('or, for developers');
-    expect(gate.querySelector('input[aria-label="Access token"]')).not.toBeNull();
+    // The developer token waits behind one quiet link, and its field opens under the way in.
+    const open = gate.querySelector<HTMLButtonElement>('button.gate-token-open')!;
+    const token = gate.querySelector<HTMLElement>('#credential-token')!;
+    expect(open.textContent).toBe('Sign in with a token');
+    expect(open.getAttribute('aria-controls')).toBe(token.id);
+    expect(token.hidden).toBe(true);
+    open.click();
+    expect(token.hidden).toBe(false);
+    expect(open.getAttribute('aria-expanded')).toBe('true');
+    expect(token.querySelector('input[aria-label="Access token"]')).not.toBeNull();
+    expect(gate.querySelector('[role="separator"]')).toBeNull();
   });
 
   it('offers no Google sign-in where the server has no accounts, only the token entry', async () => {
@@ -39,8 +48,9 @@ describe('the credential gate', () => {
     }), { status: 503 }));
     expect(gate.querySelector('button.account-sign-in')).toBeNull();
     expect(gate.textContent).not.toContain('Google');
-    // No "or" with nothing before it.
-    expect(gate.querySelector('[role="separator"]')).toBeNull();
+    // The token is the only way in: its field shows, with no link to open it.
+    expect(gate.querySelector('button.gate-token-open')).toBeNull();
+    expect(gate.querySelector<HTMLElement>('#credential-token')!.hidden).toBe(false);
     expect(gate.querySelector('input[aria-label="Access token"]')).not.toBeNull();
     expect(gate.querySelector('button[aria-label="Enter Exulanica"]')).not.toBeNull();
   });
@@ -76,7 +86,9 @@ describe('a guest coming in with a code', () => {
   it('offers the code entry the server states, first, with no Google where it is off, and sends the code', async () => {
     const { gate, code, button, enterAsGuest } = await guestGate(async () => undefined);
     expect(gate.querySelector('button.account-sign-in')).toBeNull();
-    expect(gate.querySelector('.gate-note')?.textContent).toBe('Enter with the code you were given.');
+    // The wordmark and the way in, with no sentence explaining it.
+    expect(gate.querySelector('.gate-wordmark')?.textContent).toBe('exulanica');
+    expect(gate.querySelector('.gate-note')).toBeNull();
     expect(button.disabled).toBe(true);
     code!.value = '  judge-code ';
     code!.dispatchEvent(new Event('input'));

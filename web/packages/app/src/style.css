@@ -856,6 +856,59 @@ body {
   transform: translateY(-0.04em);
 }
 
+/* The credential gate on Create's pattern (ROOT's sweep, 27 October): on Create's dark ground, the wordmark at Create's
+ * column in its title type, the guest's white pill with the host's day under it in the muted ink, Google an outlined
+ * pill where the server has accounts, and the developer token behind one quiet link at the top right, its field opening
+ * under the way in. Create's own values (tools/previews/world-workspace/create-world.css), so the two read as one. */
+/* Over redesign.css's and bridge.css's #shell .gate, which load after this sheet. */
+#shell .gate.credential-gate {
+  --gate-col: clamp(48px, 24.5vw, 470px);
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 22px;
+  padding: max(88px, 26vh) 48px 42px var(--gate-col);
+  background: var(--plane-ground);
+  color: var(--plane-ink);
+  text-align: left;
+  font-family: var(--ui-font-brand);
+}
+#shell .credential-gate .gate-wordmark { font: 500 clamp(34px, 2.9vw, 44px)/1.1 var(--ui-font-brand); letter-spacing: -0.022em; text-indent: 0; text-transform: none; color: var(--plane-ink); }
+#shell .credential-gate .gate-wordmark::after { content: none; }
+#shell .credential-gate .credential-action { align-items: flex-start; gap: 14px; width: min(420px, 100%); }
+#shell .credential-gate .guest-entry { width: 100%; gap: 10px; }
+#shell .credential-gate .guest-entry-row { gap: 10px; }
+#shell .credential-gate .guest-entry .guest-enter,
+#shell .credential-gate .guest-entry-row > .guest-enter:only-child {
+  flex: none; min-width: 0; height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--plane-pill); color: var(--plane-pill-ink);
+  font: 500 14px/1 var(--ui-font-brand); box-shadow: var(--plane-pill-shadow);
+}
+#shell .credential-gate .guest-entry .guest-enter:hover:not(:disabled) { background: var(--plane-pill-hover); }
+#shell .credential-gate .guest-entry .guest-code { height: 36px; border: 1px solid var(--plane-hair); background: var(--plane-field); color: var(--plane-ink); }
+#shell .credential-gate .gate-note { width: auto; color: var(--plane-ink-muted); font: 400 13px/1.45 var(--ui-font-brand); text-align: left; text-wrap: pretty; }
+#shell .credential-gate .gate-failure { color: var(--plane-refused); font: 400 13px/1.45 var(--ui-font-brand); text-align: left; }
+#shell .credential-gate .account-sign-in { width: auto; }
+#shell .credential-gate .account-sign-in-label { height: 36px; padding: 0 16px; border: 1px solid var(--plane-edge); background: none; color: var(--plane-ink); font: 500 14px/1 var(--ui-font-brand); }
+#shell .credential-gate .account-sign-in-arrow { display: none; }
+#shell .credential-gate .gate-token-open {
+  position: absolute; top: 36px; right: 48px; min-height: 32px; padding: 0; border: 0; background: none; cursor: pointer;
+  color: var(--plane-ink-muted); font: 400 13px/1 var(--ui-font-brand); transition: color var(--motion-standard) var(--motion-easing);
+}
+#shell .credential-gate .gate-token-open:hover { color: var(--plane-ink); }
+#shell .credential-gate .credential-operator { width: 100%; color: var(--plane-ink-muted); }
+#shell .credential-gate .credential-controls { --credential-control-height: 36px; }
+#shell .credential-gate .credential-controls[hidden] { display: none; }
+#shell .credential-gate .credential-entry { background: var(--plane-field); box-shadow: 0 0 0 1px var(--plane-hair) inset; }
+#shell .credential-gate .credential-entry:focus-within { background: var(--plane-field-active); box-shadow: 0 0 0 1px var(--plane-edge) inset; }
+#shell .credential-gate .credential-entry input { color: var(--plane-ink); }
+#shell .credential-gate .credential-entry input::placeholder { color: var(--plane-ink-faint); }
+#shell .credential-gate .credential-submit { border-color: var(--plane-hair); color: var(--plane-ink-muted); }
+#shell .credential-gate .credential-submit:not(:disabled) { border-color: var(--plane-pill); background: var(--plane-pill); color: var(--plane-pill-ink); }
+#shell .credential-gate :focus-visible { outline: 2px solid var(--plane-focus); outline-offset: 2px; }
+@media (max-width: 32rem) {
+  #shell .gate.credential-gate { padding: 96px 24px 32px; }
+  #shell .credential-gate .gate-token-open { top: 28px; right: 24px; }
+}
+
 .startup-thinking {
   position: fixed;
   inset: 0;

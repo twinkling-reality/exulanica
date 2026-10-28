@@ -357,3 +357,24 @@
   --duration-base: 0ms;
   --duration-slow: 0ms;
 }
+
+/*
+ * Create's dark plane (tools/previews/world-workspace/create-world.css's values): the gate a guest meets is laid out on
+ * it, so the way in and Create read as one page. One scheme: the plane is dark whatever the interface's own.
+ */
+:root {
+  --plane-ground: #0a0d0f;
+  --plane-ink: #ffffff;
+  --plane-ink-muted: rgb(255 255 255 / 72%);
+  --plane-ink-faint: rgb(255 255 255 / 48%);
+  --plane-hair: rgb(255 255 255 / 16%);
+  --plane-edge: rgb(255 255 255 / 30%);
+  --plane-field: rgb(255 255 255 / 7%);
+  --plane-field-active: rgb(255 255 255 / 10%);
+  --plane-pill: #ffffff;
+  --plane-pill-hover: #eef3f5;
+  --plane-pill-ink: #101416;
+  --plane-pill-shadow: 0 1px 0 rgb(255 255 255 / 40%) inset, 0 8px 24px rgb(0 0 0 / 22%);
+  --plane-refused: #ffc2b8;
+  --plane-focus: #b9d6e0;
+}
