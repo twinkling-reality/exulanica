@@ -39,6 +39,11 @@ interface DecisionPageState {
   readonly ground?: string | null;
   readonly personality?: { readonly name: string | null; readonly about: string | null } | null;
   readonly why?: string | null;
+  readonly detail?: {
+    readonly status?: string;
+    readonly request?: Readonly<Record<string, unknown>>;
+    readonly decision?: Readonly<Record<string, unknown>> | null;
+  } | null;
 }
 interface DecisionPage { draw(state: DecisionPageState): void; close(): void; hide(hidden: boolean): void }
 // A joined path: the test runner still finds the file, and the type checker leaves the preview
@@ -511,3 +516,126 @@ describe("The told column ends cleanly (D4)", () => {
     expect(blocks.filter((block) => block.classList.contains('wu-rd-faint'))).toHaveLength(1);
   });
 });
+
+describe('The 5-stage live execution pipeline & [X] Data telemetry (Pillar 1)', () => {
+  it('renders the proportional 5-stage execution pipeline bar and breakdown from a recorded decision receipt', async () => {
+    const detail = {
+      status: 'completed',
+      request: {
+        request_id: 'r1',
+        base_tick: 412,
+        state_sha256: '8f2a9c1b44d0e5128f2a9c1b44d0e5128f2a9c1b44d0e5128f2a9c1b44d0e512',
+        document_sha256: 'a'.repeat(64),
+        provider_config: { provider: 'nebius_token_factory', model_id: 'nvidia/Nemotron-3-Nano-30B' },
+        context: {
+          tick: 412,
+          character: { name: 'Teo', about: 'A retired fisherman.' },
+          here: 'by the lower pools',
+          clock: { day: 0, minute_of_day: 412 },
+          needs: [{ label: 'rest', milli: 417, seen_to_at_milli: 500 }],
+          surroundings: {
+            beings: [{ who: 'Ines', metres: 3, doing: 'standing', hears_you: true }],
+            things: [{ what: 'bench', metres: 4 }],
+            more_beings: 0,
+            more_things: 0,
+          },
+          heard: [{ from: 'Ines', line: 'Morning.', minutes_ago: 1 }],
+          remembers: { beings: [{ who: 'Ines', met_minutes_ago: 3, here: true }], places: [], handed: [] },
+          options: NINE.map((label) => ({ label, kind: 'say_to' })),
+        },
+      },
+      decision: {
+        request_id: 'r1',
+        status: 'accepted',
+        reason: 'validated_choice',
+        proposal: { label: 'Say something to Ines', line: 'Morning, Ines. The boats are out early.' },
+        provider: {
+          provider: 'nebius_token_factory',
+          served_model_id: 'nvidia/Nemotron-3-Nano-30B',
+          latency_ms: 912,
+          prompt_tokens: 410,
+          completion_tokens: 38,
+          cost_usd: '0.00030000',
+          cost_known: true,
+        },
+      },
+    };
+
+    const { root } = await open(teo({ detail }));
+    const pipeline = root.querySelector('section.wu-rd-pipeline') as HTMLElement;
+    expect(pipeline).not.toBeNull();
+    expect(pipeline.dataset['verdict']).toBe('Applied');
+    expect([pipeline.style.left, pipeline.style.width]).toEqual(['120px', '1680px']);
+
+    // Proportional 5-segment execution bar summing to 100%.
+    const segments = [...pipeline.querySelectorAll<HTMLElement>('.wu-rd-pipeline-segment')];
+    expect(segments).toHaveLength(5);
+    expect(segments.map((seg) => seg.dataset['stage'])).toEqual(['snapshot', 'context', 'inference', 'check', 'outcome']);
+    expect(segments.every((seg) => seg.dataset['status'] === 'ok')).toBe(true);
+    const totalPercent = segments.reduce((sum, seg) => sum + Number.parseInt(seg.style.width, 10), 0);
+    expect(totalPercent).toBe(100);
+
+    // 5-stage breakdown labels, summaries, and details.
+    expect(all(pipeline, '.wu-rd-stage-label')).toEqual([
+      '1. World Snapshot',
+      '2. Context',
+      '3. Model Inference',
+      '4. Engine Check',
+      '5. Outcome',
+    ]);
+    expect(all(pipeline, '.wu-rd-stage-summary')).toEqual([
+      'Tick 412 · #8f2a9c1b',
+      '6 sections · 9 choices',
+      'Nemotron 3 Nano 30B · 912 ms (0.9 s)',
+      'Applied',
+      'Teo: “Morning, Ines. The boats are out early.”',
+    ]);
+    expect(all(pipeline, '.wu-rd-stage-detail')).toEqual([
+      '1 being, 1 object',
+      'Personality · Location & Time · Status · Nearby · Heard · Remembers',
+      'nebius token factory · 448 tok (410 in / 38 out) · $0.0003',
+      'Option #1 verified',
+      'Spoken line committed · Tick 412',
+    ]);
+  });
+
+  it('shows refusal reasons, Not Applied, and Routine Fallback states in the 5-stage pipeline', async () => {
+    const unanswered = { asks: 1, latencyMs: 2100, costUsd: '0.01214400', costKnown: true, reason: 'spending_limit_reached' };
+    const why = 'Its answer was not one of the actions, and asking it again would have gone over the money left.';
+    const { root, page } = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, -1), answered: null, unanswered, why, canCompare: false }));
+    const pipeline = root.querySelector('section.wu-rd-pipeline') as HTMLElement;
+    expect(pipeline.dataset['verdict']).toBe('Routine Fallback');
+    expect(pipeline.querySelector('[data-stage="check"] .wu-rd-stage-summary')?.textContent).toBe('Spending limit reached · Routine Fallback');
+    expect(pipeline.querySelector('[data-stage="check"]')?.getAttribute('data-status')).toBe('fallback');
+    expect(pipeline.querySelector('[data-stage="outcome"] .wu-rd-stage-summary')?.textContent).toBe('Walked to the quay');
+    expect(pipeline.querySelector('[data-stage="outcome"] .wu-rd-stage-detail')?.textContent).toBe('Routine fallback committed to world state');
+
+    // Late choice (world moved on before commit): marked Not Applied · Routine Fallback.
+    page.draw(teo({ title: 'Walked to the quay', choices: choices(NINE, 4), late: true }));
+    const latePipeline = root.querySelector('section.wu-rd-pipeline') as HTMLElement;
+    expect(latePipeline.dataset['verdict']).toBe('Not Applied');
+    expect(latePipeline.querySelector('[data-stage="check"] .wu-rd-stage-summary')?.textContent).toBe('Not Applied · Routine Fallback');
+    expect(latePipeline.querySelector('[data-stage="check"]')?.getAttribute('data-status')).toBe('warn');
+  });
+
+  it('formats [X] Data person tag telemetry and town-wide model execution summary cleanly', async () => {
+    const dataViewThings = await import('../../../../tools/previews/world-workspace/' + 'data-view-things.mjs') as {
+      personLines(input: Record<string, unknown>): string[];
+      personTelemetry(input: unknown): string | null;
+      dataViewTelemetrySummary(input: unknown): string | null;
+    };
+    expect(dataViewThings.personLines({
+      name: 'Teo',
+      model: 'Nemotron 3 Nano 30B',
+      telemetry: { status: 'accepted', disposition: 'applied', latencyMs: 912, costUsd: '0.0003' },
+    })).toEqual(['Teo', 'Nemotron 3 Nano 30B', '912 ms · Applied · $0.0003']);
+    expect(dataViewThings.dataViewTelemetrySummary({
+      activeModels: 2,
+      decisions: 18,
+      applied: 17,
+      latencyP50Ms: 740,
+      costUsd: '0.0054',
+    })).toBe('2 active models · 740 ms p50 · 17/18 applied · $0.0054');
+  });
+});
+

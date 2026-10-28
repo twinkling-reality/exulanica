@@ -2,7 +2,7 @@
 // of record a point stands on, where a tag hangs and which tags show. Run: node verify-data-view-things.mjs
 import assert from 'node:assert/strict';
 import { SPLIT, neededDensity, surfaceIndex, surfaceSamples, takenCount, trianglesNear } from './data-view-samples.mjs';
-import { POINT_FALLBACK, bigEnough, boxOfExtent, easedAlbedoChunk, edgeOf, creatureWords, keepStep, kindMaker, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, thingWords, townThings, walkerBoxes } from './data-view-things.mjs';
+import { POINT_FALLBACK, bigEnough, boxOfExtent, creatureWords, dataViewTelemetrySummary, easedAlbedoChunk, edgeOf, keepStep, kindMaker, personLines, personTelemetry, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, thingWords, townThings, walkerBoxes } from './data-view-things.mjs';
 
 const extent = (x0, y0, z0, x1, y1, z1) => ({ min_x_mm: x0, min_y_mm: y0, min_z_mm: z0, max_x_mm: x1, max_y_mm: y1, max_z_mm: z1 });
 const record = (kind, identity, fields, membership = 'owned') => ({ kind, identity, membership, fields: { identity, ...fields } });
@@ -132,10 +132,27 @@ assert.deepEqual(around.map((one) => [one.key, one.x, one.y]), [['street', 800, 
 assert.equal(bigEnough(0.5, 20, 771), false);
 assert.equal(bigEnough(2, 20, 771), true);
 
-// A person: their name, and the model that decides for them under it when one does.
+// A person: their name, and the model that decides for them under it when one does, plus live execution telemetry when available.
 assert.deepEqual(personLines({ name: 'Ines Varga', model: 'Nemotron 3 Super 120B' }), ['Ines Varga', 'Nemotron 3 Super 120B']);
 assert.deepEqual(personLines({ name: 'Ines Varga', model: null }), ['Ines Varga']);
 assert.deepEqual(personLines({ name: '' }), ['someone']);
+assert.equal(personTelemetry(null), null);
+assert.equal(personTelemetry({ status: 'accepted', disposition: 'applied', latencyMs: 640, costUsd: '0.00030000' }), '640 ms · Applied · $0.0003');
+assert.equal(personTelemetry({ status: 'accepted', disposition: 'stale', latencyMs: 1420 }), '1.4 s · Not Applied · Stale');
+assert.equal(personTelemetry({ status: 'unavailable', reason: 'model_timed_out' }), 'Timed Out · Routine');
+assert.deepEqual(
+  personLines({ name: 'Ines Varga', model: 'Nemotron 3 Super 120B', telemetry: { status: 'accepted', disposition: 'applied', latencyMs: 640 } }),
+  ['Ines Varga', 'Nemotron 3 Super 120B', '640 ms · Applied'],
+);
+assert.equal(dataViewTelemetrySummary(null), null);
+assert.equal(dataViewTelemetrySummary({ activeModels: 0, decisions: 0 }), null);
+assert.equal(
+  dataViewTelemetrySummary({
+    choices: [{ subjectId: 'teo', model: { name: 'Nemotron 3 Nano 30B' }, refusal: null }, { subjectId: 'ines', model: null, refusal: null }],
+    summaries: [{ decisions: 12, applied: 11, latencyP50Ms: 680, costUsd: '0.00360000' }],
+  }),
+  '1 active model · 680 ms p50 · 11/12 applied · $0.0036',
+);
 
 // The GPU's share of the points, by measured frame time: down a quarter while a frame in four is slow, never below the
 // floor; a step down kept only where the next frames are quicker, else undone and none tried for 30 s; up a seventh once

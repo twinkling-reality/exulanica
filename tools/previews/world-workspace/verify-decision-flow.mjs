@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { ABOVE_KEYS, CAP, FLOW_LAYOUTS, HEAD, NARROW_BELOW, TOLD, WRAP, bend, choiceEnd, choiceLines, flowLayout, flowSize, headBottom, rowMost, run, titleLines, toldHeight } from './decision-flow.mjs';
+import { ABOVE_KEYS, CAP, FLOW_LAYOUTS, HEAD, NARROW_BELOW, PIPELINE_BAR, PIPELINE_STAGES, TOLD, WRAP, bend, choiceEnd, choiceLines, decisionPipeline, executionPipeline, flowLayout, flowSize, headBottom, pipelineLayout, rowMost, run, titleLines, toldHeight } from './decision-flow.mjs';
 
 const { wide, narrow } = FLOW_LAYOUTS;
 
@@ -197,5 +197,143 @@ const shortFirst = flowLayout(narrow, { count: 14, lines: mixed, height: 700 });
 const shortLast = flowLayout(narrow, { count: 14, lines: mixed, height: 700, offset: 99 });
 assert.deepEqual([shortLast.ring.y, shortLast.below], [shortFirst.ring.y, 0]);
 assert.ok(shortLast.offset > 0 && shortLast.rows.length !== shortFirst.rows.length);
+
+// Pillar 1 ([X] System): 5-stage live execution pipeline and proportional timing/status breakdown.
+assert.equal(executionPipeline, decisionPipeline);
+assert.deepEqual(PIPELINE_STAGES.map(stage => stage.label), [
+  '1. World Snapshot',
+  '2. Context',
+  '3. Model Inference',
+  '4. Engine Check',
+  '5. Outcome',
+]);
+
+{
+  const detail = {
+    status: 'completed',
+    request: {
+      request_id: 'req-412',
+      base_tick: 412,
+      state_sha256: '8f2a9c1b44d0e5128f2a9c1b44d0e5128f2a9c1b44d0e5128f2a9c1b44d0e512',
+      document_sha256: 'a'.repeat(64),
+      provider_config: { provider: 'nebius_token_factory', model_id: 'nvidia/Nemotron-3-Nano-30B' },
+      context: {
+        tick: 412,
+        character: { name: 'Teo', about: 'A retired fisherman.' },
+        here: 'by the lower pools',
+        clock: { day: 0, minute_of_day: 412 },
+        needs: [{ label: 'rest', milli: 417, seen_to_at_milli: 500 }],
+        surroundings: {
+          beings: [{ who: 'Ines', metres: 3, doing: 'standing', hears_you: true }],
+          things: [{ what: 'bench', metres: 4 }, { what: 'lantern', metres: 6 }],
+          more_beings: 1,
+          more_things: 0,
+        },
+        heard: [{ from: 'Ines', line: 'Morning.', minutes_ago: 1 }],
+        remembers: { beings: [{ who: 'Ines', met_minutes_ago: 3, here: true }], places: [], handed: [] },
+        options: [
+          { label: 'say something to Ines', kind: 'say_to' },
+          { label: 'walk to the bench', kind: 'go' },
+          { label: 'wait a minute', kind: 'wait' },
+        ],
+      },
+    },
+    decision: {
+      request_id: 'req-412',
+      status: 'accepted',
+      reason: 'validated_choice',
+      proposal: { label: 'say something to Ines', line: 'Morning, Ines. The boats are out early.' },
+      provider: {
+        provider: 'nebius_token_factory',
+        served_model_id: 'nvidia/Nemotron-3-Nano-30B',
+        latency_ms: 912,
+        prompt_tokens: 410,
+        completion_tokens: 38,
+        cost_usd: '0.00030000',
+        cost_known: true,
+      },
+    },
+  };
+
+  const pipe = executionPipeline({ detail, model: 'Nemotron 3 Nano 30B', said: 'Teo: “Morning, Ines. The boats are out early.”' });
+  assert.equal(pipe.verdict, 'Applied');
+  assert.equal(pipe.totalLatencyMs, 912);
+  assert.equal(pipe.stages.length, 5);
+  assert.equal(pipe.stages.reduce((sum, stage) => sum + stage.percent, 0), 100);
+  assert.ok(pipe.stages.every(stage => stage.percent >= 10 && stage.status === 'ok'));
+
+  // Stage 1: World Snapshot
+  assert.equal(pipe.stages[0].label, '1. World Snapshot');
+  assert.equal(pipe.stages[0].summary, 'Tick 412 · #8f2a9c1b');
+  assert.equal(pipe.stages[0].detail, '2 beings, 2 objects');
+  assert.deepEqual(pipe.stages[0].metrics, { tick: 412, digest: '8f2a9c1b', beings: 2, objects: 2 });
+
+  // Stage 2: Context
+  assert.equal(pipe.stages[1].label, '2. Context');
+  assert.equal(pipe.stages[1].summary, '6 sections · 3 choices');
+  assert.equal(pipe.stages[1].detail, 'Personality · Location & Time · Status · Nearby · Heard · Remembers');
+
+  // Stage 3: Model Inference
+  assert.equal(pipe.stages[2].label, '3. Model Inference');
+  assert.equal(pipe.stages[2].summary, 'Nemotron 3 Nano 30B · 912 ms (0.9 s)');
+  assert.equal(pipe.stages[2].detail, 'nebius token factory · 448 tok (410 in / 38 out) · $0.0003');
+  assert.equal(pipe.stages[2].metrics.tokens, 448);
+
+  // Stage 4: Engine Check
+  assert.equal(pipe.stages[3].label, '4. Engine Check');
+  assert.equal(pipe.stages[3].summary, 'Applied');
+  assert.equal(pipe.stages[3].detail, 'Option #1 verified');
+
+  // Stage 5: Outcome
+  assert.equal(pipe.stages[4].label, '5. Outcome');
+  assert.equal(pipe.stages[4].summary, 'Teo: “Morning, Ines. The boats are out early.”');
+  assert.equal(pipe.stages[4].detail, 'Spoken line committed · Tick 412');
+
+  // Proportional layout at 1920 and 1440
+  const wideBox = pipelineLayout(wide, wide.height, pipe.stages);
+  assert.deepEqual([wideBox.left, wideBox.width, wideBox.height], [120, 1680, PIPELINE_BAR.height]);
+  assert.equal(wideBox.segments.reduce((sum, seg) => sum + seg.width, 0), 1680);
+  const narrowBox = pipelineLayout(narrow, narrow.height, pipe.stages);
+  assert.deepEqual([narrowBox.left, narrowBox.width, narrowBox.height], [80, 1280, PIPELINE_BAR.height]);
+  assert.equal(narrowBox.segments.reduce((sum, seg) => sum + seg.width, 0), 1280);
+
+  // Refusal / Routine Fallback and Not Applied (late/stale) states
+  const fallbackPipe = executionPipeline({
+    detail: {
+      ...detail,
+      decision: { request_id: 'req-412', status: 'unavailable', reason: 'spending_limit_reached', proposal: null, provider: { latency_ms: 2100, cost_usd: '0.0121', cost_known: true } },
+    },
+    model: 'Nemotron 3 Nano 30B',
+    title: 'Walked to the quay',
+    unanswered: { asks: 1, latencyMs: 2100, costUsd: '0.0121', costKnown: true, reason: 'spending_limit_reached' },
+    why: 'Its answer was not one of the actions, and asking it again would have gone over the money left.',
+  });
+  assert.equal(fallbackPipe.verdict, 'Routine Fallback');
+  assert.equal(fallbackPipe.stages[2].status, 'fallback');
+  assert.equal(fallbackPipe.stages[3].status, 'fallback');
+  assert.equal(fallbackPipe.stages[3].summary, 'Spending limit reached · Routine Fallback');
+  assert.equal(fallbackPipe.stages[4].summary, 'Walked to the quay');
+  assert.equal(fallbackPipe.stages[4].detail, 'Routine fallback committed to world state');
+
+  const latePipe = executionPipeline({
+    detail,
+    model: 'Nemotron 3 Nano 30B',
+    title: 'Walked to the quay',
+    late: true,
+  });
+  assert.equal(latePipe.verdict, 'Not Applied');
+  assert.equal(latePipe.stages[3].status, 'warn');
+  assert.equal(latePipe.stages[3].summary, 'Not Applied · Routine Fallback');
+  assert.equal(latePipe.stages[4].detail, 'Routine fallback committed to world state');
+
+  // Local model inference increases/decreases stage 3 share proportionally with latency
+  const fastLocal = executionPipeline({
+    request: { base_tick: 10, provider_config: { provider: 'local', local: true, model_id: 'Qwen3-4B-Local' }, context: { tick: 10, options: [{ label: 'wait' }] } },
+    decision: { status: 'accepted', reason: 'validated_choice', proposal: { label: 'wait' }, provider: { local: true, latency_ms: 45, prompt_tokens: 120, completion_tokens: 12, cost_usd: '0', cost_known: true } },
+  });
+  assert.equal(fastLocal.stages[2].summary, 'Qwen3-4B-Local · 45 ms (<0.1 s)');
+  assert.equal(fastLocal.stages[2].detail, 'Local · 132 tok (120 in / 12 out) · $0');
+  assert.ok(pipe.stages[2].percent > fastLocal.stages[2].percent, 'slower remote inference takes a larger proportional bar share than 45ms local inference');
+}
 
 console.log('decision flow: ok');

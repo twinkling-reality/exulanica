@@ -79,3 +79,30 @@
 
 /* Why the routine acted (U3): one line in the faint ink under the head's small print. */
 .wu-record-decision .wu-rd-hint { margin: 6px 0 0; font: 400 13px/1.35 var(--font-sans); color: var(--hr-quiet); opacity: .78; text-wrap: pretty; }
+
+/* The 5-stage live execution pipeline (Pillar 1: [X] System visual execution & telemetry strip): proportional timing
+   bar with hairline rules and upright rectangular markers above the 5-stage breakdown. */
+.wu-record-decision .wu-rd-pipeline { position: absolute; box-sizing: border-box; padding-top: 8px;
+  border-top: 1px solid rgba(18, 40, 44, .14); pointer-events: none; }
+.wu-record-decision .wu-rd-pipeline-bar { display: flex; align-items: stretch; gap: 2px; height: 4px; width: 100%; margin-bottom: 8px; }
+.wu-record-decision .wu-rd-pipeline-segment { height: 100%; background: var(--hr-line); opacity: .82; transition: width 160ms ease; }
+.wu-record-decision .wu-rd-pipeline-segment[data-status="warn"] { background: var(--hr-quiet); opacity: .65; }
+.wu-record-decision .wu-rd-pipeline-segment[data-status="fallback"] { background: var(--hr-refused, #9e4738); opacity: .85; }
+.wu-record-decision .wu-rd-pipeline-segment[data-status="pending"] { background: var(--hr-quiet); opacity: .45; }
+.wu-record-decision .wu-rd-pipeline-stages { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px;
+  margin: 0; padding: 0; list-style: none; }
+.wu-record-decision .wu-rd-pipeline-stage { min-width: 0; padding-right: 8px; border-right: 1px solid rgba(18, 40, 44, .1); }
+.wu-record-decision .wu-rd-pipeline-stage:last-child { border-right: 0; padding-right: 0; }
+.wu-record-decision .wu-rd-stage-head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.wu-record-decision .wu-rd-stage-mark { flex: none; width: 4px; height: 11px; background: var(--hr-line); opacity: .85; }
+.wu-record-decision .wu-rd-pipeline-stage[data-status="warn"] .wu-rd-stage-mark { background: var(--hr-quiet); opacity: .65; }
+.wu-record-decision .wu-rd-pipeline-stage[data-status="fallback"] .wu-rd-stage-mark { background: var(--hr-refused, #9e4738); }
+.wu-record-decision .wu-rd-pipeline-stage[data-status="pending"] .wu-rd-stage-mark { background: var(--hr-quiet); opacity: .45; }
+.wu-record-decision .wu-rd-stage-label { font: 500 11px/1.2 var(--font-mono); color: var(--hr-quiet); letter-spacing: .04em;
+  text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wu-record-decision .wu-rd-stage-share { margin-left: auto; font: 400 11px/1.2 var(--font-mono); color: var(--hr-quiet); opacity: .72; }
+.wu-record-decision .wu-rd-stage-summary { font: 500 13px/1.3 var(--font-sans); color: var(--hr-ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wu-record-decision .wu-rd-stage-detail { font: 400 11px/1.3 var(--font-mono); color: var(--hr-quiet); opacity: .84;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+

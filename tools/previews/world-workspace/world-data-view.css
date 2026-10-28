@@ -31,6 +31,9 @@
 .wu-data-person > .wu-data-line:not(.wu-data-under) { font: 500 max(13px, calc(16 * var(--u)))/1.25 var(--font-sans);
   letter-spacing: 0; text-transform: none; }
 .wu-data-under { font: 450 max(10px, calc(11 * var(--u)))/1.4 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; opacity: .8; }
+.wu-data-telemetry { padding-top: var(--space-8); border-top: 1px solid rgba(255, 255, 255, .14);
+  font: 450 max(10px, calc(11 * var(--u)))/1.35 var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 @media (prefers-reduced-motion: reduce) {
   .wu-data-card { animation-duration: 120ms; }

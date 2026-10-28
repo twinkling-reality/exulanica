@@ -31,7 +31,7 @@ import type { LoadedGeneratedTile } from '../../../web/packages/atlas-react/src/
 import type { staticMeshRepresentation } from '../../../web/packages/atlas-react/src/playcanvas/representation-binding.ts';
 import type { RepresentationPointAllocation, RepresentationReport } from '../../../web/packages/atlas-react/src/playcanvas/representation-runtime.ts';
 import { SPLIT, surfaceIndex, surfaceSamples, trianglesNear } from './data-view-samples.mjs';
-import { EDGE, POINT_KINDS, bigEnough, easedAlbedoChunk, edgeOf, keepStep, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, townThings, walkerBoxes } from './data-view-things.mjs';
+import { EDGE, POINT_KINDS, bigEnough, dataViewTelemetrySummary, easedAlbedoChunk, edgeOf, keepStep, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, townThings, walkerBoxes } from './data-view-things.mjs';
 import { sceneHit, sceneSight } from './scene-sight.ts';
 import { DATA_WORDS } from './world-words.mjs';
 import './world-data-view.css';
@@ -146,8 +146,10 @@ const rgb = (colour: Colour): Vec => [colour.r, colour.g, colour.b];
 export interface DataViewPeople {
   /** Everyone drawn now: their society id and the point just over their head, render space; empty where nobody lives. */
   everyone(): readonly { readonly id: string; readonly head: { readonly x: number; readonly y: number; readonly z: number } }[];
-  /** How they are called, and the model that decides for them in the look tag's words, or null where none does. */
-  words(id: string): { readonly name: string; readonly model: string | null };
+  /** How they are called, the model that decides for them in the look tag's words, and optional execution telemetry. */
+  words(id: string): { readonly name: string; readonly model: string | null; readonly telemetry?: unknown };
+  /** Optional town-wide model execution telemetry summary for the data card. */
+  telemetry?(): unknown;
 }
 
 export interface DataView {
@@ -254,7 +256,10 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
   const to = document.createElement('span');
   to.textContent = DATA_WORDS.data;
   range.append(from, slider, to);
-  card.append(head, range);
+  const telemetryLine = document.createElement('div');
+  telemetryLine.className = 'wu-data-telemetry';
+  telemetryLine.hidden = true;
+  card.append(head, range, telemetryLine);
   const tagLayer = document.createElement('div');
   tagLayer.className = 'wu-data-tags';
   tagLayer.setAttribute('aria-hidden', 'true');
@@ -743,13 +748,23 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
   }
 
   /** How a person is called and who decides for them, read again at most every WORDS_MS. */
-  const said = new Map<string, { words: { readonly name: string; readonly model: string | null }; at: number }>();
-  function wordsOf(id: string, now: number): { readonly name: string; readonly model: string | null } {
+  const said = new Map<string, { words: { readonly name: string; readonly model: string | null; readonly telemetry?: unknown }; at: number }>();
+  let summaryAt = -Infinity;
+  function wordsOf(id: string, now: number): { readonly name: string; readonly model: string | null; readonly telemetry?: unknown } {
     const held = said.get(id);
     if (held !== undefined && now - held.at < WORDS_MS) return held.words;
     const words = people?.words(id) ?? { name: '', model: null };
     said.set(id, { words, at: now });
     return words;
+  }
+
+  function updateTelemetrySummary(now: number): void {
+    if (now - summaryAt < WORDS_MS) return;
+    summaryAt = now;
+    const text = (dataViewTelemetrySummary(people?.telemetry?.() ?? null) as string | null) ?? '';
+    if (telemetryLine.textContent !== text) telemetryLine.textContent = text;
+    const hide = text.length === 0;
+    if (telemetryLine.hidden !== hide) telemetryLine.hidden = hide;
   }
 
   /** Each tag's size as last measured, for its words and the page's scale then. */
@@ -989,6 +1004,7 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
         binding.invalidate();
       }
       drawTags(now);
+      updateTelemetrySummary(now);
       // The GPU's share, stepped by the frame times measured once the sets are taken and the town is mostly data;
       // a step down that leaves the frames as slow is taken back (keepStep), so a page slow for other reasons keeps them.
       if (overlay !== null && queues.every((queue) => queue.length === 0) && mix >= 0.5 && lastFrame !== null) {

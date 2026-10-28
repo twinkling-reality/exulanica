@@ -8,7 +8,7 @@
 // decision-words.mjs, the light page's parts from world-ui-record.ts.
 import { CHARACTER_WORDS } from './character-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
-import { FLOW_LAYOUTS, choiceEnd, choiceLines, flowLayout, flowSize, headBottom, rowMost, titleLines, toldHeight } from './decision-flow.mjs';
+import { FLOW_LAYOUTS, choiceEnd, choiceLines, executionPipeline, flowLayout, flowSize, headBottom, pipelineLayout, rowMost, titleLines, toldHeight } from './decision-flow.mjs';
 import { DECISION_FLOW_WORDS, DECISION_WORDS, UNANSWERED_WORDS, agentUnansweredParts, askedPrint, choseOneOf, decidedByParts, notAskedWhy, ringPrint, unansweredParts } from './decision-words.mjs';
 import { page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orbs, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
@@ -76,6 +76,12 @@ export interface DecisionPageState {
   /** Why the routine acted where its choice was not taken (U3), under the small print: "Asking it failed."; absent or
    * null otherwise. */
   readonly why?: string | null;
+  /** The recorded request and receipt detail for the 5-stage execution pipeline, when read from the server. */
+  readonly detail?: {
+    readonly status?: string;
+    readonly request?: Readonly<Record<string, unknown>>;
+    readonly decision?: Readonly<Record<string, unknown>> | null;
+  } | null;
 }
 
 export interface DecisionPage {
@@ -191,6 +197,64 @@ function moreButton(cap: '↑' | '↓', onPress: () => void): HTMLButtonElement 
   button.append(element('kbd', 'wu-hr-cap', cap));
   button.addEventListener('click', onPress);
   return button;
+}
+
+interface PipelineStageView {
+  readonly step: number;
+  readonly key: string;
+  readonly label: string;
+  readonly status: 'ok' | 'warn' | 'fallback' | 'pending';
+  readonly percent: number;
+  readonly share: number;
+  readonly summary: string;
+  readonly detail: string;
+}
+
+interface PipelineView {
+  readonly stages: readonly PipelineStageView[];
+  readonly totalLatencyMs: number | null;
+  readonly verdict: string;
+}
+
+interface PipelineBox {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+  readonly segments: readonly { readonly key: string; readonly step: number; readonly x: number; readonly width: number; readonly percent: number }[];
+}
+
+/** Renders the 5-stage proportional execution pipeline bar and stage breakdown strip. */
+function renderPipelineStrip(state: DecisionPageState, layout: Size, height: number): HTMLElement {
+  const pipeline = executionPipeline(state) as PipelineView;
+  const box = pipelineLayout(layout, height, pipeline.stages) as PipelineBox;
+  const strip = element('section', 'wu-rd-pipeline');
+  strip.setAttribute('aria-label', 'Execution Pipeline');
+  strip.dataset['verdict'] = pipeline.verdict;
+  px(strip, box.left, box.top, box.width);
+
+  const bar = element('div', 'wu-rd-pipeline-bar');
+  bar.setAttribute('role', 'presentation');
+  const list = element('ol', 'wu-rd-pipeline-stages');
+  for (const stage of pipeline.stages) {
+    const seg = element('div', 'wu-rd-pipeline-segment');
+    seg.dataset['stage'] = stage.key;
+    seg.dataset['status'] = stage.status;
+    seg.style.width = `${stage.percent}%`;
+    bar.append(seg);
+
+    const item = element('li', 'wu-rd-pipeline-stage');
+    item.dataset['stage'] = stage.key;
+    item.dataset['status'] = stage.status;
+    const head = element('div', 'wu-rd-stage-head');
+    const mark = element('span', 'wu-rd-stage-mark');
+    mark.setAttribute('aria-hidden', 'true');
+    head.append(mark, element('span', 'wu-rd-stage-label', stage.label), element('span', 'wu-rd-stage-share', `${stage.percent}%`));
+    item.append(head, element('div', 'wu-rd-stage-summary', stage.summary), element('div', 'wu-rd-stage-detail', stage.detail));
+    list.append(item);
+  }
+  strip.append(bar, list);
+  return strip;
 }
 
 /** Opens the page in `host`; `act` hears earlier, later, record, compare and back. */
@@ -371,6 +435,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         if (state.verdict) text.append(element('p', 'wu-rd-verdict', state.verdict));
         card.append(...(picture ? [picture] : portraits ? [portraits] : []), text);
         nodes.push(card);
+        nodes.push(renderPipelineStrip(state, layout, height));
       }
     }
 

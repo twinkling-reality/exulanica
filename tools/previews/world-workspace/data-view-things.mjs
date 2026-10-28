@@ -298,12 +298,79 @@ export function bigEnough(size, distance, pixels, least = 28) {
 }
 
 /**
- * A person's tag: their name, and under it the model that decides for them when one does (the words
- * the look tag uses for who decides), else nothing under it.
+ * Formats active model execution telemetry for a person's tag in `[X] Data` (latency, verdict/disposition, and spend),
+ * or null where no telemetry is recorded yet.
  */
-export function personLines({ name, model = null }) {
+export function personTelemetry(telemetry) {
+  if (!telemetry) return null;
+  if (typeof telemetry === 'string') return telemetry.trim() || null;
+  if (typeof telemetry !== 'object') return null;
+  const parts = [];
+  const ms = Number.isFinite(telemetry.latencyMs) ? telemetry.latencyMs
+    : Number.isFinite(telemetry.p50Ms) ? telemetry.p50Ms : null;
+  if (ms !== null && ms >= 0) {
+    parts.push(ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`);
+  }
+  const { status = null, disposition = null, reason = null } = telemetry;
+  if (disposition === 'applied') parts.push('Applied');
+  else if (disposition === 'stale') parts.push('Not Applied · Stale');
+  else if (disposition === 'rejected' || disposition === 'superseded') parts.push('Not Applied');
+  else if (status === 'accepted') parts.push('Pending');
+  else if (status === 'rejected') parts.push('Refused · Routine');
+  else if (status === 'unavailable') parts.push(reason === 'model_timed_out' ? 'Timed Out · Routine' : 'Routine Fallback');
+
+  if (telemetry.costUsd !== null && telemetry.costUsd !== undefined && telemetry.costUsd !== '') {
+    const usd = Number(telemetry.costUsd);
+    if (Number.isFinite(usd) && usd > 0) {
+      const digits = usd < 0.0001 ? 6 : 4;
+      parts.push(`$${usd.toFixed(digits).replace(/0+$/u, '').replace(/\.$/u, '')}`);
+    }
+  }
+  return parts.length ? parts.join(' · ') : null;
+}
+
+/**
+ * Summarizes town-wide model execution telemetry for the `[X] Data` card from either a pre-aggregated object or a
+ * `SocietyModels` read (`choices`, `latest`, `summaries`). Returns null when no active models or decisions exist.
+ */
+export function dataViewTelemetrySummary(source) {
+  if (!source || typeof source !== 'object') return null;
+  const activeModels = Number.isSafeInteger(source.activeModels) ? source.activeModels
+    : Array.isArray(source.choices) ? source.choices.filter((c) => c?.model && !c?.refusal).length : 0;
+  const summaries = Array.isArray(source.summaries) ? source.summaries : [];
+  const decisions = Number.isSafeInteger(source.decisions) ? source.decisions
+    : summaries.reduce((sum, s) => sum + (Number.isSafeInteger(s?.decisions) ? s.decisions : 0), 0);
+  const applied = Number.isSafeInteger(source.applied) ? source.applied
+    : summaries.reduce((sum, s) => sum + (Number.isSafeInteger(s?.applied) ? s.applied : 0), 0);
+  const p50s = summaries.map((s) => s?.latencyP50Ms).filter(Number.isFinite);
+  const latencyP50Ms = Number.isFinite(source.latencyP50Ms) ? source.latencyP50Ms
+    : p50s.length ? Math.round(p50s.reduce((sum, v) => sum + v, 0) / p50s.length) : null;
+  const rawCost = source.costUsd !== undefined ? source.costUsd
+    : summaries.length ? summaries.reduce((sum, s) => sum + (Number(s?.costUsd) || 0), 0) : null;
+  if (activeModels <= 0 && decisions <= 0) return null;
+  const parts = [];
+  if (activeModels > 0) parts.push(`${activeModels} active ${activeModels === 1 ? 'model' : 'models'}`);
+  if (latencyP50Ms !== null && latencyP50Ms >= 0) {
+    parts.push(`${latencyP50Ms < 1000 ? `${Math.round(latencyP50Ms)} ms` : `${(latencyP50Ms / 1000).toFixed(1)} s`} p50`);
+  }
+  if (decisions > 0) parts.push(`${applied}/${decisions} applied`);
+  if (rawCost !== null && rawCost !== '' && Number.isFinite(Number(rawCost)) && Number(rawCost) > 0) {
+    const usd = Number(rawCost);
+    const digits = usd < 0.0001 ? 6 : 4;
+    parts.push(`$${usd.toFixed(digits).replace(/0+$/u, '').replace(/\.$/u, '')}`);
+  }
+  return parts.length ? parts.join(' · ') : null;
+}
+
+/**
+ * A person's tag: their name, under it the model that decides for them when one does (the words
+ * the look tag uses for who decides), and under that their latest execution telemetry when provided.
+ */
+export function personLines({ name, model = null, telemetry = null }) {
   const lines = [typeof name === 'string' && name.trim() ? name.trim() : 'someone'];
   if (typeof model === 'string' && model.trim()) lines.push(model.trim());
+  const status = personTelemetry(telemetry);
+  if (status) lines.push(status);
   return lines;
 }
 

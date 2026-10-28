@@ -356,6 +356,7 @@ export function recordStates(host: RecordHost) {
         // Whether a moment stands behind the decision, once the moments read is in (U3c): with none, no picture is ever made.
         moment: moment ? true : Array.isArray(showing.moments) ? false : null,
         portraits: (moment ? titledSubjects(moment) : [subjectId, said?.to].filter(Boolean)).map((id: string) => ({ name: named.subject(id), url: host.pictures.portraitNow(id) })),
+        detail,
       };
     },
 

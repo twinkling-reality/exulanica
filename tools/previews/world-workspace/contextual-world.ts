@@ -153,9 +153,14 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     everyone: () => rows.flatMap(row => { if (row.scene?.type !== 'being' || row.key === target?.key || row.key === held?.key) return []; const head = targetPoint(row, true); return head ? [{ id: row.scene.id, head: { x: head.x, y: head.y, z: head.z } }] : []; }),
     words: (id) => {
       const row = beingRow(id), kind = subjectReads.society?.state?.inhabitants?.find(one => one.id === id)?.kind;
-      return kind?.source === 'workspace' ? creatureWords({ kind, name: madeName(id), maker: kindMakers.label(kind), models: subjectReads.models?.models, kindLabel: kindLabels.label })
+      const latest = subjectReads.models?.latest?.find(item => item.subjectId === id) ?? null;
+      const measures = subjectReads.models?.beingMeasures?.find(item => item.subjectId === id)?.measures ?? null;
+      const telemetry = latest ? { status: latest.status, disposition: latest.disposition, reason: latest.dispositionReason ?? latest.reason, latencyMs: measures?.latencyMs?.p50 ?? null } : null;
+      const base = kind?.source === 'workspace' ? creatureWords({ kind, name: madeName(id), maker: kindMakers.label(kind), models: subjectReads.models?.models, kindLabel: kindLabels.label })
         : { name: whoOf(id).start, model: row ? subjectView(row).chip ?? null : null };
+      return telemetry && base.model ? { ...base, telemetry } : base;
     },
+    telemetry: () => subjectReads.models ?? null,
   } });
   const corners = mountCorners({ host: root, people: selection.people ?? null, onLeave: () => { if (held) release(); else leaveWorld(); }, data: dataView.works,
     readOnly: import.meta.env.VITE_EXULANICA_REVIEW_OBSERVER_ONLY === '1', flySpeed: () => b.controls.flyingSpeed,

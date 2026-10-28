@@ -211,3 +211,395 @@ export function flowLayout(layout, { count, taken = -1, offset = null, toldHeigh
     down: { x: layout.column + layout.words, y: last + gap / 2 + lastEdge },
   };
 }
+
+/** The five canonical stages of a decision's execution pipeline (Pillar 1: [X] System telemetry). */
+export const PIPELINE_STAGES = Object.freeze([
+  Object.freeze({ step: 1, key: 'snapshot', label: '1. World Snapshot' }),
+  Object.freeze({ step: 2, key: 'context', label: '2. Context' }),
+  Object.freeze({ step: 3, key: 'inference', label: '3. Model Inference' }),
+  Object.freeze({ step: 4, key: 'check', label: '4. Engine Check' }),
+  Object.freeze({ step: 5, key: 'outcome', label: '5. Outcome' }),
+]);
+
+export const PIPELINE_BAR = Object.freeze({ height: 68, aboveKeys: 12 });
+
+const REFUSAL_LABELS = Object.freeze({
+  spending_limit_reached: 'Spending limit reached',
+  process_budget_spent: 'Process budget spent',
+  process_share_spent: 'Process share spent',
+  world_hour_spend_spent: 'Hourly spend limit reached',
+  no_time_to_ask: 'No time to ask',
+  unanswered_in_its_minute: 'Unanswered in minute',
+  spending_not_granted: 'Spending not granted',
+  spending_revoked: 'Spending revoked',
+  spending_expired: 'Spending expired',
+  spending_suspended: 'Spending paused',
+  spending_unavailable: 'Spending check unavailable',
+  spending_scope_missing: 'Spending scope missing',
+  request_refused: 'Request refused',
+  provider_not_admitted: 'Provider not admitted',
+  provider_credential_absent: 'Provider not connected',
+  model_no_longer_offered: 'Model no longer offered',
+  world_hour_decisions_spent: 'Hourly decision limit reached',
+  model_timed_out: 'Timed out',
+  answer_not_offered: 'Answer not in offered choices',
+  model_call_failed: 'Model call failed',
+  model_unavailable: 'Model unavailable',
+  provider_configuration_changed: 'Model settings changed',
+  decision_context_changed: 'World moved on',
+  line_out_of_bounds: 'Spoken line out of bounds',
+  no_answer_in_time: 'No answer in time',
+  decider_disconnected: 'Decider disconnected',
+  place_taken_this_minute: 'Place taken this minute',
+  partner_busy: 'Conversation partner busy',
+  target_disabled_or_removed: 'Target removed',
+});
+
+const cleanText = value => (typeof value === 'string' && value.trim() ? value.trim() : null);
+
+function reasonWords(code) {
+  const key = cleanText(code);
+  if (!key) return null;
+  if (Object.hasOwn(REFUSAL_LABELS, key)) return REFUSAL_LABELS[key];
+  const spaced = key.replaceAll('_', ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function formatUsd(value, known = true) {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) return null;
+  if (num === 0) return known ? '$0' : 'at most $0';
+  const digits = num < 0.0001 ? 6 : 4;
+  const text = num.toFixed(digits).replace(/0+$/u, '').replace(/\.$/u, '');
+  return `${known ? '' : 'at most '}$${text}`;
+}
+
+function formatLatency(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const rounded = Math.round(ms);
+  const seconds = ms < 100 ? '<0.1 s' : `${(ms / 1000).toFixed(1)} s`;
+  return `${rounded} ms (${seconds})`;
+}
+
+function parseDoneMetrics(done) {
+  const text = cleanText(done);
+  if (!text) return { latencyMs: null, costUsd: null, costKnown: true };
+  const secMatch = /(\d+(?:\.\d+)?)\s*s\b/iu.exec(text);
+  const underMatch = /under\s+0\.1\s*s/iu.test(text);
+  const costMatch = /\$([0-9]+(?:\.[0-9]+)?)/u.exec(text);
+  const atMost = /at most/iu.test(text);
+  return {
+    latencyMs: secMatch ? Math.round(Number(secMatch[1]) * 1000) : underMatch ? 50 : null,
+    costUsd: costMatch ? costMatch[1] : null,
+    costKnown: !atMost,
+  };
+}
+
+function snapshotNearbyCounts(context, told) {
+  const surroundings = context?.surroundings;
+  if (surroundings && typeof surroundings === 'object') {
+    const beings = (Array.isArray(surroundings.beings) ? surroundings.beings.length : 0)
+      + (Number.isSafeInteger(surroundings.more_beings) ? surroundings.more_beings : 0);
+    const objects = (Array.isArray(surroundings.things) ? surroundings.things.length : 0)
+      + (Number.isSafeInteger(surroundings.more_things) ? surroundings.more_things : 0);
+    return { beings, objects };
+  }
+  const nearbySection = Array.isArray(told) ? told.find(section => section?.label === 'Nearby') : null;
+  if (!nearbySection || !Array.isArray(nearbySection.lines)) return { beings: 0, objects: 0 };
+  let beings = 0, objects = 0;
+  for (const raw of nearbySection.lines) {
+    const line = cleanText(raw);
+    if (!line) continue;
+    const moreMatch = /^And (\d+) more farther away\.$/iu.exec(line);
+    if (moreMatch) { beings += Number(moreMatch[1]); continue; }
+    if (/^The\s+/u.test(line)) objects += 1;
+    else beings += 1;
+  }
+  return { beings, objects };
+}
+
+function contextSectionNames(context, told) {
+  if (Array.isArray(told) && told.length) {
+    return told.map(section => cleanText(section?.label)).filter(Boolean);
+  }
+  if (!context || typeof context !== 'object') return [];
+  const names = [];
+  if (context.character && (cleanText(context.character.name) || cleanText(context.character.about))) names.push('Personality');
+  if (cleanText(context.here) || cleanText(context.surroundings?.at?.words) || context.clock || context.world_clock || Number.isSafeInteger(context.tick)) {
+    names.push('Location & Time');
+  }
+  if ((Array.isArray(context.needs) && context.needs.length) || Number.isFinite(context.need_milli) || (Array.isArray(context.holding) && context.holding.length)) {
+    names.push('Status');
+  }
+  const near = snapshotNearbyCounts(context, null);
+  if (near.beings + near.objects > 0) names.push('Nearby');
+  if (Array.isArray(context.heard) && context.heard.some(item => cleanText(item?.line))) names.push('Heard');
+  const rem = context.remembers;
+  if (rem && ((Array.isArray(rem.beings) && rem.beings.length) || (Array.isArray(rem.places) && rem.places.length) || (Array.isArray(rem.handed) && rem.handed.length))) {
+    names.push('Remembers');
+  }
+  return names;
+}
+
+function normalizeStagePercents(rawWeights) {
+  const total = rawWeights.reduce((sum, w) => sum + w, 0) || 100;
+  const percents = rawWeights.map(w => Math.max(10, Math.round((w * 100) / total)));
+  const diff = 100 - percents.reduce((sum, p) => sum + p, 0);
+  // Adjust the largest stage (typically Model Inference) so percents sum to exactly 100.
+  let maxIndex = 2;
+  for (let i = 0; i < percents.length; i += 1) {
+    if (percents[i] > percents[maxIndex]) maxIndex = i;
+  }
+  percents[maxIndex] += diff;
+  return percents;
+}
+
+/**
+ * Computes the 5-stage visual execution pipeline and proportional timing/status breakdown from a recorded decision
+ * receipt (`detail` = `{ request, decision }`) and/or a `DecisionPageState` object.
+ */
+export function executionPipeline(input = {}) {
+  const detail = input?.detail ?? (input?.request || input?.decision ? input : null);
+  const request = detail?.request ?? input?.request ?? null;
+  const receipt = detail?.decision ?? input?.decision ?? null;
+  const context = request?.context ?? input?.context ?? null;
+  const config = request?.provider_config ?? null;
+  const provider = receipt?.provider ?? null;
+  const proposal = receipt?.proposal ?? null;
+
+  // Stage 1: World Snapshot (tick, state digest prefix, nearby beings/objects count)
+  const tick = Number.isSafeInteger(request?.base_tick) ? request.base_tick
+    : Number.isSafeInteger(context?.tick) ? context.tick : null;
+  const rawDigest = cleanText(request?.state_sha256) ?? cleanText(context?.state_sha256)
+    ?? cleanText(request?.document_sha256) ?? cleanText(receipt?.request_sha256);
+  const digest = rawDigest && rawDigest.length >= 8 ? rawDigest.slice(0, 8) : null;
+  const { beings, objects } = snapshotNearbyCounts(context, input?.told);
+  const overParts = cleanText(input?.over)?.split(' · ').slice(0, 2).join(' · ') ?? null;
+  const snapshotParts = [
+    tick !== null ? `Tick ${tick}` : overParts ?? 'Snapshot',
+    digest ? `#${digest}` : null,
+  ].filter(Boolean);
+  const snapshotDetail = `${beings} ${beings === 1 ? 'being' : 'beings'}, ${objects} ${objects === 1 ? 'object' : 'objects'}`;
+
+  // Stage 2: Context (sections assembled: Location & Time, Status, Nearby, Heard, Remembers + offered choices count)
+  const sections = contextSectionNames(context, input?.told);
+  const choicesCount = Array.isArray(input?.choices) ? input.choices.length
+    : Array.isArray(context?.options) ? context.options.length : 0;
+  const contextSummary = `${sections.length} ${sections.length === 1 ? 'section' : 'sections'} · ${choicesCount} ${choicesCount === 1 ? 'choice' : 'choices'}`;
+  const contextDetail = sections.length ? sections.join(' · ') : 'Direct options';
+
+  // Stage 3: Model Inference (model name, provider/local, latency in ms/s, token/dollar spend)
+  const origin = config?.provider ? 'model' : config?.kind ?? null;
+  const decider = input?.decider ?? (origin === 'model' || origin === 'person' || origin === 'external' ? origin : input?.model ? 'model' : null);
+  const parsedDone = parseDoneMetrics(input?.done);
+  const unanswered = input?.unanswered ?? null;
+  const answered = input?.answered ?? null;
+  const modelName = cleanText(input?.model) ?? cleanText(provider?.served_model_id) ?? cleanText(config?.model_id)
+    ?? (decider === 'person' ? 'Person playing' : decider === 'agent' ? 'Outside AI agent' : decider === 'external' ? 'Outside program' : 'Model');
+  const isLocal = Boolean(config?.local || provider?.local || config?.provider === 'local' || provider?.provider === 'local' || decider === 'person');
+  const rawProvider = cleanText(config?.provider) ?? cleanText(provider?.provider) ?? cleanText(config?.bridge);
+  const providerLabel = isLocal ? 'Local'
+    : rawProvider ? rawProvider.replaceAll('_', ' ')
+      : decider === 'agent' || decider === 'external' ? 'Door bridge' : 'Hosted';
+  const latencyMs = Number.isFinite(provider?.latency_ms) ? provider.latency_ms
+    : Number.isFinite(answered?.latencyMs) ? answered.latencyMs
+      : Number.isFinite(unanswered?.latencyMs) ? unanswered.latencyMs
+        : parsedDone.latencyMs;
+  const promptTokens = Number.isSafeInteger(provider?.prompt_tokens) ? provider.prompt_tokens : null;
+  const completionTokens = Number.isSafeInteger(provider?.completion_tokens) ? provider.completion_tokens : null;
+  const totalTokens = promptTokens !== null && completionTokens !== null ? promptTokens + completionTokens : null;
+  const rawCost = provider?.cost_usd ?? answered?.costUsd ?? unanswered?.costUsd ?? parsedDone.costUsd ?? null;
+  const costKnown = provider?.cost_known !== undefined ? Boolean(provider.cost_known)
+    : answered?.costKnown !== undefined ? Boolean(answered.costKnown)
+      : unanswered?.costKnown !== undefined ? Boolean(unanswered.costKnown)
+        : parsedDone.costKnown;
+  const costText = decider === 'person' || decider === 'external' || decider === 'agent' ? null : formatUsd(rawCost, costKnown);
+  const latencyText = formatLatency(latencyMs);
+  const notCalled = Boolean(unanswered && unanswered.asks < 1);
+  const inferenceSummary = [modelName, notCalled ? 'not called' : latencyText].filter(Boolean).join(' · ');
+  const inferenceDetail = [
+    providerLabel,
+    totalTokens !== null ? `${totalTokens} tok (${promptTokens} in / ${completionTokens} out)` : null,
+    costText,
+  ].filter(Boolean).join(' · ');
+  const inferenceStatus = notCalled ? 'warn'
+    : (unanswered || receipt?.status === 'unavailable' || receipt?.status === 'rejected') ? 'fallback' : 'ok';
+
+  // Stage 4: Engine Check (Applied vs specific refusal reason / Not Applied / Routine Fallback)
+  const receiptStatus = cleanText(receipt?.status);
+  const disposition = cleanText(detail?.disposition ?? input?.disposition);
+  const rawReason = cleanText(unanswered?.reason ?? receipt?.reason ?? detail?.disposition_reason);
+  const reasonLabel = reasonWords(rawReason);
+  const isLate = Boolean(input?.late || disposition === 'stale' || receiptStatus === 'stale');
+  const isNotApplied = Boolean(disposition === 'rejected' || disposition === 'superseded');
+  const isFallback = Boolean(unanswered || receiptStatus === 'rejected' || receiptStatus === 'unavailable');
+  const isPending = Boolean(!isLate && !isNotApplied && !isFallback && (cleanText(input?.verdict) || detail?.status === 'in_progress'));
+
+  let checkStatus = 'ok';
+  let checkVerdict = 'Applied';
+  let checkSummary = 'Applied';
+  let checkDetail = 'Proposal validated';
+
+  if (isLate) {
+    checkStatus = 'warn';
+    checkVerdict = 'Not Applied';
+    checkSummary = 'Not Applied · Routine Fallback';
+    checkDetail = reasonLabel ? `${reasonLabel} · Routine Fallback` : 'World moved on before commit · Routine Fallback';
+  } else if (isNotApplied) {
+    checkStatus = 'warn';
+    checkVerdict = 'Not Applied';
+    checkSummary = 'Not Applied · Routine Fallback';
+    checkDetail = reasonLabel ? `${reasonLabel} · Routine Fallback` : 'Superseded at commit · Routine Fallback';
+  } else if (isFallback) {
+    checkStatus = 'fallback';
+    checkVerdict = 'Routine Fallback';
+    checkSummary = reasonLabel ? `${reasonLabel} · Routine Fallback` : 'Routine Fallback';
+    checkDetail = cleanText(input?.why) ?? (reasonLabel ? `Refused (${reasonLabel})` : 'No usable proposal; routine acted');
+  } else if (isPending) {
+    checkStatus = 'pending';
+    checkVerdict = 'Pending';
+    checkSummary = 'Accepted · Pending';
+    checkDetail = cleanText(input?.verdict) ?? 'Validated option; awaiting minute commit';
+  } else {
+    const takenIndex = Array.isArray(input?.choices) ? input.choices.findIndex(choice => choice?.chosen) : -1;
+    const optionNum = takenIndex >= 0 ? (input.choices[takenIndex]?.number ?? takenIndex + 1)
+      : proposal?.label && Array.isArray(context?.options)
+        ? context.options.findIndex(option => option?.label === proposal.label) + 1 : 0;
+    checkDetail = optionNum > 0 ? `Option #${optionNum} verified` : 'Proposal validated';
+  }
+
+  // Stage 5: Outcome (world state commit / spoken line / movement target)
+  const spokenLine = cleanText(input?.said) ?? (cleanText(proposal?.line) ? `“${cleanText(proposal.line)}”` : null);
+  const actionTarget = isLate || isNotApplied || isFallback
+    ? (cleanText(input?.action) ?? cleanText(input?.title) ?? cleanText(input?.decided) ?? cleanText(proposal?.label))
+    : (cleanText(input?.action) ?? cleanText(input?.decided) ?? cleanText(input?.title) ?? cleanText(proposal?.label));
+  const outcomeStatus = checkStatus;
+  let outcomeKind = 'commit';
+  let outcomeSummary = actionTarget ?? 'State committed';
+  let outcomeDetail = 'World state commit';
+
+  if (isLate || isNotApplied || isFallback) {
+    outcomeKind = 'fallback';
+    outcomeSummary = actionTarget ?? 'Routine continuation';
+    outcomeDetail = 'Routine fallback committed to world state';
+  } else if (spokenLine) {
+    outcomeKind = 'speech';
+    outcomeSummary = spokenLine;
+    outcomeDetail = tick !== null ? `Spoken line committed · Tick ${tick}` : 'Spoken line committed to world state';
+  } else if (isPending) {
+    outcomeKind = 'pending';
+    outcomeSummary = actionTarget ?? 'Pending action';
+    outcomeDetail = 'Awaiting minute state commit';
+  } else {
+    outcomeKind = 'movement';
+    outcomeSummary = actionTarget ?? 'Action applied';
+    outcomeDetail = tick !== null ? `Movement / action committed · Tick ${tick}` : 'Movement / action committed to world state';
+  }
+
+  // Proportional timing/weight shares across the 5 stages
+  const rawWeights = [
+    14,
+    14 + Math.min(8, sections.length + Math.floor(choicesCount / 4)),
+    notCalled ? 14 : latencyMs !== null && latencyMs > 0 ? Math.min(52, Math.max(24, Math.round(16 + Math.log10(Math.max(10, latencyMs)) * 10))) : 24,
+    15,
+    15,
+  ];
+  const percents = normalizeStagePercents(rawWeights);
+
+  const stages = [
+    {
+      ...PIPELINE_STAGES[0],
+      status: 'ok',
+      percent: percents[0],
+      share: Number((percents[0] / 100).toFixed(2)),
+      summary: snapshotParts.join(' · '),
+      detail: snapshotDetail,
+      metrics: { tick, digest, beings, objects },
+    },
+    {
+      ...PIPELINE_STAGES[1],
+      status: 'ok',
+      percent: percents[1],
+      share: Number((percents[1] / 100).toFixed(2)),
+      summary: contextSummary,
+      detail: contextDetail,
+      metrics: { sections, choices: choicesCount },
+    },
+    {
+      ...PIPELINE_STAGES[2],
+      status: inferenceStatus,
+      percent: percents[2],
+      share: Number((percents[2] / 100).toFixed(2)),
+      summary: inferenceSummary,
+      detail: inferenceDetail,
+      metrics: {
+        model: modelName,
+        provider: providerLabel,
+        local: isLocal,
+        latencyMs,
+        tokens: totalTokens,
+        promptTokens,
+        completionTokens,
+        costUsd: rawCost !== null ? String(rawCost) : null,
+        costKnown,
+      },
+    },
+    {
+      ...PIPELINE_STAGES[3],
+      status: checkStatus,
+      percent: percents[3],
+      share: Number((percents[3] / 100).toFixed(2)),
+      summary: checkSummary,
+      detail: checkDetail,
+      metrics: {
+        verdict: checkVerdict,
+        reason: rawReason,
+        applied: checkVerdict === 'Applied',
+        fallback: isFallback || isLate || isNotApplied,
+      },
+    },
+    {
+      ...PIPELINE_STAGES[4],
+      status: outcomeStatus,
+      percent: percents[4],
+      share: Number((percents[4] / 100).toFixed(2)),
+      summary: outcomeSummary,
+      detail: outcomeDetail,
+      metrics: {
+        kind: outcomeKind,
+        text: outcomeSummary,
+        committed: !isPending,
+      },
+    },
+  ];
+
+  return {
+    stages,
+    totalLatencyMs: latencyMs,
+    verdict: checkVerdict,
+  };
+}
+
+export const decisionPipeline = executionPipeline;
+
+/**
+ * Places the 5-stage execution pipeline strip along the lower telemetry rail of the decision page, clear of the keys,
+ * and computes proportional pixel widths for each stage segment.
+ */
+export function pipelineLayout(layout, height = layout.height, stages = null) {
+  const width = layout.width - 2 * layout.margin;
+  const keysTop = height - layout.keys.bottom - CAP;
+  const top = Math.max(layout.told.top, keysTop - ABOVE_KEYS - PIPELINE_BAR.height);
+  const list = Array.isArray(stages) && stages.length === PIPELINE_STAGES.length
+    ? stages
+    : PIPELINE_STAGES.map(stage => ({ ...stage, percent: 20, share: 0.2 }));
+  let x = 0;
+  const segments = list.map((stage, index) => {
+    const segWidth = index === list.length - 1 ? width - x : Math.round((width * (stage.percent ?? 20)) / 100);
+    const segment = { key: stage.key, step: stage.step, x, width: segWidth, percent: stage.percent ?? 20 };
+    x += segWidth;
+    return segment;
+  });
+  return { left: layout.margin, top, width, height: PIPELINE_BAR.height, segments };
+}
