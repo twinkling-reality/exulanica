@@ -22,7 +22,7 @@ export function showWorldDetails(entry: SavedWorldEntry, credentials: Credential
   close.onclick = dismiss; dialog.addEventListener('cancel', event => { event.preventDefault(); dismiss(); });
   const read = async (path: string) => { const r = await fetch(credentials.baseUrl + path, { headers: { ...accessHeaders(credentials), Accept: 'application/json' }, credentials: 'same-origin', signal: abort.signal, cache: 'no-store' }); if (!r.ok) throw Error('World details could not be read.'); return r.json(); };
   const fact = (parent: HTMLElement, label: string, value: string) => { const row = node('div', '', 'ux-details-fact'); row.append(node('dt', label), node('dd', value)); parent.append(row); };
-  const section = (title: string) => { const s = node('section'); s.append(node('h3', title)); body.append(s); return s; };
+  const section = (title: string | null) => { const s = node('section'); if (title) s.append(node('h3', title)); body.append(s); return s; };
   const load = async () => {
     body.replaceChildren(node('p', 'Reading this world’s details…'));
     const world = '?world_id=' + encodeURIComponent(entry.worldId);
@@ -41,7 +41,8 @@ export function showWorldDetails(entry: SavedWorldEntry, credentials: Credential
     } else if (entry.generatedSite) size.append(node('p', 'Its size could not be read.', 'ux-details-note'));
     else if (entry.declaredFloor) { const floor = node('dl'); fact(floor, 'Floor width', metres(entry.declaredFloor.halfExtentMm * 2)); fact(floor, 'Floor elevation', metres(entry.declaredFloor.elevationMm)); size.append(floor); }
     else size.append(node('p', 'No size is saved for this world.', 'ux-details-note'));
-    const appearance = section('Appearance');
+    // The look stands on its own row, apart from the size: one fact needs no heading over it.
+    const appearance = section(null); appearance.className = 'ux-details-apart';
     if (styles.status === 'fulfilled' && packs.status === 'fulfilled') {
       const versions = Array.isArray(styles.value) ? styles.value : styles.value.versions;
       const version = versions?.find((v: { readonly version_id: string }) => v.version_id === entry.styleVersionId);
@@ -60,7 +61,7 @@ export function showWorldDetails(entry: SavedWorldEntry, credentials: Credential
       if (abort.signal.aborted) return;
       // A look bound to this world but not found is not known; an unbound world wears the standard look.
       const lookFacts = node('dl'); fact(lookFacts, 'Look', version ? chosen?.title ?? (bound ? 'Not known' : 'The standard look') : 'Not known'); appearance.append(lookFacts);
-    } else appearance.append(node('p', 'Its appearance could not be read. Close this and try again.', 'ux-details-note'));
+    } else appearance.append(node('p', 'Its appearance could not be read.', 'ux-details-note'));
   };
   document.body.append(dialog); dialog.showModal(); close.focus();
   const retryLoad = () => void load().catch(() => { if (!abort.signal.aborted) { body.replaceChildren(node('p', 'This world’s details could not be read.')); const retry = node('button', 'Try again', 'ux-details-action') as HTMLButtonElement; retry.type = 'button'; retry.onclick = retryLoad; body.append(retry); } });
