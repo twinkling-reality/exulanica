@@ -153,6 +153,15 @@ assert.equal(
   }),
   '1 active model · 680 ms p50 · 11/12 applied · $0.0036',
 );
+assert.equal(
+  dataViewTelemetrySummary({
+    choices: [{ subjectId: 'teo', model: { name: 'Nemotron 3 Nano 30B' }, refusal: null }],
+    latest: [{ subjectId: 'teo', status: 'accepted', disposition: 'applied' }],
+    beingMeasures: [{ subjectId: 'teo', measures: { latencyMs: { p50: null, longest: 912 } } }],
+    summaries: [],
+  }),
+  '1 active model · 912 ms p50 · 1/1 applied',
+);
 
 // The GPU's share of the points, by measured frame time: down a quarter while a frame in four is slow, never below the
 // floor; a step down kept only where the next frames are quicker, else undone and none tried for 30 s; up a seventh once

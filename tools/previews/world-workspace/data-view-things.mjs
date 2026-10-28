@@ -338,13 +338,26 @@ export function dataViewTelemetrySummary(source) {
   const activeModels = Number.isSafeInteger(source.activeModels) ? source.activeModels
     : Array.isArray(source.choices) ? source.choices.filter((c) => c?.model && !c?.refusal).length : 0;
   const summaries = Array.isArray(source.summaries) ? source.summaries : [];
+  const latest = Array.isArray(source.latest) ? source.latest : [];
+  const beingMeasures = Array.isArray(source.beingMeasures) ? source.beingMeasures : [];
+  const summaryDecisions = summaries.reduce((sum, s) => sum + (Number.isSafeInteger(s?.decisions) ? s.decisions : 0), 0);
   const decisions = Number.isSafeInteger(source.decisions) ? source.decisions
-    : summaries.reduce((sum, s) => sum + (Number.isSafeInteger(s?.decisions) ? s.decisions : 0), 0);
+    : summaryDecisions > 0 ? summaryDecisions : latest.length;
+  const summaryApplied = summaries.reduce((sum, s) => sum + (Number.isSafeInteger(s?.applied) ? s.applied : 0), 0);
   const applied = Number.isSafeInteger(source.applied) ? source.applied
-    : summaries.reduce((sum, s) => sum + (Number.isSafeInteger(s?.applied) ? s.applied : 0), 0);
-  const p50s = summaries.map((s) => s?.latencyP50Ms).filter(Number.isFinite);
+    : summaryDecisions > 0 ? summaryApplied : latest.filter((d) => d?.disposition === 'applied').length;
+  const p50s = summaries.map((s) => (
+    Number.isFinite(s?.latencyP50Ms) ? s.latencyP50Ms
+      : Number.isFinite(s?.measures?.latencyMs?.p50) ? s.measures.latencyMs.p50
+        : Number.isFinite(s?.measures?.latencyMs?.longest) ? s.measures.latencyMs.longest : null
+  )).filter(Number.isFinite);
+  const beingLatencies = beingMeasures.map((b) => (
+    Number.isFinite(b?.measures?.latencyMs?.p50) ? b.measures.latencyMs.p50
+      : Number.isFinite(b?.measures?.latencyMs?.longest) ? b.measures.latencyMs.longest : null
+  )).filter(Number.isFinite);
+  const latencySamples = p50s.length ? p50s : beingLatencies;
   const latencyP50Ms = Number.isFinite(source.latencyP50Ms) ? source.latencyP50Ms
-    : p50s.length ? Math.round(p50s.reduce((sum, v) => sum + v, 0) / p50s.length) : null;
+    : latencySamples.length ? Math.round(latencySamples.reduce((sum, v) => sum + v, 0) / latencySamples.length) : null;
   const rawCost = source.costUsd !== undefined ? source.costUsd
     : summaries.length ? summaries.reduce((sum, s) => sum + (Number(s?.costUsd) || 0), 0) : null;
   if (activeModels <= 0 && decisions <= 0) return null;

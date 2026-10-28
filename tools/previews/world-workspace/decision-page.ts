@@ -8,7 +8,7 @@
 // decision-words.mjs, the light page's parts from world-ui-record.ts.
 import { CHARACTER_WORDS } from './character-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
-import { FLOW_LAYOUTS, choiceEnd, choiceLines, executionPipeline, flowLayout, flowSize, headBottom, pipelineLayout, rowMost, titleLines, toldHeight } from './decision-flow.mjs';
+import { ABOVE_KEYS, CAP, FLOW_LAYOUTS, HEAD, choiceEnd, choiceLines, executionPipeline, flowLayout, flowSize, headBottom, pipelineLayout, rowMost, titleLines, toldHeight } from './decision-flow.mjs';
 import { DECISION_FLOW_WORDS, DECISION_WORDS, UNANSWERED_WORDS, agentUnansweredParts, askedPrint, choseOneOf, decidedByParts, notAskedWhy, ringPrint, unansweredParts } from './decision-words.mjs';
 import { page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orbs, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
@@ -97,7 +97,8 @@ interface Size {
   readonly margin: number;
   readonly headTop: number;
   readonly headWidth: number;
-  readonly told: { readonly width: number };
+  readonly told: { readonly width: number; readonly top: number };
+  readonly keys: { readonly right: number; readonly bottom: number };
 }
 
 interface Box { readonly left: number; readonly top: number; readonly width: number }
@@ -225,9 +226,14 @@ interface PipelineBox {
 }
 
 /** Renders the 5-stage proportional execution pipeline bar and stage breakdown strip. */
-function renderPipelineStrip(state: DecisionPageState, layout: Size, height: number): HTMLElement {
+function renderPipelineStrip(
+  state: DecisionPageState,
+  layout: Size,
+  height: number,
+  options: { readonly headBottom?: number; readonly viewportWidth?: number } = {},
+): HTMLElement {
   const pipeline = executionPipeline(state) as PipelineView;
-  const box = pipelineLayout(layout, height, pipeline.stages) as PipelineBox;
+  const box = pipelineLayout(layout, height, pipeline.stages, options) as PipelineBox;
   const strip = element('section', 'wu-rd-pipeline');
   strip.setAttribute('aria-label', 'Execution Pipeline');
   strip.dataset['verdict'] = pipeline.verdict;
@@ -277,9 +283,10 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
   // the rows' own heights; another window or decision starts from the estimate.
   let rowLines: { key: string; lines: number[] } | null = null;
   const windowOf = () => {
-    const layout: Size = flowSize(host.clientWidth || innerWidth);
+    const viewportWidth = host.clientWidth || innerWidth;
+    const layout: Size = flowSize(viewportWidth);
     const height = host.clientHeight || innerHeight;
-    return { layout, height, key: `${layout.width}:${height}` };
+    return { layout, viewportWidth, height, key: `${viewportWidth}:${layout.width}:${height}` };
   };
 
   const scroll = (step: number): void => {
@@ -291,7 +298,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
   };
 
   function render(state: DecisionPageState, measuredOnce = false): void {
-    const { layout, height, key } = windowOf();
+    const { layout, viewportWidth, height, key } = windowOf();
     sized = key;
     sheet.root.classList.toggle('wu-hr-narrow', layout === FLOW_LAYOUTS.narrow);
     const heading = state.decided || state.title;
@@ -333,6 +340,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     nodes.push(head);
 
     let told: HTMLElement | null = null, record: HTMLElement | null = null, takenRow: HTMLElement | null = null, lines: SVGSVGElement | null = null;
+    let pipeline: HTMLElement | null = null, momentCard: HTMLElement | null = null;
     const drawnRows: { index: number; item: HTMLElement }[] = [];
     if (state.record !== null) {
       record = element('pre', 'wu-rd-record', state.record);
@@ -434,8 +442,12 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
         else if ((state.action || state.title) && (state.action || state.title) !== heading) text.append(element('div', 'wu-rd-action', state.action || state.title));
         if (state.verdict) text.append(element('p', 'wu-rd-verdict', state.verdict));
         card.append(...(picture ? [picture] : portraits ? [portraits] : []), text);
-        nodes.push(card);
-        nodes.push(renderPipelineStrip(state, layout, height));
+        momentCard = card;
+        pipeline = renderPipelineStrip(state, layout, height, {
+          headBottom: estimate.head + (state.why && by.length ? 20 : 0),
+          viewportWidth,
+        });
+        nodes.push(pipeline, card);
       }
     }
 
@@ -448,18 +460,34 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     nodes.push(keyRow(keys));
     sheet.content.replaceChildren(...nodes);
 
-    // Laid out: where the head ends places what was told and the record under it; then the told column's height and
-    // where the taken row's words end place the bracket and the line on to the card.
+    // Laid out: where the head (and the 5-stage pipeline strip directly beneath it) ends places what was told and the
+    // record under it; then the told column's height and where the taken row's words end place the bracket and the line
+    // on to the card.
     const headHigh = head.offsetHeight;
     if (headHigh > 0) {
-      const headEnd = head.offsetTop + headHigh;
-      const placed = lay(headEnd, estimate.told, estimate.end);
-      if (told) placeTold(told, placed.told);
+      const rawHeadEnd = head.offsetTop + headHigh;
+      let effectiveHeadEnd = rawHeadEnd;
+      let pipeEnd = rawHeadEnd;
+      if (pipeline) {
+        const pipeTop = rawHeadEnd + 8;
+        pipeline.style.top = `${pipeTop}px`;
+        pipeEnd = pipeTop + pipeline.offsetHeight;
+        effectiveHeadEnd = Math.max(rawHeadEnd, pipeEnd + 10 - HEAD.gap);
+      }
+      const placed = lay(effectiveHeadEnd, estimate.told, estimate.end);
+      if (told) {
+        placeTold(told, placed.told);
+        const safeMax = Math.max(120, height - layout.keys.bottom - CAP - ABOVE_KEYS - placed.told.top);
+        if (safeMax < placed.told.most) told.style.maxHeight = `${safeMax}px`;
+      }
       if (record) px(record, placed.record.left, placed.record.top, placed.record.width, placed.record.height);
+      if (momentCard && placed.card.top < pipeEnd + 10) {
+        momentCard.style.top = `${pipeEnd + 10}px`;
+      }
       if (lines) {
         const toldHigh = told?.offsetHeight ?? 0;
         const takenEnd = takenRow ? takenRow.offsetLeft + takenRow.offsetWidth : 0;
-        flow = lay(headEnd, blocks.length ? toldHigh || estimate.told : null, takenEnd || estimate.end);
+        flow = lay(effectiveHeadEnd, blocks.length ? toldHigh || estimate.told : null, takenEnd || estimate.end);
         lines.innerHTML = flowMarkup(flow);
       }
     }

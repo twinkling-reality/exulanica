@@ -289,13 +289,18 @@ assert.deepEqual(PIPELINE_STAGES.map(stage => stage.label), [
   assert.equal(pipe.stages[4].summary, 'Teo: “Morning, Ines. The boats are out early.”');
   assert.equal(pipe.stages[4].detail, 'Spoken line committed · Tick 412');
 
-  // Proportional layout at 1920 and 1440
+  // Proportional layout at 1920, 1440, and 1366x768: sits cleanly between head and the 3-column flow
   const wideBox = pipelineLayout(wide, wide.height, pipe.stages);
   assert.deepEqual([wideBox.left, wideBox.width, wideBox.height], [120, 1680, PIPELINE_BAR.height]);
+  assert.ok(wideBox.top > wide.headTop && wideBox.top + wideBox.height < wide.told.top);
   assert.equal(wideBox.segments.reduce((sum, seg) => sum + seg.width, 0), 1680);
   const narrowBox = pipelineLayout(narrow, narrow.height, pipe.stages);
   assert.deepEqual([narrowBox.left, narrowBox.width, narrowBox.height], [80, 1280, PIPELINE_BAR.height]);
+  assert.ok(narrowBox.top > narrow.headTop && narrowBox.top + narrowBox.height < narrow.told.top);
   assert.equal(narrowBox.segments.reduce((sum, seg) => sum + seg.width, 0), 1280);
+  const compactBox = pipelineLayout(narrow, 768, pipe.stages, { viewportWidth: 1366 });
+  assert.deepEqual([compactBox.left, compactBox.width, compactBox.height], [80, 1206, PIPELINE_BAR.height]);
+  assert.equal(compactBox.segments.reduce((sum, seg) => sum + seg.width, 0), 1206);
 
   // Refusal / Routine Fallback and Not Applied (late/stale) states
   const fallbackPipe = executionPipeline({

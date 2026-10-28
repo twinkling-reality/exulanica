@@ -149,13 +149,17 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   // made is named from its kind's own record, over the model that record says made it (creatureWords).
   const kindMakers = createKindLabels((path) => read(path), kindMaker);
   // By the sea, the look's ground beyond a town on level ground is the sea: the data view reads the world's own setting as it opens.
-  const dataView = mountDataView({ host: root, binding: b, onOpen: () => corners.closeKeys(), setting: () => state.worldStyleConnection?.state.current.stylePack?.setting?.document, people: {
+  const dataView = mountDataView({ host: root, binding: b, onOpen: () => { corners.closeKeys(); refreshSubjectReads(performance.now()); }, setting: () => state.worldStyleConnection?.state.current.stylePack?.setting?.document, people: {
     everyone: () => rows.flatMap(row => { if (row.scene?.type !== 'being' || row.key === target?.key || row.key === held?.key) return []; const head = targetPoint(row, true); return head ? [{ id: row.scene.id, head: { x: head.x, y: head.y, z: head.z } }] : []; }),
     words: (id) => {
       const row = beingRow(id), kind = subjectReads.society?.state?.inhabitants?.find(one => one.id === id)?.kind;
       const latest = subjectReads.models?.latest?.find(item => item.subjectId === id) ?? null;
       const measures = subjectReads.models?.beingMeasures?.find(item => item.subjectId === id)?.measures ?? null;
-      const telemetry = latest ? { status: latest.status, disposition: latest.disposition, reason: latest.dispositionReason ?? latest.reason, latencyMs: measures?.latencyMs?.p50 ?? null } : null;
+      if (latest?.requestId && !subjectReads.decisionMetrics.has(latest.requestId)) decisionOptions(latest.requestId);
+      const cached = latest?.requestId ? subjectReads.decisionMetrics.get(latest.requestId) ?? null : null;
+      const latencyMs = cached?.latencyMs ?? measures?.latencyMs?.p50 ?? measures?.latencyMs?.longest ?? null;
+      const costUsd = cached?.costUsd ?? null;
+      const telemetry = latest ? { status: latest.status, disposition: latest.disposition, reason: latest.dispositionReason ?? latest.reason, latencyMs, costUsd } : null;
       const base = kind?.source === 'workspace' ? creatureWords({ kind, name: madeName(id), maker: kindMakers.label(kind), models: subjectReads.models?.models, kindLabel: kindLabels.label })
         : { name: whoOf(id).start, model: row ? subjectView(row).chip ?? null : null };
       return telemetry && base.model ? { ...base, telemetry } : base;
@@ -259,7 +263,15 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   // SUBJECT_READ_MS; a failed read keeps what was last read.
   const credentials = { ...state.credentials, worldId: entry.worldId };
   const societyClient = new SocietyClient(credentials), modelsClient = new SocietyModelsClient(credentials);
-  const subjectReads = { society: null, models: null, societyAt: -Infinity, modelsAt: -Infinity, pending: new Set(), options: new Map() };
+  const subjectReads = { society: null, models: null, societyAt: -Infinity, modelsAt: -Infinity, pending: new Set(), options: new Map(), decisionMetrics: new Map() };
+  function cacheDecisionMetrics(requestId, detail) {
+    if (!requestId || !detail) return;
+    const provider = detail?.decision?.provider ?? null;
+    subjectReads.decisionMetrics.set(requestId, {
+      latencyMs: typeof provider?.latency_ms === 'number' && Number.isFinite(provider.latency_ms) ? provider.latency_ms : null,
+      costUsd: typeof provider?.cost_usd === 'string' || typeof provider?.cost_usd === 'number' ? provider.cost_usd : null,
+    });
+  }
   function refreshSubjectReads(now) {
     const fetchOne = (name, at, run) => {
       if (subjectReads.pending.has(name) || now - subjectReads[at] < SUBJECT_READ_MS[name]) return;
@@ -277,6 +289,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (subjectReads.options.has(requestId)) return subjectReads.options.get(requestId);
     subjectReads.options.set(requestId, null);
     modelsClient.readDecision(entry.authoredVersionId, requestId).then(data => {
+      cacheDecisionMetrics(requestId, data);
       const options = (data?.request?.context as { readonly options?: unknown } | undefined)?.options;
       if (Array.isArray(options)) subjectReads.options.set(requestId, options.length);
       if (pageView) drawPage();
@@ -646,6 +659,11 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       if (page.next || lifetime.signal.aborted || selection.people?.clock().mode !== 'playing') return;
       const now = performance.now();
       for (const act of talkActs(page.events, quietChoices)) { talk.add(act, now); scene.add(act); }
+      if (page.events.some(event => event.event_kind === 'decision_applied')) {
+        subjectReads.modelsAt = -Infinity;
+        subjectReads.societyAt = -Infinity;
+        refreshSubjectReads(now);
+      }
     } catch { readBackoff.failed('talk', performance.now()); } finally { talkReading = false; }
   }
   const talkTimer = window.setInterval(() => { void readTalk(); if (selection.people?.clock().mode === 'playing' && !document.hidden) void readDid(false, true); }, WATCH_MS);
@@ -868,6 +886,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     drawPage();
     try {
       const detail = await modelsClient.readDecision(entry.authoredVersionId, decision.requestId);
+      cacheDecisionMetrics(decision.requestId, detail);
       if (showing.decision === decision) decision.detail = detail;
     } catch { if (showing.decision === decision) decision.failure = DECISION_WORDS.unread; }
     if (showing === pageView) drawPage();
@@ -1105,6 +1124,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const showing = { row, events: [], moments: null, things: null, did: null };
     historyDecision?.page.close(); historyDecision = { page: openDecisionPage(root, historyDecisionAct), showing, decision: { requestId: resolvedId, detail: null, failure: null, record: false } }; drawHistoryDecision();
     const [detail] = await Promise.all([modelsClient.readDecision(entry.authoredVersionId, resolvedId).catch(() => null), records.readMoments(showing)]);
+    if (detail) cacheDecisionMetrics(resolvedId, detail);
     const people = (showing.moments ?? []).filter(moment => moment.request_id === resolvedId || moment.said?.some(line => line.request_id === resolvedId)).flatMap(moment => moment.subjects ?? []);
     await Promise.all([...new Set(people.map(beingRow).filter(Boolean))].map(one => entityOffer(one).catch(() => null)));
     if (historyDecision?.showing !== showing) return;
@@ -1318,8 +1338,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     corners.reticle.dataset.state = target ? targetReachable ? 'ready' : 'far' : 'empty';
     root.dataset.reachable = String(targetReachable);
     root.dataset.focusDistance = Number.isFinite(distance) ? distance.toFixed(2) : '';
-    // The data view's tags say who decides for everyone near, so the reads behind them stay fresh while it shows.
-    if (target || held || dataView.shown) refreshSubjectReads(now);
+    // The data view's tags say who decides for everyone near, so the reads behind them stay fresh while it shows or a run plays.
+    if (target || held || dataView.shown || runWatch.run) refreshSubjectReads(now);
     // What pops now (T2: nothing while the world is paused), and the exchange a followed character is in (T5).
     const shownPops = shownWhile(talk, selection.people?.clock().mode ?? null, now);
     shownNow = shownPops;

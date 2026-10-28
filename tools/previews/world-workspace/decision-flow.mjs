@@ -221,7 +221,7 @@ export const PIPELINE_STAGES = Object.freeze([
   Object.freeze({ step: 5, key: 'outcome', label: '5. Outcome' }),
 ]);
 
-export const PIPELINE_BAR = Object.freeze({ height: 68, aboveKeys: 12 });
+export const PIPELINE_BAR = Object.freeze({ height: 44, gap: 10, aboveKeys: 12 });
 
 const REFUSAL_LABELS = Object.freeze({
   spending_limit_reached: 'Spending limit reached',
@@ -584,13 +584,15 @@ export function executionPipeline(input = {}) {
 export const decisionPipeline = executionPipeline;
 
 /**
- * Places the 5-stage execution pipeline strip along the lower telemetry rail of the decision page, clear of the keys,
- * and computes proportional pixel widths for each stage segment.
+ * Places the 5-stage execution pipeline strip between the header and the 3-column decision flow (`Context` -> `Ring`
+ * -> `Choices` -> `Outcome`), and computes proportional pixel widths for each stage segment.
  */
-export function pipelineLayout(layout, height = layout.height, stages = null) {
-  const width = layout.width - 2 * layout.margin;
-  const keysTop = height - layout.keys.bottom - CAP;
-  const top = Math.max(layout.told.top, keysTop - ABOVE_KEYS - PIPELINE_BAR.height);
+export function pipelineLayout(layout, height = layout.height, stages = null, options = null) {
+  const opts = typeof options === 'number' ? { viewportWidth: options } : (options ?? {});
+  const viewportWidth = Number.isFinite(opts.viewportWidth) && opts.viewportWidth > 0 ? opts.viewportWidth : layout.width;
+  const width = Math.max(320, Math.min(layout.width, viewportWidth) - 2 * layout.margin);
+  const baseHead = Number.isFinite(opts.headBottom) ? opts.headBottom : headBottom(layout, { lines: 1 });
+  const top = Math.max(layout.headTop + 40, Math.round(baseHead + PIPELINE_BAR.gap));
   const list = Array.isArray(stages) && stages.length === PIPELINE_STAGES.length
     ? stages
     : PIPELINE_STAGES.map(stage => ({ ...stage, percent: 20, share: 0.2 }));

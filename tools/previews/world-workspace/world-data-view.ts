@@ -747,19 +747,19 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     return answer;
   }
 
-  /** How a person is called and who decides for them, read again at most every WORDS_MS. */
+  /** How a person is called and who decides for them, read again at most every WORDS_MS (or immediately while model/telemetry is still arriving). */
   const said = new Map<string, { words: { readonly name: string; readonly model: string | null; readonly telemetry?: unknown }; at: number }>();
   let summaryAt = -Infinity;
   function wordsOf(id: string, now: number): { readonly name: string; readonly model: string | null; readonly telemetry?: unknown } {
     const held = said.get(id);
-    if (held !== undefined && now - held.at < WORDS_MS) return held.words;
+    if (held !== undefined && now - held.at < WORDS_MS && held.words.model !== null && held.words.telemetry !== undefined) return held.words;
     const words = people?.words(id) ?? { name: '', model: null };
     said.set(id, { words, at: now });
     return words;
   }
 
-  function updateTelemetrySummary(now: number): void {
-    if (now - summaryAt < WORDS_MS) return;
+  function updateTelemetrySummary(now: number, force = false): void {
+    if (!force && !telemetryLine.hidden && now - summaryAt < WORDS_MS) return;
     summaryAt = now;
     const text = (dataViewTelemetrySummary(people?.telemetry?.() ?? null) as string | null) ?? '';
     if (telemetryLine.textContent !== text) telemetryLine.textContent = text;
@@ -924,6 +924,7 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
         card.hidden = false;
         onOpen();
         begin();
+        updateTelemetrySummary(performance.now(), true);
         glideTo(1);
       } else glideTo(0);
     },
