@@ -2,7 +2,7 @@
 // of record a point stands on, where a tag hangs and which tags show. Run: node verify-data-view-things.mjs
 import assert from 'node:assert/strict';
 import { SPLIT, neededDensity, surfaceIndex, surfaceSamples, takenCount, trianglesNear } from './data-view-samples.mjs';
-import { bigEnough, boxOfExtent, easedAlbedoChunk, creatureWords, keepStep, kindMaker, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, thingWords, townThings, walkerBoxes } from './data-view-things.mjs';
+import { POINT_FALLBACK, bigEnough, boxOfExtent, easedAlbedoChunk, edgeOf, creatureWords, keepStep, kindMaker, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, thingWords, townThings, walkerBoxes } from './data-view-things.mjs';
 
 const extent = (x0, y0, z0, x1, y1, z1) => ({ min_x_mm: x0, min_y_mm: y0, min_z_mm: z0, max_x_mm: x1, max_y_mm: y1, max_z_mm: z1 });
 const record = (kind, identity, fields, membership = 'owned') => ({ kind, identity, membership, fields: { identity, ...fields } });
@@ -64,6 +64,25 @@ assert.equal(surfaceOf('Untitled', 'Untitled'), 'object');
 assert.equal(surfaceOf('Untitled', 'wheel'), 'object');
 assert.equal(surfaceOf('far-person:#603829#68543a#2a4c7b#3c556c#0f0d0f', 'character-far-body'), 'person');
 assert.equal(surfaceOf('character:skin/young_asian_male', 'body'), 'person');
+// Water is a surface of its own: the land's sea, lakes, pools and falls as the land draws them or a style pack
+// dresses them, and a pack's own water; a name that only holds the word is not water.
+assert.equal(surfaceOf('site-land:water', 'site-land:water:sea'), 'water');
+assert.equal(surfaceOf('style-pack:land-water:sea:sea', 'site-land:water:sea'), 'water');
+assert.equal(surfaceOf('style-pack:land-water:fall:falls fall 0', 'site-land:water:falls fall 0'), 'water');
+assert.equal(surfaceOf('style-pack:material:water.sea', 'cb0cf8fb-bf3d-501a-b2bb-cb5ff2a50bb9:sha'), 'water');
+assert.equal(surfaceOf('style-pack:furniture.water_tap', 'tap'), 'furniture');
+// The look's ground beyond a town on level ground is a surface as the land is, never a moving thing sampled all over:
+// the ground, or the sea where the world's setting is by the sea.
+assert.equal(surfaceOf('generated-tile:edge-ground', 'generated-tile:edge-ground'), 'ground');
+assert.equal(surfaceOf('generated-tile:edge-ground', 'generated-tile:edge-ground', 'water'), 'water');
+const setting = (ground) => ({ profile: 'exulanica.world-setting/v1', parts: [{ axis: 'sky', key: 'dusk' }, { axis: 'ground', key: ground }] });
+assert.equal(edgeOf(setting('sea')), 'water');
+assert.equal(edgeOf(setting('sand')), 'ground');
+assert.equal(edgeOf({ parts: [{ axis: 'sky', key: 'sea' }] }), 'ground');
+assert.equal(edgeOf(null), 'ground');
+assert.equal(edgeOf(undefined), 'ground');
+assert.equal(edgeOf({ parts: 'sea' }), 'ground');
+assert.equal(surfaceOf('site-land:surfaces:town-land:ground', 'site-land:chunk:0:1'), 'ground');
 
 // A point takes the most particular box that holds it among the kinds its surface can be, else its surface's own.
 const kinds = pointKinds([
@@ -79,6 +98,10 @@ assert.equal(kinds.kindAt('road', 5, 0.1, 3), 'city.lane');
 assert.equal(kinds.kindAt('road', 15, 0.1, 8), 'city.street_segment');
 assert.equal(kinds.kindAt('plant', 3, 1, -0.5), 'city.street_tree');
 assert.equal(kinds.kindAt('vehicle', 3, 1, -0.5), 'object');
+// No record of a town's tiles states water, so a point on it is the land's water wherever it stands, even in a box.
+assert.equal(kinds.kindAt('water', 5, 0.1, 3), 'land.water');
+assert.equal(kinds.kindAt('water', 400, 0, 900), 'land.water');
+assert.equal(POINT_FALLBACK.water, 'land.water');
 
 // A premises's tag hangs on a face it turns to the eye, nearest first, at its floor plus up to 2 m; anything else over its top.
 const shop = { min: [0, 8, -20], max: [10, 13, -10], hang: 'face' };
@@ -211,6 +234,23 @@ assert.deepEqual(made({ name: null, kindLabel: () => null }), { name: 'creature'
   assert.ok(need({ distance: 5 }) > need({}) && need({ facing: 1 }) > need({}) && need({ slack: 3 }) > need({}));
   // Nothing nearer than `nearest` is asked denser than there.
   assert.equal(need({ distance: 0.5, facing: 1 }), need({ distance: 2, facing: 1 }));
+}
+
+// The look's ground beyond a town on level ground, a plane 4 km across in 50 triangles, taken as a surface: its far set
+// within what a town draws, and none of it under the town's own ground, which stands over it there.
+{
+  const half = 2000, n = 5, positions = [], indices = [];
+  for (let j = 0; j <= n; j += 1) for (let i = 0; i <= n; i += 1) positions.push(-half + (2 * half * i) / n, 0, -half + (2 * half * j) / n);
+  for (let j = 0; j < n; j += 1) for (let i = 0; i < n; i += 1) { const a = j * (n + 1) + i; indices.push(a, a + 1, a + n + 1, a + 1, a + n + 2, a + n + 1); }
+  const plane = { positions, indices, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], key: 3, kind: () => 'land.water' };
+  const eye = { at: [0, 1.7, 0], pixels: 900, density: 0.04, facingFloor: 0.15, cone: Math.cos(Math.PI / 6) };
+  const split = { at: [0, 1.7, 0], ...SPLIT };
+  const far = surfaceSamples(plane, { ...eye, slack: 8, nearest: 32, within: Infinity }, split, null);
+  assert.ok(far.count > 100_000 && far.count < 1_500_000, `far set ${far.count}`);
+  const tops = [[-128, -64, 128, 64, 0.5]];
+  const hidden = (x, y, z) => tops.some((top) => x > top[0] && x < top[2] && z > top[1] && z < top[3] && y < top[4]);
+  assert.equal(surfaceSamples({ ...plane, hidden }, { ...eye, slack: 0.5, nearest: 2.5, within: 8.5 }, split, null).count, 0);
+  assert.ok(surfaceSamples(plane, { ...eye, slack: 0.5, nearest: 2.5, within: 8.5 }, split, null).count > 0);
 }
 
 // A colour chunk of a material's own, eased whole in its dark copy: its one colour function renamed and called first,

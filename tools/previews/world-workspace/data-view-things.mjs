@@ -102,30 +102,51 @@ export const POINT_KINDS = Object.freeze({
 });
 
 /**
- * What a point stands on where no box holds it, by its surface: the land beyond the town is the land's, a walker
- * drawn from afar is a person, and anything the names do not tell is an object.
+ * What a point stands on where no box holds it, by its surface: the land beyond the town is the land's, its water
+ * the land's water (no record of a town's tiles states water, so no box holds a point on it), a walker drawn from
+ * afar is a person, and anything the names do not tell is an object.
  */
 export const POINT_FALLBACK = Object.freeze({
   wall: 'city.massing', road: 'city.lane', path: 'city.street_segment', kerb: 'city.curb_edge',
-  plant: 'city.street_tree', furniture: 'city.street_furniture', ground: 'city.terrain', vehicle: 'object',
-  backdrop: 'city.terrain', person: 'person', object: 'object',
+  plant: 'city.street_tree', furniture: 'city.street_furniture', ground: 'city.terrain', water: 'land.water',
+  vehicle: 'object', backdrop: 'city.terrain', person: 'person', object: 'object',
 });
+
+/**
+ * The look's ground beyond a town on level ground: one plane round the world, kilometres wide, below every street
+ * (generated-tile/environment.ts). A town on its own land draws none.
+ */
+export const EDGE = /generated-tile:edge-ground/u;
+
+/**
+ * What the look's ground beyond a town on level ground (EDGE) stands for: the sea where the world's setting is by the
+ * sea (its ground part "sea": "open sea beyond the last street", setting-parts.v4.json), else the ground. `setting`:
+ * the world's own setting (exulanica.world-setting/v1), or anything else where it states none.
+ */
+export function edgeOf(setting) {
+  const parts = setting !== null && typeof setting === 'object' && Array.isArray(setting.parts) ? setting.parts : [];
+  return parts.some((part) => part?.axis === 'ground' && part?.key === 'sea') ? 'water' : 'ground';
+}
 
 /**
  * Which surface a drawn mesh is, from its material's and its entity's names: a style pack names its materials by
  * role ("style-pack:wall.brick_running_bond", "style-pack:road.kerb_stone"), the tile its own sets
  * ("generated-tile:cc0.broadleaf-foliage"). Every surface goes to data: the land's backdrop, beyond the town, as
- * the land; a walker drawn from afar as a person; one the names do not tell as an object; and the sky goes dark
- * with no points of its own.
+ * the land; its water (the sea, a lake, a cascade's pools and falls, "site-land:water:sea", as the land draws it
+ * or a style pack dresses it, "style-pack:land-water:sea:sea", and a pack's own water, "style-pack:material:water.sea")
+ * as water; the look's ground beyond a town on level ground (EDGE) as `edge` says (edgeOf); a walker drawn from afar
+ * as a person; one the names do not tell as an object; and the sky goes dark with no points of its own.
  */
-export function surfaceOf(material = '', entity = '') {
+export function surfaceOf(material = '', entity = '', edge = 'ground') {
   const name = `${entity} ${material}`;
   if (/backdrop/u.test(name)) return 'backdrop';
   if (/sky/u.test(name)) return 'sky';
   if (/far-person|character-far-body|(^|\s)character:/u.test(name)) return 'person';
   if (/style-pack:vehicle\./u.test(name)) return 'vehicle';
-  // The ground first: a tree's pit is ground, and the land's own surfaces and its water are.
-  if (/town-land|site-land|tree-pit|water/u.test(name)) return 'ground';
+  if (EDGE.test(name)) return edge;
+  if (/site-land:water|land-water|(^|[\s:])water\./u.test(name)) return 'water';
+  // The ground first: a tree's pit is ground, and the land's own surfaces are.
+  if (/town-land|site-land|tree-pit/u.test(name)) return 'ground';
   if (/foliage|bark/u.test(name)) return 'plant';
   if (/kerb|curb/u.test(name)) return 'kerb';
   if (/carriageway|asphalt|road\./u.test(name)) return 'road';

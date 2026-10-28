@@ -31,12 +31,15 @@ const KINDS_V1 = [
 ] as const;
 /** A city grammar record kind. `city.tile` is a tile header, never a subject. */
 const CITY_KIND = /^city\.(?!tile$)[a-z][a-z0-9_]{0,63}$/;
+/** A kind of the land a town stands on, from version 5: its water, which no record of the town's tiles states. */
+const LAND_KIND = /^land\.[a-z][a-z0-9_]{0,63}$/;
 const MAX_KINDS = 128;
 
 export type DataViewOriginKey = (typeof ORIGINS)[number];
 /**
  * A key of the kind palette. Version 1 names exactly its closed list; from version 2 the palette
- * declares its own city record kinds as data, beside the three subject kinds.
+ * declares its own city record kinds as data, beside the three subject kinds, and from version 5
+ * the kinds of the land a town stands on.
  */
 export type DataViewKindKey = string;
 /** Lowercase `#rrggbb`, a display colour. The data view shaders write it without tone mapping. */
@@ -293,6 +296,20 @@ export const DATA_VIEW_STYLE_V4 = {
   },
 } as const;
 
+/**
+ * Version 5, the land's water as a kind of its own: the sea, a lake and a cascade's pools and falls
+ * go to points in a deep blue (`land.water`), apart from the land's green and the streets' paler
+ * blues. Everything else is version 4's.
+ */
+export const DATA_VIEW_STYLE_V5 = {
+  ...DATA_VIEW_STYLE_V4,
+  version: 5,
+  palette: {
+    ...DATA_VIEW_STYLE_V4.palette,
+    kind: { ...DATA_VIEW_STYLE_V4.palette.kind, 'land.water': '#4a86ff' },
+  },
+} as const;
+
 const HEX = /^#[0-9a-f]{6}$/;
 
 function fail(path: string, why: string): never {
@@ -336,7 +353,7 @@ function text(value: unknown, path: string, maxLength: number, pattern: RegExp):
 export function dataViewStyle(value: unknown): DataViewStyle {
   const root = record(value, 'style', ['id', 'version', 'ground', 'points', 'dashes', 'palette', 'boxes', 'links', 'tags']);
   if (root['id'] !== 'exulanica.data-view') fail('style.id', 'is not exulanica.data-view');
-  const version = number(root['version'], 'style.version', 1, 4, true);
+  const version = number(root['version'], 'style.version', 1, 5, true);
   const ground = record(root['ground'], 'style.ground', ['colour', 'strength', 'rise']);
   const points = record(root['points'], 'style.points', [
     'sizeMetres', 'minPixels', 'maxPixels', 'densityPerSquareMetre', 'intensity', 'rise', 'pullMetres',
@@ -351,7 +368,7 @@ export function dataViewStyle(value: unknown): DataViewStyle {
   const dashes = record(root['dashes'], 'style.dashes', ['halfWidth', 'sizeScale', 'bandsPerMetre', 'bandsPerSecond', 'bandDepth']);
   const palette = record(root['palette'], 'style.palette', ['origin', 'kind']);
   const origin = record(palette['origin'], 'style.palette.origin', ORIGINS);
-  const kindKeys = version === 1 ? [...KINDS_V1] : declaredKinds(palette['kind']);
+  const kindKeys = version === 1 ? [...KINDS_V1] : declaredKinds(palette['kind'], version);
   const kind = record(palette['kind'], 'style.palette.kind', kindKeys);
   const boxes = record(root['boxes'], 'style.boxes', ['colour', 'opacity', 'selectedColour', 'selectedOpacity', 'cornerFraction']);
   const links = record(root['links'], 'style.links', ['colour', 'opacity', 'maxCount']);
@@ -446,14 +463,18 @@ export function dataViewStyle(value: unknown): DataViewStyle {
   return deepFreeze(style);
 }
 
-/** The kind keys a version 2 palette declares: the subject kinds, then its own city record kinds. */
-function declaredKinds(value: unknown): string[] {
+/**
+ * The kind keys a palette from version 2 declares: the subject kinds, then its own city record kinds,
+ * and from version 5 its land kinds.
+ */
+function declaredKinds(value: unknown, version: number): string[] {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) fail('style.palette.kind', 'is not an object');
   const keys = Object.keys(value);
   if (keys.length > MAX_KINDS) fail('style.palette.kind', `declares more than ${MAX_KINDS} kinds`);
-  const unknown = keys.find(key => !(SUBJECT_KINDS as readonly string[]).includes(key) && !CITY_KIND.test(key));
+  const own = (key: string): boolean => CITY_KIND.test(key) || (version >= 5 && LAND_KIND.test(key));
+  const unknown = keys.find(key => !(SUBJECT_KINDS as readonly string[]).includes(key) && !own(key));
   if (unknown !== undefined) fail(`style.palette.kind.${unknown}`, 'is not a known key');
-  return [...SUBJECT_KINDS, ...keys.filter(key => CITY_KIND.test(key))];
+  return [...SUBJECT_KINDS, ...keys.filter(own)];
 }
 
 function deepFreeze<T>(value: T): T {
@@ -467,8 +488,8 @@ function deepFreeze<T>(value: T): T {
 /** The descriptor every data view draw uses. Validated once, here. */
 export const DATA_VIEW_STYLE: DataViewStyle = dataViewStyle(DATA_VIEW_STYLE_V2);
 
-/** Version 4, validated once, here: what a town seen from its own street draws (the world workspace). */
-export const DATA_VIEW_STYLE_STREET: DataViewStyle = dataViewStyle(DATA_VIEW_STYLE_V4);
+/** Version 5, validated once, here: what a town seen from its own street draws (the world workspace). */
+export const DATA_VIEW_STYLE_STREET: DataViewStyle = dataViewStyle(DATA_VIEW_STYLE_V5);
 
 /** `id@version`, the form a display record carries. */
 export function dataViewStyleName(style: DataViewStyle): string {

@@ -4,15 +4,16 @@
 // tag in the catalogs' words, and each person drawn here a tag with their name and, under it, the model that decides
 // for them where one does. Nothing is kept or picked: closing the card puts every surface back as it was.
 // The look is the product's data view style for a town seen from its own street (atlas-core's DATA_VIEW_STYLE_STREET,
-// version 4: fine points that twinkle a little and never move, as many to the square pixel on every surface), drawn
-// by the product's own parts: the point draw (data-view/points.ts) and the dark ground and the boxes
-// (data-view/overlay.ts). Every surface goes to data, the land beyond the town as the land and the sky as the dark
-// ground, and the world's fog and haze go into the ground with it. Its samples are taken for the eye
-// (data-view-samples.mjs): near, middle and far sets (SETS), each taken again as the eye walks, a moving thing's all
-// over it, and a surface the world draws later borrowed as it comes. A GPU that cannot draw every point at the page's
-// frame rate draws a stable share of them, stepped by its measured frame time, never fewer than half. What the town's
-// things are, their words and where a tag goes are data-view-things.mjs's; whether a wall stands between the eye and a
-// tag is scene-sight.ts's.
+// version 5: fine points that twinkle a little and never move, as many to the square pixel on every surface, water in
+// a blue of its own), drawn by the product's own parts: the point draw (data-view/points.ts) and the dark ground and
+// the boxes (data-view/overlay.ts). Every surface goes to data, the land beyond the town as the land, its water as
+// water (and the open sea a setting by the sea lays beyond a town on level ground), and the sky as the dark ground,
+// and the world's fog and haze go into the ground with it. Its samples are taken for the eye (data-view-samples.mjs):
+// near, middle and far sets (SETS), each taken again as the eye walks, a moving thing's all over it, and a surface
+// the world draws later borrowed as it comes. A GPU that cannot draw every point at the page's frame rate draws a
+// stable share of them, stepped by its measured frame time, never fewer than half. What the town's things are, their
+// words and where a tag goes are data-view-things.mjs's; whether a wall stands between the eye and a tag is
+// scene-sight.ts's.
 //
 // A town is seen from its own street, so its surfaces go dark rather than dissolve: each keeps standing where it is,
 // in the ground's colour, and so hides what is behind it, its own points drawn over it (the style's pull brings each
@@ -30,7 +31,7 @@ import type { LoadedGeneratedTile } from '../../../web/packages/atlas-react/src/
 import type { staticMeshRepresentation } from '../../../web/packages/atlas-react/src/playcanvas/representation-binding.ts';
 import type { RepresentationPointAllocation, RepresentationReport } from '../../../web/packages/atlas-react/src/playcanvas/representation-runtime.ts';
 import { SPLIT, surfaceIndex, surfaceSamples, trianglesNear } from './data-view-samples.mjs';
-import { bigEnough, easedAlbedoChunk, keepStep, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, townThings, walkerBoxes } from './data-view-things.mjs';
+import { EDGE, POINT_KINDS, bigEnough, easedAlbedoChunk, edgeOf, keepStep, personLines, placeTags, pointBoxes, pointKinds, streetLine, surfaceOf, tagAnchors, townThings, walkerBoxes } from './data-view-things.mjs';
 import { sceneHit, sceneSight } from './scene-sight.ts';
 import { DATA_WORDS } from './world-words.mjs';
 import './world-data-view.css';
@@ -93,7 +94,7 @@ type Vec = readonly [number, number, number];
 /** A drawn mesh instance, as the sampled surface takes it (the engine's own type, named where atlas-react names it). */
 type MeshInstance = Parameters<typeof staticMeshRepresentation>[1];
 type Thing = { readonly id: string; readonly kind: string; readonly words: string; readonly min: Vec; readonly max: Vec; readonly hang: 'face' | 'top' | 'line' };
-type Surface = 'wall' | 'road' | 'path' | 'kerb' | 'plant' | 'furniture' | 'ground' | 'vehicle' | 'backdrop' | 'sky' | 'person' | 'object';
+type Surface = 'wall' | 'road' | 'path' | 'kerb' | 'plant' | 'furniture' | 'ground' | 'water' | 'vehicle' | 'backdrop' | 'sky' | 'person' | 'object';
 type Material = MeshInstance['material'];
 /** A colour as a standard material holds it. */
 interface Colour { r: number; g: number; b: number; set(r: number, g: number, b: number): unknown }
@@ -211,7 +212,7 @@ function corners(min: Vec, max: Vec): readonly (readonly [number, number, number
 
 const smooth = (t: number): number => { const k = Math.min(1, Math.max(0, t)); return k * k * (3 - 2 * k); };
 
-export function mountDataView({ host, binding, people = null, onOpen = () => {}, style = DATA_VIEW_STYLE_STREET }: {
+export function mountDataView({ host, binding, people = null, onOpen = () => {}, style = DATA_VIEW_STYLE_STREET, setting = () => null }: {
   readonly host: HTMLElement;
   readonly binding: AtlasBinding;
   /** Who lives here, or null where nobody does. */
@@ -219,6 +220,11 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
   /** The card opened: the keys card and any other corner card give way. */
   readonly onOpen?: () => void;
   readonly style?: DataViewStyle;
+  /**
+   * The world's own setting (exulanica.world-setting/v1) as it stands, read as the view opens: by the sea, the look's
+   * ground beyond a town on level ground is the sea (edgeOf).
+   */
+  readonly setting?: () => unknown;
 }): DataView {
   const tile = townTile(binding);
   const colourOf = (kind: string): DataViewHex => dataViewKindColour(style, kind) ?? style.boxes.colour;
@@ -276,6 +282,10 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
   const known = new Set<MeshInstance>();
   // Where the town's own land lies, each chunk's (min x, min z, max x, max z, top): the land's backdrop under it is never seen.
   let land: [number, number, number, number, number][] = [];
+  // The look's ground beyond a town on level ground, as the world's setting says it stands for (edgeOf), and the tops
+  // of the town's own ground it lies under, west, south, east, north and top as `land`'s chunks.
+  let edge: 'water' | 'ground' = 'ground';
+  let tops: [number, number, number, number, number][] = [];
   // The GPU's share of the points (every data view draw's one keep value) and the frame times it is stepped by.
   let keep = 1, downAt = -Infinity, stepAt = -Infinity, lastFrame: number | null = null;
   let tried: { keep: number; slow: number } | null = null, heldUntil = -Infinity;
@@ -437,7 +447,7 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     for (const instance of world?.meshInstances ?? []) {
       // The data view's own draws (its points, a walker's points, its ground) are never borrowed.
       if (known.has(instance) || (instance.node?.name ?? '').startsWith('data-view') || (instance.material?.name ?? '').startsWith('data-view')) continue;
-      const surface = surfaceOf(instance.material?.name ?? '', instance.node?.name ?? '') as Surface;
+      const surface = surfaceOf(instance.material?.name ?? '', instance.node?.name ?? '', edge) as Surface;
       // A walker drawn from afar is shown and hidden as they come and go; anything else is looked at once it is drawn.
       if (!instance.visible && surface !== 'person') continue;
       known.add(instance);
@@ -504,8 +514,10 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
       : { ...shared, slack, nearest: Math.max(screen.nearestMetres, from), within: to + slack };
     // A moving thing is read where it stands now.
     const matrix = one.mover ? one.instance.node.getWorldTransform().data : one.shape.matrix;
-    const table = kinds, under = land;
-    const hidden = one.surface === 'backdrop' && under.length > 0
+    // A part nothing sees has no samples: the land's backdrop under the town's own land, and the look's ground beyond
+    // a town on level ground under the town's own ground.
+    const table = kinds, under = one.surface === 'backdrop' ? land : EDGE.test(one.instance.node?.name ?? '') ? tops : [];
+    const hidden = under.length > 0
       ? (x: number, y: number, z: number) => under.some((chunk) => x > chunk[0] && x < chunk[2] && z > chunk[1] && z < chunk[3] && y < chunk[4]) : null;
     return surfaceSamples({ ...one.shape, matrix, key: one.key, hidden, kind: (x: number, y: number, z: number) => table.kindAt(one.surface, x, y, z) ?? 'object' },
       look, { at: opened ?? at, ...SPLIT }, triangles).groups;
@@ -631,7 +643,10 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     takenAt = SETS.map(() => null); taking = SETS.map(() => null);
     const tiles = townTiles(tile, at);
     things = townThings(tiles) as readonly Thing[];
-    kinds = pointKinds(pointBoxes(tiles));
+    const boxes = pointBoxes(tiles) as readonly { readonly kind: string; readonly min: Vec; readonly max: Vec }[];
+    kinds = pointKinds(boxes);
+    edge = edgeOf(setting());
+    tops = boxes.filter((box) => POINT_KINDS.ground.includes(box.kind)).map((box) => [box.min[0], box.min[2], box.max[0], box.max[2], box.max[1]]);
     // What stands in a tag's way is read before any point is drawn, so the points are never in its way.
     const hit = sceneHit(binding.app);
     sight = { face: sceneSight(hit, OWN.face), top: sceneSight(hit, OWN.top), person: sceneSight(hit, OWN.person), line: sceneSight(hit, OWN.line) };
@@ -681,7 +696,7 @@ export function mountDataView({ host, binding, people = null, onOpen = () => {},
     figures.clear();
     airBack();
     held = []; walkers = []; queues = SETS.map(() => []); allocated = 0; things = []; near = []; thingsAt = -Infinity; kinds = null; sight = null;
-    opened = null; land = []; takenAt = SETS.map(() => null); taking = SETS.map(() => null);
+    opened = null; land = []; tops = []; takenAt = SETS.map(() => null); taking = SETS.map(() => null);
     known.clear();
     setKeep(1); intervals.length = 0;
     overlay?.destroy(); overlay = null;

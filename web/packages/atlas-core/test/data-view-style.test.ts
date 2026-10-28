@@ -6,6 +6,7 @@ import {
   DATA_VIEW_STYLE_V2,
   DATA_VIEW_STYLE_V3,
   DATA_VIEW_STYLE_V4,
+  DATA_VIEW_STYLE_V5,
   dataViewKindColour,
   dataViewRgb,
   dataViewStyle,
@@ -50,7 +51,7 @@ describe('data view style descriptor', () => {
       [value => { delete value['palette']['kind']['geometry-group']; }, /geometry-group is missing/],
       [value => { value['palette']['kind']['city.street'] = '#FFFFFF'; }, /city.street is not a lowercase/],
       [value => { for (let i = 0; i < 130; i += 1) value['palette']['kind'][`city.k${i}`] = '#000000'; }, /more than 128 kinds/],
-      [value => { value['version'] = 5; }, /style.version/],
+      [value => { value['version'] = 6; }, /style.version/],
       [value => { value['version'] = 3; }, /style.points.twinkle is missing/],
     ];
     for (const [change, message] of cases) {
@@ -89,19 +90,19 @@ describe('data view style descriptor', () => {
     expect(() => dataViewStyle(early)).toThrow('style.points.twinkle is not a known key');
   });
 
-  it('validates version 4, the street as dense on the screen near as far: the look the street draws, and no screen density before it', () => {
+  it('validates version 4, the street as dense on the screen near as far, and no screen density before it', () => {
     const v4 = (): Record<string, any> => JSON.parse(JSON.stringify(DATA_VIEW_STYLE_V4));
-    expect(dataViewStyle(v4())).toEqual(DATA_VIEW_STYLE_STREET);
-    expect(dataViewStyleName(DATA_VIEW_STYLE_STREET)).toBe('exulanica.data-view@4');
-    expect(DATA_VIEW_STYLE_STREET.points.screen).toEqual({ density: 0.04, facingFloor: 0.15, nearestMetres: 2.5, coneDegrees: 30 });
+    const four = dataViewStyle(v4());
+    expect(dataViewStyleName(four)).toBe('exulanica.data-view@4');
+    expect(four.points.screen).toEqual({ density: 0.04, facingFloor: 0.15, nearestMetres: 2.5, coneDegrees: 30 });
     // The ground covers the sky entirely, and the far hills fade later than the street did.
-    expect(DATA_VIEW_STYLE_STREET.ground.strength).toBe(1);
-    expect(DATA_VIEW_STYLE_STREET.points.depthFade.startMetres).toBeGreaterThan(DATA_VIEW_STYLE.points.depthFade.startMetres);
+    expect(four.ground.strength).toBe(1);
+    expect(four.points.depthFade.startMetres).toBeGreaterThan(DATA_VIEW_STYLE.points.depthFade.startMetres);
     // Everything else is version 3's: the marker's palette, the point and its twinkle.
     const v3 = dataViewStyle(JSON.parse(JSON.stringify(DATA_VIEW_STYLE_V3)));
-    expect(DATA_VIEW_STYLE_STREET.palette).toEqual(v3.palette);
-    expect(DATA_VIEW_STYLE_STREET.tags).toEqual(v3.tags);
-    expect({ ...DATA_VIEW_STYLE_STREET.points, screen: undefined, depthFade: undefined }).toEqual({ ...v3.points, depthFade: undefined });
+    expect(four.palette).toEqual(v3.palette);
+    expect(four.tags).toEqual(v3.tags);
+    expect({ ...four.points, screen: undefined, depthFade: undefined }).toEqual({ ...v3.points, depthFade: undefined });
     const cases: [(value: Record<string, any>) => void, RegExp][] = [
       [value => { delete value['points']['screen']; }, /style.points.screen is missing/],
       [value => { value['points']['screen']['density'] = 2; }, /style.points.screen.density is not a number from 0.0001 to 1/],
@@ -118,6 +119,30 @@ describe('data view style descriptor', () => {
     const early = JSON.parse(JSON.stringify(DATA_VIEW_STYLE_V3));
     early['points']['screen'] = { density: 0.05, facingFloor: 0.15, nearestMetres: 2, coneDegrees: 35 };
     expect(() => dataViewStyle(early)).toThrow('style.points.screen is not a known key');
+  });
+
+  it('validates version 5, the land\'s water a kind of its own: the look the street draws, and no land kind before it', () => {
+    const v5 = (): Record<string, any> => JSON.parse(JSON.stringify(DATA_VIEW_STYLE_V5));
+    expect(dataViewStyle(v5())).toEqual(DATA_VIEW_STYLE_STREET);
+    expect(dataViewStyleName(DATA_VIEW_STYLE_STREET)).toBe('exulanica.data-view@5');
+    // The water's own blue, no colour version 4 gives any kind; everything else is version 4's.
+    const four = dataViewStyle(JSON.parse(JSON.stringify(DATA_VIEW_STYLE_V4)));
+    const { 'land.water': water, ...kinds } = DATA_VIEW_STYLE_STREET.palette.kind;
+    expect(water).toBe('#4a86ff');
+    expect(dataViewKindColour(DATA_VIEW_STYLE_STREET, 'land.water')).toBe('#4a86ff');
+    expect(Object.values(four.palette.kind)).not.toContain(water);
+    expect(kinds).toEqual(four.palette.kind);
+    expect({ ...DATA_VIEW_STYLE_STREET, version: 4, palette: four.palette }).toEqual(four);
+    // A land kind is a key from version 5 on, in the form a kind is named.
+    const early = JSON.parse(JSON.stringify(DATA_VIEW_STYLE_V4));
+    early['palette']['kind']['land.water'] = '#4a86ff';
+    expect(() => dataViewStyle(early)).toThrow('style.palette.kind.land.water is not a known key');
+    const named = v5();
+    named['palette']['kind']['land.Water'] = '#4a86ff';
+    expect(() => dataViewStyle(named)).toThrow('style.palette.kind.land.Water is not a known key');
+    const coloured = v5();
+    coloured['palette']['kind']['land.water'] = '#4A86FF';
+    expect(() => dataViewStyle(coloured)).toThrow(/style\.palette\.kind\.land\.water/);
   });
 
   it('validates version 1 into one frozen, JSON-shaped look with a name for display records', () => {

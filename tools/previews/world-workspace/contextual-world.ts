@@ -148,7 +148,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   // one looked at or chosen keeps their own tag or card, so the data view leaves them out. A creature its workspace
   // made is named from its kind's own record, over the model that record says made it (creatureWords).
   const kindMakers = createKindLabels((path) => read(path), kindMaker);
-  const dataView = mountDataView({ host: root, binding: b, onOpen: () => corners.closeKeys(), people: {
+  // By the sea, the look's ground beyond a town on level ground is the sea: the data view reads the world's own setting as it opens.
+  const dataView = mountDataView({ host: root, binding: b, onOpen: () => corners.closeKeys(), setting: () => state.worldStyleConnection?.state.current.stylePack?.setting?.document, people: {
     everyone: () => rows.flatMap(row => { if (row.scene?.type !== 'being' || row.key === target?.key || row.key === held?.key) return []; const head = targetPoint(row, true); return head ? [{ id: row.scene.id, head: { x: head.x, y: head.y, z: head.z } }] : []; }),
     words: (id) => {
       const row = beingRow(id), kind = subjectReads.society?.state?.inhabitants?.find(one => one.id === id)?.kind;

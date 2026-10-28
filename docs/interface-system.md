@@ -427,9 +427,10 @@ card only where it works: a small card with one slider from World to Data. As it
 dark where they stand and fine glowing points sampled from them take their place, each coloured by the kind of
 record it stands on and twinkling faintly in place (held still where the reader asks for reduced motion). Every
 surface goes to data, as dense on the screen near as far: the ground at the eye's feet, a near trunk, the land
-beyond the town, while the sky and the world's haze go into the dark ground; walkers become points drawn by their
-own bones, so they walk as points, and a walker or a car near the eye is a figure of points, never a dark shape. A
-GPU that cannot draw them all at its frame rate draws a stable share;
+beyond the town and its water (the sea, a lake, a cascade's pools and falls, and the open sea a setting by the sea
+lays beyond a town on level ground, all in the water's own blue), while the sky and the world's haze go into the dark
+ground; walkers become points drawn by their own bones, so they walk as points, and a walker or a car near the eye is
+a figure of points, never a dark shape. A GPU that cannot draw them all at its frame rate draws a stable share;
 each thing the town's own tile records name gets a thin box and a tag in the shipped catalogs' words
 (a premises by its use, a street tree by its species, street furniture by its class, a street by its name), and
 each person a tag with their name and, under it, the model that decides for them where one does. No tag covers
