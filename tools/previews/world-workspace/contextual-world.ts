@@ -544,7 +544,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     }
     const said = saidLines.of(row.scene.id, now);
     return groupContent({ who: view.who, doing: view.doing, said, toWho: said?.to ? whoOf(said.to) : null, startMinute: view.facts?.startMinute ?? null,
-      decider: deciderOf({ decider: view.decider ?? null, model: view.model ?? null }), model: view.model ?? null, connected, assignable,
+      decider: deciderOf({ decider: view.decider ?? null, model: view.model ?? null }), model: view.model ?? null, connected, assignable, canRun: !readOnly,
       running: Boolean(runWatch.run), left: runWatch.run ? timeLeft(runWatch.run.endsBy, Date.now()) : null, spent: spentInRun(row.scene.id), following: followView.active(), reading: view.reading, declared: view.outside?.declared ?? null });
   }
   let groupActions = new Set(), groupFirst = 0;
@@ -719,7 +719,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       run: { open: Boolean(run), big: run ? runningLine(run, Date.now(), runFree(), runSpent(subjectReads.models?.runSpending ?? null, subjectReads.models?.runSpendingPartial === true)) : runLength(limits, runFree()), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal, view.model ?? null) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
       did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...(row.heard ? {} : { model: row.model ?? null, choices: row.model ? decisionOptions(row.requestId) ?? null : null, decisions: row.decisions ?? null, decider: row.decider === 'person' || row.decider === 'external' || row.decider === 'agent' ? row.decider : null, unanswered: row.unanswered ?? null }), ...records.dayRow(pageView, row) })) : null,
-      didFocus: pageView.didFocus, didFailed: pageView.didFailed === true, lastRun, lastRunWhy, canAsk: !readOnly,
+      didFocus: pageView.didFocus, didFailed: pageView.didFailed === true, lastRun, lastRunWhy, canAsk: !readOnly, canChange: !readOnly,
       ask: pageView.ask ? { questions: ASK_ASPECTS.map(aspect => askWords(aspect, view.who)), focus: pageView.ask.focus, busy: pageView.ask.busy,
         answer: pageView.ask.answer, failure: pageView.ask.failure } : null,
       personality: pageView.personality ? { character: pageView.personality.character, shown: pageView.personality.shown } : null,

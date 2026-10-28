@@ -423,6 +423,13 @@ describe("Teo's personality", () => {
 });
 
 describe("Teo's day keys", () => {
+  it('draws no Run or Personality key, nor what Run would start, on a read-only copy, where they do nothing', async () => {
+    const { root, page } = await open();
+    page.draw(teoState({ canChange: false, assignable: false, canCompare: false, canAsk: false }));
+    expect(keys(root)).toEqual(['↑↓Earlier, later', 'EscBack']);
+    expect(all(root, '.wu-day-small .wu-day-line')).toEqual(['$0.06 in · $0.24 out per million tokens', 'Last run 06:00 to 07:15 · 12 decisions · spent $0.0042']);
+  });
+
   it('offers each key only where it works and says what each asked', async () => {
     const { root, act, page } = await open();
     page.draw(teoState());

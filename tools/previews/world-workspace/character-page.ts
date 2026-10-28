@@ -89,6 +89,9 @@ export interface CharacterPageState {
   readonly didFocus: number | null;
   /** Whether [Q] Ask is offered. */
   readonly canAsk: boolean;
+  /** Whether this page may change the world: start or stop a run, write a personality; false on a read-only copy, where
+   * neither [R] nor [N] is drawn. Absent: it may. */
+  readonly canChange?: boolean;
   /** Ask's questions in the right column in place of the rows, and an answer once one is read; or null. */
   readonly ask: {
     readonly questions: readonly string[];
@@ -351,7 +354,7 @@ function decidesBlock(state: CharacterPageState): HTMLElement[] {
     block.append(words);
     return [block];
   }
-  const offered = Boolean(state.model) && state.connected;
+  const offered = Boolean(state.model) && state.connected && state.canChange !== false;
   const lines: (string | HTMLElement)[] = [];
   if (state.model) lines.push(modelLine(state.model) ?? '');
   const running = !state.run.open ? null : state.running !== undefined ? state.running : offered ? state.run.big : null;
@@ -480,7 +483,7 @@ function drawDay(state: CharacterPageState, layout: Layout, view: View | null, w
 function dayKeys(state: CharacterPageState, act: Act): HTMLElement[] {
   const did = state.did ?? [];
   const choosable = (index: number) => !did[index]?.heard;
-  const offered = Boolean(state.model) && state.connected;
+  const offered = Boolean(state.model) && state.connected && state.canChange !== false;
   // The button steps earlier, and from the oldest back to the newest; the keys step either way (the host's).
   const earlier = () => {
     const next = stepChoice(did.length, state.didFocus, 1, choosable);
@@ -490,7 +493,7 @@ function dayKeys(state: CharacterPageState, act: Act): HTMLElement[] {
   return [
     ...(did.filter((row) => !row.heard).length >= 2 ? [key(['↑', '↓'], PATH_WORDS.earlierLater, 'ArrowUp ArrowDown', earlier)] : []),
     ...(state.assignable ? [key(['M'], CHARACTER_WORDS.model, 'M', () => act('model'))] : []),
-    ...(state.personality ? [key(['N'], PERSONALITY_WORDS.label, 'N', () => act('personality'))] : []),
+    ...(state.personality && state.canChange !== false ? [key(['N'], PERSONALITY_WORDS.label, 'N', () => act('personality'))] : []),
     ...(offered ? [key(['R'], state.run.open ? CHARACTER_WORDS.stop : CHARACTER_WORDS.run, 'R', () => act(state.run.open ? 'stop' : 'run'), state.run.busy)] : []),
     ...(state.canCompare ? [key(['C'], COMPARE_WORDS.compare, 'C', () => act('compare'))] : []),
     ...(state.canAsk ? [key(['Q'], askWho(state.who), 'Q', () => act('ask'))] : []),

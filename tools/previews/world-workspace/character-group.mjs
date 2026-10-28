@@ -98,8 +98,9 @@ export function deciderOf({ decider = null, model = null }) {
  * - `said` (lastSaid's answer, or null), `toWho` (called()'s for its listener, or null), `startMinute` (the
  *   society clock's first minute, null where it keeps none);
  * - `decider` (deciderOf's: 'person', 'external', 'agent', 'model' or 'routine'), `model` (the model's served name, or null), `connected` (a model can be asked
- *   here), `assignable` (this page may choose their model), `running` (a run is on), `left` (its time left), `spent` (what
- *   their model has spent in it, runSpentWords's, or null);
+ *   here), `assignable` (this page may choose their model), `canRun` (this page may start and stop runs: false on a
+ *   read-only copy), `running` (a run is on), `left` (its time left), `spent` (what their model has spent in it,
+ *   runSpentWords's, or null);
  * - `following` (V follows them now); `reading` while their record is still read, when the group holds their
  *   name and that it is reading, and no keys yet;
  * - `declared` (an outside AI agent's own words about itself, its door entry's), drawn under the print (AG1d 2).
@@ -107,14 +108,14 @@ export function deciderOf({ decider = null, model = null }) {
  * is on, Stop; without a model, Choose only where this page may choose one.
  */
 export function groupContent({ who, doing = null, said = null, toWho = null, startMinute = null, decider = 'routine', model = null,
-  connected = true, assignable = false, running = false, left = null, spent = null, following = false, reading = false, declared = null }) {
+  connected = true, assignable = false, canRun = true, running = false, left = null, spent = null, following = false, reading = false, declared = null }) {
   if (reading) return Object.freeze({ name: who.title, doing: readingRecord(who), said: null, note: null, rows: Object.freeze([]), print: null, refused: false, declared: null });
   const hhmm = said && said.tick !== null && Number.isSafeInteger(startMinute) ? worldTime(said.tick, startMinute)?.hhmm ?? null : null;
   const spoken = said ? Object.freeze({ line: quoted(said.line), under: saidUnder({ to: said.to ? toWho : null, hhmm }) }) : null;
   const rows = [{ action: 'details', key: 'Enter', word: dayWord(who), shortcut: 'Enter' }];
   const decided = decider === 'model' && plain(model);
-  if (running && decided) rows.push({ action: 'stop', key: 'R', word: GROUP_WORDS.stop(who), shortcut: 'R' });
-  else if (decided && connected) rows.push({ action: 'run', key: 'R', word: GROUP_WORDS.decide(who), shortcut: 'R' });
+  if (running && decided && canRun) rows.push({ action: 'stop', key: 'R', word: GROUP_WORDS.stop(who), shortcut: 'R' });
+  else if (decided && connected && canRun) rows.push({ action: 'run', key: 'R', word: GROUP_WORDS.decide(who), shortcut: 'R' });
   else if (decider === 'routine' && assignable) rows.push({ action: 'model', key: 'M', word: GROUP_WORDS.choose(who), shortcut: 'M' });
   rows.push({ action: 'follow', key: 'V', word: following ? GROUP_WORDS.stopFollowing() : GROUP_WORDS.follow(who), shortcut: 'V' });
   return Object.freeze({

@@ -158,6 +158,11 @@ assert.equal(groupContent({ who: visitor, decider: 'agent', declared: { name: ' 
 assert.equal(groupContent({ who: visitor, decider: 'external', declared }).declared, null);
 assert.equal(deciderOf({ decider: 'agent', model: 'M' }), 'agent');
 
+// A read-only copy draws no run key: neither Let decide nor Stop, which do nothing there (ROOT's sweep of 27 October).
+assert.deepEqual(groupContent({ who: teo, decider: 'model', model: 'M', connected: true, canRun: false }).rows.map(row => row.action), ['details', 'follow']);
+assert.deepEqual(groupContent({ who: teo, decider: 'model', model: 'M', connected: true, running: true, canRun: false }).rows.map(row => row.action), ['details', 'follow']);
+assert.deepEqual(groupContent({ who: teo, decider: 'model', model: 'M', connected: true }).rows.map(row => row.action), ['details', 'run', 'follow']);
+
 // The Run question (r08): the same group asking in place; J28's counts, each person with their own model (F9).
 const ari = called({ name: 'Ari' }), ines = called({ name: 'Ines' });
 const [nano, qwen, sup] = ['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct', 'Nemotron 3 Super 120B'];
