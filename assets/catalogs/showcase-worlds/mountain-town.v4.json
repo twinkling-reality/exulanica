@@ -1,0 +1,382 @@
+{
+ "cast": [
+  {
+   "model": {
+    "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "provider": "nebius_token_factory"
+   },
+   "ordinal": 0
+  },
+  {
+   "model": {
+    "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "provider": "nebius_token_factory"
+   },
+   "ordinal": 1
+  }
+ ],
+ "key": "mountain-town",
+ "look": {
+  "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+  "pack_id": "exulanica.cozy-town",
+  "setting": {
+   "edge": {
+    "ground": [
+     226,
+     232,
+     242
+    ]
+   },
+   "light": {
+    "changes": {},
+    "from": "day"
+   },
+   "origin": "authored",
+   "parts": [
+    {
+     "axis": "ground",
+     "key": "snowfield"
+    },
+    {
+     "axis": "cover",
+     "key": "snow"
+    }
+   ],
+   "profile": "exulanica.world-setting/v1",
+   "provenance": {
+    "kind": "authored"
+   },
+   "surfaces": {
+    "ground.default": {
+     "srgb8": [
+      238,
+      242,
+      248
+     ]
+    },
+    "ground.tree_pit_soil": {
+     "srgb8": [
+      238,
+      242,
+      248
+     ]
+    },
+    "path.footway_paving": {
+     "srgb8": [
+      217,
+      229,
+      243
+     ]
+    },
+    "road.carriageway_asphalt": {
+     "srgb8": [
+      192,
+      200,
+      214
+     ]
+    },
+    "roof.default": {
+     "srgb8": [
+      240,
+      244,
+      250
+     ]
+    },
+    "wall.brick_running_bond": {
+     "srgb8": [
+      75,
+      59,
+      45
+     ]
+    },
+    "wall.cast_concrete": {
+     "srgb8": [
+      150,
+      146,
+      138
+     ]
+    },
+    "wall.painted_render": {
+     "srgb8": [
+      236,
+      232,
+      220
+     ]
+    },
+    "wall.painted_timber": {
+     "srgb8": [
+      107,
+      97,
+      88
+     ]
+    }
+   },
+   "swatches": {},
+   "up": {
+    "wall.awning_canvas": [
+     240,
+     244,
+     250
+    ],
+    "wall.brick_running_bond": [
+     240,
+     244,
+     250
+    ],
+    "wall.cast_concrete": [
+     240,
+     244,
+     250
+    ],
+    "wall.default": [
+     240,
+     244,
+     250
+    ],
+    "wall.limestone_ashlar": [
+     240,
+     244,
+     250
+    ],
+    "wall.painted_render": [
+     240,
+     244,
+     250
+    ],
+    "wall.painted_timber": [
+     240,
+     244,
+     250
+    ],
+    "wall.storefront_metal": [
+     240,
+     244,
+     250
+    ]
+   }
+  },
+  "version": 3
+ },
+ "made": {
+  "calls": [
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "world_tool_chooser",
+    "usd": "0.00065130"
+   },
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "specification_drafter",
+    "usd": "0.00314370"
+   },
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "look_chooser",
+    "usd": "0.00031740"
+   },
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "setting_chooser",
+    "usd": "0.00109080"
+   }
+  ],
+  "date": "2026-10-26",
+  "decisions": 25,
+  "draft_id": "7faa20c2-4813-51ef-ad07-c4834d634b0e",
+  "draft_usd": "0.00520320",
+  "people_models": [
+   "Qwen/Qwen3-235B-A22B-Instruct-2507",
+   "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+  ],
+  "tool": "town"
+ },
+ "paintings": [
+  {
+   "camera": "{\"camera_to_world_column_major\":[-0.5,0,0.866025,0,0.445566,0.857493,0.257248,0,-0.742611,0.514496,-0.428746,0,24.385365,84.247375,-119.124588,1],\"fov_deg\":70,\"height\":480,\"pitch\":-0.540419,\"position_m\":[24.3854,84.2474,-119.1246],\"width\":832,\"yaw\":-2.094395}",
+   "cost_microusd": 7181,
+   "height": 480,
+   "held_permille": 607,
+   "media_type": "image/jpeg",
+   "painter": {
+    "control": "depth without trees, one range over the orbit",
+    "control_scale_milli": 950,
+    "guidance_milli": 4000,
+    "machine": "NVIDIA RTX PRO 6000 Blackwell Server Edition, Nebius AI Cloud",
+    "models": [
+     {
+      "licence": "apache-2.0",
+      "repository": "Tongyi-MAI/Z-Image",
+      "revision": "04cc4abb7c50"
+     },
+     {
+      "licence": "apache-2.0",
+      "repository": "alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1",
+      "revision": "755999a93490"
+     }
+    ],
+    "steps": 25
+   },
+   "recipe": "z-image-orbit-still/v1",
+   "run_id": "graphics-s1",
+   "sha256": "91a3c555f323216b2dc6ab521ad157396e56fb1b1433af879369496a768a188b",
+   "view": "orbit",
+   "width": 832,
+   "words": {
+    "negative": "text, letters, words, signs, logo, watermark, signature, people, crowds, blurry, low quality, flicker, distortion, static frame",
+    "prompt": "aerial photograph of a snowy mountain town with a bakery, stone and dark timber houses with thick snow on steep roofs, warm light in the windows, a little square with a bakery, snowy pines and high peaks around, crisp winter light, realistic, cinematic, sharp detail",
+    "seed": 7,
+    "sentence": "a snowy mountain town with a bakery"
+   }
+  }
+ ],
+ "picture": {
+  "height": 720,
+  "media_type": "image/jpeg",
+  "sha256": "088df6f52ae57c32ca9191f16f91ed8cf2672931c99bb9d7e99e067806f8d994",
+  "taken": {
+   "date": "2026-10-27",
+   "how": "the first view the page keeps for a world's card (keepFirstViewPicture), drawn by the engine in headless Chrome on the GPU at the camera the world opens at, as the server kept it",
+   "main": "a646afd55",
+   "of": "a copy of version 3, made from its link (/?world=mountain-town) on a personal install with tiles"
+  },
+  "width": 1280
+ },
+ "profile": "exulanica.showcase-world/v1",
+ "sentence": "a snowy mountain town with a bakery",
+ "society": {
+  "engine": "exulanica-society/v7"
+ },
+ "title": "A snowy mountain town with a bakery",
+ "version": 4,
+ "world": {
+  "kind": null,
+  "land": {
+   "document": {
+    "features": [
+     {
+      "grade_permille": 30,
+      "id": "tilt",
+      "kind": "tilt",
+      "reach_mm": 200000,
+      "side": "north"
+     },
+     {
+      "depth_mm": 300000,
+      "distance_mm": 120000,
+      "height_mm": 50000,
+      "id": "fell",
+      "kind": "rise",
+      "offset_mm": -40000,
+      "roughness_permille": 550,
+      "side": "north",
+      "width_mm": 500000
+     },
+     {
+      "depth_mm": 140000,
+      "distance_mm": 150000,
+      "height_mm": 35000,
+      "id": "crag",
+      "kind": "rise",
+      "offset_mm": 0,
+      "roughness_permille": 700,
+      "side": "west",
+      "width_mm": 200000
+     },
+     {
+      "amplitude_mm": 3000,
+      "id": "swell",
+      "kind": "undulation",
+      "wavelength_mm": 80000
+     },
+     {
+      "amplitude_mm": 900,
+      "id": "texture",
+      "kind": "undulation",
+      "wavelength_mm": 25000
+     },
+     {
+      "band_mm": 900000,
+      "distance_mm": 2000000,
+      "height_mm": 650000,
+      "id": "peaks",
+      "kind": "range",
+      "offset_mm": 0,
+      "ruggedness_permille": 750,
+      "side": "north",
+      "wavelength_mm": 600000,
+      "width_mm": 0
+     },
+     {
+      "band_mm": 700000,
+      "distance_mm": 1700000,
+      "height_mm": 500000,
+      "id": "peaks_east",
+      "kind": "range",
+      "offset_mm": 0,
+      "ruggedness_permille": 800,
+      "side": "north_east",
+      "wavelength_mm": 450000,
+      "width_mm": 0
+     },
+     {
+      "band_mm": 600000,
+      "distance_mm": 1500000,
+      "height_mm": 400000,
+      "id": "peaks_west",
+      "kind": "range",
+      "offset_mm": 0,
+      "ruggedness_permille": 750,
+      "side": "west",
+      "wavelength_mm": 900000,
+      "width_mm": 0
+     },
+     {
+      "band_mm": 700000,
+      "distance_mm": 1600000,
+      "height_mm": 300000,
+      "id": "far_south",
+      "kind": "range",
+      "offset_mm": 0,
+      "ruggedness_permille": 650,
+      "side": "south",
+      "wavelength_mm": 900000,
+      "width_mm": 0
+     }
+    ],
+    "ground_mm": 16000,
+    "profile": "exulanica.landform/v1"
+   },
+   "recipe": "upland",
+   "sha256": "84849b4a53058e69523b0b51039829c236537587cb823460c70ac973332aefe0"
+  },
+  "made_by": "town",
+  "receipt_sha256": "c06859708753e5f92b9db7a68f490f2203eafa38c0963e6f64eff0a40cd25d63",
+  "recipe": "small_town",
+  "values": {
+   "block_length_mm": 90000,
+   "city_extent_x_mm": 256000,
+   "cross_street_hierarchy": "local_street",
+   "ground_floor_use_weight_bakery_permille": 500,
+   "ground_floor_use_weight_bookshop_permille": 500,
+   "ground_floor_use_weight_cafe_permille": 500,
+   "ground_floor_use_weight_grocery_permille": 500,
+   "ground_floor_use_weight_office_permille": 500,
+   "ground_floor_use_weight_pharmacy_permille": 500,
+   "ground_floor_use_weight_restaurant_permille": 500,
+   "ground_floor_use_weight_workshop_permille": 500,
+   "high_street_count": 1,
+   "storey_band_high": 4,
+   "storey_band_low": 2,
+   "typology_weight_apartment_block_permille": 500,
+   "typology_weight_loft_building_permille": 500,
+   "typology_weight_mansion_block_permille": 500,
+   "typology_weight_rowhouse_permille": 500,
+   "typology_weight_shophouse_permille": 500
+  },
+  "world_id": "world:generated:7faa20c2-4813-51ef-ad07-c4834d634b0e"
+ }
+}

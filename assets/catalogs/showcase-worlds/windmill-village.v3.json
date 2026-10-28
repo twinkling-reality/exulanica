@@ -1,0 +1,911 @@
+{
+ "cast": [
+  {
+   "model": {
+    "model_id": "nvidia/nemotron-3-super-120b-a12b",
+    "provider": "nebius_token_factory"
+   },
+   "ordinal": 0
+  },
+  {
+   "model": {
+    "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "provider": "nebius_token_factory"
+   },
+   "ordinal": 1
+  }
+ ],
+ "key": "windmill-village",
+ "look": {
+  "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+  "pack_id": "exulanica.cozy-town",
+  "setting": null,
+  "version": 3
+ },
+ "made": {
+  "calls": [
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "world_tool_chooser",
+    "usd": "0.00083370"
+   },
+   {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "outcome": "completed",
+    "role": "kind_drafter",
+    "usd": "0.00398734"
+   },
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "look_chooser",
+    "usd": "0.00018840"
+   },
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "setting_chooser",
+    "usd": "0.00061260"
+   }
+  ],
+  "date": "2026-10-26",
+  "decisions": 38,
+  "draft_id": "bf6a6d68-67b7-5b5d-8f07-23449f246b4a",
+  "draft_usd": "0.00562204",
+  "people_models": [
+   "Qwen/Qwen3-235B-A22B-Instruct-2507",
+   "nvidia/nemotron-3-super-120b-a12b"
+  ],
+  "tool": "place"
+ },
+ "paintings": [
+  {
+   "camera": "{\"camera_to_world_column_major\":[1,0,0,0,0,0.857493,-0.514496,0,0,0.514496,0.857493,0,33.490257,33.697273,18.897766,1],\"fov_deg\":70,\"height\":480,\"pitch\":-0.540419,\"position_m\":[33.4903,33.6973,18.8978],\"width\":832,\"yaw\":0.0}",
+   "cost_microusd": 7181,
+   "height": 480,
+   "held_permille": 718,
+   "media_type": "image/jpeg",
+   "painter": {
+    "control": "depth without trees, one range over the orbit",
+    "control_scale_milli": 950,
+    "guidance_milli": 4000,
+    "machine": "NVIDIA RTX PRO 6000 Blackwell Server Edition, Nebius AI Cloud",
+    "models": [
+     {
+      "licence": "apache-2.0",
+      "repository": "Tongyi-MAI/Z-Image",
+      "revision": "04cc4abb7c50"
+     },
+     {
+      "licence": "apache-2.0",
+      "repository": "alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1",
+      "revision": "755999a93490"
+     }
+    ],
+    "steps": 25
+   },
+   "recipe": "z-image-orbit-still/v1",
+   "run_id": "graphics-s1",
+   "sha256": "e1085865495aa51ec36c11ef3f6f050bcb4045438ce10df4c128fbeb9062db5f",
+   "view": "orbit",
+   "width": 832,
+   "words": {
+    "negative": "text, letters, words, signs, logo, watermark, signature, people, crowds, blurry, low quality, flicker, distortion, static frame",
+    "prompt": "aerial photograph of a farming village in green rolling hills with an old wooden windmill, farmhouses with tiled roofs, barns, patchwork fields and hedgerows, a dirt lane, soft warm afternoon light, gentle haze, realistic, cinematic, sharp detail",
+    "seed": 7,
+    "sentence": "a farming village in the hills with an old windmill"
+   }
+  }
+ ],
+ "picture": {
+  "height": 720,
+  "media_type": "image/jpeg",
+  "sha256": "d2a698db069665a5bf8e6a2280a336f8af74b87114d0fc12fde570add3bac694",
+  "taken": {
+   "date": "2026-10-27",
+   "how": "the first view the page keeps for a world's card (keepFirstViewPicture), drawn by the engine in headless Chrome on the GPU at the camera the world opens at, as the server kept it",
+   "main": "b45cbee6a",
+   "of": "a copy of version 2, made from its link (/?world=windmill-village) on a personal install with tiles"
+  },
+  "width": 1280
+ },
+ "profile": "exulanica.showcase-world/v1",
+ "sentence": "a farming village in the hills with an old windmill",
+ "society": {
+  "engine": "exulanica-society/v7"
+ },
+ "title": "Farming village",
+ "version": 3,
+ "world": {
+  "kind": {
+   "generator": {
+    "key": "site-plan",
+    "version": 1
+   },
+   "kind": "farming_village",
+   "label": "farming village",
+   "licence": {
+    "spdx": "CC0-1.0",
+    "verdict": "SHIP"
+   },
+   "origin": "drafted",
+   "parameters": [],
+   "parts": [
+    {
+     "description": "",
+     "form": "path",
+     "key": "village_lane",
+     "label": "village lane",
+     "look": "path.dirt",
+     "roles": [
+      "path"
+     ],
+     "use_class": "",
+     "width_mm": 3000
+    },
+    {
+     "blocks": 0,
+     "depth_mm": 2000,
+     "description": "a double bed",
+     "form": "fixture",
+     "height_mm": 600,
+     "key": "farmhouse_1_bed_1",
+     "label": "farmhouse 1 bed 1",
+     "look": "fixture.bed",
+     "roles": [
+      "bed"
+     ],
+     "seats": 0,
+     "sleepers": 2,
+     "stands": 0,
+     "use_class": "",
+     "width_mm": 2000
+    },
+    {
+     "description": "a bedroom with a double bed",
+     "form": "room",
+     "holds": [
+      {
+       "count": 1,
+       "part": "farmhouse_1_bed_1",
+       "pattern": "back_wall"
+      }
+     ],
+     "key": "farmhouse_1_bedroom_1",
+     "label": "farmhouse 1 bedroom 1",
+     "look": "ground.wood",
+     "roles": [
+      "home"
+     ],
+     "share": 1,
+     "use_class": ""
+    },
+    {
+     "blocks": 0,
+     "depth_mm": 2000,
+     "description": "a single bed",
+     "form": "fixture",
+     "height_mm": 600,
+     "key": "farmhouse_1_bed_2",
+     "label": "farmhouse 1 bed 2",
+     "look": "fixture.bed",
+     "roles": [
+      "bed"
+     ],
+     "seats": 0,
+     "sleepers": 1,
+     "stands": 0,
+     "use_class": "",
+     "width_mm": 2000
+    },
+    {
+     "description": "a bedroom with a single bed",
+     "form": "room",
+     "holds": [
+      {
+       "count": 1,
+       "part": "farmhouse_1_bed_2",
+       "pattern": "back_wall"
+      }
+     ],
+     "key": "farmhouse_1_bedroom_2",
+     "label": "farmhouse 1 bedroom 2",
+     "look": "ground.wood",
+     "roles": [
+      "home"
+     ],
+     "share": 1,
+     "use_class": ""
+    },
+    {
+     "depth_mm": 7000,
+     "description": "a timber-framed farmhouse with a thatched roof",
+     "door_width_mm": 900,
+     "form": "structure",
+     "key": "farmhouse_1",
+     "label": "farmhouse 1",
+     "look": "structure.farmhouse",
+     "roles": [
+      "home"
+     ],
+     "roof_form": "gable",
+     "roof_look": "roof.thatched",
+     "rooms": [
+      {
+       "count": 1,
+       "part": "farmhouse_1_bedroom_1"
+      },
+      {
+       "count": 1,
+       "part": "farmhouse_1_bedroom_2"
+      }
+     ],
+     "storey_height_mm": 3000,
+     "storeys": 2,
+     "use_class": "",
+     "wall_look": "wall.timber",
+     "width_mm": 8500
+    },
+    {
+     "blocks": 0,
+     "depth_mm": 2000,
+     "description": "a double bed",
+     "form": "fixture",
+     "height_mm": 600,
+     "key": "farmhouse_2_bed_1",
+     "label": "farmhouse 2 bed 1",
+     "look": "fixture.bed",
+     "roles": [
+      "bed"
+     ],
+     "seats": 0,
+     "sleepers": 2,
+     "stands": 0,
+     "use_class": "",
+     "width_mm": 2000
+    },
+    {
+     "description": "a bedroom with a double bed",
+     "form": "room",
+     "holds": [
+      {
+       "count": 1,
+       "part": "farmhouse_2_bed_1",
+       "pattern": "back_wall"
+      }
+     ],
+     "key": "farmhouse_2_bedroom_1",
+     "label": "farmhouse 2 bedroom 1",
+     "look": "ground.wood",
+     "roles": [
+      "home"
+     ],
+     "share": 1,
+     "use_class": ""
+    },
+    {
+     "blocks": 0,
+     "depth_mm": 2000,
+     "description": "a single bed",
+     "form": "fixture",
+     "height_mm": 600,
+     "key": "farmhouse_2_bed_2",
+     "label": "farmhouse 2 bed 2",
+     "look": "fixture.bed",
+     "roles": [
+      "bed"
+     ],
+     "seats": 0,
+     "sleepers": 1,
+     "stands": 0,
+     "use_class": "",
+     "width_mm": 2000
+    },
+    {
+     "description": "a bedroom with a single bed",
+     "form": "room",
+     "holds": [
+      {
+       "count": 1,
+       "part": "farmhouse_2_bed_2",
+       "pattern": "back_wall"
+      }
+     ],
+     "key": "farmhouse_2_bedroom_2",
+     "label": "farmhouse 2 bedroom 2",
+     "look": "ground.wood",
+     "roles": [
+      "home"
+     ],
+     "share": 1,
+     "use_class": ""
+    },
+    {
+     "depth_mm": 7000,
+     "description": "a timber-framed farmhouse with a thatched roof",
+     "door_width_mm": 900,
+     "form": "structure",
+     "key": "farmhouse_2",
+     "label": "farmhouse 2",
+     "look": "structure.farmhouse",
+     "roles": [
+      "home"
+     ],
+     "roof_form": "gable",
+     "roof_look": "roof.thatched",
+     "rooms": [
+      {
+       "count": 1,
+       "part": "farmhouse_2_bedroom_1"
+      },
+      {
+       "count": 1,
+       "part": "farmhouse_2_bedroom_2"
+      }
+     ],
+     "storey_height_mm": 3000,
+     "storeys": 2,
+     "use_class": "",
+     "wall_look": "wall.timber",
+     "width_mm": 8500
+    },
+    {
+     "blocks": 0,
+     "depth_mm": 2000,
+     "description": "a double bed",
+     "form": "fixture",
+     "height_mm": 600,
+     "key": "farmhouse_3_bed_1",
+     "label": "farmhouse 3 bed 1",
+     "look": "fixture.bed",
+     "roles": [
+      "bed"
+     ],
+     "seats": 0,
+     "sleepers": 2,
+     "stands": 0,
+     "use_class": "",
+     "width_mm": 2000
+    },
+    {
+     "description": "a bedroom with a double bed",
+     "form": "room",
+     "holds": [
+      {
+       "count": 1,
+       "part": "farmhouse_3_bed_1",
+       "pattern": "back_wall"
+      }
+     ],
+     "key": "farmhouse_3_bedroom_1",
+     "label": "farmhouse 3 bedroom 1",
+     "look": "ground.wood",
+     "roles": [
+      "home"
+     ],
+     "share": 1,
+     "use_class": ""
+    },
+    {
+     "blocks": 0,
+     "depth_mm": 2000,
+     "description": "a single bed",
+     "form": "fixture",
+     "height_mm": 600,
+     "key": "farmhouse_3_bed_2",
+     "label": "farmhouse 3 bed 2",
+     "look": "fixture.bed",
+     "roles": [
+      "bed"
+     ],
+     "seats": 0,
+     "sleepers": 1,
+     "stands": 0,
+     "use_class": "",
+     "width_mm": 2000
+    },
+    {
+     "description": "a bedroom with a single bed",
+     "form": "room",
+     "holds": [
+      {
+       "count": 1,
+       "part": "farmhouse_3_bed_2",
+       "pattern": "back_wall"
+      }
+     ],
+     "key": "farmhouse_3_bedroom_2",
+     "label": "farmhouse 3 bedroom 2",
+     "look": "ground.wood",
+     "roles": [
+      "home"
+     ],
+     "share": 1,
+     "use_class": ""
+    },
+    {
+     "depth_mm": 7000,
+     "description": "a timber-framed farmhouse with a thatched roof",
+     "door_width_mm": 900,
+     "form": "structure",
+     "key": "farmhouse_3",
+     "label": "farmhouse 3",
+     "look": "structure.farmhouse",
+     "roles": [
+      "home"
+     ],
+     "roof_form": "gable",
+     "roof_look": "roof.thatched",
+     "rooms": [
+      {
+       "count": 1,
+       "part": "farmhouse_3_bedroom_1"
+      },
+      {
+       "count": 1,
+       "part": "farmhouse_3_bedroom_2"
+      }
+     ],
+     "storey_height_mm": 3000,
+     "storeys": 2,
+     "use_class": "",
+     "wall_look": "wall.timber",
+     "width_mm": 8500
+    },
+    {
+     "blocks": 0,
+     "depth_mm": 2000,
+     "description": "a low stone well head",
+     "form": "fixture",
+     "height_mm": 1200,
+     "key": "well",
+     "label": "well",
+     "look": "fixture.well",
+     "roles": [
+      "decoration"
+     ],
+     "seats": 0,
+     "sleepers": 0,
+     "stands": 0,
+     "use_class": "",
+     "width_mm": 2000
+    },
+    {
+     "blocks": 0,
+     "depth_mm": 500,
+     "description": "a wooden bench",
+     "form": "fixture",
+     "height_mm": 450,
+     "key": "bench",
+     "label": "bench",
+     "look": "fixture.bench",
+     "roles": [
+      "seat"
+     ],
+     "seats": 2,
+     "sleepers": 0,
+     "stands": 0,
+     "use_class": "",
+     "width_mm": 2000
+    },
+    {
+     "depth_mm": 6000,
+     "description": "an old stone windmill with a wooden cap",
+     "door_width_mm": 900,
+     "form": "structure",
+     "key": "old_windmill",
+     "label": "old windmill",
+     "look": "structure.windmill",
+     "roles": [],
+     "roof_form": "gable",
+     "roof_look": "roof.gable",
+     "rooms": [],
+     "storey_height_mm": 3000,
+     "storeys": 3,
+     "use_class": "",
+     "wall_look": "wall.stone",
+     "width_mm": 6000
+    },
+    {
+     "description": "a field of wheat",
+     "form": "area",
+     "key": "wheat_field",
+     "label": "wheat field",
+     "look": "plant.wheat",
+     "roles": [
+      "field",
+      "workplace"
+     ],
+     "use_class": "wheat_field"
+    },
+    {
+     "description": "a field of vegetables",
+     "form": "area",
+     "key": "vegetable_field",
+     "label": "vegetable field",
+     "look": "plant.vegetable",
+     "roles": [
+      "field",
+      "workplace"
+     ],
+     "use_class": "vegetable_field"
+    },
+    {
+     "depth_mm": 8000,
+     "description": "a large timber barn with a tin roof",
+     "door_width_mm": 1200,
+     "form": "structure",
+     "key": "barn",
+     "label": "barn",
+     "look": "structure.barn",
+     "roles": [],
+     "roof_form": "gable",
+     "roof_look": "roof.tin",
+     "rooms": [],
+     "storey_height_mm": 4000,
+     "storeys": 1,
+     "use_class": "",
+     "wall_look": "wall.timber",
+     "width_mm": 10000
+    }
+   ],
+   "presets": [
+    {
+     "key": "as_described",
+     "label": "As described",
+     "values": {}
+    }
+   ],
+   "profile": "exulanica.world-kind/v2",
+   "provenance": {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "prompt_sha256": "83d72674a4e18f2d6c820d5abcb14f7be80a583e32ed242fcb0b71bc297396dc",
+    "prompt_version": "kind-drafting-7",
+    "role": "kind_drafter",
+    "words_sha256": "b6dbfe0edfe7fba1c54ccc5a66661e2107919130d9b63046d3398234401abd3a"
+   },
+   "requirement_source": {
+    "characters": 51,
+    "sha256": "b6dbfe0edfe7fba1c54ccc5a66661e2107919130d9b63046d3398234401abd3a"
+   },
+   "requirements": [
+    {
+     "form": "structure",
+     "key": "requirement_1",
+     "look": "",
+     "minimum_count": 3,
+     "omission": "",
+     "parts": [
+      "farmhouse_1",
+      "farmhouse_2",
+      "farmhouse_3"
+     ],
+     "roles": [
+      "home"
+     ],
+     "roof_form": "",
+     "shape_class": "",
+     "source_span": [
+      0,
+      17
+     ],
+     "status": "fulfilled"
+    },
+    {
+     "form": "area",
+     "key": "requirement_2",
+     "look": "",
+     "minimum_count": 2,
+     "omission": "",
+     "parts": [
+      "wheat_field",
+      "vegetable_field"
+     ],
+     "roles": [
+      "field",
+      "workplace"
+     ],
+     "roof_form": "",
+     "shape_class": "",
+     "source_span": [
+      0,
+      17
+     ],
+     "status": "fulfilled"
+    },
+    {
+     "form": "structure",
+     "key": "requirement_3",
+     "look": "structure.windmill",
+     "minimum_count": 1,
+     "omission": "",
+     "parts": [
+      "old_windmill"
+     ],
+     "roles": [],
+     "roof_form": "gable",
+     "shape_class": "",
+     "source_span": [
+      39,
+      51
+     ],
+     "status": "fulfilled"
+    }
+   ],
+   "site": {
+    "boundary": "",
+    "depth_mm": 60000,
+    "enclosure": "open",
+    "entry_width_mm": 3000,
+    "ground": "ground.dirt",
+    "spine": "village_lane",
+    "width_mm": 80000
+   },
+   "society": {
+    "employment_permille": 200,
+    "offsite_home": {
+     "label": "homes in the village",
+     "use_class": "residential"
+    },
+    "offsite_residents": 0,
+    "place_words": {
+     "around": "across the village",
+     "here": "in this village"
+    }
+   },
+   "summary": "a farming village in the hills with an old windmill",
+   "use_classes": [
+    {
+     "closing_minute": 1440,
+     "key": "wheat_field",
+     "kind": "workplace",
+     "label": "wheat field",
+     "opening_minute": 0,
+     "resident_capacity": 0,
+     "role_key": "farmers",
+     "role_label": "farmers",
+     "shifts": [
+      "day"
+     ],
+     "staff_per_unit": 2,
+     "visitor_affordances": [],
+     "visitor_capacity": 0
+    },
+    {
+     "closing_minute": 1440,
+     "key": "vegetable_field",
+     "kind": "workplace",
+     "label": "vegetable field",
+     "opening_minute": 0,
+     "resident_capacity": 0,
+     "role_key": "farmers",
+     "role_label": "farmers",
+     "shifts": [
+      "day"
+     ],
+     "staff_per_unit": 2,
+     "visitor_affordances": [],
+     "visitor_capacity": 0
+    }
+   ],
+   "version": 1,
+   "zones": [
+    {
+     "access": "open",
+     "boundary": "",
+     "ground": "ground.dirt",
+     "holds": [
+      {
+       "count": 1,
+       "part": "farmhouse_1",
+       "pattern": "row"
+      },
+      {
+       "count": 1,
+       "part": "farmhouse_2",
+       "pattern": "row"
+      },
+      {
+       "count": 1,
+       "part": "farmhouse_3",
+       "pattern": "row"
+      },
+      {
+       "count": 1,
+       "part": "well",
+       "pattern": "centre"
+      },
+      {
+       "count": 1,
+       "part": "bench",
+       "pattern": "perimeter"
+      }
+     ],
+     "key": "homesteads",
+     "label": "homesteads",
+     "placement": "left",
+     "share": 2
+    },
+    {
+     "access": "open",
+     "boundary": "",
+     "ground": "ground.dirt",
+     "holds": [
+      {
+       "count": 1,
+       "part": "old_windmill",
+       "pattern": "row"
+      }
+     ],
+     "key": "windmill",
+     "label": "windmill",
+     "placement": "right",
+     "share": 1
+    },
+    {
+     "access": "open",
+     "boundary": "",
+     "ground": "ground.dirt",
+     "holds": [
+      {
+       "count": 1,
+       "part": "wheat_field",
+       "pattern": "fill"
+      },
+      {
+       "count": 1,
+       "part": "vegetable_field",
+       "pattern": "fill"
+      }
+     ],
+     "key": "fields",
+     "label": "fields",
+     "placement": "back",
+     "share": 3
+    },
+    {
+     "access": "open",
+     "boundary": "",
+     "ground": "ground.dirt",
+     "holds": [
+      {
+       "count": 1,
+       "part": "barn",
+       "pattern": "row"
+      }
+     ],
+     "key": "barn",
+     "label": "barn",
+     "placement": "front",
+     "share": 1
+    }
+   ]
+  },
+  "land": {
+   "document": {
+    "features": [
+     {
+      "grade_permille": 35,
+      "id": "tilt",
+      "kind": "tilt",
+      "reach_mm": 200000,
+      "side": "north"
+     },
+     {
+      "depth_mm": 300000,
+      "distance_mm": 30000,
+      "height_mm": 38000,
+      "id": "mountainside",
+      "kind": "rise",
+      "offset_mm": -30000,
+      "roughness_permille": 300,
+      "side": "north",
+      "width_mm": 600000
+     },
+     {
+      "depth_mm": 600000,
+      "distance_mm": 260000,
+      "height_mm": 180000,
+      "id": "mountain",
+      "kind": "rise",
+      "offset_mm": -60000,
+      "roughness_permille": 450,
+      "side": "north",
+      "width_mm": 900000
+     },
+     {
+      "depth_mm": 160000,
+      "distance_mm": 25000,
+      "fade_mm": 30000,
+      "id": "steps",
+      "kind": "terraces",
+      "offset_mm": -30000,
+      "riser_share_permille": 800,
+      "side": "north",
+      "tier_height_mm": 3000,
+      "width_mm": 300000
+     },
+     {
+      "amplitude_mm": 2400,
+      "id": "swell",
+      "kind": "undulation",
+      "wavelength_mm": 90000
+     },
+     {
+      "amplitude_mm": 700,
+      "id": "texture",
+      "kind": "undulation",
+      "wavelength_mm": 30000
+     },
+     {
+      "beach_mm": 15000,
+      "beach_top_mm": 2500,
+      "coast_grade_permille": 350,
+      "distance_mm": 220000,
+      "id": "lake",
+      "kind": "shore",
+      "sea_depth_mm": 14000,
+      "side": "south",
+      "wander_mm": 20000
+     },
+     {
+      "depth_mm": 500000,
+      "distance_mm": 520000,
+      "height_mm": 85000,
+      "id": "far_hills",
+      "kind": "rise",
+      "offset_mm": 0,
+      "roughness_permille": 450,
+      "side": "north_west",
+      "width_mm": 1100000
+     },
+     {
+      "depth_mm": 360000,
+      "distance_mm": 380000,
+      "height_mm": 55000,
+      "id": "east_hills",
+      "kind": "rise",
+      "offset_mm": 0,
+      "roughness_permille": 400,
+      "side": "east",
+      "width_mm": 700000
+     },
+     {
+      "band_mm": 900000,
+      "distance_mm": 2200000,
+      "height_mm": 380000,
+      "id": "skyline",
+      "kind": "range",
+      "offset_mm": 0,
+      "ruggedness_permille": 650,
+      "side": "north",
+      "wavelength_mm": 900000,
+      "width_mm": 0
+     },
+     {
+      "band_mm": 700000,
+      "distance_mm": 1600000,
+      "height_mm": 220000,
+      "id": "skyline_east",
+      "kind": "range",
+      "offset_mm": 0,
+      "ruggedness_permille": 600,
+      "side": "north_east",
+      "wavelength_mm": 700000,
+      "width_mm": 0
+     }
+    ],
+    "ground_mm": 8000,
+    "profile": "exulanica.landform/v1"
+   },
+   "recipe": "hillside",
+   "sha256": "64f7aacf2e7734027ae0eac80bfafa1dd65e35a6a7fda7c90b24bda7500dc2f1"
+  },
+  "made_by": "place",
+  "receipt_sha256": "e3b990b75cea7ff21e45996ea60fd4546a2e5a6eba0725c32031082a2b029719",
+  "recipe": null,
+  "values": {},
+  "world_id": "world:generated:bf6a6d68-67b7-5b5d-8f07-23449f246b4a"
+ }
+}

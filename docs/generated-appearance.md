@@ -760,8 +760,9 @@ everywhere: the painting changes only how the views look.
 - **Who makes them.** The operator's painting run: it draws the world's structure through the
   install's own page, paints it on a GPU on Nebius AI Cloud with the models of section 3, measures
   the hold, and keeps what passes (`exulanica/world/world_paintings.py`). The one route that writes
-  one is a showcase world's copy (`POST /worlds/showcase/{showcase}`): it keeps the card paintings
-  its document names, painted by that run, for the copy's world (`exulanica/world/showcase_worlds.py`).
+  one is a showcase world's copy (`POST /worlds/showcase/{showcase}`): it keeps the paintings its
+  document names, painted by that run, for the copy's world, and as its card picture the engine's
+  own first view of the world its document carries (`exulanica/world/showcase_worlds.py`).
 - **Who reads them.** `GET /world/paintings?world_id=` lists a world's paintings, newest first, and
   `GET /world/paintings/{sha256}?world_id=` answers one's bytes; both need `world.read`. No page of
   the product reads or shows one (27 October): a card showing a painted view promised a world the

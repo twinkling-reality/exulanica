@@ -19,22 +19,29 @@ world_society_seed`), so a copy's people are its own people, not the showcase wo
 gives the same models to the people at the same places. What the made world did (its history) is
 its own record and is not copied; a copy records its own as it plays.
 
-A document may name its world's card paintings (``paintings``): each a painting's record as G1
-keeps it (:class:`~exulanica.world.world_paintings.WorldPaintingRepository`), its camera as JSON
-text since a digest takes no decimal, and its bytes in ``paintings/<sha256>.jpg`` beside the
-documents. A copy keeps them for its world right after it is made, and again on a later ask where
-one is missing (the copy's making runs its own transactions and a place's waits on the kind
-worker), so a copy without a painting is only ever a missing card picture. They are deleted with
-the copy's world, by its identity's trigger.
+A document may name its world's paintings (``paintings``): each a painting's record as G1 keeps it
+(:class:`~exulanica.world.world_paintings.WorldPaintingRepository`), its camera as JSON text since
+a digest takes no decimal, and its bytes in ``paintings/<sha256>.jpg`` beside the documents. A
+copy keeps them for its world right after it is made, and again on a later ask where one is missing
+(the copy's making runs its own transactions and a place's waits on the kind worker). They are
+records only: no page shows a painting (27 October). They are deleted with the copy's world, by its
+identity's trigger.
+
+A document may name its world's card picture (``picture``): the engine's own picture of the world
+as it opens, the first view a page keeps for a world's card (:mod:`exulanica.world.
+saved_entry_pictures`), taken of a copy of that version, with how it was taken, and its bytes in
+``pictures/<sha256>.jpg`` beside the documents. A copy keeps it as its own card picture when it is
+made, of the copy as it is then, so its card shows the world it opens on before any page has drawn
+it; a page puts its own once the copy has changed, as for any world.
 
 The lock (``showcase-worlds.lock.json``) names the one version of each world served, by digest:
 a served document never changes, a changed one is a new version, and a file the lock does not name
 at its digest is refused. Every document is checked when the catalog loads, not at a visitor's
 copy: its look's setting is applied to the pack it names
-(:func:`~exulanica.world.world_settings.bound_setting`), and each painting's bytes are held to
-their digest, their media type and their size. Whether a world's documents still make that world
-is the installation's check (``python -m exulanica.api.showcase_dressing prepare``), which makes
-each once in the operator's workspace and compares the receipt's digest.
+(:func:`~exulanica.world.world_settings.bound_setting`), and each painting's and its picture's
+bytes are held to their digest, their media type and their size. Whether a world's documents
+still make that world is the installation's check (``python -m exulanica.api.showcase_dressing
+prepare``), which makes each once in the operator's workspace and compares the receipt's digest.
 """
 
 from __future__ import annotations
@@ -59,6 +66,7 @@ __all__ = [
     "SHOWCASE_DIRECTORY",
     "CastMember",
     "ShowcasePainting",
+    "ShowcasePicture",
     "ShowcaseWorld",
     "ShowcaseWorldsInvalid",
     "make_showcase_world",
@@ -78,7 +86,7 @@ _TOP: Final = frozenset(
     {"profile", "key", "version", "title", "sentence", "world", "look", "society", "cast", "made"}
 )
 #: What a document may state beside them: a field the profile grew, absent meaning none.
-_OPTIONAL: Final = frozenset({"paintings"})
+_OPTIONAL: Final = frozenset({"paintings", "picture"})
 _PAINTING: Final = frozenset(
     {
         "view",
@@ -95,8 +103,9 @@ _PAINTING: Final = frozenset(
         "run_id",
     }
 )
-#: Where a painting's bytes are, by media type.
-_PAINTING_SUFFIX: Final = {"image/jpeg": ".jpg"}
+_PICTURE: Final = frozenset({"sha256", "media_type", "width", "height", "taken"})
+#: Where a painting's or a picture's bytes are, by media type.
+_BYTES_SUFFIX: Final = {"image/jpeg": ".jpg"}
 _WORLD: Final = frozenset(
     {"world_id", "made_by", "recipe", "values", "kind", "land", "receipt_sha256"}
 )
@@ -133,6 +142,17 @@ class ShowcasePainting:
 
 
 @dataclass(frozen=True, slots=True)
+class ShowcasePicture:
+    """A showcase world's card picture, the engine's own first view of it, with its bytes."""
+
+    sha256: str
+    media_type: str
+    data: bytes
+    #: How it was taken: by what, of which copy, and when.
+    taken: Mapping[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
 class ShowcaseWorld:
     key: str
     version: int
@@ -151,6 +171,7 @@ class ShowcaseWorld:
     engine: str
     cast: tuple[CastMember, ...]
     paintings: tuple[ShowcasePainting, ...] = ()
+    picture: ShowcasePicture | None = None
 
 
 def _refuse(where: str, detail: str) -> ShowcaseWorldsInvalid:
@@ -197,16 +218,15 @@ def _look(where: str, raw: object) -> StylePackBinding | None:
     )
 
 
-def _painting(where: str, raw: object, directory: Path) -> ShowcasePainting:
-    """A card painting's record, its bytes read from ``directory`` and held to it as G1 holds
-    them."""
+def _held_bytes(where: str, stated: Mapping[str, Any], directory: Path) -> bytes:
+    """The bytes a painting's or picture's record names in ``directory``, held as a saved world's
+    card picture is held (walked whole), to the size and digest the record states."""
     from exulanica.world.saved_entry_pictures import PictureRefused, checked_picture
 
-    stated = _fields(where, raw, _PAINTING)
-    suffix = _PAINTING_SUFFIX.get(stated["media_type"])
+    suffix = _BYTES_SUFFIX.get(stated["media_type"])
     named = isinstance(stated["sha256"], str) and _DIGEST.fullmatch(stated["sha256"]) is not None
     if suffix is None or not named:
-        raise _refuse(where, f"is a painting of {sorted(_PAINTING_SUFFIX)} named by its SHA-256")
+        raise _refuse(where, f"is a picture of {sorted(_BYTES_SUFFIX)} named by its SHA-256")
     path = directory / f"{stated['sha256']}{suffix}"
     if not path.is_file():
         raise _refuse(where, f"names {path.name}, with no file")
@@ -217,6 +237,22 @@ def _painting(where: str, raw: object, directory: Path) -> ShowcasePainting:
         raise _refuse(where, f"{path.name} is not a picture kept as stated: {refused}") from refused
     if (width, height, sha256) != (stated["width"], stated["height"], stated["sha256"]):
         raise _refuse(where, f"{path.name} is not the picture its record states")
+    return data
+
+
+def _picture(where: str, raw: object, directory: Path) -> ShowcasePicture:
+    """A card picture's record, its bytes read from ``directory`` and held to it."""
+    stated = _fields(where, raw, _PICTURE)
+    data = _held_bytes(where, stated, directory)
+    if not isinstance(stated["taken"], dict):
+        raise _refuse(f"{where}.taken", "is how the picture was taken, an object")
+    return ShowcasePicture(stated["sha256"], stated["media_type"], data, stated["taken"])
+
+
+def _painting(where: str, raw: object, directory: Path) -> ShowcasePainting:
+    """A painting's record, its bytes read from ``directory`` and held to it as G1 holds them."""
+    stated = _fields(where, raw, _PAINTING)
+    data = _held_bytes(where, stated, directory)
     try:
         camera = json.loads(stated["camera"]) if isinstance(stated["camera"], str) else None
     except json.JSONDecodeError:
@@ -231,7 +267,7 @@ def _painting(where: str, raw: object, directory: Path) -> ShowcasePainting:
     return ShowcasePainting(
         view=stated["view"],
         recipe=stated["recipe"],
-        sha256=sha256,
+        sha256=stated["sha256"],
         media_type=stated["media_type"],
         data=data,
         camera=texts["camera"],
@@ -244,10 +280,12 @@ def _painting(where: str, raw: object, directory: Path) -> ShowcasePainting:
 
 
 def read_showcase_world(
-    document: object, paintings: Path = SHOWCASE_DIRECTORY / "paintings"
+    document: object,
+    paintings: Path = SHOWCASE_DIRECTORY / "paintings",
+    pictures: Path = SHOWCASE_DIRECTORY / "pictures",
 ) -> ShowcaseWorld:
-    """A showcase world's document, read and checked, its paintings' bytes read from ``paintings``;
-    refused by name otherwise."""
+    """A showcase world's document, read and checked, its paintings' bytes read from ``paintings``
+    and its card picture's from ``pictures``; refused by name otherwise."""
     from exulanica.world.kinds.document import read_kind
     from exulanica.world.world_recipes import town_recipe
 
@@ -319,10 +357,11 @@ def read_showcase_world(
         raise _refuse("made", "is the making's provenance, an object")
     stated = raw.get("paintings", [])
     if not isinstance(stated, list):
-        raise _refuse("paintings", "is a list of the world's card paintings")
+        raise _refuse("paintings", "is a list of the world's paintings")
     painted = tuple(
         _painting(f"paintings[{index}]", one, paintings) for index, one in enumerate(stated)
     )
+    picture = None if raw.get("picture") is None else _picture("picture", raw["picture"], pictures)
     return ShowcaseWorld(
         key=key,
         version=version,
@@ -340,6 +379,7 @@ def read_showcase_world(
         engine=engine.engine,
         cast=tuple(cast),
         paintings=painted,
+        picture=picture,
     )
 
 
@@ -372,7 +412,9 @@ def showcase_worlds(
         if not path.is_file():
             raise _refuse(lock.name, f"names {key} v{version}, with no file")
         world = read_showcase_world(
-            json.loads(path.read_text(encoding="utf-8")), directory / "paintings"
+            json.loads(path.read_text(encoding="utf-8")),
+            directory / "paintings",
+            directory / "pictures",
         )
         if (world.key, world.version) != (key, version):
             raise _refuse(path.name, "names the world and version it states")
@@ -449,16 +491,49 @@ def make_showcase_world(
         keep = getattr(composer, "keep", None)
         if keep is not None:
             keep()
+    # The card picture shows the world in the look its document names: a copy left in the host's
+    # look keeps none, and its card waits for the first page that draws it.
+    looks_as_pictured = world.look is None
     if world.look is not None:
         with suppress(StyleWriteBusy):
             created = name_creation_look(repository, created, world.look, created_by)
+            looks_as_pictured = True
     _keep_paintings(repository, world)
+    if looks_as_pictured:
+        _keep_picture(repository, world, created, created_by)
     return created, True
 
 
+def _keep_picture(repository: Any, world: ShowcaseWorld, entry: Any, taken_by: uuid.UUID) -> None:
+    """Keep ``world``'s card picture as the copy's own, of the copy as it was just made, as a page
+    keeps a first view it drew. One refused leaves the card to the first page that draws it."""
+    from exulanica.world.saved_entry_pictures import (
+        PictureRefused,
+        PictureShows,
+        SavedEntryPictureRepository,
+    )
+
+    if world.picture is None:
+        return
+    pictures = SavedEntryPictureRepository(repository.connection, repository.workspace_id)
+    try:
+        with repository.connection.transaction():
+            pictures.keep(
+                entry,
+                world.picture.data,
+                world.picture.media_type,
+                PictureShows.of(entry),
+                taken_by,
+            )
+    except PictureRefused as refused:
+        _LOG.warning(
+            "a showcase copy kept no card picture %s: %s", world.picture.sha256[:12], refused
+        )
+
+
 def _keep_paintings(repository: Any, world: ShowcaseWorld) -> None:
-    """Keep each of ``world``'s card paintings for the repository's copy of it: the same bytes kept
-    again are one. One refused leaves the copy without that card picture and nothing else."""
+    """Keep each of ``world``'s paintings for the repository's copy of it: the same bytes kept again
+    are one. One refused leaves the copy without that painting and nothing else."""
     from exulanica.world.saved_entry_pictures import PictureRefused
     from exulanica.world.world_paintings import WorldPaintingRepository
 

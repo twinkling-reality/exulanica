@@ -4,11 +4,13 @@ A showcase world's document holds what the sentence's draft decided and the made
 and receipt digest (:mod:`exulanica.world.showcase_worlds`). ``POST /worlds/showcase/{showcase}``
 makes it in the caller's own workspace with no model call; the control is the installation's own
 world of the same document, whose receipt the copy must match byte for byte. The copy is brought to
-life as the made world was (its society, the cast's models), once, and opens playing; its card
-painting is kept for it. Asked again, the workspace's copy is answered as the visitor left it.
-A document whose painting's bytes or look's setting the host cannot hold is refused when the
-catalog loads, never at a visitor's copy. A copy's painting is deleted with its world by G1's
-identity trigger, which ``test_world_erasure_postgres.py`` holds for every painting row.
+life as the made world was (its society, the cast's models), once, and opens playing; its painting
+is kept for it as a record, and its document's card picture, the engine's own first view of the
+world, as its card picture, current for the copy as made, unless the copy was left in the host's
+look. Asked again, the workspace's copy is answered as the visitor left it. A document whose
+painting's or picture's bytes or look's setting the host cannot hold is refused when the catalog
+loads, never at a visitor's copy. A copy's painting is deleted with its world by G1's identity
+trigger, which ``test_world_erasure_postgres.py`` holds for every painting row.
 """
 
 from __future__ import annotations
@@ -20,8 +22,10 @@ import uuid
 import pytest
 from exulanica.canonical import sha256_of_canonical
 from exulanica.world import showcase_worlds as catalog
+from exulanica.world.errors import StyleWriteBusy
 from exulanica.world.generated_worlds import generation_receipt
 from exulanica.world.saved_entries import SavedWorldEntryRepository
+from exulanica.world.saved_entry_pictures import checked_picture
 from exulanica.world.society_control_repository import open_session_receipt
 
 from personal_world_support import STRANGER_TOKEN
@@ -31,8 +35,8 @@ CAST_MODEL = {
     "provider": "nebius_token_factory",
     "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
 }
-#: A shipped showcase world, whose card painting and look the tests below lend a test world.
-SHIPPED = json.loads((catalog.SHOWCASE_DIRECTORY / "mountain-town.v3.json").read_text())
+#: A shipped showcase world, whose painting, card picture and look the tests below lend to others.
+SHIPPED = json.loads((catalog.SHOWCASE_DIRECTORY / "mountain-town.v4.json").read_text())
 
 
 @pytest.fixture(name="made")
@@ -64,18 +68,28 @@ def _document(key: str, world_id: str, receipt_sha256: str, **more) -> dict:
     }
 
 
-def _catalog(tmp_path, document: dict, painting_bytes: bytes | None = None):
-    """``document`` alone, locked at its digest, as a showcase catalog; its paintings' bytes the
-    shipped ones unless ``painting_bytes`` stands in for them."""
+def _catalog(
+    tmp_path,
+    document: dict,
+    painting_bytes: bytes | None = None,
+    picture_bytes: bytes | None = None,
+):
+    """``document`` alone, locked at its digest, as a showcase catalog; its paintings' and its
+    picture's bytes the shipped ones unless ``painting_bytes`` or ``picture_bytes`` stands in."""
     directory = tmp_path / "showcase"
-    (directory / "paintings").mkdir(parents=True, exist_ok=True)
-    for painting in document.get("paintings", []):
-        name = f"{painting['sha256']}.jpg"
-        if painting_bytes is None:
-            shipped = catalog.SHOWCASE_DIRECTORY / "paintings" / name
-            shutil.copyfile(shipped, directory / "paintings" / name)
-        else:
-            (directory / "paintings" / name).write_bytes(painting_bytes)
+    for folder, records, stand_in in (
+        ("paintings", document.get("paintings", []), painting_bytes),
+        ("pictures", [document["picture"]] if document.get("picture") else [], picture_bytes),
+    ):
+        (directory / folder).mkdir(parents=True, exist_ok=True)
+        for record in records:
+            name = f"{record['sha256']}.jpg"
+            if stand_in is None:
+                shutil.copyfile(
+                    catalog.SHOWCASE_DIRECTORY / folder / name, directory / folder / name
+                )
+            else:
+                (directory / folder / name).write_bytes(stand_in)
     (directory / f"{document['key']}.v{document['version']}.json").write_text(json.dumps(document))
     lock = directory / "showcase-worlds.lock.json"
     lock.write_text(
@@ -103,12 +117,11 @@ def _served(tmp_path, monkeypatch, document: dict) -> None:
     )
 
 
-@pytest.mark.postgres
-def test_a_visitor_s_copy_is_the_made_world_brought_to_life_once(made, tmp_path, monkeypatch):
-    api = made
+def _made_world(api) -> tuple[str, str, uuid.UUID]:
+    """The made world, the installation's own, of the identity its draft fixed: that identity, its
+    receipt's digest and its entry."""
     owner = api.repository.workspace_id
     world_id = f"world:generated:{uuid.uuid4()}"
-    # The made world: the installation's own, of the identity its draft fixed.
     with api.database.session(owner) as connection:
         original = SavedWorldEntryRepository(connection, owner, api.store).create_generated(
             title="A small town by the sea",
@@ -120,15 +133,35 @@ def test_a_visitor_s_copy_is_the_made_world_brought_to_life_once(made, tmp_path,
         digest, _ = generation_receipt(
             connection, owner, original.world_id, original.source_snapshot_id
         )
+    return world_id, digest, original.entry_id
+
+
+def _card_picture(api, entry_id: str) -> dict | None:
+    """The card picture a page is told the visitor's copy has, as Your worlds lists it."""
+    listed = api.get("/world-entries", token=STRANGER_TOKEN)
+    assert listed.status_code == 200, listed.text
+    body = listed.json()
+    entries = body if isinstance(body, list) else body["entries"]
+    return next(one for one in entries if one["entry_id"] == entry_id)["picture"]
+
+
+@pytest.mark.postgres
+def test_a_visitor_s_copy_is_the_made_world_brought_to_life_once(made, tmp_path, monkeypatch):
+    api = made
+    world_id, digest, original = _made_world(api)
     painting = SHIPPED["paintings"][0]
-    _served(tmp_path, monkeypatch, _document("seaside", world_id, digest, paintings=[painting]))
+    _served(
+        tmp_path,
+        monkeypatch,
+        _document("seaside", world_id, digest, paintings=[painting], picture=SHIPPED["picture"]),
+    )
 
     made_now = api.post("/worlds/showcase/seaside", {}, token=STRANGER_TOKEN)
     assert made_now.status_code == 201, made_now.text
     body = made_now.json()
     assert body["made"] is True and body["incomplete"] == []
     copy = body["entry"]
-    assert copy["world_id"] == world_id and copy["entry_id"] != str(original.entry_id)
+    assert copy["world_id"] == world_id and copy["entry_id"] != str(original)
     stranger = api.client.app.state.services.tokens.session_for(STRANGER_TOKEN).workspace_id
 
     def held() -> dict:
@@ -168,7 +201,7 @@ def test_a_visitor_s_copy_is_the_made_world_brought_to_life_once(made, tmp_path,
 
     first = held()
     # The same world, by its receipt; alive on the document's engine; its cast given its model;
-    # playing from its first frame; its card painting kept, painted from the camera recorded.
+    # playing from its first frame; its painting kept, painted from the camera recorded.
     assert first["receipt"] == digest
     assert first["society"]["engine_version"] == "exulanica-society/v5"
     assert [row["document"]["decider"]["model_id"] for row in first["chosen"]] == [
@@ -179,6 +212,11 @@ def test_a_visitor_s_copy_is_the_made_world_brought_to_life_once(made, tmp_path,
         (painting["sha256"], painting["view"])
     ]
     assert first["paintings"][0]["camera"] == json.loads(painting["camera"])
+    # Its card picture is its document's, the engine's own first view of the world, kept as the
+    # copy's own and current for the copy as made, so a page shows it before any has drawn it.
+    card = _card_picture(api, copy["entry_id"])
+    assert card is not None and card["sha256"] == SHIPPED["picture"]["sha256"]
+    assert card["current"] is True
 
     # Asked again: the copy the workspace holds, as it stands, dressed nothing more.
     again = api.post("/worlds/showcase/seaside", {}, token=STRANGER_TOKEN)
@@ -186,12 +224,33 @@ def test_a_visitor_s_copy_is_the_made_world_brought_to_life_once(made, tmp_path,
     assert again.json()["made"] is False and again.json()["entry"]["entry_id"] == copy["entry_id"]
     after = held()
     assert len(after["chosen"]) == 1 and len(after["paintings"]) == 1
+    assert _card_picture(api, copy["entry_id"]) == card
 
     # A key the installation does not serve is answered alike for everyone.
     for token in (None, STRANGER_TOKEN):
         kwargs = {"token": token} if token else {}
         unknown = api.post("/worlds/showcase/nowhere", {}, **kwargs)
         assert unknown.status_code == 404 and unknown.json()["code"] == "unknown_showcase_world"
+
+
+@pytest.mark.postgres
+def test_a_copy_left_in_the_host_s_look_keeps_no_card_picture(made, tmp_path, monkeypatch):
+    """The picture shows the world in its document's look: a copy whose look could not be named
+    (a busy write leaves it in the host's) keeps none, and waits for a page to draw it."""
+    api = made
+    world_id, digest, _ = _made_world(api)
+    document = _document(
+        "seaside", world_id, digest, look=SHIPPED["look"], picture=SHIPPED["picture"]
+    )
+    _served(tmp_path, monkeypatch, document)
+
+    def busy(*_args, **_kwargs):
+        raise StyleWriteBusy("another write holds the world's look")
+
+    monkeypatch.setattr("exulanica.world.creation_look.name_creation_look", busy)
+    made_now = api.post("/worlds/showcase/seaside", {}, token=STRANGER_TOKEN)
+    assert made_now.status_code == 201, made_now.text
+    assert _card_picture(api, made_now.json()["entry"]["entry_id"]) is None
 
 
 def test_a_document_the_lock_does_not_name_at_its_digest_is_refused(tmp_path):
@@ -222,6 +281,16 @@ def test_a_painting_whose_bytes_are_not_its_record_is_refused_when_the_catalog_l
         catalog.showcase_worlds(*_catalog(tmp_path, document, stranger.read_bytes()))
 
 
+def test_a_card_picture_whose_bytes_are_not_its_record_is_refused_when_the_catalog_loads(tmp_path):
+    document = _document(
+        "seaside", f"world:generated:{uuid.uuid4()}", "a" * 64, picture=SHIPPED["picture"]
+    )
+    other = (catalog.SHOWCASE_DIRECTORY / "pictures").glob("*.jpg")
+    stranger = next(path for path in other if path.stem != SHIPPED["picture"]["sha256"])
+    with pytest.raises(catalog.ShowcaseWorldsInvalid, match="picture"):
+        catalog.showcase_worlds(*_catalog(tmp_path, document, picture_bytes=stranger.read_bytes()))
+
+
 def test_a_setting_the_pack_cannot_wear_is_refused_when_the_catalog_loads(tmp_path):
     look = {
         **SHIPPED["look"],
@@ -242,5 +311,8 @@ def test_the_shipped_showcase_worlds_read():
     assert served, "the installation serves showcase worlds"
     for key, world in served.items():
         assert world.key == key and world.cast
-        # Each wears its card painting, kept for every copy.
+        # Each keeps its painting as a record for every copy, shown on no page.
         assert world.paintings and all(painting.view == "orbit" for painting in world.paintings)
+        # Each carries its card picture, the engine's own first view of it, at a card's largest.
+        assert world.picture is not None and world.picture.media_type == "image/jpeg"
+        assert checked_picture(world.picture.data, "image/jpeg")[:2] == (1280, 720)

@@ -1,0 +1,447 @@
+{
+ "cast": [
+  {
+   "model": {
+    "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "provider": "nebius_token_factory"
+   },
+   "ordinal": 0
+  },
+  {
+   "model": {
+    "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "provider": "nebius_token_factory"
+   },
+   "ordinal": 1
+  }
+ ],
+ "key": "night-market",
+ "look": {
+  "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+  "pack_id": "exulanica.cozy-town",
+  "setting": null,
+  "version": 3
+ },
+ "made": {
+  "calls": [
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "world_tool_chooser",
+    "usd": "0.00084060"
+   },
+   {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "outcome": "completed",
+    "role": "kind_drafter",
+    "usd": "0.00219758"
+   },
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "look_chooser",
+    "usd": "0.00027900"
+   },
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "setting_chooser",
+    "usd": "0.00088680"
+   }
+  ],
+  "date": "2026-10-26",
+  "decisions": 30,
+  "draft_id": "089859e9-f12f-5761-ac2b-a317e9ddc175",
+  "draft_usd": "0.00420398",
+  "people_models": [
+   "Qwen/Qwen3-235B-A22B-Instruct-2507",
+   "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+  ],
+  "tool": "place"
+ },
+ "paintings": [
+  {
+   "camera": "{\"camera_to_world_column_major\":[1,0,0,0,0,0.857493,-0.514496,0,0,0.514496,0.857493,0,10.373184,24.537001,16.225363,1],\"fov_deg\":70,\"height\":480,\"pitch\":-0.540419,\"position_m\":[10.3732,24.537,16.2254],\"width\":832,\"yaw\":0.0}",
+   "cost_microusd": 7181,
+   "height": 480,
+   "held_permille": 613,
+   "media_type": "image/jpeg",
+   "painter": {
+    "control": "depth without trees, one range over the orbit",
+    "control_scale_milli": 950,
+    "guidance_milli": 4000,
+    "machine": "NVIDIA RTX PRO 6000 Blackwell Server Edition, Nebius AI Cloud",
+    "models": [
+     {
+      "licence": "apache-2.0",
+      "repository": "Tongyi-MAI/Z-Image",
+      "revision": "04cc4abb7c50"
+     },
+     {
+      "licence": "apache-2.0",
+      "repository": "alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1",
+      "revision": "755999a93490"
+     }
+    ],
+    "steps": 25
+   },
+   "recipe": "z-image-orbit-still/v1",
+   "run_id": "graphics-s1",
+   "sha256": "248d689afdc2065e97ed352a9bbb1fcc51bc2df801be581bb77c085e4693940c",
+   "view": "orbit",
+   "width": 832,
+   "words": {
+    "negative": "text, letters, words, signs, logo, watermark, signature, people, crowds, blurry, low quality, flicker, distortion, static frame",
+    "prompt": "aerial photograph of a rainy night market in the city, rows of market stalls under colourful awnings and glowing paper lanterns, wet streets reflecting warm and neon light, city buildings with lit windows around, light rain, realistic, cinematic, sharp detail",
+    "seed": 7,
+    "sentence": "a rainy night market in the city"
+   }
+  }
+ ],
+ "picture": {
+  "height": 720,
+  "media_type": "image/jpeg",
+  "sha256": "0c5f2f855303d98763515fe844fae2662566f76a63a6fa155070698fb1fecec4",
+  "taken": {
+   "date": "2026-10-27",
+   "how": "the first view the page keeps for a world's card (keepFirstViewPicture), drawn by the engine in headless Chrome on the GPU at the camera the world opens at, as the server kept it",
+   "main": "b45cbee6a",
+   "of": "a copy of version 2, made from its link (/?world=night-market) on a personal install with tiles"
+  },
+  "width": 1280
+ },
+ "profile": "exulanica.showcase-world/v1",
+ "sentence": "a rainy night market in the city",
+ "society": {
+  "engine": "exulanica-society/v7"
+ },
+ "title": "Night market",
+ "version": 3,
+ "world": {
+  "kind": {
+   "generator": {
+    "key": "site-plan",
+    "version": 1
+   },
+   "kind": "night_market",
+   "label": "night market",
+   "licence": {
+    "spdx": "CC0-1.0",
+    "verdict": "SHIP"
+   },
+   "origin": "drafted",
+   "parameters": [],
+   "parts": [
+    {
+     "description": "",
+     "form": "path",
+     "key": "spine",
+     "label": "spine",
+     "look": "path.paved",
+     "roles": [
+      "path"
+     ],
+     "use_class": "",
+     "width_mm": 3000
+    },
+    {
+     "blocks": 0,
+     "depth_mm": 1500,
+     "description": "A market stall with a top over it.",
+     "form": "fixture",
+     "height_mm": 2200,
+     "key": "stall",
+     "label": "stall",
+     "look": "fixture.stall",
+     "roles": [
+      "shop"
+     ],
+     "seats": 0,
+     "sleepers": 0,
+     "stands": 0,
+     "use_class": "stall",
+     "width_mm": 2000
+    },
+    {
+     "blocks": 0,
+     "depth_mm": 500,
+     "description": "A bench to sit on.",
+     "form": "fixture",
+     "height_mm": 450,
+     "key": "bench",
+     "label": "bench",
+     "look": "fixture.bench",
+     "roles": [
+      "seat"
+     ],
+     "seats": 2,
+     "sleepers": 0,
+     "stands": 0,
+     "use_class": "",
+     "width_mm": 2000
+    }
+   ],
+   "presets": [
+    {
+     "key": "as_described",
+     "label": "As described",
+     "values": {}
+    }
+   ],
+   "profile": "exulanica.world-kind/v2",
+   "provenance": {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "prompt_sha256": "83d72674a4e18f2d6c820d5abcb14f7be80a583e32ed242fcb0b71bc297396dc",
+    "prompt_version": "kind-drafting-7",
+    "role": "kind_drafter",
+    "words_sha256": "1104cd9904e39b1855be2fb373d7899014002c6c8ca40be08154e6c50b374073"
+   },
+   "requirement_source": {
+    "characters": 32,
+    "sha256": "1104cd9904e39b1855be2fb373d7899014002c6c8ca40be08154e6c50b374073"
+   },
+   "requirements": [
+    {
+     "form": "fixture",
+     "key": "requirement_1",
+     "look": "fixture.stall",
+     "minimum_count": 4,
+     "omission": "",
+     "parts": [
+      "stall"
+     ],
+     "roles": [],
+     "roof_form": "",
+     "shape_class": "",
+     "source_span": [
+      8,
+      20
+     ],
+     "status": "fulfilled"
+    },
+    {
+     "form": "fixture",
+     "key": "requirement_2",
+     "look": "fixture.bench",
+     "minimum_count": 2,
+     "omission": "",
+     "parts": [
+      "bench"
+     ],
+     "roles": [
+      "seat"
+     ],
+     "roof_form": "",
+     "shape_class": "",
+     "source_span": [
+      8,
+      20
+     ],
+     "status": "fulfilled"
+    }
+   ],
+   "site": {
+    "boundary": "",
+    "depth_mm": 30000,
+    "enclosure": "open",
+    "entry_width_mm": 3000,
+    "ground": "ground.paved",
+    "spine": "spine",
+    "width_mm": 33000
+   },
+   "society": {
+    "employment_permille": 1000,
+    "offsite_home": {
+     "label": "homes in the city",
+     "use_class": "residential"
+    },
+    "offsite_residents": 20,
+    "place_words": {
+     "around": "across the night market",
+     "here": "in this night market"
+    }
+   },
+   "summary": "A night market in the city with stalls and seating.",
+   "use_classes": [
+    {
+     "closing_minute": 1380,
+     "key": "stall",
+     "kind": "workplace",
+     "label": "stall",
+     "opening_minute": 960,
+     "resident_capacity": 0,
+     "role_key": "vendor",
+     "role_label": "vendor",
+     "shifts": [
+      "evening"
+     ],
+     "staff_per_unit": 1,
+     "visitor_affordances": [
+      "shop"
+     ],
+     "visitor_capacity": 2
+    }
+   ],
+   "version": 1,
+   "zones": [
+    {
+     "access": "open",
+     "boundary": "",
+     "ground": "ground.paved",
+     "holds": [
+      {
+       "count": 4,
+       "part": "stall",
+       "pattern": "row"
+      }
+     ],
+     "key": "left_zone",
+     "label": "left zone",
+     "placement": "left",
+     "share": 1
+    },
+    {
+     "access": "open",
+     "boundary": "",
+     "ground": "ground.paved",
+     "holds": [
+      {
+       "count": 2,
+       "part": "bench",
+       "pattern": "scatter"
+      }
+     ],
+     "key": "right_zone",
+     "label": "right zone",
+     "placement": "right",
+     "share": 1
+    }
+   ]
+  },
+  "land": {
+   "document": {
+    "features": [
+     {
+      "grade_permille": 25,
+      "id": "tilt",
+      "kind": "tilt",
+      "reach_mm": 200000,
+      "side": "north"
+     },
+     {
+      "depth_mm": 260000,
+      "distance_mm": 40000,
+      "height_mm": 24000,
+      "id": "hill",
+      "kind": "rise",
+      "offset_mm": -40000,
+      "roughness_permille": 250,
+      "side": "north",
+      "width_mm": 420000
+     },
+     {
+      "depth_mm": 100000,
+      "distance_mm": 40000,
+      "height_mm": 10000,
+      "id": "knoll",
+      "kind": "rise",
+      "offset_mm": 0,
+      "roughness_permille": 200,
+      "side": "west",
+      "width_mm": 140000
+     },
+     {
+      "depth_mm": 300000,
+      "distance_mm": 120000,
+      "height_mm": 18000,
+      "id": "south_down",
+      "kind": "rise",
+      "offset_mm": 0,
+      "roughness_permille": 300,
+      "side": "south",
+      "width_mm": 600000
+     },
+     {
+      "amplitude_mm": 3200,
+      "id": "swell",
+      "kind": "undulation",
+      "wavelength_mm": 110000
+     },
+     {
+      "amplitude_mm": 700,
+      "id": "texture",
+      "kind": "undulation",
+      "wavelength_mm": 30000
+     },
+     {
+      "depth_mm": 500000,
+      "distance_mm": 520000,
+      "height_mm": 85000,
+      "id": "far_hills",
+      "kind": "rise",
+      "offset_mm": 0,
+      "roughness_permille": 450,
+      "side": "north_west",
+      "width_mm": 1100000
+     },
+     {
+      "depth_mm": 360000,
+      "distance_mm": 380000,
+      "height_mm": 55000,
+      "id": "east_hills",
+      "kind": "rise",
+      "offset_mm": 0,
+      "roughness_permille": 400,
+      "side": "east",
+      "width_mm": 700000
+     },
+     {
+      "band_mm": 900000,
+      "distance_mm": 2200000,
+      "height_mm": 380000,
+      "id": "skyline",
+      "kind": "range",
+      "offset_mm": 0,
+      "ruggedness_permille": 650,
+      "side": "north",
+      "wavelength_mm": 900000,
+      "width_mm": 0
+     },
+     {
+      "band_mm": 700000,
+      "distance_mm": 1600000,
+      "height_mm": 220000,
+      "id": "skyline_east",
+      "kind": "range",
+      "offset_mm": 0,
+      "ruggedness_permille": 600,
+      "side": "north_east",
+      "wavelength_mm": 700000,
+      "width_mm": 0
+     },
+     {
+      "band_mm": 700000,
+      "distance_mm": 1800000,
+      "height_mm": 200000,
+      "id": "skyline_south",
+      "kind": "range",
+      "offset_mm": 0,
+      "ruggedness_permille": 650,
+      "side": "south_west",
+      "wavelength_mm": 900000,
+      "width_mm": 0
+     }
+    ],
+    "ground_mm": 9000,
+    "profile": "exulanica.landform/v1"
+   },
+   "recipe": "rolling",
+   "sha256": "c86c19559634dcc913800a14568e1dad4f75598206705929dea7ac67d6c36d98"
+  },
+  "made_by": "place",
+  "receipt_sha256": "c79dc2f9945aab3cad7997da6928fc392f40f370f773f464be653421e69640a7",
+  "recipe": null,
+  "values": {},
+  "world_id": "world:generated:089859e9-f12f-5761-ac2b-a317e9ddc175"
+ }
+}

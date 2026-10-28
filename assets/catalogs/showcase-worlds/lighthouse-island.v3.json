@@ -1,0 +1,531 @@
+{
+ "cast": [
+  {
+   "model": {
+    "model_id": "nvidia/nemotron-3-super-120b-a12b",
+    "provider": "nebius_token_factory"
+   },
+   "ordinal": 0
+  }
+ ],
+ "key": "lighthouse-island",
+ "look": {
+  "manifest_sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+  "pack_id": "exulanica.cozy-town",
+  "setting": {
+   "edge": {
+    "ground": [
+     70,
+     134,
+     160
+    ]
+   },
+   "light": null,
+   "origin": "authored",
+   "parts": [
+    {
+     "axis": "ground",
+     "key": "sea"
+    }
+   ],
+   "profile": "exulanica.world-setting/v1",
+   "provenance": {
+    "kind": "authored"
+   },
+   "surfaces": {
+    "ground.default": {
+     "srgb8": [
+      228,
+      208,
+      164
+     ]
+    },
+    "ground.tree_pit_soil": {
+     "srgb8": [
+      228,
+      208,
+      164
+     ]
+    }
+   },
+   "swatches": {},
+   "up": {}
+  },
+  "version": 3
+ },
+ "made": {
+  "calls": [
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "world_tool_chooser",
+    "usd": "0.00082710"
+   },
+   {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "outcome": "completed",
+    "role": "kind_drafter",
+    "usd": "0.00327628"
+   },
+   {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "outcome": "completed",
+    "role": "kind_drafter",
+    "usd": "0.00429758"
+   },
+   {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "outcome": "completed",
+    "role": "kind_drafter",
+    "usd": "0.00481824"
+   },
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "look_chooser",
+    "usd": "0.00017370"
+   },
+   {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "outcome": "completed",
+    "role": "setting_chooser",
+    "usd": "0.00094260"
+   }
+  ],
+  "date": "2026-10-26",
+  "decisions": 30,
+  "draft_id": "6fa10c0e-95ce-5f95-8651-08b4878c71a4",
+  "draft_usd": "0.01433550",
+  "people_models": [
+   "nvidia/nemotron-3-super-120b-a12b"
+  ],
+  "tool": "place"
+ },
+ "paintings": [
+  {
+   "camera": "{\"camera_to_world_column_major\":[1,0,0,0,0,0.857493,-0.514496,0,0,0.514496,0.857493,0,9.057831,22.604679,19.759869,1],\"fov_deg\":70,\"height\":480,\"pitch\":-0.540419,\"position_m\":[9.0578,22.6047,19.7599],\"width\":832,\"yaw\":0.0}",
+   "cost_microusd": 7255,
+   "height": 480,
+   "held_permille": 142,
+   "media_type": "image/jpeg",
+   "painter": {
+    "control": "depth without trees, one range over the orbit",
+    "control_scale_milli": 950,
+    "guidance_milli": 4000,
+    "machine": "NVIDIA RTX PRO 6000 Blackwell Server Edition, Nebius AI Cloud",
+    "models": [
+     {
+      "licence": "apache-2.0",
+      "repository": "Tongyi-MAI/Z-Image",
+      "revision": "04cc4abb7c50"
+     },
+     {
+      "licence": "apache-2.0",
+      "repository": "alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1",
+      "revision": "755999a93490"
+     }
+    ],
+    "steps": 25
+   },
+   "recipe": "z-image-orbit-still/v1",
+   "run_id": "graphics-s1",
+   "sha256": "2ec53512507060a0d4bb69b3472b6a8ee02b91c8a6faf2c53e59bfcbba790592",
+   "view": "orbit",
+   "width": 832,
+   "words": {
+    "negative": "text, letters, words, signs, logo, watermark, signature, people, crowds, blurry, low quality, flicker, distortion, static frame",
+    "prompt": "aerial photograph of a tiny rocky island with a tall white lighthouse, a small keeper's cottage, grassy slopes and dark rocks, white surf breaking around the shore, a clear turquoise sea, bright clear daylight with soft white clouds, realistic, cinematic, sharp detail",
+    "seed": 7,
+    "sentence": "a tiny island with a lighthouse"
+   }
+  }
+ ],
+ "picture": {
+  "height": 720,
+  "media_type": "image/jpeg",
+  "sha256": "412784c36e1b849a58e2159349c0f9db3757ef5ebd55d384517e521be524618c",
+  "taken": {
+   "date": "2026-10-27",
+   "how": "the first view the page keeps for a world's card (keepFirstViewPicture), drawn by the engine in headless Chrome on the GPU at the camera the world opens at, as the server kept it",
+   "main": "b45cbee6a",
+   "of": "a copy of version 2, made from its link (/?world=lighthouse-island) on a personal install with tiles"
+  },
+  "width": 1280
+ },
+ "profile": "exulanica.showcase-world/v1",
+ "sentence": "a tiny island with a lighthouse",
+ "society": {
+  "engine": "exulanica-society/v7"
+ },
+ "title": "Tiny Island Lighthouse",
+ "version": 3,
+ "world": {
+  "kind": {
+   "generator": {
+    "key": "site-plan",
+    "version": 1
+   },
+   "kind": "tiny_island_lighthouse",
+   "label": "Tiny Island Lighthouse",
+   "licence": {
+    "spdx": "CC0-1.0",
+    "verdict": "SHIP"
+   },
+   "origin": "drafted",
+   "parameters": [],
+   "parts": [
+    {
+     "description": "",
+     "form": "path",
+     "key": "island_path",
+     "label": "island path",
+     "look": "path.stone_path",
+     "roles": [
+      "path"
+     ],
+     "use_class": "",
+     "width_mm": 2000
+    },
+    {
+     "blocks": 0,
+     "depth_mm": 2000,
+     "description": "A single bed for the lighthouse keeper.",
+     "form": "fixture",
+     "height_mm": 600,
+     "key": "keeper_s_bed",
+     "label": "keeper's bed",
+     "look": "fixture.bed",
+     "roles": [
+      "bed"
+     ],
+     "seats": 0,
+     "sleepers": 1,
+     "stands": 0,
+     "use_class": "",
+     "width_mm": 2000
+    },
+    {
+     "description": "The ground-floor room of the lighthouse where the keeper sleeps.",
+     "form": "room",
+     "holds": [
+      {
+       "count": 1,
+       "part": "keeper_s_bed",
+       "pattern": "back_wall"
+      }
+     ],
+     "key": "keeper_s_room",
+     "label": "keeper's room",
+     "look": "ground.stone_floor",
+     "roles": [
+      "home"
+     ],
+     "share": 1,
+     "use_class": ""
+    },
+    {
+     "depth_mm": 5000,
+     "description": "A tall narrow lighthouse tower with a flat top and a light room at the top.",
+     "door_width_mm": 1000,
+     "form": "structure",
+     "key": "lighthouse",
+     "label": "lighthouse",
+     "look": "structure.lighthouse",
+     "roles": [
+      "home"
+     ],
+     "roof_form": "flat",
+     "roof_look": "roof.lighthouse_top",
+     "rooms": [
+      {
+       "count": 1,
+       "part": "keeper_s_room"
+      }
+     ],
+     "storey_height_mm": 4000,
+     "storeys": 3,
+     "use_class": "",
+     "wall_look": "wall.lighthouse_wall",
+     "width_mm": 5000
+    },
+    {
+     "description": "The open rocky ground of the island behind the lighthouse.",
+     "form": "area",
+     "key": "island_ground",
+     "label": "island ground",
+     "look": "ground.island_rock",
+     "roles": [
+      "ground"
+     ],
+     "use_class": ""
+    }
+   ],
+   "presets": [
+    {
+     "key": "as_described",
+     "label": "As described",
+     "values": {}
+    }
+   ],
+   "profile": "exulanica.world-kind/v2",
+   "provenance": {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "prompt_sha256": "83d72674a4e18f2d6c820d5abcb14f7be80a583e32ed242fcb0b71bc297396dc",
+    "prompt_version": "kind-drafting-7",
+    "role": "kind_drafter",
+    "words_sha256": "0db18b626688b3f586aee01df9cc33dfcf9c1e5c6f5f058735a498b114533340"
+   },
+   "requirement_source": {
+    "characters": 31,
+    "sha256": "0db18b626688b3f586aee01df9cc33dfcf9c1e5c6f5f058735a498b114533340"
+   },
+   "requirements": [
+    {
+     "form": "area",
+     "key": "requirement_1",
+     "look": "ground.island_rock",
+     "minimum_count": 1,
+     "omission": "",
+     "parts": [
+      "island_ground"
+     ],
+     "roles": [
+      "ground"
+     ],
+     "roof_form": "",
+     "shape_class": "",
+     "source_span": [
+      0,
+      13
+     ],
+     "status": "fulfilled"
+    },
+    {
+     "form": "structure",
+     "key": "requirement_2",
+     "look": "structure.lighthouse",
+     "minimum_count": 1,
+     "omission": "",
+     "parts": [
+      "lighthouse"
+     ],
+     "roles": [],
+     "roof_form": "flat",
+     "shape_class": "",
+     "source_span": [
+      19,
+      31
+     ],
+     "status": "fulfilled"
+    },
+    {
+     "form": "fixture",
+     "key": "requirement_3",
+     "look": "fixture.bed",
+     "minimum_count": 1,
+     "omission": "",
+     "parts": [
+      "keeper_s_bed"
+     ],
+     "roles": [
+      "bed"
+     ],
+     "roof_form": "",
+     "shape_class": "",
+     "source_span": [
+      19,
+      31
+     ],
+     "status": "fulfilled"
+    }
+   ],
+   "site": {
+    "boundary": "",
+    "depth_mm": 20000,
+    "enclosure": "open",
+    "entry_width_mm": 2000,
+    "ground": "ground.island_rock",
+    "spine": "island_path",
+    "width_mm": 34000
+   },
+   "society": {
+    "employment_permille": 1000,
+    "offsite_home": {
+     "label": "none",
+     "use_class": "residential"
+    },
+    "offsite_residents": 0,
+    "place_words": {
+     "around": "across the island",
+     "here": "on this tiny island"
+    }
+   },
+   "summary": "A tiny island with a lighthouse.",
+   "use_classes": [],
+   "version": 1,
+   "zones": [
+    {
+     "access": "open",
+     "boundary": "",
+     "ground": "ground.island_rock",
+     "holds": [
+      {
+       "count": 1,
+       "part": "lighthouse",
+       "pattern": "row"
+      },
+      {
+       "count": 1,
+       "part": "island_ground",
+       "pattern": "fill"
+      }
+     ],
+     "key": "island",
+     "label": "island",
+     "placement": "front",
+     "share": 1
+    }
+   ]
+  },
+  "land": {
+   "document": {
+    "features": [
+     {
+      "grade_permille": 30,
+      "id": "tilt",
+      "kind": "tilt",
+      "reach_mm": 200000,
+      "side": "north"
+     },
+     {
+      "depth_mm": 240000,
+      "distance_mm": 30000,
+      "height_mm": 32000,
+      "id": "hill",
+      "kind": "rise",
+      "offset_mm": -50000,
+      "roughness_permille": 200,
+      "side": "north",
+      "width_mm": 420000
+     },
+     {
+      "depth_mm": 90000,
+      "distance_mm": 40000,
+      "height_mm": 12000,
+      "id": "knoll",
+      "kind": "rise",
+      "offset_mm": 0,
+      "roughness_permille": 200,
+      "side": "west",
+      "width_mm": 120000
+     },
+     {
+      "amplitude_mm": 3200,
+      "id": "swell",
+      "kind": "undulation",
+      "wavelength_mm": 110000
+     },
+     {
+      "amplitude_mm": 700,
+      "id": "texture",
+      "kind": "undulation",
+      "wavelength_mm": 30000
+     },
+     {
+      "depth_mm": 500000,
+      "distance_mm": 520000,
+      "height_mm": 85000,
+      "id": "far_hills",
+      "kind": "rise",
+      "offset_mm": 0,
+      "roughness_permille": 450,
+      "side": "north_west",
+      "width_mm": 1100000
+     },
+     {
+      "depth_mm": 360000,
+      "distance_mm": 380000,
+      "height_mm": 55000,
+      "id": "east_hills",
+      "kind": "rise",
+      "offset_mm": 0,
+      "roughness_permille": 400,
+      "side": "east",
+      "width_mm": 700000
+     },
+     {
+      "band_mm": 900000,
+      "distance_mm": 2200000,
+      "height_mm": 380000,
+      "id": "skyline",
+      "kind": "range",
+      "offset_mm": 0,
+      "ruggedness_permille": 650,
+      "side": "north",
+      "wavelength_mm": 900000,
+      "width_mm": 0
+     },
+     {
+      "band_mm": 700000,
+      "distance_mm": 1600000,
+      "height_mm": 220000,
+      "id": "skyline_east",
+      "kind": "range",
+      "offset_mm": 0,
+      "ruggedness_permille": 600,
+      "side": "north_east",
+      "wavelength_mm": 700000,
+      "width_mm": 0
+     },
+     {
+      "beach_mm": 25000,
+      "beach_top_mm": 2500,
+      "coast_grade_permille": 350,
+      "distance_mm": 25000,
+      "id": "sea",
+      "kind": "shore",
+      "sea_depth_mm": 14000,
+      "side": "south",
+      "wander_mm": 15000
+     },
+     {
+      "depth_mm": 110000,
+      "distance_mm": 40000,
+      "fade_mm": 30000,
+      "id": "steps",
+      "kind": "terraces",
+      "offset_mm": -50000,
+      "riser_share_permille": 800,
+      "side": "north",
+      "tier_height_mm": 2500,
+      "width_mm": 220000
+     },
+     {
+      "course": "follow",
+      "depth_mm": 1200,
+      "freeboard_mm": 300,
+      "from_mm": 5000,
+      "id": "falls",
+      "kind": "cascade",
+      "least_fall_mm": 1000,
+      "offset_mm": 0,
+      "side": "south",
+      "step_mm": 2000,
+      "to_mm": 40000,
+      "wall_mm": 1000,
+      "width_mm": 6000
+     }
+    ],
+    "ground_mm": 9000,
+    "profile": "exulanica.landform/v1"
+   },
+   "recipe": "coast",
+   "sha256": "bafd9d7fcb1fbce6fbc4aff4e49f93e3f40eedff7e63b6dbb4c0868a268f71d3"
+  },
+  "made_by": "place",
+  "receipt_sha256": "fef1713e77c7622019f9d02f093de77f771375410699b99861faf34ddc8af7de",
+  "recipe": null,
+  "values": {},
+  "world_id": "world:generated:6fa10c0e-95ce-5f95-8651-08b4878c71a4"
+ }
+}
