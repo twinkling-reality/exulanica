@@ -153,6 +153,20 @@ class AffordancePlace:
             "z_mm": self.z_mm,
         }
 
+    @classmethod
+    def from_canonical_dict(cls, data: Mapping[str, Any]) -> AffordancePlace:
+        return cls(
+            place_id=str(data["place_id"]),
+            label=str(data["label"]),
+            kind=str(data["kind"]),
+            x_mm=int(data["x_mm"]),
+            y_mm=int(data["y_mm"]),
+            z_mm=int(data.get("z_mm", 0)),
+            capacity=int(data.get("capacity", 4)),
+            enabled=bool(data.get("enabled", True)),
+            occupants={str(item) for item in data.get("occupants", ())},
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class OfferedChoice:
@@ -174,6 +188,17 @@ class OfferedChoice:
             "target_x_mm": self.target_x_mm,
             "target_y_mm": self.target_y_mm,
         }
+
+    @classmethod
+    def from_canonical_dict(cls, data: Mapping[str, Any]) -> OfferedChoice:
+        return cls(
+            label=str(data["label"]),
+            kind=str(data["kind"]),
+            target_id=None if data.get("target_id") is None else str(data["target_id"]),
+            target_x_mm=None if data.get("target_x_mm") is None else int(data["target_x_mm"]),
+            target_y_mm=None if data.get("target_y_mm") is None else int(data["target_y_mm"]),
+            takes_line=bool(data.get("takes_line", False)),
+        )
 
 
 @dataclass(slots=True)
@@ -232,6 +257,18 @@ class RealtimeBeing:
             self.goal_target_id,
         )
 
+    def mind_tier_label(self) -> str:
+        """Surface the being's active mind tier for client inspection and telemetry."""
+        if self.came_by == "crossed" or self.decider.get("kind") == "external":
+            return "door_visitor"
+        if self.active_tier == 2 or (
+            self.decider.get("kind") == "model" and self.active_request_id is not None
+        ):
+            return "tier2_model"
+        if self.active_tier == 1:
+            return "tier1_routine"
+        return "tier0_reflex"
+
     def canonical_dict(self) -> dict[str, Any]:
         return {
             "active_request_id": self.active_request_id,
@@ -259,6 +296,44 @@ class RealtimeBeing:
             "z_mm": self.z_mm,
         }
 
+    @classmethod
+    def from_canonical_dict(cls, data: Mapping[str, Any]) -> RealtimeBeing:
+        being = cls(
+            being_id=str(data["being_id"]),
+            u16_id=int(data["u16_id"]),
+            label=str(data["label"]),
+            came_by=str(data["came_by"]),
+            decider=dict(data["decider"]),
+            x_mm=int(data["x_mm"]),
+            y_mm=int(data["y_mm"]),
+            z_mm=int(data.get("z_mm", 0)),
+            yaw_urad=int(data.get("yaw_urad", 0)),
+            speed_mm_per_tick=int(data.get("speed_mm_per_tick", DEFAULT_SPEED_MM_PER_TICK)),
+            goal_kind=str(data.get("goal_kind", "idle")),
+            goal_target_id=(
+                None if data.get("goal_target_id") is None else str(data["goal_target_id"])
+            ),
+            target_x_mm=int(data.get("target_x_mm", data["x_mm"])),
+            target_y_mm=int(data.get("target_y_mm", data["y_mm"])),
+            active_tier=int(data.get("active_tier", 0)),
+            motion_state=str(data.get("motion_state", "idle")),
+            active_request_id=(
+                None if data.get("active_request_id") is None else str(data["active_request_id"])
+            ),
+            last_line=None if data.get("last_line") is None else str(data["last_line"]),
+            said_lines=[str(line) for line in data.get("said_lines", ())],
+            heard_lines=[str(line) for line in data.get("heard_lines", ())],
+            carried_ids=[str(cid) for cid in data.get("carried_ids", ())],
+            arrival_id=None if data.get("arrival_id") is None else str(data["arrival_id"]),
+            translation_manifest_sha256=(
+                None
+                if data.get("translation_manifest_sha256") is None
+                else str(data["translation_manifest_sha256"])
+            ),
+        )
+        being.last_Snapshot_pose = being.pose_tuple()
+        return being
+
 
 class AOISpatialGrid:
     """Integer spatial hash grid for fast Area-of-Interest (AOI) queries and collision checks."""
@@ -282,7 +357,7 @@ class AOISpatialGrid:
         cell_mm = self._cell_mm
         by_cell = self._beings_by_cell
         coords = self._coords_by_being
-        for being in beings:
+        for being in sorted(beings, key=lambda b: b.u16_id):
             cell = (being.x_mm // cell_mm, being.y_mm // cell_mm)
             by_cell[cell].append(being)
             coords[being.being_id] = cell
@@ -368,6 +443,25 @@ class RealtimeDecisionRequest:
             "profile": REALTIME_DECISION_REQUEST_PROFILE,
             "request_id": self.request_id,
         }
+
+    @classmethod
+    def from_canonical_dict(cls, data: Mapping[str, Any]) -> RealtimeDecisionRequest:
+        return cls(
+            request_id=str(data["request_id"]),
+            being_id=str(data["being_id"]),
+            base_tick=int(data["base_tick"]),
+            context_epoch=int(data["context_epoch"]),
+            decider=dict(data["decider"]),
+            offered_choices=tuple(
+                OfferedChoice.from_canonical_dict(item) for item in data["offered_choices"]
+            ),
+            line_characters_maximum=int(
+                data.get("line_characters_maximum", LINE_CHARACTERS_MAXIMUM)
+            ),
+            context=dict(data["context"]),
+            context_sha256=str(data["context_sha256"]),
+            document_sha256=str(data["document_sha256"]),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -521,9 +615,7 @@ class ContinuationValidator:
         checked_line: str | None = None
         if choice.takes_line and proposal.line is not None:
             try:
-                checked_line = check_line(
-                    proposal.line, maximum=request.line_characters_maximum
-                )
+                checked_line = check_line(proposal.line, maximum=request.line_characters_maximum)
             except LineRefused:
                 return ContinuationVerdict(
                     status="rejected",
@@ -547,10 +639,7 @@ class ContinuationValidator:
                     disposition="stale",
                     reason="stale_precondition",
                 )
-            if (
-                len(place.occupants) >= place.capacity
-                and being.being_id not in place.occupants
-            ):
+            if len(place.occupants) >= place.capacity and being.being_id not in place.occupants:
                 return ContinuationVerdict(
                     status="stale",
                     disposition="stale",
@@ -616,8 +705,7 @@ class HierarchicalMindCoordinator:
         for other in nearby[:3]:
             dist_m = max(
                 1,
-                math.isqrt((other.x_mm - being.x_mm) ** 2 + (other.y_mm - being.y_mm) ** 2)
-                // 1000,
+                math.isqrt((other.x_mm - being.x_mm) ** 2 + (other.y_mm - being.y_mm) ** 2) // 1000,
             )
             choices.append(
                 OfferedChoice(
@@ -649,8 +737,7 @@ class HierarchicalMindCoordinator:
                 continue
             dist_m = max(
                 1,
-                math.isqrt((place.x_mm - being.x_mm) ** 2 + (place.y_mm - being.y_mm) ** 2)
-                // 1000,
+                math.isqrt((place.x_mm - being.x_mm) ** 2 + (place.y_mm - being.y_mm) ** 2) // 1000,
             )
             choices.append(
                 OfferedChoice(
@@ -728,9 +815,7 @@ class HierarchicalMindCoordinator:
         if len(offered) < 2:
             return None
 
-        request_id = (
-            f"req:{room.world_id}:{being.being_id}:{room.tick}:{room.epoch_seq}"
-        )
+        request_id = f"req:{room.world_id}:{being.being_id}:{room.tick}:{room.epoch_seq}"
         context: dict[str, Any] = {
             "being_id": being.being_id,
             "context_epoch": room.epoch_seq,
@@ -1067,13 +1152,9 @@ class RealtimeWorldRoom:
     def canonical_state(self) -> dict[str, Any]:
         """Return the strict zero-float canonical dictionary of the authoritative room state."""
         return {
-            "beings": [
-                self.beings[bid].canonical_dict() for bid in sorted(self.beings)
-            ],
+            "beings": [self.beings[bid].canonical_dict() for bid in sorted(self.beings)],
             "epoch_seq": self.epoch_seq,
-            "places": [
-                self.places[pid].canonical_dict() for pid in sorted(self.places)
-            ],
+            "places": [self.places[pid].canonical_dict() for pid in sorted(self.places)],
             "profile": REALTIME_ROOM_STATE_PROFILE,
             "seed": self.seed,
             "tick": self.tick,
@@ -1103,7 +1184,8 @@ class RealtimeWorldRoom:
         min_sep = COLLISION_RADIUS_MM * 2
         min_sep_sq = min_sep * min_sep
 
-        for being in beings_map.values():
+        for being_Id in sorted(beings_map):
+            being = beings_map[being_Id]
             # Update dynamic follow target if following another being
             if being.goal_kind == "follow" and being.goal_target_id in beings_map:
                 leader = beings_map[being.goal_target_id]
@@ -1183,9 +1265,7 @@ class RealtimeWorldRoom:
             self._epoch_receipts.extend(committed_receipts)
 
         # 2. Step Tier 0 (20 Hz steering/collision) & Tier 1 (reactive fallback) + dispatch Tier 2
-        dispatched_requests = self._step_tier0_and_tier1(
-            tier2_dispatch_limit=tier2_dispatch_limit
-        )
+        dispatched_requests = self._step_tier0_and_tier1(tier2_dispatch_limit=tier2_dispatch_limit)
 
         # 3. Rebuild spatial hash grid and compute delta-compressed frames by AOI cell
         self.grid.rebuild(self.beings.values())
@@ -1194,9 +1274,9 @@ class RealtimeWorldRoom:
         ] = {}
         changed_count = 0
         cell_mm = self.grid._cell_mm
-        temp_cells: dict[
-            tuple[int, int], list[tuple[int, int, int, int, int, str, int]]
-        ] = defaultdict(list)
+        temp_cells: dict[tuple[int, int], list[tuple[int, int, int, int, int, str, int]]] = (
+            defaultdict(list)
+        )
 
         for being in self.beings.values():
             pose = being.pose_tuple()
@@ -1222,10 +1302,7 @@ class RealtimeWorldRoom:
 
         # 4. Periodic epoch checkpointing
         checkpoint: EpochCheckpoint | None = None
-        if (
-            self.checkpoint_interval_ticks > 0
-            and self.tick % self.checkpoint_interval_ticks == 0
-        ):
+        if self.checkpoint_interval_ticks > 0 and self.tick % self.checkpoint_interval_ticks == 0:
             checkpoint = self.flush_epoch_checkpoint()
 
         return RealtimeTickResult(
@@ -1264,14 +1341,88 @@ class RealtimeWorldRoom:
                     deltas.append(list(entry))
 
         deltas.sort(key=lambda row: row[0])
+        entities: list[dict[str, Any]] = []
+        by_u16 = {b.u16_id: b for b in self.beings.values()}
+        for row in deltas:
+            being = by_u16.get(int(row[0]))
+            if being is not None:
+                entities.append(
+                    {
+                        "active_tier": being.active_tier,
+                        "being_id": being.being_id,
+                        "label": being.label,
+                        "last_line": being.last_line,
+                        "mind_tier": being.mind_tier_label(),
+                        "motion_state": being.motion_state,
+                        "u16_id": being.u16_id,
+                        "x_mm": being.x_mm,
+                        "y_mm": being.y_mm,
+                        "yaw_urad": being.yaw_urad,
+                        "z_mm": being.z_mm,
+                    }
+                )
         return {
             "deltas": deltas,
+            "entities": entities,
             "observer_cell": [observer_x_mm // cell_mm, observer_y_mm // cell_mm],
             "profile": REALTIME_DELTA_FRAME_PROFILE,
             "radius_mm": radius_mm,
             "tick": tick_result.tick,
             "world_minute": tick_result.world_minute,
         }
+
+    def tier_summary(self) -> dict[str, int]:
+        """Count active beings by mind tier plus in-flight Tier 2 deliberations."""
+        counts = {
+            "door_visitor": 0,
+            "in_flight_requests": len(self.coordinator.in_flight_requests),
+            "tier0_reflex": 0,
+            "tier1_routine": 0,
+            "tier2_model": 0,
+        }
+        for being in self.beings.values():
+            tier_key = being.mind_tier_label()
+            counts[tier_key] = counts.get(tier_key, 0) + 1
+        return counts
+
+    def apply_player_action(
+        self,
+        *,
+        being_id: str,
+        target_x_mm: int | None = None,
+        target_y_mm: int | None = None,
+        target_z_mm: int | None = None,
+        goal_kind: str = "walk_to_point",
+        line: str | None = None,
+    ) -> RealtimeBeing:
+        """Apply an immediate player or agent movement/speech command to a being in the room."""
+        being = self.beings.get(being_id)
+        if being is None:
+            raise KeyError(f"unknown being_id {being_id!r}")
+        if target_x_mm is not None:
+            if type(target_x_mm) is not int:
+                raise TypeError("target_x_mm must be an int")
+            being.target_x_mm = target_x_mm
+        if target_y_mm is not None:
+            if type(target_y_mm) is not int:
+                raise TypeError("target_y_mm must be an int")
+            being.target_y_mm = target_y_mm
+        if target_z_mm is not None:
+            if type(target_z_mm) is not int:
+                raise TypeError("target_z_mm must be an int")
+            being.z_mm = target_z_mm
+        being.goal_kind = goal_kind
+        if (being.target_x_mm, being.target_y_mm) != (being.x_mm, being.y_mm):
+            being.motion_state = "walking"
+        if line is not None:
+            checked = check_line(line, maximum=LINE_CHARACTERS_MAXIMUM)
+            being.last_line = checked
+            being.said_lines.append(checked)
+            for listener in self.grid.nearby_beings(
+                being.x_mm, being.y_mm, HEARING_REACH_MM, exclude_id=being.being_id
+            ):
+                listener.heard_lines.append(checked)
+        return being
 
     def flush_epoch_checkpoint(self) -> EpochCheckpoint:
         """Compute canonical zero-float ``state_sha256`` and flush the epoch checkpoint batch."""
@@ -1305,3 +1456,111 @@ class RealtimeWorldRoom:
         self._epoch_crossings.clear()
         self.epoch_start_tick = self.tick
         return checkpoint
+
+    def to_checkpoint_record(self, checkpoint: EpochCheckpoint | None = None) -> dict[str, Any]:
+        """Build a complete, zero-float persistence envelope for PostgreSQL checkpoint storage."""
+        ckpt = checkpoint or (
+            self.checkpoints[-1] if self.checkpoints else self.flush_epoch_checkpoint()
+        )
+        room_state = self.canonical_state()
+        positions = [
+            {
+                "active_tier": b.active_tier,
+                "being_id": b.being_id,
+                "mind_tier": b.mind_tier_label(),
+                "motion_state": b.motion_state,
+                "u16_id": b.u16_id,
+                "x_mm": b.x_mm,
+                "y_mm": b.y_mm,
+                "yaw_urad": b.yaw_urad,
+                "z_mm": b.z_mm,
+            }
+            for b in (self.beings[bid] for bid in sorted(self.beings))
+        ]
+        return {
+            "aoi_cell_mm": self.grid.cell_mm,
+            "checkpoint": ckpt.canonical_dict(),
+            "checkpoint_interval_ticks": self.checkpoint_interval_ticks,
+            "checkpoint_sha256": ckpt.checkpoint_sha256,
+            "crossings_bound": list(ckpt.crossings_bound),
+            "decision_seq": self.coordinator.decision_seq,
+            "end_tick": ckpt.end_tick,
+            "epoch_seq": ckpt.epoch_seq,
+            "epoch_start_tick": self.epoch_start_tick,
+            "in_flight_requests": [
+                req.canonical_dict()
+                for req in (
+                    self.coordinator.in_flight_requests[rid]
+                    for rid in sorted(self.coordinator.in_flight_requests)
+                )
+            ],
+            "next_u16_id": self._next_u16_id,
+            "positions": positions,
+            "profile": EPOCH_CHECKPOINT_PROFILE,
+            "receipt_batch": list(ckpt.receipt_batch),
+            "room_state": room_state,
+            "start_tick": ckpt.start_tick,
+            "state_sha256": ckpt.state_sha256,
+            "version_id": self.version_id,
+            "world_id": self.world_id,
+            "world_minute": ckpt.world_minute,
+        }
+
+    @classmethod
+    def from_checkpoint_record(cls, record: Mapping[str, Any]) -> RealtimeWorldRoom:
+        """Hydrate a ``RealtimeWorldRoom`` from a saved checkpoint record and verify its digest."""
+        room_state = record["room_state"]
+        room = cls(
+            world_id=str(room_state["world_id"]),
+            version_id=str(room_state["version_id"]),
+            world_title=str(room_state.get("world_title", "A Living Town")),
+            seed=str(room_state["seed"]),
+            checkpoint_interval_ticks=int(
+                record.get("checkpoint_interval_ticks", DEFAULT_CHECKPOINT_INTERVAL_TICKS)
+            ),
+            aoi_cell_mm=int(record.get("aoi_cell_mm", AOI_CELL_MM)),
+        )
+        room.tick = int(room_state["tick"])
+        room.epoch_seq = int(room_state["epoch_seq"])
+        room.epoch_start_tick = int(record.get("epoch_start_tick", room.tick))
+
+        for place_data in room_state.get("places", ()):
+            place = AffordancePlace.from_canonical_dict(place_data)
+            room.places[place.place_id] = place
+
+        max_u16 = 0
+        for being_data in room_state.get("beings", ()):
+            being = RealtimeBeing.from_canonical_dict(being_data)
+            room.beings[being.being_id] = being
+            if being.u16_id > max_u16:
+                max_u16 = being.u16_id
+
+        room._next_u16_id = max(int(record.get("next_u16_id", max_u16 + 1)), max_u16 + 1)
+        room.grid.rebuild(room.beings.values())
+
+        room.coordinator.decision_seq = int(record.get("decision_seq", 0))
+        for req_data in record.get("in_flight_requests", ()):
+            req = RealtimeDecisionRequest.from_canonical_dict(req_data)
+            room.coordinator.in_flight_requests[req.request_id] = req
+
+        if "checkpoint" in record and isinstance(record["checkpoint"], Mapping):
+            ckpt_data = record["checkpoint"]
+            ckpt = EpochCheckpoint(
+                epoch_seq=int(ckpt_data["epoch_seq"]),
+                start_tick=int(ckpt_data["start_tick"]),
+                end_tick=int(ckpt_data["end_tick"]),
+                world_minute=int(ckpt_data["world_minute"]),
+                state_sha256=str(ckpt_data["state_sha256"]),
+                receipt_batch=tuple(dict(r) for r in ckpt_data.get("receipt_batch", ())),
+                crossings_bound=tuple(dict(c) for c in ckpt_data.get("crossings_bound", ())),
+                checkpoint_sha256=str(ckpt_data["checkpoint_sha256"]),
+            )
+            room.checkpoints.append(ckpt)
+
+        expected_sha = str(record["state_sha256"])
+        actual_sha = room.state_sha256()
+        if actual_sha != expected_sha:
+            raise ValueError(
+                f"realtime_checkpoint_digest_mismatch: expected {expected_sha}, got {actual_sha}"
+            )
+        return room

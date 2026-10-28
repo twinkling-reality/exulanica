@@ -113,6 +113,7 @@ from exulanica.api.routes import (
     personal_admission,
     piece_requests,
     place_name_rights,
+    realtime_world,
     reconstruction_admission,
     references,
     scene_segments,
@@ -676,6 +677,7 @@ def create_app(
     app.include_router(world_drafts.router)
     app.include_router(door.router)
     app.include_router(participation.router)
+    app.include_router(realtime_world.router)
     # After the last router and before the application is handed to anybody: a route nobody
     # declared, or a declaration for a route that is gone, is a build failure with its name in it.
     require_complete_declaration(app)

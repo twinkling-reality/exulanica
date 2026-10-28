@@ -57,6 +57,7 @@ from typing import Annotated
 import psycopg
 from fastapi import Depends, Header, Request
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import HTTPConnection
 
 from exulanica.api.account_repository import AccountRejected, AccountUnavailable
 from exulanica.api.admission import claim_workspace
@@ -192,7 +193,7 @@ def _resolve(
     return session, held, True
 
 
-async def authorise_route(request: Request) -> None:
+async def authorise_route(request: HTTPConnection) -> None:
     """The route permission floor. Installed on the application, so it runs for every route.
 
     Public routes and the sign-in surface return at once and never look at a credential, so a
@@ -202,6 +203,9 @@ async def authorise_route(request: Request) -> None:
     The header is read from the request rather than declared as a parameter, because a declared
     parameter here would advertise an Authorization header on the public routes too.
     """
+    if request.scope.get("type") == "websocket":
+        return
+    assert isinstance(request, Request)
     path = _matched_path(request)
     if _needs_no_credential(request, path):
         return

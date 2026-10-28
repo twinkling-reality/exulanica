@@ -135,10 +135,7 @@ def test_256_concurrent_beings_20hz_aoi_and_deterministic_checkpoints() -> None:
 
     # Verify zero-float canonical digest parity across both independent runs
     assert room_a.state_sha256() == room_b.state_sha256()
-    assert (
-        room_a.checkpoints[-1].checkpoint_sha256
-        == room_b.checkpoints[-1].checkpoint_sha256
-    )
+    assert room_a.checkpoints[-1].checkpoint_sha256 == room_b.checkpoints[-1].checkpoint_sha256
 
     # Verify AOI delta frame filtering returns only nearby entities in canonical format
     aoi_frame = room_a.aoi_delta_frame(

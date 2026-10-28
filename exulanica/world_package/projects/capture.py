@@ -923,9 +923,8 @@ def capture(
                     "decision": receipt,
                     "event": event,
                     "status": receipt["status"],
-                    "disposition": disposition or (
-                        "applied" if receipt["status"] == "accepted" else receipt["status"]
-                    ),
+                    "disposition": disposition
+                    or ("applied" if receipt["status"] == "accepted" else receipt["status"]),
                     "reason": decision["reason_code"],
                     "branches": list(record.get("branches") or record.get("asks") or ()),
                 }

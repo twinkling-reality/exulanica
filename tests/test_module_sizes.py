@@ -107,10 +107,16 @@ LIMITS: dict[str, tuple[int, str]] = {
         "web notes and creatures for every guest among them",
     ),
     "tools/previews/world-workspace/contextual-world.ts": (
-        1_526,
+        1_549,
         "the world view's host: its corners, people, speech, building (which lets go of a chosen "
-        "person as it starts), History and chosen-character hooks; the record pages' states are "
-        "record-host.ts's",
+        "person as it starts), History, chosen-character hooks and [X] Data live model telemetry; "
+        "the record pages' states are record-host.ts's",
+    ),
+    "exulanica/world/realtime_runtime.py": (
+        1_566,
+        "the 20 Hz real-time spatial room tick loop, the 3-tier hierarchical mind runtime, "
+        "deterministic continuation validation, AOI delta framing and room hydration from "
+        "society state",
     ),
     "exulanica/api/routes/world_kinds.py": (
         1_537,

@@ -29021,6 +29021,241 @@
      }
     }
    }
+  },
+  "/world/versions/{version_id}/realtime/state": {
+   "get": {
+    "tags": [
+     "realtime"
+    ],
+    "summary": "Get Realtime State",
+    "description": "Return the current 20 Hz room state snapshot, AOI delta frame, and active tier summary.",
+    "operationId": "get_realtime_state_world_versions__version_id__realtime_state_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 200
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "observer_x_mm",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 0,
+       "title": "Observer X Mm"
+      }
+     },
+     {
+      "name": "observer_y_mm",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Observer Y Mm"
+      }
+     },
+     {
+      "name": "observer_z_mm",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 0,
+       "title": "Observer Z Mm"
+      }
+     },
+     {
+      "name": "radius_mm",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500000,
+       "minimum": 1000,
+       "default": 24000,
+       "title": "Radius Mm"
+      }
+     },
+     {
+      "name": "since_tick",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Since Tick"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Realtime State World Versions  Version Id  Realtime State Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/realtime/step": {
+   "post": {
+    "tags": [
+     "realtime"
+    ],
+    "summary": "Post Realtime Step",
+    "description": "Advance the 20 Hz room by 1..100 ticks and apply player actions / Tier 2 proposals.",
+    "operationId": "post_realtime_step_world_versions__version_id__realtime_step_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 200
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/StepRealtimeBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Post Realtime Step World Versions  Version Id  Realtime Step Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "components": {
@@ -42071,6 +42306,76 @@
     ],
     "title": "PlayBody"
    },
+   "PlayerActionInput": {
+    "properties": {
+     "being_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Being Id"
+     },
+     "target_x_mm": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target X Mm"
+     },
+     "target_y_mm": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target Y Mm"
+     },
+     "target_z_mm": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target Z Mm"
+     },
+     "goal_kind": {
+      "type": "string",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Goal Kind",
+      "default": "walk_to_point"
+     },
+     "line": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Line"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "being_id"
+    ],
+    "title": "PlayerActionInput",
+    "description": "Direct player or agent movement/speech command submitted to the 20 Hz loop."
+   },
    "PointMapArrivalPin": {
     "properties": {
      "profile": {
@@ -49758,6 +50063,80 @@
     ],
     "title": "StepBody"
    },
+   "StepRealtimeBody": {
+    "properties": {
+     "ticks": {
+      "type": "integer",
+      "maximum": 100.0,
+      "minimum": 1.0,
+      "title": "Ticks",
+      "default": 1
+     },
+     "tier2_dispatch_limit": {
+      "type": "integer",
+      "maximum": 256.0,
+      "minimum": 0.0,
+      "title": "Tier2 Dispatch Limit",
+      "default": 8
+     },
+     "observer_x_mm": {
+      "type": "integer",
+      "title": "Observer X Mm",
+      "default": 0
+     },
+     "observer_y_mm": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Observer Y Mm"
+     },
+     "observer_z_mm": {
+      "type": "integer",
+      "title": "Observer Z Mm",
+      "default": 0
+     },
+     "radius_mm": {
+      "type": "integer",
+      "maximum": 500000.0,
+      "minimum": 1000.0,
+      "title": "Radius Mm",
+      "default": 24000
+     },
+     "player_actions": {
+      "items": {
+       "$ref": "#/components/schemas/PlayerActionInput"
+      },
+      "type": "array",
+      "title": "Player Actions"
+     },
+     "tier2_proposals": {
+      "items": {
+       "$ref": "#/components/schemas/Tier2ProposalInput"
+      },
+      "type": "array",
+      "title": "Tier2 Proposals"
+     },
+     "flush_checkpoint": {
+      "type": "boolean",
+      "title": "Flush Checkpoint",
+      "default": false
+     },
+     "bootstrap": {
+      "type": "boolean",
+      "title": "Bootstrap",
+      "default": false
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "StepRealtimeBody",
+    "description": "Request body for advancing a 20 Hz real-time room by 1..100 ticks."
+   },
    "StepSocietyBody": {
     "properties": {
      "base_tick": {
@@ -50891,6 +51270,89 @@
     ],
     "title": "ThingPoseBody",
     "description": "Where a thing stands, region-local: no scale, since a thing stands at its kind's size."
+   },
+   "Tier2ProposalInput": {
+    "properties": {
+     "request_id": {
+      "type": "string",
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Request Id"
+     },
+     "chosen_label": {
+      "type": "string",
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Chosen Label"
+     },
+     "line": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Line"
+     },
+     "latency_ms": {
+      "type": "integer",
+      "maximum": 3600000.0,
+      "minimum": 0.0,
+      "title": "Latency Ms",
+      "default": 0
+     },
+     "model_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Id"
+     },
+     "bridge": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 64,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bridge"
+     },
+     "grant_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 64,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Grant Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "request_id",
+     "chosen_label"
+    ],
+    "title": "Tier2ProposalInput",
+    "description": "Asynchronous Tier 2 model or external Door bridge proposal arriving at tick T + k."
    },
    "TileBakesQueuedView": {
     "properties": {

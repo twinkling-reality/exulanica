@@ -425,9 +425,7 @@ def society_trajectories(
     session: CurrentSession,
     request: Request,
     world_id: WorldId,
-    format: Annotated[
-        Literal["json", "jsonl", "openai", "openenv", "dpo"] | None, Query()
-    ] = None,
+    format: Annotated[Literal["json", "jsonl", "openai", "openenv", "dpo"] | None, Query()] = None,
     kind: Annotated[Literal["all", "sft", "dpo"] | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=DECISIONS_READ)] = DECISIONS_READ,
     subject_id: Annotated[uuid.UUID | None, Query()] = None,

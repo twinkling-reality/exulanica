@@ -322,10 +322,7 @@ def test_validator_verdict_rules() -> None:
         )
         == "validated_choice"
     )
-    assert (
-        validate_proposal_verdict(options, "jump over the moon", None)
-        == "answer_not_offered"
-    )
+    assert validate_proposal_verdict(options, "jump over the moon", None) == "answer_not_offered"
     assert (
         validate_proposal_verdict(options, "wait here a minute", "Talking while waiting")
         == "line_where_none"
@@ -446,4 +443,3 @@ def test_project_checkpoint_and_github_trajectory_export(tmp_path) -> None:
     assert TRAJECTORIES_FILE in written
     assert (folder / TRAJECTORIES_FILE).is_file()
     assert (folder / "training" / "sft.jsonl").is_file()
-

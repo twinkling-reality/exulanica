@@ -324,9 +324,7 @@ def validate_proposal_verdict(
     if not takes_line or proposed_line is None:
         return "validated_choice"
 
-    max_chars = int(
-        (context or {}).get("line_characters_maximum") or line_characters_maximum
-    )
+    max_chars = int((context or {}).get("line_characters_maximum") or line_characters_maximum)
     try:
         checked = check_line(proposed_line, maximum=max_chars)
     except LineRefused:
@@ -374,11 +372,7 @@ def _normalize_action(
             "kind": matched["kind"] if matched else "action",
             "line": default_line,
             "target_id": matched["target_id"] if matched else None,
-            **(
-                {"model_id": default_model_id}
-                if default_model_id is not None
-                else {}
-            ),
+            **({"model_id": default_model_id} if default_model_id is not None else {}),
         }
     if isinstance(raw_action, Mapping):
         assert_no_floats(raw_action, "$.action")
@@ -500,9 +494,7 @@ def _unpack_decision_turn(
             request.get("base_tick")
             if request.get("base_tick") is not None
             else (
-                context.get("tick")
-                if context.get("tick") is not None
-                else event.get("tick", index)
+                context.get("tick") if context.get("tick") is not None else event.get("tick", index)
             )
         )
     )
@@ -530,10 +522,7 @@ def _unpack_decision_turn(
         fallback="unknown-model",
     )
     decider_kind = str(
-        item.get("decider_kind")
-        or event_doc.get("origin")
-        or provider_cfg.get("kind")
-        or "model"
+        item.get("decider_kind") or event_doc.get("origin") or provider_cfg.get("kind") or "model"
     )
     prompt_version = (
         item.get("prompt_version")
@@ -599,11 +588,7 @@ def _unpack_decision_turn(
     latency_ms = _require_non_negative_int(latency_raw, "latency_ms", default=0)
     has_latency = latency_raw is not None
 
-    cost_raw = (
-        item.get("cost_usd")
-        if "cost_usd" in item
-        else provider_rec.get("cost_usd", "0")
-    )
+    cost_raw = item.get("cost_usd") if "cost_usd" in item else provider_rec.get("cost_usd", "0")
     cost_usd = _normalize_cost_usd(cost_raw)
 
     branches = list(
@@ -612,11 +597,7 @@ def _unpack_decision_turn(
         or item.get("counterfactual_alternatives")
         or ()
     )
-    rejected_proposals = list(
-        item.get("rejected_proposals")
-        or item.get("rejected_attempts")
-        or ()
-    )
+    rejected_proposals = list(item.get("rejected_proposals") or item.get("rejected_attempts") or ())
     # Also check provider calls if any earlier attempt was rejected before a retry succeeded
     for call in provider_rec.get("calls") or ():
         if isinstance(call, Mapping) and call.get("outcome") in (
@@ -873,11 +854,7 @@ def extract_dpo_pairs(
             if not isinstance(attempt, Mapping):
                 continue
             assert_no_floats(attempt, f"$.decisions[{index}].rejected_proposals[{attempt_idx}]")
-            raw_label = (
-                attempt.get("label")
-                or attempt.get("chosen_label")
-                or attempt.get("action")
-            )
+            raw_label = attempt.get("label") or attempt.get("chosen_label") or attempt.get("action")
             raw_line = attempt.get("line")
             verdict_reason = str(
                 attempt.get("reason")
@@ -1010,12 +987,8 @@ def compute_trajectory_metrics(
         )
         for index, raw in enumerate(decision_list)
     ]
-    sft_records = extract_sft_records(
-        decision_list, world_id=world_id, version_id=version_id
-    )
-    dpo_pairs = extract_dpo_pairs(
-        decision_list, world_id=world_id, version_id=version_id
-    )
+    sft_records = extract_sft_records(decision_list, world_id=world_id, version_id=version_id)
+    dpo_pairs = extract_dpo_pairs(decision_list, world_id=world_id, version_id=version_id)
 
     total_decisions = len(turns)
     applied_count = len(sft_records)
@@ -1038,21 +1011,13 @@ def compute_trajectory_metrics(
                     agreed_branches += 1
 
     agreement_rate_permille = (
-        round_half_down(agreed_branches * 1000, total_branches)
-        if total_branches > 0
-        else 0
+        round_half_down(agreed_branches * 1000, total_branches) if total_branches > 0 else 0
     )
 
     latencies = [
-        turn["latency_ms"]
-        for turn in turns
-        if turn["has_latency"] or turn["latency_ms"] > 0
+        turn["latency_ms"] for turn in turns if turn["has_latency"] or turn["latency_ms"] > 0
     ]
-    mean_latency_ms = (
-        round_half_down(sum(latencies), len(latencies))
-        if latencies
-        else 0
-    )
+    mean_latency_ms = round_half_down(sum(latencies), len(latencies)) if latencies else 0
 
     metrics = TrajectoryMetrics(
         {
@@ -1078,15 +1043,9 @@ def export_trajectories(
 ) -> TrajectoryBundle:
     """Build a complete, content-addressed ``exulanica.world-trajectory/v1`` bundle."""
     decision_list = list(decisions)
-    sft_records = extract_sft_records(
-        decision_list, world_id=world_id, version_id=version_id
-    )
-    dpo_pairs = extract_dpo_pairs(
-        decision_list, world_id=world_id, version_id=version_id
-    )
-    metrics = compute_trajectory_metrics(
-        decision_list, world_id=world_id, version_id=version_id
-    )
+    sft_records = extract_sft_records(decision_list, world_id=world_id, version_id=version_id)
+    dpo_pairs = extract_dpo_pairs(decision_list, world_id=world_id, version_id=version_id)
+    metrics = compute_trajectory_metrics(decision_list, world_id=world_id, version_id=version_id)
     body = {
         "profile": TRAJECTORY_PROFILE,
         "world_id": _require_non_empty_str(world_id, "world_id"),
@@ -1112,9 +1071,7 @@ def to_openai_tool_example(record: Mapping[str, Any]) -> dict[str, Any]:
     }
     required = ["action"]
     if takes_line:
-        properties["line"] = {
-            "anyOf": [{"type": "string", "maxLength": 200}, {"type": "null"}]
-        }
+        properties["line"] = {"anyOf": [{"type": "string", "maxLength": 200}, {"type": "null"}]}
         required.append("line")
 
     tool_args = dict(record["tool_call"]["arguments"])
@@ -1246,8 +1203,7 @@ def to_dpo_preference_example(pair: Mapping[str, Any]) -> dict[str, Any]:
 def format_openai_tool_jsonl(sft_records: Sequence[Mapping[str, Any]]) -> str:
     """Serialize SFT records as canonical zero-float OpenAI/NeMo tool-calling JSONL."""
     return "\n".join(
-        canonical_json(to_openai_tool_example(rec)).decode("utf-8")
-        for rec in sft_records
+        canonical_json(to_openai_tool_example(rec)).decode("utf-8") for rec in sft_records
     )
 
 
@@ -1259,16 +1215,13 @@ def format_openenv_jsonl(
 ) -> str:
     """Serialize SFT records as canonical OpenEnv step JSONL."""
     episode = to_openenv_episode(sft_records, world_id=world_id, version_id=version_id)
-    return "\n".join(
-        canonical_json(step).decode("utf-8") for step in episode["steps"]
-    )
+    return "\n".join(canonical_json(step).decode("utf-8") for step in episode["steps"])
 
 
 def format_dpo_jsonl(dpo_pairs: Sequence[Mapping[str, Any]]) -> str:
     """Serialize DPO / validator preference pairs as canonical zero-float JSONL."""
     return "\n".join(
-        canonical_json(to_dpo_preference_example(pair)).decode("utf-8")
-        for pair in dpo_pairs
+        canonical_json(to_dpo_preference_example(pair)).decode("utf-8") for pair in dpo_pairs
     )
 
 

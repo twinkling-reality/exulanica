@@ -304,16 +304,10 @@ def project_decisions_to_trajectory_inputs(
         chosen_label = (
             str(readable["choice"])
             if readable and isinstance(readable.get("choice"), str)
-            else (
-                option_label_by_id.get(str(chosen_opt_id))
-                if chosen_opt_id is not None
-                else None
-            )
+            else (option_label_by_id.get(str(chosen_opt_id)) if chosen_opt_id is not None else None)
         )
         chosen_line = (
-            str(readable["line"])
-            if readable and readable.get("line") is not None
-            else None
+            str(readable["line"]) if readable and readable.get("line") is not None else None
         )
         matched_opt = next((o for o in offered_options if o["label"] == chosen_label), None)
         chosen_action = (
