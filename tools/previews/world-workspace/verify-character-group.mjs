@@ -8,13 +8,13 @@ import { dayWord } from './talk-words.mjs';
 const teo = called({ name: 'Teo' }), marco = called({ name: 'Marco' }), resident = called({ name: null, kind: 'Resident' });
 
 // The words, as J30 has them, for a named person and for one called by their kind.
-assert.equal(dayWord(teo), "Teo's day", 'the talking scene\'s own word (talk-words.mjs), one word for both');
-assert.equal(GROUP_WORDS.decide(teo), "Let Teo's model decide");
-assert.equal(GROUP_WORDS.stop(teo), "Stop Teo's model");
-assert.equal(GROUP_WORDS.choose(teo), "Choose Teo's AI model");
-assert.equal(GROUP_WORDS.follow(teo), 'Follow Teo');
-assert.equal(dayWord(resident), "The resident's day");
-assert.equal(GROUP_WORDS.follow(resident), 'Follow the resident');
+assert.equal(dayWord(teo), 'Activity', 'the talking scene\'s own word (talk-words.mjs), one word for both');
+assert.equal(GROUP_WORDS.decide(teo), 'Run Model');
+assert.equal(GROUP_WORDS.stop(teo), 'Stop Model');
+assert.equal(GROUP_WORDS.choose(teo), 'Model');
+assert.equal(GROUP_WORDS.follow(teo), 'Follow');
+assert.equal(dayWord(resident), 'Activity');
+assert.equal(GROUP_WORDS.follow(resident), 'Follow');
 assert.equal(decidesPrint(teo, { decider: 'model', model: 'Nemotron 3 Nano 30B' }), 'Nemotron 3 Nano 30B decides for Teo');
 assert.equal(decidesPrint(teo, { decider: 'model', model: 'Nemotron 3 Nano 30B', left: '1:52' }), "Teo's model is deciding · 1:52 left");
 // What their model has spent in the run (D9): from its known receipts, "at least" while a cost is not known, nothing before.
@@ -115,24 +115,24 @@ const picture = groupContent({ who: teo, doing: 'Waiting by the bench', said: la
 assert.equal(picture.name, 'Teo');
 assert.equal(picture.doing, 'Waiting by the bench');
 assert.deepEqual({ ...picture.said }, { line: '“Sardines, mostly. Come down early tomorrow.”', under: 'To Marco, 07:10' });
-assert.deepEqual(keys(picture), ["Enter Teo's day", "R Let Teo's model decide", 'V Follow Teo']);
+assert.deepEqual(keys(picture), ['Enter Activity', 'R Run Model', 'V Follow']);
 assert.deepEqual(picture.rows.map(row => row.action), ['details', 'run', 'follow']);
 assert.deepEqual(picture.rows.map(row => row.shortcut), ['Enter', 'R', 'V']);
 assert.equal(picture.print, 'Nemotron 3 Nano 30B decides for Teo');
 // Each row only where it works (K6).
 const running = groupContent({ who: teo, decider: 'model', model: 'Nemotron 3 Nano 30B', running: true, left: '1:52' });
-assert.deepEqual(keys(running), ["Enter Teo's day", "R Stop Teo's model", 'V Follow Teo']);
+assert.deepEqual(keys(running), ['Enter Activity', 'R Stop Model', 'V Follow']);
 assert.equal(running.print, "Teo's model is deciding · 1:52 left");
 assert.equal(groupContent({ who: teo, decider: 'model', model: 'N', running: true, left: '1:52', spent: '$0.0003 spent' }).print, "Teo's model is deciding · 1:52 left · $0.0003 spent");
 assert.equal(groupContent({ who: teo, decider: 'model', model: 'N', spent: '$0.0003 spent' }).print, 'N decides for Teo', 'no run, no spending');
-assert.deepEqual(keys(groupContent({ who: teo, decider: 'model', model: 'M', connected: false })), ["Enter Teo's day", 'V Follow Teo'], 'a model that cannot be asked here: no R');
-assert.deepEqual(keys(groupContent({ who: teo, decider: 'routine', assignable: true })), ["Enter Teo's day", "M Choose Teo's AI model", 'V Follow Teo']);
-assert.deepEqual(keys(groupContent({ who: teo, decider: 'routine', assignable: false })), ["Enter Teo's day", 'V Follow Teo'], 'no M where this page cannot choose');
-assert.deepEqual(keys(groupContent({ who: teo, decider: 'person', model: 'M' })), ["Enter Teo's day", 'V Follow Teo']);
-assert.deepEqual(keys(groupContent({ who: teo, decider: 'external', assignable: true })), ["Enter Teo's day", 'V Follow Teo']);
-assert.deepEqual(keys(groupContent({ who: teo, following: true })), ["Enter Teo's day", 'V Stop following']);
+assert.deepEqual(keys(groupContent({ who: teo, decider: 'model', model: 'M', connected: false })), ['Enter Activity', 'V Follow'], 'a model that cannot be asked here: no R');
+assert.deepEqual(keys(groupContent({ who: teo, decider: 'routine', assignable: true })), ['Enter Activity', 'M Model', 'V Follow']);
+assert.deepEqual(keys(groupContent({ who: teo, decider: 'routine', assignable: false })), ['Enter Activity', 'V Follow'], 'no M where this page cannot choose');
+assert.deepEqual(keys(groupContent({ who: teo, decider: 'person', model: 'M' })), ['Enter Activity', 'V Follow']);
+assert.deepEqual(keys(groupContent({ who: teo, decider: 'external', assignable: true })), ['Enter Activity', 'V Follow']);
+assert.deepEqual(keys(groupContent({ who: teo, following: true })), ['Enter Activity', 'V Stop Following']);
 assert.equal(groupContent({ who: teo, decider: 'routine', running: true, left: '1:52' }).print, 'Teo follows a routine', 'a run on without their model: their routine still decides');
-assert.deepEqual(keys(groupContent({ who: teo, decider: 'routine', running: true, left: '1:52' })), ["Enter Teo's day", 'V Follow Teo'], 'no Stop for someone the run does not ask');
+assert.deepEqual(keys(groupContent({ who: teo, decider: 'routine', running: true, left: '1:52' })), ['Enter Activity', 'V Follow'], 'no Stop for someone the run does not ask');
 // Nothing said yet: both lines are left out; no clock: no time; to everyone near: the time alone.
 assert.equal(groupContent({ who: teo }).said, null);
 assert.equal(groupContent({ who: teo, said: lastSaid(events, 'teo'), toWho: marco, startMinute: null }).said.under, 'To Marco');
@@ -148,7 +148,7 @@ assert.deepEqual({ ...groupContent({ who: teo, reading: true, decider: 'model', 
 const visitor = called({ name: null, kind: 'visitor' });
 const declared = { name: 'Scout', maker: 'Harbour Lab', mind: 'Nemotron 3 Nano 30B' };
 const agentGroup = groupContent({ who: visitor, decider: 'agent', declared, assignable: true, connected: true });
-assert.deepEqual(agentGroup.rows.map(row => `${row.key} ${row.word}`), ["Enter The visitor's day", 'V Follow the visitor']);
+assert.deepEqual(agentGroup.rows.map(row => `${row.key} ${row.word}`), ['Enter Activity', 'V Follow']);
 assert.equal(agentGroup.print, 'An outside AI agent decides for the visitor.');
 assert.equal(agentGroup.declared.map(part => part.words).join(''), 'In its own words: Scout, made by Harbour Lab, thinking with Nemotron 3 Nano 30B.');
 assert.deepEqual(agentGroup.declared.filter(part => part.declared).map(part => part.words), ['Scout', 'Harbour Lab', 'Nemotron 3 Nano 30B']);
@@ -180,10 +180,10 @@ assert.equal(modelsDecide([]), null);
 const limits = { wallSeconds: 600, usd: '0.05000000' };
 const asked = questionGroup({ who: teo, askers: [teo], models: ['Nemotron 3 Nano 30B'], limits, anotherModel: true });
 assert.equal(asked.name, 'Teo');
-assert.equal(asked.doing, 'Run for 10 minutes');
+assert.equal(asked.doing, 'Run · 10 Minutes');
 assert.equal(asked.said, null);
 assert.equal(asked.note, whole("Teo's Nemotron 3 Nano 30B decides."));
-assert.deepEqual(keys(asked), ['Enter Run', 'M Choose another model']);
+assert.deepEqual(keys(asked), ['Enter Run', 'M Change Model']);
 assert.deepEqual(asked.rows.map(row => row.action), ['run', 'model']);
 assert.equal(asked.print, 'At most $0.05');
 assert.equal('after' in asked, false, 'no line on when it stops under the cap');
@@ -204,7 +204,7 @@ assert.equal(questionGroup({ who: teo, askers: [teo, ari], models: ['Qwen3 4B In
   'Qwen3 4B Instruct is not running on this computer now. Start it, then try again.', 'one model for two people is one model');
 assert.equal(questionGroup({ who: teo, models: ['M'], limits, refusal: 'unheard_of' }).print, 'The run did not start. Nothing was spent.');
 assert.equal(questionGroup({ who: teo, askers: [], models: ['M'], limits }).note, whole("Teo's M decides."), 'the chosen one at least');
-assert.equal(questionGroup({ who: teo, models: ['M'], limits: { wallSeconds: 300, usd: '0.02000000' } }).doing, 'Run for 5 minutes');
+assert.equal(questionGroup({ who: teo, models: ['M'], limits: { wallSeconds: 300, usd: '0.02000000' } }).doing, 'Run · 5 Minutes');
 // Whose model is whose (F9): the note pairs each person with theirs, and the small print is the cap alone.
 const three = questionGroup({ who: teo, askers: [teo, ari, resident], models: [nano, qwen, sup], limits });
 assert.equal(three.note, whole("Teo's Nemotron 3 Nano 30B, Ari's Qwen3 235B Instruct and the resident's Nemotron 3 Super 120B decide."));

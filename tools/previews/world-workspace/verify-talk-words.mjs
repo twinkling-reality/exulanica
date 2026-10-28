@@ -40,9 +40,9 @@ assert.equal(heardRow(resident, 'Calm water.'), 'Heard the resident: \u201cCalm 
 assert.equal(saidRow(ines, 'Calm water today, Ines.'), 'Said to Ines: \u201cCalm water today, Ines.\u201d');
 assert.equal(saidRow(null, 'Calm water today.'), 'Said: \u201cCalm water today.\u201d');
 // Talking while following (T9): the speaker's page, whom the line now was said to, the orb's letter.
-assert.equal(SCENE_WORDS.stopFollowing, 'Stop following');
-assert.equal(dayWord(ines), "Ines's day");
-assert.equal(dayWord(resident), "The resident's day");
+assert.equal(SCENE_WORDS.stopFollowing, 'Stop Following');
+assert.equal(dayWord(ines), 'Activity');
+assert.equal(dayWord(resident), 'Activity');
 assert.equal(plateTo(teo), 'to Teo');
 assert.equal(plateTo(resident), 'to the resident');
 assert.equal(plateTo(null), 'to everyone nearby');

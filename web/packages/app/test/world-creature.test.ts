@@ -94,7 +94,7 @@ describe('making a creature where it will stand', () => {
     const { deps, calls, root } = world();
     await openCreatureScreen(deps);
     const pill = root.querySelector<HTMLButtonElement>('.wu-creature-field .wu-composer-pill')!;
-    expect(pill.textContent).toBe('Make↵');
+    expect(pill.textContent).toBe('Create↵');
     expect(pill.getAttribute('aria-disabled')).toBe('true');
     const field = root.querySelector('textarea')!;
     field.value = '  ';
@@ -354,8 +354,8 @@ describe('making a creature where it will stand', () => {
     opened.key(press('Enter'));
     await settle();
     expect(root.textContent).toContain('This world has no flying creatures yet.');
-    // Changed words may pass: Try again shows, and Enter goes back to the field with the words kept.
-    expect(root.querySelector('.wu-creature-group [aria-keyshortcuts="Enter"]')?.textContent).toBe('Try again');
+    // Changed words may pass: Try Again shows, and Enter goes back to the field with the words kept.
+    expect(root.querySelector('.wu-creature-group [aria-keyshortcuts="Enter"]')?.textContent).toBe('Try Again');
     expect(opened.key(press('Enter'))).toBe(true);
     expect(root.querySelector('textarea')?.value).toBe('a winged body that flies');
     expect(opened.key(press('Escape'))).toBe(true);
@@ -387,7 +387,7 @@ describe('making a creature where it will stand', () => {
       // Nothing carries on at the server, so the live spend goes; nothing was spent, so no spend.
       expect(root.textContent).not.toContain('of up to');
       expect(root.textContent).not.toContain('Spent');
-      expect(root.querySelector('.wu-creature-group [aria-keyshortcuts="Enter"]')?.textContent ?? null).toBe(retry ? 'Try again' : null);
+      expect(root.querySelector('.wu-creature-group [aria-keyshortcuts="Enter"]')?.textContent ?? null).toBe(retry ? 'Try Again' : null);
       // Enter tries again only where Try again shows: back to the field, the words kept.
       expect(opened.key(press('Enter'))).toBe(retry);
       expect(root.querySelector('.wu-creature-group') === null).toBe(retry);
@@ -420,8 +420,8 @@ describe('making a creature where it will stand', () => {
           .toBe('This page can\'t tell how the making went. If the creature was made, it waits in Creatures.');
         // No step is left under way: making the creature is drawn as not done, with its time.
         expect(root.querySelector('.wu-making-step[aria-current="step"]')).toBeNull();
-        expect(root.querySelector('.wu-making-step[data-state="next"]')?.textContent).toMatch(/^Making the creature\d+ s$/);
-        expect(root.querySelector('.wu-creature-group [aria-keyshortcuts="Enter"]')?.textContent).toBe('Try again');
+        expect(root.querySelector('.wu-making-step[data-state="next"]')?.textContent).toMatch(/^Generating Creature\d+ s$/);
+        expect(root.querySelector('.wu-creature-group [aria-keyshortcuts="Enter"]')?.textContent).toBe('Try Again');
         expect(opened.key(press('Enter'))).toBe(true);
         expect(root.querySelector('textarea')?.value).toBe('a round yellow body');
         expect(calls.ask).toEqual(['a round yellow body']);
@@ -715,7 +715,7 @@ describe('web notes before a creature is made', () => {
     const { deps, root } = noted([]);
     await openCreatureScreen(deps);
     const chip = root.querySelector<HTMLButtonElement>('.wu-creature-field .wu-composer-chip')!;
-    expect(chip.textContent).toBe('Search the web');
+    expect(chip.textContent).toBe('Web Search');
     expect(chip.getAttribute('aria-pressed')).toBe('false');
     expect(root.querySelector(`#${chip.getAttribute('aria-describedby')}`)?.textContent)
       .toBe('Looks up what such a creature looks like before it is made: up to 3 searches with Tavily, which keeps them. Adds at most $0.02.');
@@ -763,10 +763,10 @@ describe('web notes before a creature is made', () => {
     await settle();
     // Create's making view: one row a step, its time in seconds; the draft's own wait is part of making the creature.
     const rows = [...root.querySelectorAll('.wu-making-step')].map((row) => [row.querySelector('.wu-making-words')?.textContent, row.querySelector('.wu-making-time')?.textContent]);
-    expect(rows.map(([words]) => words)).toEqual(['Waiting to start', 'Choosing what to look up', 'Searching the web', 'Writing notes from what it found', 'Making the creature']);
+    expect(rows.map(([words]) => words)).toEqual(['Queued', 'Planning Queries', 'Searching Web', 'Synthesizing Context', 'Generating Creature']);
     for (const [, time] of rows) expect(time).toMatch(/^\d+ s$/);
     const notes = root.querySelector('.wu-creature-group .wu-making-web')!;
-    expect(notes.querySelector('.wu-making-kind')?.textContent).toBe('FROM THE WEB, 3 SEARCHES');
+    expect(notes.querySelector('.wu-making-kind')?.textContent).toBe('Web References · 3 Searches');
     expect([...notes.querySelectorAll('.wu-making-note')].map((note) => note.textContent)).toEqual(seven.map((note, at) => `${({ anatomy: 'Anatomy', materials_and_colour: 'Materials and colour', scale: 'Scale', part_layout: 'Part layout' } as Record<string, string>)[note.aspect]}Note ${at + 1} on a round body`));
     // No line on what wrote them, and none left out.
     expect(notes.textContent).not.toContain('A model wrote these');

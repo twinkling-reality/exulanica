@@ -3,10 +3,10 @@
 // Refusals are sentences by code, drawn in the refusal ink; no sentence names a key.
 
 export const KEEP_WORDS = Object.freeze({
-  keepInProject: 'Keep in a project',
-  keepOnGitHub: 'Keep on GitHub',
+  keepInProject: 'Save Project',
+  keepOnGitHub: 'Save to GitHub',
   create: 'Create',
-  tryAgain: 'Try again',
+  tryAgain: 'Try Again',
   back: 'Back',
   account: 'GitHub account',
   name: 'Repository name',

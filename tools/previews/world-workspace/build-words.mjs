@@ -372,7 +372,7 @@ export function heldRows(state) {
   const turn = { key: '[ ]', word: 'Turn', shortcut: '[ ]', action: 'turn-right' };
   const remove = { key: 'Del', word: 'Remove', shortcut: 'Delete', action: 'remove' };
   if (state.placing || state.moving) {
-    const back = { key: 'Esc', word: 'Put back', shortcut: 'Escape', action: 'put-back' };
+    const back = { key: 'Esc', word: 'Cancel', shortcut: 'Escape', action: 'put-back' };
     if (state.refused) return [back];
     return [
       { key: 'mouse-click', word: 'Place', shortcut: 'Enter', action: 'place', disabled: !state.ready },

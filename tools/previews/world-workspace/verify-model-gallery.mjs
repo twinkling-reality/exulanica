@@ -22,12 +22,12 @@ const read = { takesModelChoices: true, models, requestTokensAtMost: 7200, decis
 
 const page = galleryPage({ read, who: sami, doing: 'Resting at the bench', current: null });
 assert.equal(page.over, 'Sami Sorrel · Resting at the bench');
-assert.equal(page.title, 'Choose an AI model for Sami Sorrel');
+assert.equal(page.title, 'Select Model · Sami Sorrel');
 // No line on what the models are or what picking costs, no maker's marks (ROOT's sweep of 27 October).
 assert.equal('role' in page, false);
 // This computer first, then the key's group by price, never ranked; Routine last under No AI model.
 assert.deepEqual(page.groups.map(group => [group.label, group.rows.map(row => [row.key, row.name, row.sub, row.cost, row.current])]), [
-  ['On this computer, free', [['1', 'Qwen3 4B Instruct', 'Qwen · 4B', 'Free', false]]],
+  ['Local Models (Free)', [['1', 'Qwen3 4B Instruct', 'Qwen · 4B', 'Free', false]]],
   ['With your Nebius key', [
     ['2', 'DeepSeek V4 Flash', 'DeepSeek', 'at most $0.003 a decision', false],
     ['3', 'Qwen3 235B Instruct', 'Qwen · 235B, 22B at work at a time · decided 9 times here', 'about $0.0002 a decision', false],
@@ -36,7 +36,7 @@ assert.deepEqual(page.groups.map(group => [group.label, group.rows.map(row => [r
   ['No AI model', [['5', 'Routine', null, 'Free', true]]],
 ]);
 assert.equal(page.rows.some(row => 'mark' in row), false);
-assert.deepEqual(page.keys.map(key => [key.caps.join(key.through ? ' to ' : ' '), key.word]), [['↑ ↓', 'Move'], ['1 to 5', 'Choose at once'], ['Esc', 'Back']]);
+assert.deepEqual(page.keys.map(key => [key.caps.join(key.through ? ' to ' : ' '), key.word]), [['↑ ↓', 'Navigate'], ['1 to 5', 'Select'], ['Esc', 'Back']]);
 // A guest's page: the server's budget names the group (C4's own-key words are a person's own install's).
 const served = galleryPage({ read, who: sami, fromServer: true });
 assert.deepEqual(served.groups.map(group => group.label), ['On this server, free', "From this server's budget", 'No AI model'], 'a guest\'s own computer runs nothing here');
@@ -65,19 +65,19 @@ assert.deepEqual(asked.facts.map(fact => [fact.key, fact.value]), [
   ['Size', '235 billion parameters, 22 billion at work at a time'],
   ['Reads', 'Text, up to 262,144 tokens at once'],
   ['Licence', 'Apache 2.0'],
-  ['A decision', 'About $0.0002 a decision here (the middle of 9); at most $0.005, its largest request and longest answer, twice. $0.20 in and $0.60 out per million tokens.'],
-  ['In this world', 'Decided 9 times'],
+  ['Cost per Decision', 'About $0.0002 a decision here (the middle of 9); at most $0.005, its largest request and longest answer, twice. $0.20 in and $0.60 out per million tokens.'],
+  ['Usage', 'Decided 9 times'],
 ]);
 assert.equal(asked.act, 'Choose it for Sami Sorrel');
 assert.equal('then' in asked, false);
 const never = galleryDetail({ read, row: rowForKey(page, '2'), who: sami });
-assert.deepEqual(never.facts.map(fact => fact.key), ['Reads', 'Licence', 'A decision', 'In this world'], 'no size where its card states none');
-assert.equal(never.facts.find(fact => fact.key === 'A decision').value, 'At most $0.003, its largest request and longest answer, twice. $0.14 in and $0.28 out per million tokens.');
+assert.deepEqual(never.facts.map(fact => fact.key), ['Reads', 'Licence', 'Cost per Decision', 'Usage'], 'no size where its card states none');
+assert.equal(never.facts.find(fact => fact.key === 'Cost per Decision').value, 'At most $0.003, its largest request and longest answer, twice. $0.14 in and $0.28 out per million tokens.');
 assert.equal(never.facts.at(-1).value, 'Not asked here yet');
 // A middle under the smallest figure says so, never "about less than".
 const tiny = { ...read, byModel: [{ ...read.byModel[0], costMedianUsd: '0.00000400' }] };
 assert.equal(galleryPage({ read: tiny, who: sami }).groups[1].rows[1].cost, 'less than $0.0001 a decision');
-assert.match(galleryDetail({ read: tiny, row: rowForKey(page, '3'), who: sami }).facts.find(fact => fact.key === 'A decision').value, /^Less than \$0\.0001 a decision here \(the middle of 9\)/u);
+assert.match(galleryDetail({ read: tiny, row: rowForKey(page, '3'), who: sami }).facts.find(fact => fact.key === 'Cost per Decision').value, /^Less than \$0\.0001 a decision here \(the middle of 9\)/u);
 // Routine in focus: its name and choosing it, nothing on what the routine is.
 const routine = galleryDetail({ read, row: rowForKey(page, '5'), who: sami });
 assert.deepEqual([routine.name, routine.act, routine.why], ['Routine', 'Choose the routine for Sami Sorrel', []]);
@@ -119,13 +119,13 @@ assert.equal(checkedHere.by, null);
 const idle = galleryPage({ read: { ...read, models: [{ ...models[3], refusal: 'provider_not_running' }, ...models.slice(0, 3)] }, who: sami });
 assert.deepEqual(idle.groups.map(group => group.label), ['With your Nebius key', 'No AI model']);
 
-// Opened from the Integrations page with nobody to choose for: "Models", the same groups and rows, no number keys
+// Opened from the Integrations page with nobody to choose for: "Available Models", the same groups and rows, no number keys
 // and nothing to choose.
 const listed = galleryPage({ read, browse: true });
-assert.equal(listed.title, 'Models');
+assert.equal(listed.title, 'Available Models');
 assert.equal(listed.over, '');
 assert.deepEqual(listed.groups.map(group => group.label), page.groups.map(group => group.label));
-assert.deepEqual(listed.keys.map(key => key.word), ['Move', 'Back']);
+assert.deepEqual(listed.keys.map(key => key.word), ['Navigate', 'Back']);
 assert.equal(listed.rows.some(row => row.current), false, 'nobody\'s choice is current in a list for nobody');
 assert.equal(galleryDetail({ read, row: rowForKey(listed, '3'), browse: true }).act, null);
 assert.equal(galleryDetail({ read, row: rowForKey(listed, '5'), browse: true }).act, null);

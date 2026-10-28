@@ -49,7 +49,7 @@ describe('the composer', () => {
     document.body.append(box.root);
     expect(box.field.tagName).toBe('TEXTAREA');
     expect(box.field.placeholder).toBe('A cozy little town by the sea at dusk');
-    expect(box.field.getAttribute('aria-label')).toBe('Describe it');
+    expect(box.field.getAttribute('aria-label')).toBe('Prompt');
     expect([...box.root.querySelectorAll('button')]).toEqual([box.pill]);
     expect(box.pill.textContent).toBe('Create↵');
     expect(box.pill.getAttribute('aria-keyshortcuts')).toBe('Enter');
@@ -94,7 +94,7 @@ describe('the composer', () => {
     box.offerWeb({ on: true, tip, onChange: (on) => heard.push(on) });
     const chip = box.web!;
     expect(chip.tagName).toBe('BUTTON');
-    expect(chip.textContent).toBe('Search the web');
+    expect(chip.textContent).toBe('Web Search');
     expect(chip.getAttribute('aria-pressed')).toBe('true');
     expect(chip.hasAttribute('title')).toBe(false);
     const said = document.getElementById(chip.getAttribute('aria-describedby')!)!;
@@ -124,10 +124,10 @@ describe('the strip of ready worlds', () => {
     return { shown, started };
   };
 
-  it('names each card, says READY WORLD over a ready world and EMPTY over Blank, last, and makes one Tab stop', async () => {
+  it('names each card, says Ready World over a ready world and Empty over Blank, last, and makes one Tab stop', async () => {
     const { shown, started } = await strip();
     expect(shown.cards.map(nameOf)).toEqual(['A small town', 'Wall city', 'Blank']);
-    expect(shown.cards.map((card) => document.getElementById(card.getAttribute('aria-describedby')!)!.textContent)).toEqual(['READY WORLD', 'READY WORLD', 'EMPTY']);
+    expect(shown.cards.map((card) => document.getElementById(card.getAttribute('aria-describedby')!)!.textContent)).toEqual(['Ready World', 'Ready World', 'Empty']);
     expect(shown.cards.map((card) => card.tabIndex)).toEqual([0, -1, -1]);
     expect(shown.cards[0]!.getAttribute('aria-current')).toBe('true');
     expect(shown.cards.map((card) => card.dataset['picture'])).toEqual(['served', 'none', 'blank']);
@@ -135,7 +135,7 @@ describe('the strip of ready worlds', () => {
     expect(shown.cards[0]!.querySelector('img')!.alt).toBe('');
     expect(shown.cards[1]!.querySelector('img')).toBeNull();
     // No price or sub-line under a name (the mock): its kind and its name alone.
-    expect(shown.cards[1]!.textContent).toBe('READY WORLDWall city');
+    expect(shown.cards[1]!.textContent).toBe('Ready WorldWall city');
     shown.cards[1]!.click();
     expect(started).toEqual(['kind:wall']);
     expect(shown.root.getAttribute('role')).toBe('group');
@@ -203,17 +203,17 @@ describe('the making view', () => {
   it('marks the running step and says each new one once in a polite live region', async () => {
     const create = await parts();
     const shown = create.makingSteps();
-    shown.set([{ words: 'Worked out what to make', state: 'done', time: '1 s' }, { words: 'Planning the place', state: 'now', time: '6 s' }]);
+    shown.set([{ words: 'Planning Layout', state: 'done', time: '1 s' }, { words: 'Designing World', state: 'now', time: '6 s' }]);
     document.body.append(shown.root);
     const live = shown.root.querySelector('[aria-live]')!;
     expect(live.getAttribute('aria-live')).toBe('polite');
-    expect(live.textContent).toBe('Planning the place');
+    expect(live.textContent).toBe('Designing World');
     const now = shown.root.querySelector('[aria-current="step"]')!;
-    expect(now.querySelector('.wu-making-words')!.textContent).toBe('Planning the place');
+    expect(now.querySelector('.wu-making-words')!.textContent).toBe('Designing World');
     expect(now.querySelector('.wu-making-now')!.getAttribute('aria-hidden')).toBe('true');
     expect(shown.root.querySelectorAll('[aria-current]')).toHaveLength(1);
-    shown.set([{ words: 'Worked out what to make', state: 'done', time: '1 s' }, { words: 'Planning the place', state: 'done', time: '9 s' }, { words: 'Building it', state: 'now', time: '12 s' }]);
-    expect(live.textContent).toBe('Building it');
+    shown.set([{ words: 'Planning Layout', state: 'done', time: '1 s' }, { words: 'Designing World', state: 'done', time: '9 s' }, { words: 'Building World', state: 'now', time: '12 s' }]);
+    expect(live.textContent).toBe('Building World');
     expect(shown.root.querySelectorAll('.wu-making-step')).toHaveLength(3);
     expect(shown.root.querySelectorAll('.wu-making-now')).toHaveLength(1);
     expect(shown.root.querySelector('[aria-current="step"] .wu-making-time')!.textContent).toBe('12 s');
@@ -222,12 +222,12 @@ describe('the making view', () => {
   it('keeps each step\'s row across reads, so a time changes in place', async () => {
     const create = await parts();
     const shown = create.makingSteps();
-    shown.set([{ key: 'queued', words: 'Waiting to start', state: 'now', time: '0 s' }]);
+    shown.set([{ key: 'queued', words: 'Queued', state: 'now', time: '0 s' }]);
     const row = shown.root.querySelector('.wu-making-step');
-    shown.set([{ key: 'queued', words: 'Waiting to start', state: 'now', time: '1 s' }]);
-    shown.set([{ key: 'queued', words: 'Waiting to start', state: 'done', time: '2 s' }, { key: 'choosing', words: 'Worked out what to make', state: 'now', time: '3 s' }]);
+    shown.set([{ key: 'queued', words: 'Queued', state: 'now', time: '1 s' }]);
+    shown.set([{ key: 'queued', words: 'Queued', state: 'done', time: '2 s' }, { key: 'choosing', words: 'Planning Layout', state: 'now', time: '3 s' }]);
     expect(shown.root.querySelector('.wu-making-step')).toBe(row);
-    expect(row!.textContent).toBe('Waiting to start2 s');
+    expect(row!.textContent).toBe('Queued2 s');
   });
 
   it('says the web notes under their label, each under its aspect, or the line in their place', async () => {
@@ -235,12 +235,12 @@ describe('the making view', () => {
     const web = webNotes();
     document.body.append(web.root);
     expect(web.root.hidden).toBe(true);
-    web.notes('FROM THE WEB, 3 SEARCHES', [{ aspect: 'buildings', text: 'Low clusters of buildings with simple gabled roofs.' }]);
+    web.notes('Web References · 3 Searches', [{ aspect: 'buildings', text: 'Low clusters of buildings with simple gabled roofs.' }]);
     expect(web.root.hidden).toBe(false);
-    expect(nameOf(web.root)).toBe('FROM THE WEB, 3 SEARCHES');
+    expect(nameOf(web.root)).toBe('Web References · 3 Searches');
     expect([...web.root.querySelectorAll('.wu-making-note')].map((note) => note.textContent)).toEqual(['BuildingsLow clusters of buildings with simple gabled roofs.']);
-    web.instead('FROM THE WEB', 'The web notes could not be made, so it is made from your words alone.');
-    expect(web.root.textContent).toBe('FROM THE WEBThe web notes could not be made, so it is made from your words alone.');
+    web.instead('Web References', 'The web notes could not be made, so it is made from your words alone.');
+    expect(web.root.textContent).toBe('Web ReferencesThe web notes could not be made, so it is made from your words alone.');
   });
 });
 
@@ -436,20 +436,20 @@ describe('Create a world as a page', () => {
       key(field(), 'Enter');
       // Nothing awaited: the view is there before the start answers.
       expect(making()).toBe(true);
-      expect(document.querySelector('h1.wu-create-title')!.textContent).toBe('Creating your world');
+      expect(document.querySelector('h1.wu-create-title')!.textContent).toBe('Creating World');
       expect(document.querySelector('.wu-making-quote')!.textContent).toBe('“A cozy little town by the sea at dusk”');
-      expect(stepRows()).toEqual([['Waiting to start', 'now', '0 s']]);
+      expect(stepRows()).toEqual([['Queued', 'now', '0 s']]);
       expect(document.querySelector('.wu-strip, .wu-composer')).toBeNull();
       await settle();
       expect(starts.map((one) => one.words)).toEqual(['A cozy little town by the sea at dusk']);
       now += 2_400;
       await new Promise((resolve) => setTimeout(resolve, 1_200));
-      expect(stepRows()).toEqual([['Waiting to start', 'now', '2 s']]);
+      expect(stepRows()).toEqual([['Queued', 'now', '2 s']]);
       // Answered, the draft's own steps follow the wait, which ends where they begin.
       answer({ draftId: 'd-1', state: 'queued', refusal: null });
       await settle();
-      expect(stepRows()[0]).toEqual(['Waiting to start', 'done', '2 s']);
-      expect(stepRows()[1]).toEqual(['Building it', 'now', '1 s']);
+      expect(stepRows()[0]).toEqual(['Queued', 'done', '2 s']);
+      expect(stepRows()[1]).toEqual(['Building World', 'now', '1 s']);
     });
 
     it('sends no second start for a second Enter, or a press, while the first is in flight', async () => {
@@ -539,12 +539,12 @@ describe('Create a world as a page', () => {
       expect(starts.map((one) => one.words)).toEqual(['A quiet valley']);
     });
 
-    it('says "Describe it" for an Enter with no words, and starts nothing', async () => {
+    it('says "Prompt" for an Enter with no words, and starts nothing', async () => {
       serve(offerOf());
       await mount();
       type(field(), '');
       key(field(), 'Enter');
-      expect(why()).toBe('Describe it');
+      expect(why()).toBe('Prompt');
       expect(price()).toBe('up to $1.43');
       expect(starts).toEqual([]);
       type(field(), 'A');
@@ -589,7 +589,7 @@ describe('Create a world as a page', () => {
         const said = `${order.join(', ')}: ${first}`;
         // Started only with the offer read and words typed before it; else a reason, never nothing.
         const could = order.indexOf('offer') < order.indexOf('enter') && order.indexOf('type') < order.indexOf('enter');
-        expect(said).toBe(`${order.join(', ')}: ${could ? 'started' : order.indexOf('offer') > order.indexOf('enter') ? 'Reading what you can make here…' : 'Describe it'}`);
+        expect(said).toBe(`${order.join(', ')}: ${could ? 'started' : order.indexOf('offer') > order.indexOf('enter') ? 'Reading what you can make here…' : 'Prompt'}`);
         expect(starts).toHaveLength(could ? 1 : 0);
         // With everything in, an Enter starts.
         if (!could) {
@@ -839,11 +839,11 @@ describe('Create a world as a page', () => {
     card.click();
     // At once, the start not yet answered: the making view, the card's name, and its one live step timed from the press.
     expect(document.querySelector('.wu-making-quote')!.textContent).toBe('Small town');
-    expect(document.querySelector('h1.wu-create-title')!.textContent).toBe('Creating your world');
-    expect(stepRows()).toEqual([['Building it', 'now', '0 s']]);
+    expect(document.querySelector('h1.wu-create-title')!.textContent).toBe('Creating World');
+    expect(stepRows()).toEqual([['Building World', 'now', '0 s']]);
     now += 7_400;
     vi.advanceTimersByTime(1_000);
-    expect(stepRows()).toEqual([['Building it', 'now', '7 s']]);
+    expect(stepRows()).toEqual([['Building World', 'now', '7 s']]);
     // No card, composer or Create is left to press; Enter, and the pressed card again, start nothing.
     expect(document.querySelector('.wu-strip-card, .wu-composer, .wu-composer-pill')).toBeNull();
     key(document.querySelector('section.wu-create')!, 'Enter');
@@ -1031,7 +1031,7 @@ describe('Create a world with web notes', () => {
   it('searches the web first by default, prices the notes, drafts with them and says what they gave', async () => {
     serveNotes([request('running'), KEPT], [{ ...READY, references: { state: 'used', reference_id: 'r-1', code: null, detail: null, notes: 2, bundle_sha256: 'a'.repeat(64), basis: ['web_description'], searches: 3, spent_usd: '0.00200000' } }]);
     await mountNotes();
-    expect(chip().textContent).toBe('Search the web');
+    expect(chip().textContent).toBe('Web Search');
     expect(chip().getAttribute('aria-pressed')).toBe('true');
     expect(document.getElementById(chip().getAttribute('aria-describedby')!)!.textContent)
       .toBe('Looks up what such a place looks like before it is made: up to 3 searches with Tavily, which keeps them. Adds at most $0.02.');
@@ -1045,7 +1045,7 @@ describe('Create a world with web notes', () => {
     key(field(), 'Enter');
     // The making view at once, the wait first, before the notes request answers.
     expect(making()).toBe(true);
-    expect(stepRows()[0]).toEqual(['Waiting to start', 'now', '0 s']);
+    expect(stepRows()[0]).toEqual(['Queued', 'now', '0 s']);
     await settle();
     await new Promise((resolve) => setTimeout(resolve, 1100));
     await settle(); await settle();
@@ -1053,15 +1053,15 @@ describe('Create a world with web notes', () => {
     expect(posted.body).toMatchObject({ purpose: 'world_draft', description: 'a cozy little town by the sea at dusk', web: true });
     expect(starts.map((one) => one.reference)).toEqual(['r-1']);
     const web = document.querySelector('.wu-making-web')!;
-    expect(web.querySelector('.wu-making-kind')!.textContent).toBe('FROM THE WEB, 3 SEARCHES');
+    expect(web.querySelector('.wu-making-kind')!.textContent).toBe('Web References · 3 Searches');
     expect([...web.querySelectorAll('.wu-making-note')].map((note) => note.textContent)).toEqual([
       'BuildingsNarrow terraced houses in soft pastel colours', 'Vehicles and boatsSmall wooden fishing boats moored in a row',
     ]);
     // No line of explanation under the notes (the mock).
     expect(web.textContent).not.toContain('A model wrote these');
     const words = stepRows().map((row) => row[0]);
-    expect(words.slice(0, 4)).toEqual(['Waiting to start', 'Choosing what to look up', 'Searching the web', 'Writing notes from what it found']);
-    expect(words.filter((one) => one === 'Waiting to start')).toHaveLength(1);
+    expect(words.slice(0, 4)).toEqual(['Queued', 'Planning Queries', 'Searching Web', 'Synthesizing Context']);
+    expect(words.filter((one) => one === 'Queued')).toHaveLength(1);
     await settle(); await settle();
     const handed = JSON.parse(sessionStorage.getItem('exulanica.made.v1') ?? 'null') as { line: string | null } | null;
     expect(handed?.line?.startsWith('2 notes from the web · spent $')).toBe(true);
@@ -1079,7 +1079,7 @@ describe('Create a world with web notes', () => {
     key(field(), 'Enter');
     await settle(); await settle();
     expect(starts.map((one) => one.reference)).toEqual([null]);
-    expect(document.querySelector('.wu-making-web')!.textContent).toBe('FROM THE WEBThe web notes could not be made, so it is made from your words alone.');
+    expect(document.querySelector('.wu-making-web')!.textContent).toBe('Web ReferencesThe web notes could not be made, so it is made from your words alone.');
   });
 
   describe('the start after the notes (the judges\' server, 27 October: a quote expired while the notes ran)', () => {
@@ -1106,7 +1106,7 @@ describe('Create a world with web notes', () => {
       expect(starts.map((one) => one.reference)).toEqual(['r-1', 'r-1']);
       // Following the draft on the making view, never left on the notes' last step.
       expect(making()).toBe(true);
-      expect(stepRows().map((row) => row[0])).toContain('Building it');
+      expect(stepRows().map((row) => row[0])).toContain('Building World');
       expect(document.body.textContent).not.toMatch(/price changed|price went up/u);
     });
 

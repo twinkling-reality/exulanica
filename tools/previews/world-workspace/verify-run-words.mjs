@@ -62,7 +62,7 @@ assert.equal(defaultRunLimits(10, 4000).decisions, 10_000);
 assert.equal(DEFAULT_RUN.usd, '0.05000000');
 
 // The frames' words (08, 09).
-assert.equal(runFor(limits), 'Run for 10 minutes');
+assert.equal(runFor(limits), 'Run · 10 Minutes');
 assert.equal(atMost(limits, true), 'At most $0.05');
 assert.equal(runLength(limits), '10 minutes · at most $0.05');
 // A run whose every model is on this computer says no money figure: free (A2).

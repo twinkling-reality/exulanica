@@ -8,16 +8,16 @@ import { choosableModels, overRows } from './character-group.mjs';
 import { PROVIDER_NAMES } from './create-words.mjs';
 
 export const GALLERY_WORDS = Object.freeze({
-  title: who => `Choose an AI model for ${who.within}`,
+  title: who => `Select Model · ${who.within}`,
   /** The list opened with nobody to choose for (the Integrations page's Models): the models, and nothing chosen. */
-  browse: 'Models',
+  browse: 'Available Models',
   noModel: CHARACTER_WORDS.noModel,
   choose: who => `Choose it for ${who.within}`,
   chooseRoutine: who => `Choose the routine for ${who.within}`,
-  inWords: "In its maker's words",
+  inWords: 'Overview',
   learnMore: 'Learn more on its model card ↗',
-  move: 'Move',
-  chooseAtOnce: 'Choose at once',
+  move: 'Navigate',
+  chooseAtOnce: 'Select',
   back: CHARACTER_WORDS.back,
 });
 
@@ -176,11 +176,11 @@ export function galleryDetail({ read, row, who = called({ name: null, kind: null
     const here = hereOf(read, model);
     const most = `at most ${amount(model.decisionMostUsd)}, its largest request and longest answer, ${attemptsWord(model)}.`;
     const perMillion = model.price ? ` ${amount(model.price.input)} in and ${amount(model.price.output)} out per million tokens.` : '';
-    facts.push(['A decision', here?.costMedianUsd
+    facts.push(['Cost per Decision', here?.costMedianUsd
       ? `${capital(about(here.costMedianUsd))} a decision here (the middle of ${here.costsCounted}); ${most}${perMillion}`
       : `${capital(most)}${perMillion}`]);
-  } else if (model.local === true) facts.push(['A decision', CHARACTER_WORDS.free]);
-  facts.push(['In this world', decidedHere(read, hereOf(read, model), { sentence: true })]);
+  } else if (model.local === true) facts.push(['Cost per Decision', CHARACTER_WORDS.free]);
+  facts.push(['Usage', decidedHere(read, hereOf(read, model), { sentence: true })]);
   return Object.freeze({
     name: model.name,
     by: card ? `By ${card.maker}` : null, link: card?.source ?? null,

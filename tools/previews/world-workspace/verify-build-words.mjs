@@ -399,12 +399,12 @@ assert.equal(buildKeys().find(({ word }) => word === 'Redo').shortcut, 'Shift+Me
 // The held group's rows in each state (ruling W10), each pressing what its key does.
 const rows = (state) => heldRows(state).map(({ key, word }) => [key, word]);
 assert.deepEqual(rows({}), [['mouse-click', 'Move'], ['[ ]', 'Turn'], ['Del', 'Remove']]);
-assert.deepEqual(rows({ moving: true, ready: true }), [['mouse-click', 'Place'], ['[ ]', 'Turn'], ['Del', 'Remove'], ['Esc', 'Put back']]);
+assert.deepEqual(rows({ moving: true, ready: true }), [['mouse-click', 'Place'], ['[ ]', 'Turn'], ['Del', 'Remove'], ['Esc', 'Cancel']]);
 assert.equal(heldRows({ moving: true, ready: false })[0].disabled, true);
 assert.equal(heldRows({ moving: true, ready: true })[0].disabled, false);
-assert.deepEqual(rows({ placing: true, ready: true }), [['mouse-click', 'Place'], ['[ ]', 'Turn'], ['Esc', 'Put back']]);
-assert.deepEqual(rows({ moving: true, refused: true }), [['Esc', 'Put back']]);
-assert.deepEqual(rows({ placing: true, refused: true }), [['Esc', 'Put back']]);
+assert.deepEqual(rows({ placing: true, ready: true }), [['mouse-click', 'Place'], ['[ ]', 'Turn'], ['Esc', 'Cancel']]);
+assert.deepEqual(rows({ moving: true, refused: true }), [['Esc', 'Cancel']]);
+assert.deepEqual(rows({ placing: true, refused: true }), [['Esc', 'Cancel']]);
 assert.deepEqual(rows({ confirming: true }), [['Enter', 'Remove'], ['Esc', 'Keep']]);
 // After a removal was refused (people live or work there), the rows offer moving it, not removing it again.
 assert.deepEqual(rows({ removeRefused: true }), [['mouse-click', 'Move'], ['[ ]', 'Turn']]);

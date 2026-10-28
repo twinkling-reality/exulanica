@@ -271,7 +271,13 @@ export function openCharacterPage(host: HTMLElement, act: Act): CharacterPage {
       last = state;
       render();
     },
-    hide(hidden) { sheet.root.hidden = hidden; },
+    hide(hidden) {
+      const was = sheet.root.hidden;
+      sheet.root.hidden = hidden;
+      if (was && !hidden && !sheet.root.contains(document.activeElement)) {
+        sheet.root.querySelector<HTMLElement>('[data-focus-key="title"]')?.focus({ preventScroll: true });
+      }
+    },
     close() {
       removeEventListener('resize', resized);
       if (savedTimer) clearTimeout(savedTimer);

@@ -761,7 +761,7 @@ export function mountHistory(host: HistoryHost): History {
       if (moment) {
         content.append(openedView(moment, layout));
         if (moment.lines.length > 1) keys.append(keyButton(['↑', '↓'], PATH_WORDS.chooseLine, () => chooseLine(1)));
-        if (host.openDecision) keys.append(keyButton(['Enter'], PATH_WORDS.seeDecision, () => seeDecision()));
+        if (host.openDecision && decisionOf(moment)) keys.append(keyButton(['Enter'], PATH_WORDS.seeDecision, () => seeDecision()));
       } else if (changes) {
         const list = changesView(changes, layout);
         content.append(list.view);
@@ -879,7 +879,9 @@ export function mountHistory(host: HistoryHost): History {
   /** Opens the chosen moment, or a grouped changes dot's list, on the same page. */
   function openMoment(id: string) {
     chosen = id;
-    opened = { id, line: 0, first: 0 };
+    const moment = moments().find((one) => one.id === id);
+    const firstDecided = moment ? moment.lines.findIndex((one: Json) => Boolean(one.request || one.by)) : -1;
+    opened = { id, line: firstDecided > 0 && !moment?.lines[0]?.request && !moment?.lines[0]?.by ? firstDecided : 0, first: 0 };
     draw();
   }
 
@@ -902,14 +904,23 @@ export function mountHistory(host: HistoryHost): History {
     draw();
   }
 
+  function decisionOf(moment: Json | null | undefined, lineIndex = opened?.line ?? 0) {
+    if (!moment) return null;
+    const line = moment.lines[lineIndex] ?? null;
+    const requestId = line?.request ?? moment.request ?? null;
+    if (!requestId && !(line ? line.by : moment.by)) return null;
+    return {
+      momentId: moment.moment_id,
+      requestId,
+      tick: line?.tick ?? moment.tick,
+      subject: line?.subject ?? moment.subjects[0] ?? null,
+    };
+  }
+
   function seeDecision() {
     const moment = opened ? moments().find((one) => one.id === opened!.id) : null;
-    if (!opened || !moment) return;
-    const line = moment.lines[opened.line] ?? null;
-    host.openDecision?.({
-      momentId: moment.moment_id, requestId: line ? line.request : moment.request,
-      tick: line?.tick ?? moment.tick, subject: line?.subject ?? moment.subjects[0] ?? null,
-    });
+    const decision = decisionOf(moment);
+    if (decision) host.openDecision?.(decision);
   }
 
   /** Takes the page away; nothing more is made or told once it is gone. */

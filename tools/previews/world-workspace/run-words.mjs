@@ -72,8 +72,8 @@ export function defaultRunLimits(intervalMs, askers) {
 
 const minutesWords = seconds => { const count = Math.round(seconds / 60); return `${count} ${count === 1 ? 'minute' : 'minutes'}`; };
 
-/** The question card's title: "Run for 10 minutes". */
-export const runFor = limits => `Run for ${minutesWords(limits.wallSeconds)}`;
+/** The question card's title: "Run · 10 Minutes". */
+export const runFor = limits => `Run · ${minutesWords(limits.wallSeconds).replace(/minutes?$/u, m => m.charAt(0).toUpperCase() + m.slice(1))}`;
 
 /** The most a run may spend: "At most $0.05" heads the card; "at most $0.05" sits in a line. */
 export const atMost = (limits, start = false) => `${start ? 'At' : 'at'} most ${amount(limits.usd)}`;

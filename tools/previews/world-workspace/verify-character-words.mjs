@@ -27,7 +27,7 @@ assert.equal(outOfViewNote(resident), 'The resident went out of view, so followi
 // Frames 06 and 07.
 assert.equal(pageSub('resident', 'Terraces on the bay'), 'Resident · Terraces on the bay');
 assert.equal(pageSub(null, 'Terraces on the bay'), 'Terraces on the bay');
-assert.equal(whatDid(teo), 'What Teo did');
+assert.equal(whatDid(teo), 'Activity');
 assert.equal(nothingYet(teo), 'Teo has not done anything yet.');
 // A read that failed says so, never that nothing was done (ROOT's sweep of 27 October).
 assert.equal(recordFailed(teo), "Teo's record could not be read. Try again.");
@@ -59,7 +59,7 @@ assert.equal(rowPrice({ price: null }), '');
 assert.equal(providerName({ provider: 'nebius_token_factory', providerDescription: 'Nebius Token Factory, which serves open models.' }), 'Nebius Token Factory');
 assert.equal(providerName({ provider: 'nebius_token_factory' }), 'nebius_token_factory', 'no description: the provider\'s key');
 assert.equal(keyGroup('Nebius Token Factory'), 'With your Nebius Token Factory key, per million tokens');
-assert.equal(CHARACTER_WORDS.hereFree, 'On this computer, free');
+assert.equal(CHARACTER_WORDS.hereFree, 'Local Models (Free)');
 assert.equal(CHARACTER_WORDS.serverBudget, "From this server's budget, per million tokens");
 const nemotron = { maker: 'NVIDIA', parameters: { total: '120B', active: '12B' }, licence: 'NVIDIA Nemotron Open Model License', says: 'This model is optimized for collaborative agents and high-volume workloads.' };
 assert.equal(makerLine({ card: nemotron }), 'NVIDIA · 120B');

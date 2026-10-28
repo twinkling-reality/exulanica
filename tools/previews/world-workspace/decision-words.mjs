@@ -9,17 +9,17 @@ import { personalityRecordLines } from './personality-words.mjs';
 import { worldTime } from './world-clock.mjs';
 
 export const DECISION_WORDS = Object.freeze({
-  personality: 'Personality, as you wrote it',
-  whereWhen: 'Where and when',
+  personality: 'Personality',
+  whereWhen: 'Location & Time',
   /** After the world's title in Where and when: whose words the title is (DESIGN 11:25). */
   heard: 'Heard',
   remembers: 'Remembers',
   chosen: 'Chosen',
   /** A choice the world had moved past before it could happen (U3). */
-  chosenNotDone: 'Chosen, not done',
-  fullRecord: 'Full record',
-  earlierLater: 'Earlier, later',
-  inspect: 'Inspect decision',
+  chosenNotDone: 'Not Applied',
+  fullRecord: 'Raw Prompt',
+  earlierLater: 'Previous / Next',
+  inspect: 'Decision',
   reading: 'Reading the decision…',
   unread: 'This decision could not be read. Try again.',
   rest: 'Rest',
@@ -42,17 +42,14 @@ const list = value => Array.isArray(value) ? value : [];
  * person playing Teo was shown" (DESIGN, WORDS.md R5b); on one an outside program made, "What Teo's outside program
  * was told" (WORDS.md R5c: a machine is told, a person is shown). `decider` is 'person', 'external', 'model' or null.
  */
-export const toldLabel = (who, decider = null) => (decider === 'person'
-  ? `What the person playing ${who.within} was shown`
-  : decider === 'agent' ? 'What the outside AI agent was told'
-    : `What ${possessive(who.within)} ${decider === 'external' ? 'outside program' : 'model'} was told`);
+export const toldLabel = (_who, _decider = null) => 'Context';
 
-/** "How Teo is", "Near the resident". */
-export const howIsLabel = who => `How ${who.within} is`;
-export const nearLabel = who => `Near ${who.within}`;
+/** "Status", "Nearby". */
+export const howIsLabel = _who => 'Status';
+export const nearLabel = _who => 'Nearby';
 
-/** "Teo's choices (9)". */
-export const choicesLabel = (who, count) => `${possessive(who.start)} choices (${count})`;
+/** "Teo's Choices (9)". */
+export const choicesLabel = (who, count) => `${possessive(who.start)} Choices (${count})`;
 
 /**
  * The over-label: "06:52 · Day 1 · Teo said to Ines", "06:52 · Day 1" for a chosen action, and the
@@ -98,7 +95,7 @@ export function costWords(costUsd, costKnown = true) {
 
 /** The record page's own words (DESIGN's r10): the moment card's label and who decided, T7's words where no model did. */
 export const DECISION_FLOW_WORDS = Object.freeze({
-  whatHappened: 'What happened',
+  whatHappened: 'Outcome',
   decidedBy: 'Decided by ',
   decidedByPerson: 'Decided by a person playing',
   decidedByProgram: 'Decided by an outside program',
@@ -212,8 +209,8 @@ export function agentUnansweredWhy(reason = null) {
     : 'Its answer could not be used.';
 }
 
-/** Over the column of choices (r10): "Teo's choices", "The resident's choices". */
-export const choicesOver = who => `${possessive(who.start)} choices`;
+/** Over the column of choices (r10): "Teo's Choices", "The resident's Choices". */
+export const choicesOver = who => `${possessive(who.start)} Choices`;
 
 /** Under the decision's ring, after who decided (r10): "chose 1 of 9". */
 export const choseOneOf = count => `chose 1 of ${count}`;
@@ -305,7 +302,7 @@ export function toldSections(context, who) {
     .map(item => `${[plain(item.from) ?? 'Someone', ago(item.minutes_ago)].filter(Boolean).join(', ')}: “${plain(item.line)}”`);
   // The newest heard kept, so the ones left out came before them: "earlier" (DESIGN 03:17).
   const earlier = heard.length - Math.min(heard.length, HEARD_LINES);
-  add(DECISION_WORDS.heard, heard.slice(-HEARD_LINES), false, earlier > 0 ? `And ${earlier} earlier ${earlier === 1 ? 'line' : 'lines'} in the Full record.` : null);
+  add(DECISION_WORDS.heard, heard.slice(-HEARD_LINES), false, earlier > 0 ? `And ${earlier} earlier ${earlier === 1 ? 'line' : 'lines'} in the Raw Prompt.` : null);
   const remembers = context?.remembers;
   if (remembers) {
     const lines = [
@@ -315,7 +312,7 @@ export function toldSections(context, who) {
     const handed = list(remembers.handed).length;
     const shown = lines.slice(0, REMEMBERED_LINES);
     const more = lines.length - shown.length + handed;
-    add(DECISION_WORDS.remembers, shown, false, more > 0 ? `And ${more} more in the Full record.` : null);
+    add(DECISION_WORDS.remembers, shown, false, more > 0 ? `And ${more} more in the Raw Prompt.` : null);
   }
   return sections;
 }

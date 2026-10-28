@@ -157,9 +157,9 @@ describe('Compare as r12', () => {
 
   it('answers its keys: earlier and later, use the asked model, back', async () => {
     const { root, act } = await opened(finished());
-    expect(keyWords(root)).toEqual([['← →', 'Earlier, later'], ['Enter', 'Use Qwen3 235B Instruct for Teo'], ['Esc', 'Back']]);
-    expect(keyNamed(root, 'Earlier, later')!.getAttribute('aria-keyshortcuts')).toBe('ArrowLeft ArrowRight');
-    keyNamed(root, 'Earlier, later')!.click();
+    expect(keyWords(root)).toEqual([['← →', 'Previous / Next'], ['Enter', 'Use Qwen3 235B Instruct for Teo'], ['Esc', 'Back']]);
+    expect(keyNamed(root, 'Previous / Next')!.getAttribute('aria-keyshortcuts')).toBe('ArrowLeft ArrowRight');
+    keyNamed(root, 'Previous / Next')!.click();
     keyNamed(root, 'Use Qwen3 235B Instruct for Teo')!.click();
     keyNamed(root, 'Back')!.click();
     expect(act.mock.calls.map(call => call[0])).toEqual(['later', 'use', 'back']);
@@ -167,15 +167,15 @@ describe('Compare as r12', () => {
 
   it('moves earlier from the newest moment, where Compare opens, and later where a later one exists', async () => {
     const { root, act, page } = await opened(finished({ focus: 11, moment: { label: 'At 06:52 · 12 of 12', rows: finished().moment!.rows } }));
-    keyNamed(root, 'Earlier, later')!.click();
+    keyNamed(root, 'Previous / Next')!.click();
     page.draw(finished({ focus: 0 }));
-    keyNamed(root, 'Earlier, later')!.click();
+    keyNamed(root, 'Previous / Next')!.click();
     expect(act.mock.calls.map(call => call[0])).toEqual(['earlier', 'later']);
   });
 
   it('draws each key only where it works', async () => {
     const { root, page } = await opened(finished({ use: null }));
-    expect(keyWords(root).map(([, word]) => word)).toEqual(['Earlier, later', 'Back']);
+    expect(keyWords(root).map(([, word]) => word)).toEqual(['Previous / Next', 'Back']);
     // One moment asked: no line and nothing earlier or later.
     page.draw(finished({
       over: 'Teo · 1 decision, 06:43 · Day 1', title: "Teo's decision, asked again", eachChose: [], lanes: [], times: [], focus: 0,

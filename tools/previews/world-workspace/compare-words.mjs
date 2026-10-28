@@ -7,14 +7,14 @@ import { amount, possessive } from './character-words.mjs';
 
 export const COMPARE_WORDS = Object.freeze({
   compare: 'Compare',
-  compareThisMoment: 'Compare this moment',
+  compareThisMoment: 'Compare',
   thisDecision: 'Ask this decision again',
   perMillion: 'Per million tokens',
   choose: 'Choose',
   stop: 'Stop',
   back: 'Back',
-  earlierLater: 'Earlier, later',
-  whatEachChose: 'What each chose',
+  earlierLater: 'Previous / Next',
+  whatEachChose: 'Comparison',
   asRecorded: 'As recorded',
   different: 'Another choice',
   same: 'Same choice',

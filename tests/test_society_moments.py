@@ -140,6 +140,7 @@ def test_a_line_said_as_the_two_meet_is_read_with_the_meeting():
     assert (met.kind, met.subjects, met.anchor_event_id) == ("met", (TEO, INES), contact.event_id)
     assert met.moment_id == alone.moment_id
     assert met.event_ids == (contact.event_id, line.event_id)
+    assert met.request_id == uuid.UUID(int=906)
     # The positive control: without the meeting, the line makes its own moment.
     (said,) = _form([line])
     assert said.event_ids == (line.event_id,)

@@ -315,9 +315,25 @@ const UNDER_LINE = 150, RUN_WORDS_OVER = 22, LEAST_PICTURE = 90;
 export function fitLayout(drawn, { top, bottom, side = drawn.margin }) {
   const layout = side === drawn.margin ? drawn : Object.freeze({ ...drawn, margin: side });
   if (!(bottom > top)) return layout;
-  const lineY = Math.round(bottom - UNDER_LINE);
-  if (lineY >= layout.lineY) return layout;
+  const openedTop = Math.max(drawn.opened.top, Math.round(top));
+  const orbBelow = Math.ceil(drawn.opened.orb / 2);
+  const openedHeight = Math.max(LEAST_PICTURE, Math.min(drawn.opened.height, Math.round(bottom - openedTop - orbBelow)));
+  const openedScale = openedHeight / drawn.opened.height;
+  const openedWidth = Math.round(drawn.opened.width * openedScale);
+  const openedOrb = Math.round(drawn.opened.orb * Math.max(openedScale, .75));
+  const openedGap = drawn.opened.column - (drawn.opened.left + drawn.opened.width);
+  const opened = openedTop !== drawn.opened.top || openedHeight !== drawn.opened.height || side !== drawn.opened.left
+    ? Object.freeze({ ...drawn.opened, left: side, top: openedTop, width: openedWidth, height: openedHeight, orb: openedOrb, column: side + openedWidth + openedGap })
+    : drawn.opened;
+  const changesTop = Math.max(drawn.changes.top, Math.round(top));
+  const changes = changesTop !== drawn.changes.top || side !== drawn.changes.left
+    ? Object.freeze({ ...drawn.changes, left: side, top: changesTop })
+    : drawn.changes;
   const overPicture = layout.lineY - layout.picture - layout.bracketY;
+  const mostLineY = Math.round(bottom - UNDER_LINE);
+  const leastLineY = Math.round(top + RUN_WORDS_OVER + overPicture + layout.picture);
+  const lineY = Math.min(mostLineY, Math.max(layout.lineY, leastLineY));
+  if (lineY === layout.lineY && opened === drawn.opened && changes === drawn.changes) return layout;
   const room = lineY - top - overPicture - RUN_WORDS_OVER;
   const picture = Math.max(LEAST_PICTURE, Math.min(layout.picture, Math.round(room)));
   const scale = picture / layout.picture;
@@ -329,6 +345,8 @@ export function fitLayout(drawn, { top, bottom, side = drawn.margin }) {
     orb: Math.round(layout.orb * Math.max(scale, .75)),
     bracketY: lineY - picture - overPicture,
     branchY: layout.branchY - (layout.lineY - lineY),
+    opened,
+    changes,
   });
 }
 

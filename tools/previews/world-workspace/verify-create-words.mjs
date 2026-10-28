@@ -9,7 +9,7 @@ import {
 // Frame 20's words, as WORDS.md "Making a world" and N1 to N20 say them.
 assert.equal(CREATE_WORDS.wordmark, 'exulanica');
 assert.equal(CREATE_WORDS.title, 'Create a world');
-assert.equal(CREATE_WORDS.describeIt, 'Describe it');
+assert.equal(CREATE_WORDS.describeIt, 'Prompt');
 assert.equal(CREATE_WORDS.create, 'Create');
 assert.equal(CREATE_WORDS.orStartFrom, 'Or start from');
 assert.equal(CREATE_WORDS.noModelFree, 'No AI model · Free');
@@ -73,10 +73,10 @@ assert.doesNotMatch(copy, /A harbour with fishing boats/u);
 
 // The composer page's words (ROOT's mock of 27 October): the strip's kinds and arrows, the toggle and its details, the
 // price in the composer's foot and what was spent under the making view's steps.
-assert.equal(CREATE_WORDS.readyWorld, 'READY WORLD');
-assert.equal(CREATE_WORDS.empty, 'EMPTY');
+assert.equal(CREATE_WORDS.readyWorld, 'Ready World');
+assert.equal(CREATE_WORDS.empty, 'Empty');
 assert.deepEqual([CREATE_WORDS.previous, CREATE_WORDS.next], ['Previous', 'Next']);
-assert.equal(NOTES_WORDS.toggle, 'Search the web');
+assert.equal(NOTES_WORDS.toggle, 'Web Search');
 assert.equal(priceUpTo('0.2577'), 'up to $0.26');
 assert.equal(priceUpTo('0.20766720', '0.05'), 'up to $0.05');
 assert.equal(priceUpTo('0.20766720', '0.0599'), 'up to $0.05');
@@ -88,13 +88,13 @@ assert.equal(spentUpTo({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), 'Spent $0.
 assert.equal(spentUpTo({ spentUsd: 0 }, '0.26'), 'Spent $0 of up to $0.26');
 assert.equal(webTip(3, '0.0453'), 'Looks up what such a place looks like before it is made: up to 3 searches with Tavily, which keeps them. Adds at most $0.05.');
 assert.equal(webTip(1, '0.01'), 'Looks up what such a place looks like before it is made: up to 1 search with Tavily, which keeps it. Adds at most $0.01.');
-assert.equal(webNotesLabel(3), 'FROM THE WEB, 3 SEARCHES');
-assert.equal(webNotesLabel(1), 'FROM THE WEB, 1 SEARCH');
-for (const none of [0, null, undefined, 1.5]) assert.equal(webNotesLabel(none), 'FROM THE WEB', String(none));
+assert.equal(webNotesLabel(3), 'Web References · 3 Searches');
+assert.equal(webNotesLabel(1), 'Web References · 1 Search');
+for (const none of [0, null, undefined, 1.5]) assert.equal(webNotesLabel(none), 'Web References', String(none));
 
 // Frame 21's and 22's words.
-assert.equal(CREATE_WORDS.creating, 'Creating your world');
-assert.deepEqual({ ...STEP_WORDS }, { queued: 'Waiting to start', choosing: 'Worked out what to make', drafting: 'Planning the place', making: 'Building it', land: 'Drawing its land' });
+assert.equal(CREATE_WORDS.creating, 'Creating World');
+assert.deepEqual({ ...STEP_WORDS }, { queued: 'Queued', choosing: 'Planning Layout', drafting: 'Designing World', making: 'Building World', land: 'Drawing its land' });
 assert.equal(CREATE_WORDS.leave, 'You can leave this page. It carries on, and it waits in Your worlds.');
 assert.equal(CREATE_WORDS.beingMade, 'Being made…');
 assert.equal(spendLine({ spentUsd: 0.12 }, '1.43'), 'Spent $0.12 of at most $1.43');
@@ -261,7 +261,7 @@ export default true;
 // Web notes in Create, DESIGN's words of 11:55 on 25 October (WORDS.md "Web notes in Create, the words").
 assert.equal(NOTES_WORDS.ask, 'Read the web first for what such a place looks like');
 assert.equal(notesAskLine(3, '0.0153'), 'Up to 3 web searches go to Tavily, made from your words with the names and details this install holds as yours left out, and Tavily keeps them. Adds at most $0.02.');
-assert.deepEqual(NOTES_WORDS.steps, { plan: 'Choosing what to look up', search: 'Searching the web', read: 'Writing notes from what it found' });
+assert.deepEqual(NOTES_WORDS.steps, { plan: 'Planning Queries', search: 'Searching Web', read: 'Synthesizing Context' });
 assert.equal(notesFoot(3), 'A model wrote these from 3 web searches. They help plan the place and are never facts about it.');
 assert.equal(NOTES_WORDS.notMade, 'The web notes could not be made, so it is made from your words alone.');
 assert.equal(NOTES_WORDS.nothingFound, 'The searches found nothing to use, so it is made from your words alone.');

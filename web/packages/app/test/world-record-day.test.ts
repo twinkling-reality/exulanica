@@ -198,7 +198,7 @@ describe("Teo's day", () => {
   it('draws What Teo did newest first on the path at x 880, the chosen card filled and offering its decision', async () => {
     const { root, act, page } = await open();
     page.draw(teoState());
-    expect(one(root, '.wu-day-over')).toBe('What Teo did');
+    expect(one(root, '.wu-day-over')).toBe('Activity');
     const cards = items(root);
     expect(cards.map((card) => card.querySelector('.wu-day-title')?.textContent)).toEqual([
       'Teo spoke to Marco', 'Marco asked Teo', 'Teo met Ines at the bench', 'Teo went to the lower pools', 'Teo left home',
@@ -219,9 +219,9 @@ describe("Teo's day", () => {
     // A picture where one exists, the quiet tile where a moment's is still to come (no words in it).
     expect(cards.map((card) => card.querySelector('.wu-hr-pic img')?.getAttribute('src') ?? null)).toEqual(['/pictures/spoke.png', null, '/pictures/met.png', null, null]);
     expect(all(root, '.wu-hr-pic')).toEqual(['', '', '', '']);
-    // The chosen card rises; only it says "[Enter] See the decision".
+    // The chosen card rises; only it says "[Enter] Decision".
     expect(cards.map((card) => card.getAttribute('aria-current'))).toEqual([null, null, 'true', null, null]);
-    expect(all(root, '.wu-day-see')).toEqual(['EnterSee the decision']);
+    expect(all(root, '.wu-day-see')).toEqual(['EnterDecision']);
     expect(cards[2]!.querySelector('.wu-day-see')).not.toBeNull();
     // The path from the newest card's top to the oldest dot, a hollow dot per card, the chosen one filled.
     expect(root.querySelector('.wu-day-path .line')?.getAttribute('d')).toBe('M 880 150 L 880 811');
@@ -426,7 +426,7 @@ describe("Teo's day keys", () => {
   it('draws no Run or Personality key, nor what Run would start, on a read-only copy, where they do nothing', async () => {
     const { root, page } = await open();
     page.draw(teoState({ canChange: false, assignable: false, canCompare: false, canAsk: false }));
-    expect(keys(root)).toEqual(['↑↓Earlier, later', 'EscBack']);
+    expect(keys(root)).toEqual(['↑↓Previous / Next', 'EscBack']);
     expect(all(root, '.wu-day-small .wu-day-line')).toEqual(['$0.06 in · $0.24 out per million tokens', 'Last run 06:00 to 07:15 · 12 decisions · spent $0.0042']);
   });
 
@@ -434,7 +434,7 @@ describe("Teo's day keys", () => {
     const { root, act, page } = await open();
     page.draw(teoState());
     // Ask names the person, as the card's keys do (DESIGN 03:57).
-    expect(keys(root)).toEqual(['↑↓Earlier, later', 'MModel', 'NPersonality', 'RRun', 'CCompare', 'QAsk Teo', 'EscBack']);
+    expect(keys(root)).toEqual(['↑↓Previous / Next', 'MModel', 'NPersonality', 'RRun', 'CCompare', 'QAsk Teo', 'EscBack']);
     expect(keyNamed(root, 'Back').getAttribute('aria-keyshortcuts')).toBe('Escape');
     for (const word of ['Model', 'Personality', 'Run', 'Compare', 'Ask Teo', 'Back']) keyNamed(root, word).click();
     // One with no name is asked by its kind.
@@ -444,13 +444,13 @@ describe("Teo's day keys", () => {
     expect(act.mock.calls).toEqual([['model'], ['personality'], ['run'], ['compare'], ['ask'], ['back']]);
     // The arrows' key steps earlier, over a line heard, and from the oldest back to the newest.
     act.mockClear();
-    keyNamed(root, 'Earlier, later').click();
+    keyNamed(root, 'Previous / Next').click();
     expect(act).toHaveBeenLastCalledWith('row', 3);
     page.draw(teoState({ didFocus: 3 }));
-    keyNamed(root, 'Earlier, later').click();
+    keyNamed(root, 'Previous / Next').click();
     expect(act).toHaveBeenLastCalledWith('row', 4);
     page.draw(teoState({ didFocus: 4 }));
-    keyNamed(root, 'Earlier, later').click();
+    keyNamed(root, 'Previous / Next').click();
     expect(act).toHaveBeenLastCalledWith('row', 0);
     // While a run is on: R stops, and the running line stands in for the last run; while it is asked, R waits.
     page.draw(teoState({ run: { open: true, big: '9:13 left · $0.0011 of $0.05', busy: false, refusal: null }, running: "Teo's model is deciding · 9:13 left" }));

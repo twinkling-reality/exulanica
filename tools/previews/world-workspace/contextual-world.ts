@@ -684,6 +684,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     await refreshInventory();
     const fresh = rows.find(item => item.key === row.key);
     if (!fresh) throw Object.assign(Error('gone'), { code: 'person_not_in_this_world' });
+    if (held?.key === fresh.key) held = fresh; if (pageView?.row.key === fresh.key) pageView.row = fresh;
     return { row: fresh, inventory, offer: await entityOffer(fresh, true) };
   }
   function act(action) {
@@ -1087,16 +1088,19 @@ export async function mountContextualWorld({ state, renderer, selection, objects
   }
   // A decision from History ([Enter] See the decision): the r10 page over History, by its request.
   let historyDecision = null;
-  async function openHistoryDecision({ requestId, subject }) {
-    const row = subject ? beingRow(subject) : null;
-    if (!requestId || !row) return;
+  async function openHistoryDecision({ requestId, tick, subject }) {
+    const row = subject ? beingRow(subject) : null; if (!row) return;
+    let resolvedId = requestId ?? (Number.isInteger(tick) ? subjectReads.models?.latest.find(item => item.subjectId === subject && (item.consumedTick === tick || item.baseTick === tick))?.requestId ?? null : null);
+    if (!resolvedId && Number.isInteger(tick)) {
+      const page = await read(eventsPath(['decision_applied', 'said'], `&from_tick=${tick}&limit=64`)).catch(() => null);
+      const found = (page?.events ?? []).find(event => event.tick === tick && event.subject_id === subject && (event.document?.request_id || event.document?.thing?.request_id));
+      resolvedId = found?.document?.request_id ?? found?.document?.thing?.request_id ?? null;
+    }
+    if (!resolvedId) return;
     const showing = { row, events: [], moments: null, things: null, did: null };
-    historyDecision?.page.close();
-    historyDecision = { page: openDecisionPage(root, historyDecisionAct), showing, decision: { requestId, detail: null, failure: null, record: false } };
-    drawHistoryDecision();
-    const [detail] = await Promise.all([modelsClient.readDecision(entry.authoredVersionId, requestId).catch(() => null), records.readMoments(showing)]);
-    // Its people named as History names them: their offers read first.
-    const people = (showing.moments ?? []).filter(moment => moment.request_id === requestId || moment.said?.some(line => line.request_id === requestId)).flatMap(moment => moment.subjects ?? []);
+    historyDecision?.page.close(); historyDecision = { page: openDecisionPage(root, historyDecisionAct), showing, decision: { requestId: resolvedId, detail: null, failure: null, record: false } }; drawHistoryDecision();
+    const [detail] = await Promise.all([modelsClient.readDecision(entry.authoredVersionId, resolvedId).catch(() => null), records.readMoments(showing)]);
+    const people = (showing.moments ?? []).filter(moment => moment.request_id === resolvedId || moment.said?.some(line => line.request_id === resolvedId)).flatMap(moment => moment.subjects ?? []);
     await Promise.all([...new Set(people.map(beingRow).filter(Boolean))].map(one => entityOffer(one).catch(() => null)));
     if (historyDecision?.showing !== showing) return;
     if (detail) historyDecision.decision.detail = detail; else historyDecision.decision.failure = DECISION_WORDS.unread;

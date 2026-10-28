@@ -37,22 +37,22 @@ const reads = [
   { state: 'making', elapsed_seconds: 6 }, { state: 'making', elapsed_seconds: 12 },
 ];
 assert.deepEqual(draftSteps(reads), [
-  { key: 'choosing', words: 'Worked out what to make', state: 'done', time: '1 s' },
-  { key: 'drafting', words: 'Planning the place', state: 'done', time: '6 s' },
-  { key: 'making', words: 'Building it', state: 'now', time: '12 s' },
+  { key: 'choosing', words: 'Planning Layout', state: 'done', time: '1 s' },
+  { key: 'drafting', words: 'Designing World', state: 'done', time: '6 s' },
+  { key: 'making', words: 'Building World', state: 'now', time: '12 s' },
 ]);
 // A state never served (queued here, and no land stage) is not shown; nothing comes from a clock.
 assert.ok(!draftSteps(reads).some(step => step.key === 'queued' || step.words === 'Drawing its land'));
-// Queued, when served, is a step: "Waiting to start".
-assert.deepEqual(draftSteps([{ state: 'queued', elapsed_seconds: 0 }]), [{ key: 'queued', words: 'Waiting to start', state: 'now', time: '0 s' }]);
+// Queued, when served, is a step: "Queued".
+assert.deepEqual(draftSteps([{ state: 'queued', elapsed_seconds: 0 }]), [{ key: 'queued', words: 'Queued', state: 'now', time: '0 s' }]);
 // Ready ends the last step at its read; a refused draft leaves its last step where it stopped.
 assert.deepEqual(draftSteps([...reads, { state: 'ready', elapsed_seconds: 64 }]).map(step => [step.state, step.time]), [['done', '1 s'], ['done', '6 s'], ['done', '1 min 4 s']]);
-assert.deepEqual(draftSteps([...reads, { state: 'refused', elapsed_seconds: 13 }]).at(-1), { key: 'making', words: 'Building it', state: 'now', time: '13 s' });
+assert.deepEqual(draftSteps([...reads, { state: 'refused', elapsed_seconds: 13 }]).at(-1), { key: 'making', words: 'Building World', state: 'now', time: '13 s' });
 // A state served again out of order moves nothing back; an unreadable elapsed time is skipped.
 assert.equal(draftSteps([...reads, { state: 'choosing', elapsed_seconds: 14 }]).at(-1).time, '12 s');
 assert.equal(draftSteps([{ state: 'making', elapsed_seconds: 'x' }]).length, 0);
 // A recipe or kind start with one served state shows that single step with its time (N4, N11).
-assert.deepEqual(draftSteps([{ state: 'making', elapsed_seconds: 3 }, { state: 'ready', elapsed_seconds: 5 }]), [{ key: 'making', words: 'Building it', state: 'done', time: '5 s' }]);
+assert.deepEqual(draftSteps([{ state: 'making', elapsed_seconds: 3 }, { state: 'ready', elapsed_seconds: 5 }]), [{ key: 'making', words: 'Building World', state: 'done', time: '5 s' }]);
 
 // Reads: at the served interval; none once ended. One failed read is quiet; three say offline.
 assert.equal(pollDelay({ state: 'making', poll_after_seconds: 3 }), 3000);
@@ -151,7 +151,7 @@ export default true;
 // Web notes: their steps from the request's own (a missed one drawn as not done, one waiting or skipped not shown), what
 // came of the request, the line in their place, and the spend counting them, never complete where it is not known.
 assert.deepEqual(notesSteps([{ step: 'plan', state: 'done' }, { step: 'search', state: 'missed' }, { step: 'read', state: 'skipped' }, { step: 'bundle', state: 'done' }], { plan: 2, search: 20 }),
-  [{ key: 'plan', words: 'Choosing what to look up', state: 'done', time: '2 s' }, { key: 'search', words: 'Searching the web', state: 'next', time: '20 s' }]);
+  [{ key: 'plan', words: 'Planning Queries', state: 'done', time: '2 s' }, { key: 'search', words: 'Searching Web', state: 'next', time: '20 s' }]);
 assert.deepEqual(notesSteps([{ step: 'plan', state: 'running' }, { step: 'search', state: 'waiting' }]).map((step) => step.state), ['now']);
 assert.equal(notesOutcome({ status: 'partial', notes: [{}] }), 'notes');
 assert.equal(notesOutcome({ status: 'complete', notes: [] }), 'nothing');

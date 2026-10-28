@@ -302,9 +302,9 @@ describe('a decision, filled', () => {
     expect(state).toMatchObject({
       over: '06:52 · Day 1 · Teo spoke to Ines',
       decided: 'Teo spoke to Ines', said: 'Teo: “Morning, Ines.”', action: null,
-      decider: 'model', answered: { latencyMs: 900, costUsd: '0.0003', costKnown: true }, choicesHeading: "Teo's choices",
+      decider: 'model', answered: { latencyMs: 900, costUsd: '0.0003', costKnown: true }, choicesHeading: "Teo's Choices",
       picture: 'blob:m1', portraits: [{ name: 'Teo', url: 'blob:portrait-teo' }, { name: 'Ines', url: 'blob:portrait-ines' }],
-      ground: 'blob:still', earlier: true, later: false, canCompare: false, toldLabel: "What Teo's model was told",
+      ground: 'blob:still', earlier: true, later: false, canCompare: false, toldLabel: 'Context',
     });
     // The decision's picture is the open page's own, drawn ahead of those its day's rows asked for.
     expect(made.pictures.momentNow).toHaveBeenLastCalledWith(expect.objectContaining({ moment_id: 'm1' }), true);
@@ -345,8 +345,7 @@ describe('a decision, filled', () => {
     played.request = { ...played.request, provider_config: { kind: 'person', contract: { sha256: 'c'.repeat(64) } } } as never;
     const state = records.decision(showing, { requestId: 'r1', detail: played, failure: null, record: false });
     expect([state.decider, state.model, state.answered, state.decided]).toEqual(['person', null, null, 'Teo spoke to Ines']);
-    // A person playing Teo was shown what the record holds; no model was told it.
-    expect(state.toldLabel).toBe('What the person playing Teo was shown');
+    expect(state.toldLabel).toBe('Context');
   });
 
   it("says an outside program decided where the request was a program's, and that the program was told", async () => {
@@ -358,8 +357,7 @@ describe('a decision, filled', () => {
     program.request = { ...program.request, provider_config: { kind: 'external', bridge: 'b1', grant_id: 'g1', grant_seq: 1 } } as never;
     const state = records.decision(showing, { requestId: 'r1', detail: program, failure: null, record: false });
     expect([state.decider, state.model, state.answered, state.decided]).toEqual(['external', null, null, 'Teo spoke to Ines']);
-    // A machine is told, a person is shown (WORDS.md R5c); the program is named as Teo's, never as a model.
-    expect(state.toldLabel).toBe("What Teo's outside program was told");
+    expect(state.toldLabel).toBe('Context');
   });
 
   it("names an outside AI agent as one: its decision's time and no cost, a turn it did not answer, its own words (AG1d)", async () => {
@@ -373,7 +371,7 @@ describe('a decision, filled', () => {
     const answered = { ...detail('say something to Ines', { kind: 'external', bridge: 'agents', answer_sha256: 'a'.repeat(64), latency_ms: 1600 }) };
     answered.request = { ...answered.request, provider_config: config } as never;
     const state = records.decision(showing, { requestId: 'r1', detail: answered, failure: null, record: false });
-    expect([state.decider, state.answered, state.toldLabel, state.unanswered]).toEqual(['agent', { latencyMs: 1600, costUsd: null, costKnown: true }, 'What the outside AI agent was told', null]);
+    expect([state.decider, state.answered, state.toldLabel, state.unanswered]).toEqual(['agent', { latencyMs: 1600, costUsd: null, costKnown: true }, 'Context', null]);
     // No note on who chose: the head says it (ROOT's sweep of 27 October).
     expect(state.why).toBeNull();
     // Its program silent past the deadline: asked, no answer, the routine acted.

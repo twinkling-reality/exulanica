@@ -45,8 +45,8 @@ afterEach(() => { document.body.replaceChildren(); });
 describe('the model gallery page (G2)', () => {
   it('opens over the world with its head, its groups and the model in focus, every name drawn as text', async () => {
     const { root } = await mounted();
-    expect(root.querySelector('.wu-g2-title')?.textContent).toBe('Choose an AI model for Teo');
-    expect(all(root, '.wu-g2-label')).toEqual(['On this computer, free', 'With your Nebius key', 'No AI model']);
+    expect(root.querySelector('.wu-g2-title')?.textContent).toBe('Select Model · Teo');
+    expect(all(root, '.wu-g2-label')).toEqual(['Local Models (Free)', 'With your Nebius key', 'No AI model']);
     expect(all(root, '.wu-g2-row:not(.faint) .wu-g2-name')).toEqual(['Nemotron 3 Nano 30B', 'RoutineCurrent']);
     expect(all(root, '.wu-g2-row:not(.faint) .wu-g2-cost')).toEqual(['about $0.0001 a decision', 'Free']);
     // A runner's model being checked stands faint, its name as text, never markup.
@@ -56,10 +56,10 @@ describe('the model gallery page (G2)', () => {
     expect(root.querySelector('.wu-g2-row[aria-current="true"] .wu-g2-name')?.textContent).toBe('Nemotron 3 Nano 30B');
     expect(root.querySelector('.wu-g2-dname')?.textContent).toBe('Nemotron 3 Nano 30B');
     expect(root.querySelector('.wu-g2-link')?.getAttribute('href')).toBe(card.source);
-    expect(all(root, '.wu-g2-fk')).toEqual(['Size', 'Reads', 'Licence', 'A decision', 'In this world']);
+    expect(all(root, '.wu-g2-fk')).toEqual(['Size', 'Reads', 'Licence', 'Cost per Decision', 'Usage']);
     // No line on what the models are, no maker's marks, no headings over the card's parts, nothing after Choose.
     expect(root.querySelector('.wu-g2-role, .wu-g2-mark, .wu-g2-then, .wu-g2-from')).toBeNull();
-    expect(all(root, '.wu-g2-k')).toEqual(["In its maker's words"]);
+    expect(all(root, '.wu-g2-k')).toEqual(['Overview']);
   });
 
   it('chooses at once by a number through the host\'s write, then closes; Esc closes unchanged', async () => {

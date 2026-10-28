@@ -57,8 +57,8 @@ export const togetherNames = names => names.length <= 1 ? names[0] ?? ''
 /** Talking while following a conversation (T9, frame r24): its two choices and the speaker's plate. */
 export const SCENE_WORDS = Object.freeze({ stopFollowing: CHARACTER_WORDS.stopFollowing, everyone: 'to everyone nearby' });
 
-/** The speaker's page, the scene's Enter (T9): "Ines's day", "The resident's day". */
-export const dayWord = speaker => `${possessive(speaker.start)} day`;
+/** The speaker's page, the scene's Enter (T9): "Activity". */
+export const dayWord = _speaker => 'Activity';
 
 /** Under the line now, after the speaker's name (T9): "to Teo", "to the resident", or "to everyone nearby". */
 export const plateTo = listener => listener ? `to ${listener.within}` : SCENE_WORDS.everyone;

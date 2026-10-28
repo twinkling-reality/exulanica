@@ -155,14 +155,14 @@ describe('History', () => {
     expect(all(exchange, '.wu-hr-more')).toEqual(['1 more line']);
     expect(all(exchange, '.wu-hr-who')).toEqual(['By a person playing', 'Qwen3 235B chose the same']);
     // A different answer hangs as a branch; a model's name never breaks.
-    expect(all(made.root, '.wu-hr-ghost .wu-hr-text > div')).toEqual(['Asked again with Qwen3 235B', 'Teo would have gone to the market']);
+    expect(all(made.root, '.wu-hr-ghost .wu-hr-text > div')).toEqual(['Compared with Qwen3 235B', 'Teo would have gone to the market']);
     expect(all(made.root, '.wu-hr-model')).toEqual(['Nemotron 3 Nano 30B', 'Qwen3 235B', 'Qwen3 235B']);
     expect(made.root.querySelector('.wu-hr-run')?.textContent).toBe("Teo's model was deciding · 06:00 to 07:15 · spent $0.0042");
     expect(made.root.querySelector('.wu-hr-now')?.textContent).toBe('Now07:15 · Day 1');
     // A kept picture is read at its address; a missing one is the quiet tile, no words in it.
     await vi.waitFor(() => expect(made.root.querySelector('.wu-hr-card[aria-current="true"] .wu-hr-pic img')?.getAttribute('src')).toBe(`/world/pictures/${'f'.repeat(64)}?world_id=${encodeURIComponent(WORLD)}`));
     expect(made.root.querySelector('.wu-hr-card:not(.first):not([aria-current]) .wu-hr-pic img')).toBeNull();
-    expect(keys(made.root)).toEqual(['←→Earlier, later', 'EnterOpen this moment', 'GOpen on GitHub', 'EscBack']);
+    expect(keys(made.root)).toEqual(['←→Previous / Next', 'EnterOpen Moment', 'GOpen on GitHub', 'EscBack']);
     history.key(press('KeyG'));
     expect(made.open).toHaveBeenCalledWith('https://github.com/learner/terraces-on-the-bay/pull/3');
     expect(read.mock.calls.every(([path]) => typeof path === 'string')).toBe(true);
@@ -180,7 +180,7 @@ describe('History', () => {
     history.key(press('ArrowLeft'));
     const [moved] = all(made.root, '.wu-hr-change .wu-hr-change-words');
     expect([chosen(made.root), made.root.querySelector('.wu-hr-change[aria-current="true"] .wu-hr-change-words')?.textContent]).toEqual([undefined, moved]);
-    expect(keys(made.root)).toEqual(['←→Earlier, later', 'GOpen on GitHub', 'EscBack']);
+    expect(keys(made.root)).toEqual(['←→Previous / Next', 'GOpen on GitHub', 'EscBack']);
     history.key(press('Enter'));
     expect(made.root.querySelector('.wu-hr-moment')).toBeNull();
     history.key(press('ArrowLeft'));
@@ -199,7 +199,7 @@ describe('History', () => {
     expect(all(opened, '.wu-hr-answer')).toEqual(['Qwen3 235B chose the same']);
     // The run's small print, and why it ended where it did not end at its own time (H3).
     expect(opened.querySelector('.wu-hr-small')?.textContent).toBe("Teo's model was deciding · 06:00 to 07:15The run was stopped.");
-    expect(keys(made.root)).toEqual(['↑↓Choose a line', 'EnterSee the decision', 'EscBack to the story']);
+    expect(keys(made.root)).toEqual(['↑↓Select Line', 'EnterDecision', 'EscBack to History']);
     // The arrows choose a line; Enter sees that line's decision.
     history.key(press('ArrowDown'));
     expect(made.root.querySelector('.wu-hr-line[aria-current="true"] .wu-hr-speaker')?.textContent).toBe('Teo');
@@ -210,6 +210,49 @@ describe('History', () => {
     expect(made.root.querySelector('.wu-hr-moment')).toBeNull();
     expect(history.isOpen).toBe(true);
     expect(chosen(made.root)).toBe('Marco asked Teo');
+  });
+
+  it('offers See the decision only where a decision was made, and places an opened moment below a two-line head', async () => {
+    const routine = { kind: 'routine', model: null };
+    const { read } = reads({
+      [`/world/versions/${VERSION}/history/moments`]: {
+        profile: 'exulanica.world-history-moments/v1', version_id: VERSION, now: { tick: 440 }, more: false,
+        moments: [
+          { moment_id: 'm-decided', tick: 412, at: at(40), session_id: 's1', kind: 'met', request_id: 'r412', subjects: ['teo', 'ines'],
+            place: null, target: null, with: null, said: [{ tick: 412, by: 'teo', to: ['ines'], line: 'Morning, Ines.', decider: routine }],
+            decider: model('Nemotron 3 Super 120B'), scene: {}, picture: null, branches: [] },
+          { moment_id: 'm-routine', tick: 435, at: at(20), session_id: 's1', kind: 'met', request_id: null, subjects: ['teo', 'ines'],
+            place: null, target: null, with: null, said: [], decider: routine, scene: {}, picture: null, branches: [] },
+        ],
+      },
+    });
+    const top = vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('wu-frame-body')) return 338;
+      if (this.classList.contains('wu-frame-keys')) return 937;
+      return 0;
+    });
+    try {
+      const made = host(read);
+      const history = (await module()).mountHistory(made);
+      await history.open();
+      // The newest moment is a routine meeting: opening it offers no See the decision, and Enter sends nothing.
+      history.key(press('Enter'));
+      const routineView = made.root.querySelector('.wu-hr-moment') as HTMLElement;
+      expect(routineView.querySelector<HTMLElement>('.wu-hr-pic.large')?.style.top).toBe('338px');
+      expect(routineView.querySelector<HTMLElement>('.wu-hr-column')?.style.top).toBe('338px');
+      expect(keys(made.root)).toEqual(['EscBack to History']);
+      history.key(press('Enter'));
+      expect(made.openDecision).not.toHaveBeenCalled();
+      // Back to the decided meeting: its moment request is used even where the line carries none.
+      history.key(press('Escape'));
+      history.key(press('ArrowLeft'));
+      history.key(press('Enter'));
+      expect(keys(made.root)).toEqual(['EnterDecision', 'EscBack to History']);
+      history.key(press('Enter'));
+      expect(made.openDecision).toHaveBeenCalledWith({ momentId: 'm-decided', requestId: 'r412', tick: 412, subject: 'teo' });
+    } finally {
+      top.mockRestore();
+    }
   });
 
   it('says a thing turned where it stood as turned, and its undo as turned back (W12.7)', async () => {
@@ -252,7 +295,7 @@ describe('History', () => {
     expect(made.root.querySelectorAll('.wu-hr-path .ring')).toHaveLength(1);
     expect(chosen(made.root)).toBeUndefined();
     expect(group().querySelector('.wu-hr-change-words')?.textContent).toBe('You made 3 changes');
-    expect(keys(made.root)).toEqual(['←→Earlier, later', 'EnterOpen these changes', 'GOpen on GitHub', 'EscBack']);
+    expect(keys(made.root)).toEqual(['←→Previous / Next', 'EnterView Changes', 'GOpen on GitHub', 'EscBack']);
     history.key(press('Enter'));
     expect(made.root.querySelector('.wu-history-r23')?.classList.contains('wu-hr-opened')).toBe(true);
     const list = made.root.querySelector('.wu-hr-changes') as HTMLElement;
@@ -262,7 +305,7 @@ describe('History', () => {
     expect(all(list, '.wu-hr-row-words')).toEqual(['You moved the bench', 'You took out the market', 'You put the bench back where it was']);
     expect(all(list, '.wu-hr-row > .wu-hr-time').every((time) => /\d\d:\d\d$/.test(time ?? ''))).toBe(true);
     // Nothing runs past the column here, so no arrows; Esc goes back to the story with the same dot chosen.
-    expect(keys(made.root)).toEqual(['EscBack to the story']);
+    expect(keys(made.root)).toEqual(['EscBack to History']);
     history.key(press('Escape'));
     expect(made.root.querySelector('.wu-hr-changes')).toBeNull();
     expect(history.isOpen).toBe(true);
@@ -406,7 +449,7 @@ describe('History', () => {
     const { read: none } = reads({ '/world/github-projects': { projects: [] } });
     const second = host(none);
     await (await module()).mountHistory(second).open();
-    expect(second.root.querySelector('.wu-hr-kept')?.textContent).toBe('Not kept in a project');
+    expect(second.root.querySelector('.wu-hr-kept')?.textContent).toBe('Not Saved to GitHub');
     expect(keys(second.root)).not.toContain('GOpen on GitHub');
   });
 
@@ -416,17 +459,17 @@ describe('History', () => {
     const made = host(read, { write });
     const history = (await module()).mountHistory(made);
     await history.open();
-    expect(keys(made.root)).toContain('KKeep in a project');
+    expect(keys(made.root)).toContain('KSave Project');
     expect(history.key(press('KeyK'))).toBe(true);
     await vi.waitFor(() => expect(made.root.querySelector('.wu-hr-kept')?.textContent).toBe('Starting a project…'));
     expect(write).toHaveBeenCalledWith('POST', `/world/github-projects?world_id=${encodeURIComponent(WORLD)}`, { version_id: VERSION, readable: false });
-    expect(keys(made.root)).not.toContain('KKeep in a project');
+    expect(keys(made.root)).not.toContain('KSave Project');
     history.close();
     // A read-only copy has no writes: no K.
     const { read: again } = reads({ '/world/github-projects': { projects: [], requests: [], publications: [] } });
     const watching = host(again, { write: null });
     await (await module()).mountHistory(watching).open();
-    expect(keys(watching.root)).toEqual(['←→Earlier, later', 'EnterOpen this moment', 'EscBack']);
+    expect(keys(watching.root)).toEqual(['←→Previous / Next', 'EnterOpen Moment', 'EscBack']);
   });
 
   it('says a project is starting until it is listed, though the follower took the request first (F13)', async () => {
@@ -449,7 +492,7 @@ describe('History', () => {
       expect(kept()).toBe('Starting a project…');
       listed = [local];
       await vi.advanceTimersByTimeAsync(3_100);
-      expect(kept()).toBe('Kept in a project on this computer, not on GitHub');
+      expect(kept()).toBe('Saved Locally · Not on GitHub');
       history.close();
       // Where no project is ever listed, the page reads where the world is kept as it stands after two minutes.
       listed = [];
@@ -460,7 +503,7 @@ describe('History', () => {
       await vi.advanceTimersByTimeAsync(118_000);
       expect(again.root.querySelector('.wu-hr-kept')?.textContent).toBe('Starting a project…');
       await vi.advanceTimersByTimeAsync(6_100);
-      expect(again.root.querySelector('.wu-hr-kept')?.textContent).toBe('Not kept in a project');
+      expect(again.root.querySelector('.wu-hr-kept')?.textContent).toBe('Not Saved to GitHub');
       second.close();
     } finally {
       vi.useRealTimers();
@@ -520,11 +563,11 @@ describe('History', () => {
     const made = host(read, { write });
     const history = (await module()).mountHistory(made);
     await history.open();
-    expect(made.root.querySelector('.wu-hr-kept')?.textContent).toBe('Kept in a project on this computer, not on GitHub');
-    expect(keys(made.root)).toContain('GKeep on GitHub');
+    expect(made.root.querySelector('.wu-hr-kept')?.textContent).toBe('Saved Locally · Not on GitHub');
+    expect(keys(made.root)).toContain('GSave to GitHub');
     history.key(press('KeyG'));
     const card = made.root.querySelector('.wu-hr-keepcard') as HTMLElement;
-    expect(card.querySelector('.wu-hr-keep-label')?.textContent).toBe('Keep on GitHub');
+    expect(card.querySelector('.wu-hr-keep-label')?.textContent).toBe('Save to GitHub');
     // Only what works now (GH4): while Create is pale the row offers no Enter.
     expect(keys(made.root)).toEqual(['EscBack']);
     await vi.waitFor(() => expect(write).toHaveBeenCalledWith('POST', `/world/github-projects/publications?world_id=${encodeURIComponent(WORLD)}`, { project_id: 'project:demo', name: null }));
@@ -536,7 +579,7 @@ describe('History', () => {
     expect(made.root.querySelector('.wu-hr-keepcard')).toBeNull();
     expect(history.isOpen).toBe(true);
     await vi.waitFor(() => expect(write).toHaveBeenCalledWith('DELETE', `/world/github-projects/requests/q1?world_id=${encodeURIComponent(WORLD)}`));
-    expect(keys(made.root)).toContain('GKeep on GitHub');
+    expect(keys(made.root)).toContain('GSave to GitHub');
   });
 
   it('reads the sign-in again with Enter or when the page has the focus back, its key row as the card stands (GH4)', async () => {
@@ -553,11 +596,11 @@ describe('History', () => {
     const history = (await module()).mountHistory(made);
     await history.open();
     history.key(press('KeyG'));
-    await vi.waitFor(() => expect(keys(made.root)).toEqual(['EnterTry again', 'EscBack']), { timeout: 4000 });
+    await vi.waitFor(() => expect(keys(made.root)).toEqual(['EnterTry Again', 'EscBack']), { timeout: 4000 });
     expect(made.root.querySelector('.wu-hr-keep-status')?.textContent).toBe('Sign in to GitHub on this computer once (gh auth login), then try again.');
     history.key(press('Enter'));
     await vi.waitFor(() => expect(asked).toBe(2));
-    await vi.waitFor(() => expect(keys(made.root)).toEqual(['EnterTry again', 'EscBack']), { timeout: 4000 });
+    await vi.waitFor(() => expect(keys(made.root)).toEqual(['EnterTry Again', 'EscBack']), { timeout: 4000 });
     window.dispatchEvent(new Event('focus'));
     await vi.waitFor(() => expect(asked).toBe(3));
     history.key(press('Escape'));
@@ -573,7 +616,7 @@ describe('History', () => {
     const newest = all(made.root, '.wu-hr-change .wu-hr-change-words').at(-1);
     expect(made.root.querySelector('.wu-hr-change[aria-current="true"] .wu-hr-change-words')?.textContent).toBe(newest);
     expect(made.root.querySelector('.wu-hr-now')?.textContent).toBe('Now07:15 · Day 1');
-    expect(keys(made.root)).toEqual(['←→Earlier, later', 'GOpen on GitHub', 'EscBack']);
+    expect(keys(made.root)).toEqual(['←→Previous / Next', 'GOpen on GitHub', 'EscBack']);
     // Among world times a change states no wall clock: none records the world's time it was made (F12b).
     expect(made.root.querySelectorAll('.wu-hr-change .wu-hr-time')).toHaveLength(0);
     history.key(press('ArrowRight'));

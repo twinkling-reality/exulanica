@@ -12,7 +12,7 @@ export const PERSONALITY_WORDS = Object.freeze({
   save: 'Save',
   cancel: 'Cancel',
   unsaved: 'This could not be saved. Try again.',
-  record: 'Personality, as you wrote it',
+  record: 'Personality',
   /** The note after a save the society reads. */
   saved: 'Saved.',
   none: 'No personality yet.',

@@ -10,17 +10,16 @@ const repository = path => readFileSync(new URL('../../../' + path, import.meta.
 const teo = called({ name: 'Teo' }), resident = called({ kind: 'resident' });
 
 // Frame 10's labels, called by name or kind, never "it".
-assert.equal(toldLabel(teo), "What Teo's model was told");
-assert.equal(toldLabel(resident), "What the resident's model was told");
-// Each decider names itself (WORDS.md R5b, R5c): a person playing them was shown, a model or an outside program was told.
-assert.equal(toldLabel(teo, 'person'), 'What the person playing Teo was shown');
-assert.equal(toldLabel(resident, 'person'), 'What the person playing the resident was shown');
-assert.equal(toldLabel(teo, 'external'), "What Teo's outside program was told");
-assert.equal(toldLabel(resident, 'external'), "What the resident's outside program was told");
-assert.equal(toldLabel(teo, 'model'), "What Teo's model was told");
-assert.equal(toldLabel(resident, 'model'), "What the resident's model was told");
-assert.equal(choicesLabel(teo, 9), "Teo's choices (9)");
-assert.equal(choicesLabel(resident, 3), "The resident's choices (3)");
+assert.equal(toldLabel(teo), 'Context');
+assert.equal(toldLabel(resident), 'Context');
+assert.equal(toldLabel(teo, 'person'), 'Context');
+assert.equal(toldLabel(resident, 'person'), 'Context');
+assert.equal(toldLabel(teo, 'external'), 'Context');
+assert.equal(toldLabel(resident, 'external'), 'Context');
+assert.equal(toldLabel(teo, 'model'), 'Context');
+assert.equal(toldLabel(resident, 'model'), 'Context');
+assert.equal(choicesLabel(teo, 9), "Teo's Choices (9)");
+assert.equal(choicesLabel(resident, 3), "The resident's Choices (3)");
 assert.equal(overLabel({ at: askedAt(52, 360), who: teo, said: true, to: 'Ines' }), '06:52 · Day 1 · Teo said to Ines');
 assert.equal(overLabel({ at: askedAt(1500, 360), who: teo }), '07:00 · Day 2');
 assert.equal(overLabel({ at: askedAt(4, null), who: resident, said: true }), 'The resident said');
@@ -44,14 +43,14 @@ assert.equal(resultLines({ verdict: { kind: 'applied' }, latencyMs: 100 }).done,
 
 // The record page's words (r10): the column's label, the ring's count, the card's label and the head's small print,
 // who decided first (T7's words where no model did), then the answer's time and cost as resultLines says them.
-assert.equal(choicesOver(teo), "Teo's choices");
+assert.equal(choicesOver(teo), "Teo's Choices");
 // No newcomer's notes: what each part is goes unsaid (ROOT's sweep of 27 October).
 assert.doesNotMatch(repository('tools/previews/world-workspace/decision-words.mjs'), /export (const|function) (DECISION_NOTE_WORDS|decisionNotes|lateNotes|unansweredNotes)\b/u);
-assert.equal(choicesOver(resident), "The resident's choices");
+assert.equal(choicesOver(resident), "The resident's Choices");
 assert.equal(choseOneOf(9), 'chose 1 of 9');
-assert.equal(DECISION_FLOW_WORDS.whatHappened, 'What happened');
+assert.equal(DECISION_FLOW_WORDS.whatHappened, 'Outcome');
 assert.equal(DECISION_WORDS.chosen, 'Chosen');
-assert.equal(toldLabel(teo), "What Teo's model was told");
+assert.equal(toldLabel(teo), 'Context');
 assert.deepEqual([answeredIn(912), answeredIn(13), answeredIn(100), answeredIn(null)], ['answered in 0.9 s', 'answered in under 0.1 s', 'answered in 0.1 s', null]);
 assert.deepEqual([costWords('0.00030000'), costWords('0.0014006', false), costWords('0'), costWords(null), costWords('nonsense')], ['cost $0.0003', 'cost at most $0.0014', 'cost $0', null, null]);
 const partsText = parts => parts.map(part => typeof part === 'string' ? part : part.model).join('');
@@ -85,14 +84,14 @@ const town = {
   options: [{ kind: 'target', label: 'walking, 62 m away' }, { kind: 'wait', label: 'wait here a minute' }, { kind: 'target', label: 'at home, 35 m away' }],
 };
 assert.deepEqual(toldSections(town, resident), [
-  { label: 'Where and when', lines: ['On the glass terraces · 06:54 · Day 1'] , apart: false },
-  { label: 'How the resident is', lines: ['Rest: not needed yet (417 of 1000).', 'A meal: needed now (712 of 1000).'] , apart: true },
+  { label: 'Location & Time', lines: ['On the glass terraces · 06:54 · Day 1'] , apart: false },
+  { label: 'Status', lines: ['Rest: not needed yet (417 of 1000).', 'A meal: needed now (712 of 1000).'] , apart: true },
 ]);
 // A society of things' model told the world's clock (clock_told) is shown it as told; before that it was told a minute.
 assert.deepEqual(toldSections({ here: 'on the quay', tick: 27, world_clock: { minute_of_day: 1108, day: 0 } }, resident)[0].lines, ['On the quay · 18:28 · Day 1']);
 // Where the character lives, the world's title its owner named (world_named), on its own line above the spot and minute.
 assert.deepEqual(toldSections({ world: { title: 'A cozy little town by the sea at dusk' }, here: 'on the quay', tick: 27, world_clock: { minute_of_day: 1108, day: 0 } }, resident)[0],
-  { label: 'Where and when', lines: ['\u201cA cozy little town by the sea at dusk\u201d', 'On the quay · 18:28 · Day 1'], apart: true });
+  { label: 'Location & Time', lines: ['\u201cA cozy little town by the sea at dusk\u201d', 'On the quay · 18:28 · Day 1'], apart: true });
 assert.deepEqual(toldSections({ here: 'on the quay', tick: 27 }, resident)[0].lines, ['On the quay · Minute 27']);
 // A town's premises told by name (places_named, P3): the page shows where the model stood and what it remembered as
 // told, at a premises' door, inside one, and a premises remembered by what the being did there.
@@ -126,19 +125,19 @@ const garden = {
   options: [{ label: 'say something' }, { label: 'rest, 4 m away' }],
 };
 assert.deepEqual(toldSections(garden, teo), [
-  { label: 'Personality, as you wrote it', lines: ['Teo', 'A slow, kind resident who likes the pools.'] , apart: false },
-  { label: 'Where and when', lines: ['By the lower pools (others can rest at it) · Minute 4'] , apart: false },
-  { label: 'How Teo is', lines: ['Rest: needed now (802 of 1000).', 'Holding the acorn.'] , apart: true },
-  { label: 'Near Teo', lines: ['Ines, 3 m away, standing, can hear Teo.', 'A duck, beside Teo, resting, holding the leaf, from another world.', 'The bench, 4 m away.', 'And 3 more farther away.'] , apart: false },
+  { label: 'Personality', lines: ['Teo', 'A slow, kind resident who likes the pools.'] , apart: false },
+  { label: 'Location & Time', lines: ['By the lower pools (others can rest at it) · Minute 4'] , apart: false },
+  { label: 'Status', lines: ['Rest: needed now (802 of 1000).', 'Holding the acorn.'] , apart: true },
+  { label: 'Nearby', lines: ['Ines, 3 m away, standing, can hear Teo.', 'A duck, beside Teo, resting, holding the leaf, from another world.', 'The bench, 4 m away.', 'And 3 more farther away.'] , apart: false },
   { label: 'Heard', lines: ['Ines, 1 minute ago: “Morning.”'] , apart: false },
-  { label: 'Remembers', lines: ['Ines, met 3 minutes ago.', 'Ari, met 1 minute ago, no longer here.', 'The lower pools, this minute.', 'The bench, 2 minutes ago.'] , apart: false, more: 'And 2 more in the Full record.' },
+  { label: 'Remembers', lines: ['Ines, met 3 minutes ago.', 'Ari, met 1 minute ago, no longer here.', 'The lower pools, this minute.', 'The bench, 2 minutes ago.'] , apart: false, more: 'And 2 more in the Raw Prompt.' },
 ]);
 assert.deepEqual(toldSections({}, teo), []);
-// D4: Heard shows the newest three lines in the order they were told, the rest in the Full record; three or fewer, all.
+// D4: Heard shows the newest three lines in the order they were told, the rest in the Raw Prompt; three or fewer, all.
 const heardOf = count => ({ heard: Array.from({ length: count }, (_, at) => ({ from: `Ines ${at + 1}`, line: `Line ${at + 1}.`, minutes_ago: count - at, to_you: false })) });
 assert.deepEqual(toldSections(heardOf(5), teo).find(section => section.label === 'Heard').lines,
   ['Ines 3, 3 minutes ago: “Line 3.”', 'Ines 4, 2 minutes ago: “Line 4.”', 'Ines 5, 1 minute ago: “Line 5.”']);
-assert.deepEqual(['And 2 earlier lines in the Full record.', 'And 1 earlier line in the Full record.', undefined],
+assert.deepEqual(['And 2 earlier lines in the Raw Prompt.', 'And 1 earlier line in the Raw Prompt.', undefined],
   [5, 4, 3].map(count => toldSections(heardOf(count), teo).find(section => section.label === 'Heard').more));
 
 // Plain words: no em dash, no code, no "it" for a character (the personality is "it": as you wrote it;
@@ -190,7 +189,7 @@ assert.equal(by('line_out_of_bounds'), 'Its answer could not be used.');
 assert.equal(by('spending_limit_reached', 0), 'Asking it would have gone over the money left.');
 assert.equal(by('no_time_to_ask', 0), 'There was no time to ask it.');
 assert.equal(by('provider_credential_absent', 0), 'It could not be asked just then.');
-assert.equal(WORDS.chosenNotDone, 'Chosen, not done');
+assert.equal(WORDS.chosenNotDone, 'Not Applied');
 for (const reason of [...stated, null]) {
   for (const asks of [0, 1, 2]) {
     const why = unansweredWhy({ asks, reason });
@@ -201,7 +200,7 @@ for (const reason of [...stated, null]) {
 // An outside AI agent decided (AG1d 4, 5): who decided and nothing else; its told heading; its note; a turn it did not
 // answer read as U3 reads a model's, by its reason.
 assert.deepEqual(decidedByParts({ decider: 'agent' }), ['Decided by an outside AI agent']);
-assert.equal(toldLabel(called({ name: null, kind: 'visitor' }), 'agent'), 'What the outside AI agent was told');
+assert.equal(toldLabel(called({ name: null, kind: 'visitor' }), 'agent'), 'Context');
 const visitor = called({ name: null, kind: 'visitor' });
 assert.deepEqual([...NO_ANSWER], ['no_answer_in_time', 'decider_disconnected']);
 for (const reason of NO_ANSWER) assert.ok(stated.has(reason), reason);

@@ -43,7 +43,7 @@ assert.equal(card.chip, 'Nemotron 3 Nano 30B');
 assert.deepEqual(card.prompts.map(item => `${item.keys.join('+')} ${item.word}`), ['Enter Details', 'R Run', 'V Follow']);
 assert.deepEqual(chosenCard({ who: teo, being: true, model: 'Nano', running: true }).prompts.map(item => item.word), ['Details', 'Stop', 'Follow']);
 assert.deepEqual(chosenCard({ who: teo, being: true, model: 'Nano', connected: false }).prompts.map(item => item.word), ['Details', 'Follow']);
-assert.deepEqual(chosenCard({ who: teo, being: true, following: true }).prompts.map(item => item.word), ['Details', 'Stop following']);
+assert.deepEqual(chosenCard({ who: teo, being: true, following: true }).prompts.map(item => item.word), ['Details', 'Stop Following']);
 assert.deepEqual([...chosenCard({ who: teo, being: true }).lines], ["Teo's routine."]);
 assert.deepEqual([...chosenCard({ who: teo, being: true, reading: true }).lines], ["Reading Teo's record…"]);
 const thing = chosenCard({ who: called({ name: 'Bench', being: false }), being: false, thingLine: 'Placed in this world' });

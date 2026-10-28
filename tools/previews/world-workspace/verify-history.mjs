@@ -32,8 +32,8 @@ assert.equal(headLine(linked({ reached: false })).words, HEAD_WORDS.unreachable)
 // A pause GitHub no longer answers for (a deleted repository) is still a pause: sending will not resume on its own (GH6).
 const gone = { reason: 'GitHub refused or failed the request.' };
 assert.deepEqual(headLine(linked({ reached: false, paused: gone })), { words: 'Kept on GitHub in terraces-on-the-bay · sending has stopped. Your changes are kept on this computer.', refused: true });
-assert.equal(headLine({ link: null }).words, 'Kept in a project on this computer, not on GitHub');
-assert.equal(headLine(null).words, 'Not kept in a project');
+assert.equal(headLine({ link: null }).words, 'Saved Locally · Not on GitHub');
+assert.equal(headLine(null).words, 'Not Saved to GitHub');
 assert.equal(headLine(null, { refused: null }).words, 'Starting a project…');
 assert.deepEqual(headLine(null, { refused: { code: 'world_unreadable' } }), { words: 'Not kept: the world could not be read. Try again.', refused: true });
 assert.equal(headLine(undefined).words, '');
@@ -137,7 +137,7 @@ const twoLines = historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[
   names, partsOf, clock, now).items.find((item) => item.kind === 'moment');
 assert.equal(text(twoLines.by), 'By a person playing');
 // Only an answer that differs is a branch, the newest drawn; a same answer is one small line on the card.
-assert.deepEqual([text(met.branch.head), met.branch.outcome, met.same], ['Asked again with Qwen3 235B', 'Teo would have gone to the market', null]);
+assert.deepEqual([text(met.branch.head), met.branch.outcome, met.same], ['Compared with Qwen3 235B', 'Teo would have gone to the market', null]);
 assert.deepEqual([asked.branch, text(asked.same)], [null, 'Qwen3 235B chose the same']);
 // The opened moment holds every answer, oldest first.
 assert.deepEqual(met.answers.map(text), ['Llama 4: Teo would have waited a minute', 'Qwen3 235B: Teo would have gone to the market']);
@@ -181,6 +181,16 @@ assert.equal(fitLayout(narrow, { top: 147, bottom: 556 }).picture, narrow.pictur
 assert.equal(fitLayout(narrow, { top: 190, bottom: 664, side: 64 }).margin, 64);
 assert.equal(fitLayout(narrow, { top: 190, bottom: 664, side: 64 }).lineY, narrow.lineY);
 assert.equal(fitLayout(wide, { top: 260, bottom: 1024, side: 120 }), wide);
+// A two-line title pushes the frame's body below 260 (at 1920x1080, 1920x993, 1440x900, 1366x768): the opened
+// moment's picture and column sit at the body's top, never over the head's kept line, and stay above the key row.
+for (const [base, top, bottom, side] of [[wide, 338, 1024, 120], [wide, 338, 937, 120], [narrow, 286, 844, 64], [narrow, 250, 712, 64]]) {
+  const fitted = fitLayout(base, { top, bottom, side });
+  assert.ok(fitted.opened.top >= top, `opened moment below head at ${top}`);
+  assert.ok(fitted.opened.top + fitted.opened.height + Math.ceil(fitted.opened.orb / 2) <= bottom, `opened moment above keys at ${bottom}`);
+  assert.equal(fitted.opened.left, side);
+  assert.ok(fitted.changes.top >= top, `opened changes below head at ${top}`);
+  assert.ok(fitted.bracketY - 22 >= top, `run words below head at ${top}`);
+}
 const placed = pathLayout(path.items, wide);
 assert.deepEqual([...placed.x.values()], [120, 510, 600, 1020, 1440]);
 assert.equal(placed.nowAt, 1800);

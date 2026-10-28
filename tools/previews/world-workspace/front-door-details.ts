@@ -64,6 +64,6 @@ export function showWorldDetails(entry: SavedWorldEntry, credentials: Credential
     } else appearance.append(node('p', 'Its appearance could not be read.', 'ux-details-note'));
   };
   document.body.append(dialog); dialog.showModal(); close.focus();
-  const retryLoad = () => void load().catch(() => { if (!abort.signal.aborted) { body.replaceChildren(node('p', 'This world’s details could not be read.')); const retry = node('button', 'Try again', 'ux-details-action') as HTMLButtonElement; retry.type = 'button'; retry.onclick = retryLoad; body.append(retry); } });
+  const retryLoad = () => void load().catch(() => { if (!abort.signal.aborted) { body.replaceChildren(node('p', 'This world’s details could not be read.')); const retry = node('button', 'Try Again', 'ux-details-action') as HTMLButtonElement; retry.type = 'button'; retry.onclick = retryLoad; body.append(retry); } });
   retryLoad();
 }

@@ -82,7 +82,7 @@ assert.equal(wakesHints(key('KeyW', { metaKey: true })), false);
 
 // Bringing people in (K13): the corner's words as WORDS.md has them, the pill's line after, and what a refusal shows.
 assert.deepEqual({ ...PEOPLE_WORDS }, {
-  nobodyYet: 'Nobody lives here yet', bringIn: 'Bring people in', bringing: 'Bringing people in\u2026',
+  nobodyYet: 'Nobody lives here yet', bringIn: 'Bring People In', bringing: 'Bringing people in\u2026',
   nowhere: 'People need somewhere', nowhereSecond: 'to rest or visit nearby', build: 'Build',
   invented: 'invented for this world',
 });
@@ -122,7 +122,7 @@ function standIn(society = 'absent', { plays = true } = {}) {
   };
 }
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-const offer = { state: 'offer', keys: ['P'], word: 'Bring people in' };
+const offer = { state: 'offer', keys: ['P'], word: 'Bring People In' };
 {
   // Where nobody lives yet and this page may bring people in: the pill says so, the clock offers P.
   const world = standIn(), notes = [];

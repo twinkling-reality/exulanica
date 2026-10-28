@@ -146,7 +146,7 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
   const big = add(document.createElement('p'), run); big.className = 'wu-big'; big.textContent = '10 minutes · at most $0.05';
   const field = add(document.createElement('textarea'), left); field.className = 'wu-field'; field.rows = 2; field.value = 'Quiet, kind, waits for friends by the bench.';
   const count = add(div('wu-count'), left); count.textContent = '43 of 300';
-  right.append(label('What Teo did'));
+  right.append(label('Activity'));
   for (const [time, what, who, chosen] of [['07:09', 'Waited by the bench', 'Nemotron 3 Nano 30B · 7 choices', true], ['06:52', 'Said hello to Ines', 'Nemotron 3 Nano 30B · 9 choices', false], ['06:40', 'Walked to the lower pools', 'Routine', false]] as const) {
     const row = add(div('wu-list-row'), right);
     if (chosen) row.setAttribute('aria-current', 'true');
@@ -154,7 +154,7 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
     const words = add(div(''), row);
     const doing = add(div('wu-what'), words); doing.textContent = what;
     const by = add(div('wu-who'), words); by.textContent = who;
-    if (chosen) words.append(keyWord({ keys: ['Enter'], word: 'Inspect decision', shortcut: 'Enter', onPress: press, small: true }));
+    if (chosen) words.append(keyWord({ keys: ['Enter'], word: 'Decision', shortcut: 'Enter', onPress: press, small: true }));
   }
   right.append(label('Making'), stepList([
     { words: 'Your words and the picture\'s description', state: 'done', time: '0:02' },
@@ -229,10 +229,10 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
   // Building's held keys (W10) end their longest word 152 in from the right edge; talking's bars (T9) end 124 in.
   const held = at(shade(), 'right:calc(152 * var(--u));top:calc(312 * var(--u));--shade-pad:calc(24 * var(--u))');
   held.append(glyphRows([
-    { key: 'mouse', word: 'Place' }, { key: '[ ]', word: 'Turn' }, { key: 'Del', word: 'Remove' }, { key: 'Esc', word: 'Put back' },
+    { key: 'mouse', word: 'Place' }, { key: '[ ]', word: 'Turn' }, { key: 'Del', word: 'Remove' }, { key: 'Esc', word: 'Cancel' },
   ], { glyph: 'max(40px, calc(48 * var(--u)))', rowGap: 'max(12px, calc(16 * var(--u)))', colGap: 'max(16px, calc(20 * var(--u)))', word: 'max(28px, calc(32 * var(--u)))', nudge: -1 }));
   at(glyphRows([
-    { key: 'V', word: 'Stop following', onPress: press }, { key: 'Enter', word: "Ines's day", onPress: press },
+    { key: 'V', word: 'Stop Following', onPress: press }, { key: 'Enter', word: 'Activity', onPress: press },
   ], { glyph: 32, rowGap: 16, colGap: 16, word: 18, nudge: 1, bars: true }), 'position:absolute;right:calc(124 * var(--u));bottom:calc(128 * var(--u))');
 } else {
   for (const corner of ['tl', 'tr', 'bl', 'tc']) add(div(`wu-scrim wu-${corner}`));

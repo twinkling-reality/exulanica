@@ -10,14 +10,14 @@ export const CREATE_WORDS = Object.freeze({
   title: 'Create a world',
   /** The line under the title: what a newcomer can do with AI here (C4). */
   peopleMoveIn: 'People move in, and you choose an open AI model to decide for any of them.',
-  describeIt: 'Describe it',
+  describeIt: 'Prompt',
   /** The composer's placeholder, in the muted ink while it is empty: a sentence that makes a world (WORLDLOOK, 2 of 2). */
   placeholder: 'A cozy little town by the sea at dusk',
   create: 'Create',
   orStartFrom: 'Or start from',
   /** Over a ready world's name in the strip, and over Blank's (the composer page's mock). */
-  readyWorld: 'READY WORLD',
-  empty: 'EMPTY',
+  readyWorld: 'Ready World',
+  empty: 'Empty',
   /** The strip's arrows. */
   previous: 'Previous',
   next: 'Next',
@@ -29,7 +29,7 @@ export const CREATE_WORDS = Object.freeze({
   yourWorlds: 'Your worlds',
   start: 'Start',
   loading: 'Reading what you can make here…',
-  creating: 'Creating your world',
+  creating: 'Creating World',
   leave: 'You can leave this page. It carries on, and it waits in Your worlds.',
   beingMade: 'Being made…',
   madeFromYourWords: 'Made from your words',
@@ -49,10 +49,10 @@ export const CREATE_WORDS = Object.freeze({
  * serve is not shown; "Drawing its land" waits for a land stage the draft read does not serve yet.
  */
 export const STEP_WORDS = Object.freeze({
-  queued: 'Waiting to start',
-  choosing: 'Worked out what to make',
-  drafting: 'Planning the place',
-  making: 'Building it',
+  queued: 'Queued',
+  choosing: 'Planning Layout',
+  drafting: 'Designing World',
+  making: 'Building World',
   land: 'Drawing its land',
 });
 
@@ -278,11 +278,11 @@ export const refusalSpent = ({ spentUsd, unknownUsd = 0 }) =>
 export const NOTES_WORDS = Object.freeze({
   ask: 'Read the web first for what such a place looks like',
   /** The toggle in the composer's foot that asks for web notes (the composer page's mock), on until it is pressed. */
-  toggle: 'Search the web',
+  toggle: 'Web Search',
   steps: Object.freeze({
-    plan: 'Choosing what to look up',
-    search: 'Searching the web',
-    read: 'Writing notes from what it found',
+    plan: 'Planning Queries',
+    search: 'Searching Web',
+    read: 'Synthesizing Context',
   }),
   /** The request failed, expired or was stopped: the drafting goes on from the words alone. */
   notMade: 'The web notes could not be made, so it is made from your words alone.',
@@ -327,9 +327,9 @@ export function madeLine({ notes = null, spent = null, leftOut = [] }) {
 export const webTip = (searches, mostUsd, made = 'place') =>
   `Looks up what such a ${made} looks like before it is made: up to ${counted(searches, 'search', 'searches')} with ${NOTES_SOURCE}, which keeps ${searches === 1 ? 'it' : 'them'}. Adds at most ${ceilingAmount(mostUsd)}.`;
 
-/** Over the notes in the making view's second column: "FROM THE WEB, 3 SEARCHES", the searches sent, where any were. */
+/** Over the notes in the making view's second column: "Web References · 3 Searches", the searches sent, where any were. */
 export const webNotesLabel = (searches) =>
-  Number.isSafeInteger(searches) && searches > 0 ? `FROM THE WEB, ${counted(searches, 'SEARCH', 'SEARCHES')}` : 'FROM THE WEB';
+  Number.isSafeInteger(searches) && searches > 0 ? `Web References · ${searches} ${searches === 1 ? 'Search' : 'Searches'}` : 'Web References';
 
 const ASPECT_LABELS = new Map(aspects.entries.map((entry) => [entry.key, entry.label]));
 

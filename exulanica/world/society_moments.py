@@ -276,7 +276,13 @@ def form_moments(
             if partner is not None and not met(event.subject_id, partner):
                 met_now.add(frozenset((event.subject_id, partner)))
                 decider = decided.get(event.subject_id, _routine())
-                add("met", event, (event.subject_id, partner), decider)
+                add(
+                    "met",
+                    event,
+                    (event.subject_id, partner),
+                    decider,
+                    request_id=decider.get("request_id"),
+                )
         elif event.kind == "decision_applied":
             decision = decided.get(event.subject_id)
             if decision is None or decision["request_id"] is None:
@@ -342,7 +348,14 @@ def form_moments(
         rank, kept = chosen[line.subjects[0]]
         if kept is not line and set(kept.subjects) == set(line.subjects):
             joined = (*kept.event_ids, *line.event_ids)
-            chosen[line.subjects[0]] = (rank, replace(kept, event_ids=joined))
+            chosen[line.subjects[0]] = (
+                rank,
+                replace(
+                    kept,
+                    event_ids=joined,
+                    request_id=kept.request_id or line.request_id,
+                ),
+            )
     kept = sorted((moment for _, moment in chosen.values()), key=lambda m: str(m.anchor_event_id))
     return [
         replace(

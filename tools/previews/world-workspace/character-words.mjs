@@ -8,7 +8,7 @@ export const CHARACTER_WORDS = Object.freeze({
   run: 'Run',
   stop: 'Stop',
   follow: 'Follow',
-  stopFollowing: 'Stop following',
+  stopFollowing: 'Stop Following',
   back: 'Back',
   model: 'Model',
   personality: 'Personality',
@@ -30,7 +30,7 @@ export const CHARACTER_WORDS = Object.freeze({
   current: 'Current',
   chooseModel: 'Choose an AI model',
   /** The chooser's groups by where a model runs (A3), free first; the key group is keyGroup's. */
-  hereFree: 'On this computer, free',
+  hereFree: 'Local Models (Free)',
   serverBudget: "From this server's budget, per million tokens",
   /** A model a person's own runner holds, while a check on this computer runs (L1): its faint row, after its name. */
   checking: 'Checking that it can decide for a person here…',
@@ -43,7 +43,7 @@ export const CHARACTER_WORDS = Object.freeze({
   /** The Run question's cost where every model it asks runs on this computer (A2, DESIGN). */
   freeHere: 'Free, on this computer',
   readingModels: 'Reading the models…',
-  inspectDecision: 'Inspect decision',
+  inspectDecision: 'Decision',
   ask: 'Ask',
   askReading: 'Reading the world\u2019s records\u2026',
   noAnswer: 'The world has no answer recorded for this question.',
@@ -102,8 +102,8 @@ export const outOfViewNote = who => `${who.start} went out of view, so following
 /** A page's sub-line: the character's kind and the world's name. */
 export const pageSub = (kind, world) => [plain(kind) ? capitalised(plain(kind)) : null, plain(world)].filter(Boolean).join(' · ');
 
-/** The page's list of a character's actions, titled with its name. */
-export const whatDid = who => `What ${who.within} did`;
+/** The page's list of a character's actions. */
+export const whatDid = _who => 'Activity';
 
 /** The list when nothing is recorded yet. */
 export const nothingYet = who => `${who.start} has not done anything yet.`;
@@ -327,10 +327,10 @@ export function modelRefusalWords(code, who) {
  * works, as the key rows say them. `who` is called()'s.
  */
 export const GROUP_WORDS = Object.freeze({
-  decide: who => `Let ${possessive(who.within)} model decide`,
-  stop: who => `Stop ${possessive(who.within)} model`,
-  choose: who => `Choose ${possessive(who.within)} AI model`,
-  follow: who => `Follow ${who.within}`,
+  decide: _who => 'Run Model',
+  stop: _who => 'Stop Model',
+  choose: _who => 'Model',
+  follow: _who => 'Follow',
   stopFollowing: () => CHARACTER_WORDS.stopFollowing,
 });
 
@@ -402,4 +402,4 @@ export function modelsNamed(names) {
 }
 
 /** The Run question's way to another model (r08), where another is offered and this page may choose. */
-export const ANOTHER_MODEL = 'Choose another model';
+export const ANOTHER_MODEL = 'Change Model';

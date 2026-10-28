@@ -41,7 +41,7 @@ export const NOTE_WORDS = Object.freeze({
  * clock, while they come in, and when there is nowhere for them to go.
  */
 export const PEOPLE_WORDS = Object.freeze({
-  nobodyYet: 'Nobody lives here yet', bringIn: 'Bring people in', bringing: 'Bringing people in…',
+  nobodyYet: 'Nobody lives here yet', bringIn: 'Bring People In', bringing: 'Bringing people in…',
   nowhere: 'People need somewhere', nowhereSecond: 'to rest or visit nearby', build: 'Build',
   invented: 'invented for this world',
 });

@@ -54,19 +54,19 @@ const choices = (words: readonly string[], taken: number): Choice[] => words.map
 function teo(extra: Partial<DecisionPageState> = {}): DecisionPageState {
   return {
     over: '06:52 · Day 1 · Teo met Ines at the bench', title: '“Morning, Ines. The boats are out early.”', model: 'Nemotron 3 Nano 30B',
-    done: 'Answered in 0.9 s · cost $0.0003', verdict: null, toldLabel: "What Teo's model was told",
+    done: 'Answered in 0.9 s · cost $0.0003', verdict: null, toldLabel: 'Context',
     told: [
       // As personalityRecordLines gives it: the name, then the words.
-      { label: 'Personality, as you wrote it', lines: ['Teo', 'A retired fisherman who walks the quay every morning and talks to anyone who will listen.'], apart: false },
-      { label: 'Where and when', lines: ['The lower pools · 06:52 · Day 1'], apart: false },
-      { label: 'How Teo is', lines: ['Rest: not needed yet (417 of 1000).', 'A meal: needed now (712 of 1000).'], apart: true },
-      { label: 'Near Teo', lines: ['Ines, 3 m away, standing, can hear Teo.', 'The bench, 4 m away.'], apart: false },
+      { label: 'Personality', lines: ['Teo', 'A retired fisherman who walks the quay every morning and talks to anyone who will listen.'], apart: false },
+      { label: 'Location & Time', lines: ['The lower pools · 06:52 · Day 1'], apart: false },
+      { label: 'Status', lines: ['Rest: not needed yet (417 of 1000).', 'A meal: needed now (712 of 1000).'], apart: true },
+      { label: 'Nearby', lines: ['Ines, 3 m away, standing, can hear Teo.', 'The bench, 4 m away.'], apart: false },
       { label: 'Heard', lines: ['Ines, 1 minute ago: “Morning.”'], apart: false },
       { label: 'Remembers', lines: ['Ines, met 3 minutes ago.'], apart: false },
     ],
-    choicesLabel: "Teo's choices (9)", choices: choices(NINE, 0), earlier: true, later: false, record: null, failure: null, canCompare: true,
+    choicesLabel: "Teo's Choices (9)", choices: choices(NINE, 0), earlier: true, later: false, record: null, failure: null, canCompare: true,
     decided: 'Teo spoke to Ines', said: 'Teo: “Morning, Ines. The boats are out early.”', decider: 'model',
-    answered: { latencyMs: 912, costUsd: '0.00030000', costKnown: true }, choicesHeading: "Teo's choices",
+    answered: { latencyMs: 912, costUsd: '0.00030000', costKnown: true }, choicesHeading: "Teo's Choices",
     picture: null, portraits: [{ name: 'Teo', url: null }, { name: 'Ines', url: '/portraits/ines.png' }],
     ...extra,
   };
@@ -122,8 +122,8 @@ describe('A decision (r10)', () => {
     // curly quotes; each need on its own line; the rest run on.
     const told = page.querySelector('.wu-rd-told') as HTMLElement;
     expect([told.style.left, told.style.top, told.style.width]).toEqual(['120px', '300px', '470px']);
-    expect(told.querySelector('.wu-rd-label')?.textContent).toBe("What Teo's model was told");
-    expect(all(told, '.wu-rd-name')).toEqual(['Personality, as you wrote it', 'Where and when', 'How Teo is', 'Near Teo', 'Heard', 'Remembers']);
+    expect(told.querySelector('.wu-rd-label')?.textContent).toBe('Context');
+    expect(all(told, '.wu-rd-name')).toEqual(['Personality', 'Location & Time', 'Status', 'Nearby', 'Heard', 'Remembers']);
     expect(all(told.querySelectorAll('.wu-rd-section')[0]!, '.wu-rd-block')).toEqual(['Teo', '“A retired fisherman who walks the quay every morning and talks to anyone who will listen.”']);
     expect(all(told, '.wu-rd-quote')).toEqual(['“A retired fisherman who walks the quay every morning and talks to anyone who will listen.”']);
     expect(all(told.querySelectorAll('.wu-rd-section')[2]!, '.wu-rd-block')).toEqual(['Rest: not needed yet (417 of 1000).', 'A meal: needed now (712 of 1000).']);
@@ -145,11 +145,11 @@ describe('A decision (r10)', () => {
     // Under the ring: how many choices it had and what the answer took; who decided is the head's alone.
     expect(all(page, '.wu-rd-caption > span')).toEqual(['chose 1 of 9', 'answered in 0.9\u00a0s · $0.0003']);
     // What the model was told is the first heading after the title.
-    expect(page.querySelector('.wu-rd-told > h2.wu-rd-told-heading')?.textContent).toBe("What Teo's model was told");
+    expect(page.querySelector('.wu-rd-told > h2.wu-rd-told-heading')?.textContent).toBe('Context');
     expect(at(page.querySelector('.wu-rd-caption'))).toEqual(['740px', '650px']);
 
     // The choices, numbered as offered, 44px apart; the taken one in the ink with its tag.
-    expect(page.querySelector('.wu-rd-over .wu-rd-label')?.textContent).toBe("Teo's choices");
+    expect(page.querySelector('.wu-rd-over .wu-rd-label')?.textContent).toBe("Teo's Choices");
     expect(at(page.querySelector('.wu-rd-over'))).toEqual(['868px', '392px']);
     expect(numbers(page)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(all(page, '.wu-rd-choice-words')).toEqual(NINE);
@@ -167,11 +167,11 @@ describe('A decision (r10)', () => {
     expect(picture.querySelector(':scope > img')).toBeNull();
     expect([...card.querySelectorAll<HTMLElement>('.wu-hr-orb')].map((orb) => [orb.style.width, orb.textContent, orb.querySelector('img')?.getAttribute('src') ?? null]))
       .toEqual([['52px', 'T', null], ['52px', '', '/portraits/ines.png']]);
-    expect(card.querySelector('.wu-rd-label')?.textContent).toBe('What happened');
+    expect(card.querySelector('.wu-rd-label')?.textContent).toBe('Outcome');
     expect(card.querySelector('.wu-hr-said')?.textContent).toBe('Teo: “Morning, Ines. The boats are out early.”');
 
     // History's keys: earlier and later through the character's decisions, the full record, compare, back.
-    expect(keys(page)).toEqual(['←→Earlier, later', 'JFull record', 'CCompare this moment', 'EscBack']);
+    expect(keys(page)).toEqual(['←→Previous / Next', 'JRaw Prompt', 'CCompare', 'EscBack']);
     for (const button of page.querySelectorAll<HTMLButtonElement>('.wu-hr-key')) button.click();
     expect(act.mock.calls.map(([action]) => action)).toEqual(['earlier', 'record', 'compare', 'back']);
   });
@@ -227,26 +227,26 @@ describe('A decision (r10)', () => {
     expect(root.querySelector('.wu-rd-moment .wu-hr-said')?.textContent).toBe('Marco: “Did they bring in anything good?”');
     expect(root.querySelector('.wu-rd-moment .wu-hr-orbs')).toBeNull();
     // No earlier or later decision and nothing to compare: only the keys that work.
-    expect(keys(root)).toEqual(['JFull record', 'EscBack']);
+    expect(keys(root)).toEqual(['JRaw Prompt', 'EscBack']);
   });
 
   it("draws today's decision state before the host fills the record page's own parts", async () => {
     const { root } = await open({
       over: '06:52 · Day 1 · Teo said to Ines', title: 'Wait here a minute', model: 'Nemotron 3 Nano 30B',
       done: 'Answered in 1.3 s · cost at most $0.0014', verdict: 'Accepted; no minute has acted on it yet.',
-      toldLabel: "What Teo's model was told", told: [{ label: 'Where and when', lines: ['On the glass terraces · 06:54 · Day 1'], apart: false }],
-      choicesLabel: "Teo's choices (3)", choices: choices(['Walking, 62 m away', 'Wait here a minute', 'At home, 35 m away'], 1),
+      toldLabel: 'Context', told: [{ label: 'Location & Time', lines: ['On the glass terraces · 06:54 · Day 1'], apart: false }],
+      choicesLabel: "Teo's Choices (3)", choices: choices(['Walking, 62 m away', 'Wait here a minute', 'At home, 35 m away'], 1),
       earlier: false, later: true, record: null, failure: null, canCompare: false,
     });
     expect(root.querySelector('.wu-rd-title')?.textContent).toBe('Wait here a minute');
     expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Decided by Nemotron 3 Nano 30B');
-    expect(root.querySelector('.wu-rd-over .wu-rd-label')?.textContent).toBe("Teo's choices (3)");
+    expect(root.querySelector('.wu-rd-over .wu-rd-label')?.textContent).toBe("Teo's Choices (3)");
     expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 3', 'answered in 1.3 s · cost at most $0.0014']);
     // What happened: what came of it, the choice itself being the title already; the quiet tile where no picture exists.
     expect(root.querySelector('.wu-rd-moment .wu-rd-action')).toBeNull();
     expect(root.querySelector('.wu-rd-moment .wu-rd-verdict')?.textContent).toBe('Accepted; no minute has acted on it yet.');
     expect(root.querySelector('.wu-rd-moment .wu-hr-pic img')).toBeNull();
-    expect(keys(root)).toEqual(['←→Earlier, later', 'JFull record', 'EscBack']);
+    expect(keys(root)).toEqual(['←→Previous / Next', 'JRaw Prompt', 'EscBack']);
   });
 
   it('reads, says a record it could not read, and shows the full record with only its keys', async () => {
@@ -269,7 +269,7 @@ describe('A decision (r10)', () => {
     expect(document.activeElement).toBe(record);
     expect(root.querySelector('svg.wu-rd-flow')).toBeNull();
     expect(root.querySelector('.wu-rd-title')?.textContent).toBe('Teo spoke to Ines');
-    expect(keys(root)).toEqual(['←→Earlier, later', 'JFull record', 'EscBack']);
+    expect(keys(root)).toEqual(['←→Previous / Next', 'JRaw Prompt', 'EscBack']);
     // Hidden while another page stands over it, and gone when closed.
     page.hide(true);
     expect((root.querySelector('[role="dialog"]') as HTMLElement).hidden).toBe(true);
@@ -347,7 +347,7 @@ describe('A decision (r10)', () => {
 
   it("keeps a personality's name apart from its words, and says a name written alone plainly", async () => {
     const section = (lines: readonly string[], personality?: DecisionPageState['personality']) =>
-      teo({ told: [{ label: 'Personality, as you wrote it', lines, apart: false }], ...(personality === undefined ? {} : { personality }) });
+      teo({ told: [{ label: 'Personality', lines, apart: false }], ...(personality === undefined ? {} : { personality }) });
     const blocks = (root: HTMLElement) => [...root.querySelectorAll('.wu-rd-told .wu-rd-block')].map((block) => [block.textContent, block.classList.contains('wu-rd-quote')]);
     // Only a name written: personalityRecordLines gives the name alone, which is said plainly, never quoted.
     const { root, page } = await open(section(['Teo']));
@@ -416,11 +416,11 @@ describe("A model's decision whose choice was not taken (U3)", () => {
     expect(all(paused.root, '.wu-rd-caption > span')).toEqual(['spending was paused']);
   });
 
-  it('says a choice the world had moved past was made too late: marked Chosen, not done, its answer under the ring', async () => {
+  it('says a choice the world had moved past was made too late: marked Not Applied, its answer under the ring', async () => {
     const { root } = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, 4), late: true }));
     expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Asked Nemotron 3 Nano 30B · chose too late · the routine acted');
     expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 9', 'answered in 0.9\u00a0s · $0.0003']);
-    expect(all(root, '.wu-rd-choice .wu-hr-tag')).toEqual(['Chosen, not done']);
+    expect(all(root, '.wu-rd-choice .wu-hr-tag')).toEqual(['Not Applied']);
   });
 });
 
@@ -448,7 +448,7 @@ describe('What happened where a decision made no moment (U3c)', () => {
     expect(card.classList.contains('wu-rd-unframed')).toBe(true);
     // The portraits stand first in the card, then the words.
     expect(card.firstElementChild?.classList.contains('wu-hr-orbs')).toBe(true);
-    expect(all(card, '.wu-rd-label')).toEqual(['What happened']);
+    expect(all(card, '.wu-rd-label')).toEqual(['Outcome']);
   });
 
   it("keeps the frame while a moment's picture is still to come, and while the moments are read", async () => {
@@ -502,11 +502,11 @@ describe("The told column ends cleanly (D4)", () => {
   });
 
   it("closes a list shown in part on its own faint line at the section's end", async () => {
-    const heard = { label: 'Heard', lines: ['Ines, 2 minutes ago: “Morning.”', 'Ari, 1 minute ago: “Hello.”'], apart: false, more: 'And 4 earlier lines in the Full record.' };
+    const heard = { label: 'Heard', lines: ['Ines, 2 minutes ago: “Morning.”', 'Ari, 1 minute ago: “Hello.”'], apart: false, more: 'And 4 earlier lines in the Raw Prompt.' };
     const { root } = await open(teo({ told: [heard] }));
     const section = [...root.querySelectorAll('.wu-rd-section')].find((part) => part.querySelector('.wu-rd-name')?.textContent === 'Heard')!;
     const blocks = [...section.querySelectorAll('.wu-rd-block')];
-    expect(blocks.at(-1)?.textContent).toBe('And 4 earlier lines in the Full record.');
+    expect(blocks.at(-1)?.textContent).toBe('And 4 earlier lines in the Raw Prompt.');
     expect(blocks.at(-1)?.classList.contains('wu-rd-faint')).toBe(true);
     expect(blocks.filter((block) => block.classList.contains('wu-rd-faint'))).toHaveLength(1);
   });

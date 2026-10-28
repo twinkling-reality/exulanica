@@ -15,15 +15,15 @@ export const PATH_WORDS = Object.freeze({
   outsideProgram: 'By an outside program',
   /** An outside AI agent at the door decided (AG1d 4). */
   outsideAgent: 'By an outside AI agent',
-  earlierLater: 'Earlier, later',
-  openMoment: 'Open this moment',
+  earlierLater: 'Previous / Next',
+  openMoment: 'Open Moment',
   // A grouped changes dot, chosen (H15).
-  openChanges: 'Open these changes',
+  openChanges: 'View Changes',
   back: 'Back',
   openOnGitHub: 'Open on GitHub',
-  chooseLine: 'Choose a line',
-  seeDecision: 'See the decision',
-  backToStory: 'Back to the story',
+  chooseLine: 'Select Line',
+  seeDecision: 'Decision',
+  backToStory: 'Back to History',
   askedAgain: 'Asked again',
   nothingYet: 'Nothing has happened here yet.',
   momentsFailed: "The world's moments could not be read. Try again.",
@@ -31,8 +31,8 @@ export const PATH_WORDS = Object.freeze({
 
 /** The head's GitHub line (sheet section 2): `words`, and whether it is a refusal (drawn in refusal ink). */
 export const HEAD_WORDS = Object.freeze({
-  noProject: 'Not kept in a project',
-  localProject: 'Kept in a project on this computer, not on GitHub',
+  noProject: 'Not Saved to GitHub',
+  localProject: 'Saved Locally · Not on GitHub',
   starting: 'Starting a project…',
   putting: 'Putting it on GitHub…',
   unreachable: 'GitHub could not be reached. Your changes are kept here and sent when it answers.',
@@ -297,9 +297,9 @@ export function didWords({ kind, to = null, activity = null, thing = null, withN
   }
 }
 
-/** The branch's head: "Asked again with Qwen3 235B". */
+/** The branch's head: "Compared with Qwen3 235B". */
 export function askedAgainParts(modelName) {
-  return ['Asked again with ', modelPart(modelName)];
+  return ['Compared with ', modelPart(modelName)];
 }
 
 /** Another model chose what happened: one small line on the card, "Qwen3 235B chose the same". */
