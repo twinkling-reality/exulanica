@@ -6,7 +6,22 @@
 // passed in, so the page and the account never disagree. verify-decision-words.mjs holds these.
 import { amount, finer, possessive } from './character-words.mjs';
 import { personalityRecordLines } from './personality-words.mjs';
+import {
+  TRAJECTORY_PROFILE,
+  TRAJECTORY_WORDS,
+  decisionTrajectoryRecord,
+  serializeTrajectoryJsonl,
+  trajectorySummaryWords,
+} from './trajectory-export.mjs';
 import { worldTime } from './world-clock.mjs';
+
+export {
+  TRAJECTORY_PROFILE,
+  TRAJECTORY_WORDS,
+  decisionTrajectoryRecord,
+  serializeTrajectoryJsonl,
+  trajectorySummaryWords,
+};
 
 export const DECISION_WORDS = Object.freeze({
   personality: 'Personality',
@@ -25,6 +40,10 @@ export const DECISION_WORDS = Object.freeze({
   rest: 'Rest',
   neededNow: 'needed now',
   notNeededYet: 'not needed yet',
+  trainingData: TRAJECTORY_WORDS.trainingData,
+  exportTrajectories: TRAJECTORY_WORDS.exportTrajectories,
+  counterfactualPairs: TRAJECTORY_WORDS.counterfactualPairs,
+  verifiedDecisions: TRAJECTORY_WORDS.verifiedDecisions,
 });
 
 /** At most this many lines of what is remembered; the rest are in the Full record. */

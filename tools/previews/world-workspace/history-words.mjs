@@ -5,6 +5,21 @@
 // never "it"; never a topic, a summary of a line, "simulated", or counts or money on a moment.
 
 import { HISTORY } from './build-words.mjs';
+import {
+  TRAJECTORY_PROFILE,
+  TRAJECTORY_WORDS,
+  historyRunTrajectories,
+  serializeTrajectoryJsonl,
+  trajectorySummaryWords,
+} from './trajectory-export.mjs';
+
+export {
+  TRAJECTORY_PROFILE,
+  TRAJECTORY_WORDS,
+  historyRunTrajectories,
+  serializeTrajectoryJsonl,
+  trajectorySummaryWords,
+};
 
 export const PATH_WORDS = Object.freeze({
   history: 'History',
@@ -27,6 +42,10 @@ export const PATH_WORDS = Object.freeze({
   askedAgain: 'Asked again',
   nothingYet: 'Nothing has happened here yet.',
   momentsFailed: "The world's moments could not be read. Try again.",
+  trainingData: TRAJECTORY_WORDS.trainingData,
+  exportTrajectories: TRAJECTORY_WORDS.exportTrajectories,
+  counterfactualPairs: TRAJECTORY_WORDS.counterfactualPairs,
+  verifiedDecisions: TRAJECTORY_WORDS.verifiedDecisions,
 });
 
 /** The head's GitHub line (sheet section 2): `words`, and whether it is a refusal (drawn in refusal ink). */
