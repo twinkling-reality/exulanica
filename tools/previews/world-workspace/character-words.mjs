@@ -108,6 +108,9 @@ export const whatDid = who => `What ${who.within} did`;
 /** The list when nothing is recorded yet. */
 export const nothingYet = who => `${who.start} has not done anything yet.`;
 
+/** The list where the record could not be read: never that nothing was done. */
+export const recordFailed = who => `${possessive(who.start)} record could not be read. Try again.`;
+
 /**
  * Under one row of What Teo did: the model and its number of choices, a person playing or an outside
  * program where one decided (`decider`, T7), or the routine.

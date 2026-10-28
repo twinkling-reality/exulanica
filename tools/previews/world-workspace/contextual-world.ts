@@ -719,7 +719,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       run: { open: Boolean(run), big: run ? runningLine(run, Date.now(), runFree(), runSpent(subjectReads.models?.runSpending ?? null, subjectReads.models?.runSpendingPartial === true)) : runLength(limits, runFree()), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal, view.model ?? null) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
       did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...(row.heard ? {} : { model: row.model ?? null, choices: row.model ? decisionOptions(row.requestId) ?? null : null, decisions: row.decisions ?? null, decider: row.decider === 'person' || row.decider === 'external' || row.decider === 'agent' ? row.decider : null, unanswered: row.unanswered ?? null }), ...records.dayRow(pageView, row) })) : null,
-      didFocus: pageView.didFocus, lastRun, lastRunWhy, canAsk: !readOnly,
+      didFocus: pageView.didFocus, didFailed: pageView.didFailed === true, lastRun, lastRunWhy, canAsk: !readOnly,
       ask: pageView.ask ? { questions: ASK_ASPECTS.map(aspect => askWords(aspect, view.who)), focus: pageView.ask.focus, busy: pageView.ask.busy,
         answer: pageView.ask.answer, failure: pageView.ask.failure } : null,
       personality: pageView.personality ? { character: pageView.personality.character, shown: pageView.personality.shown } : null,
@@ -757,6 +757,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       // The people its rows name (a line heard, a line said to someone), named as History names them: offers read first.
       await Promise.all([...new Set((since?.fresh ?? events).filter(event => event.event_kind === 'said').map(event => event.subject_id === showing.row.scene.id ? event.document?.thing?.to : event.document?.thing?.heard_by?.includes(showing.row.scene.id) ? event.subject_id : null).map(beingRow).filter(Boolean))].map(one => entityOffer(one).catch(() => null)));
       if (showing !== pageView || showing.events !== events) return;
+      showing.didFailed = false;
       showing.did = didRows({ events, subjectId: showing.row.scene.id, startMinute: facts?.startMinute ?? null, modelName, runs: showing.runs ?? [], agent: outsideDecider(subjectReads.models, showing.row.scene.id) === 'agent',
         options: (requestId) => decisionOptions(requestId), who: whoOf, foldable: (row) => records.foldable(showing, row), limit: want,
         wordGoal: (document) => {
@@ -767,7 +768,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       // The chosen row follows the newest until the person moves it, then stays that row (dayFocus, F12b).
       showing.didMoved ||= earlier; showing.didFocus = dayFocus({ rows: showing.did, focus: showing.didFocus, earlier, before: newer ? was : null, moved: showing.didMoved }); if (newer) showing.didWant = Math.max(DID_ROWS, showing.did.length);
       drawPage();
-    } catch { if (showing === pageView && showing.did === null) { showing.did = []; drawPage(); } } finally { showing.reading = false; }
+    } catch { if (showing === pageView && showing.did === null) { showing.did = []; showing.didFailed = true; drawPage(); } } finally { showing.reading = false; }
   }
   function pageAct(action, index?) {
     if (!pageView) return;

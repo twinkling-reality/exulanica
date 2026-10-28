@@ -8,7 +8,7 @@
 // words the words modules'.
 import { label, orb as runOrb, page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orb as portraitOrb, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
-import { CHARACTER_WORDS, askWho, modelLine, routineRow, priceWords, whatDid, nothingYet, readingRecord, called } from './character-words.mjs';
+import { CHARACTER_WORDS, askWho, modelLine, routineRow, priceWords, whatDid, nothingYet, readingRecord, recordFailed, called } from './character-words.mjs';
 import type { ModelCard } from '../../../web/packages/app/src/society-models-api.ts';
 import { PERSONALITY_LIMITS, PERSONALITY_WORDS, counter, length, notRead, writtenWords } from './personality-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
@@ -83,6 +83,8 @@ export interface CharacterPageState {
   };
   /** The rows of What Teo did, newest first; null while they are read. */
   readonly did: readonly DidRow[] | null;
+  /** Whether the read of those rows failed, so the empty list says so rather than that nothing was done. */
+  readonly didFailed?: boolean;
   /** The chosen row, which the arrows move; null with none. */
   readonly didFocus: number | null;
   /** Whether [Q] Ask is offered. */
@@ -436,7 +438,7 @@ function drawDay(state: CharacterPageState, layout: Layout, view: View | null, w
   px(over, layout.labelX, layout.top);
   day.append(over);
   if (!state.did || !view) {
-    const note = element('p', 'wu-day-note', state.did ? nothingYet(state.who) : readingRecord(state.who));
+    const note = element('p', 'wu-day-note', !state.did ? readingRecord(state.who) : state.didFailed ? recordFailed(state.who) : nothingYet(state.who));
     px(note, layout.labelX, layout.firstTop);
     day.append(note);
     return day;

@@ -323,6 +323,10 @@ describe("Teo's day", () => {
     expect(root.querySelector('.wu-day-small')).toBeNull();
     expect(one(root, '.wu-day-note')).toBe('The resident has not done anything yet.');
     expect(root.querySelector('.wu-day-path .line')).toBeNull();
+    // Where the read failed it says so, never that nothing was done (ROOT's sweep of 27 October).
+    page.draw(residentState({ did: [], didFailed: true }));
+    expect(one(root, '.wu-day-note')).toBe("The resident's record could not be read. Try again.");
+    page.draw(residentState({ did: [] }));
     expect(keys(root)).toEqual(['NPersonality', 'EscBack']);
     // While the rows are read, it says so; without the host's words for who decides, the Run section's line.
     const plain = residentState({ did: null });

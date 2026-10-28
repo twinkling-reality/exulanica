@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { checkingLine, notAbleFold, notAbleLine, overLine, runnerCalls, runnerOpen } from './character-words.mjs';
-import { declaredParts, deciderWords, decidesPrint, runSectionLine, CHARACTER_WORDS, amount, askWho, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, pageSub, possessive, priceWords, readingRecord, routineBetween, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
+import { declaredParts, deciderWords, decidesPrint, runSectionLine, CHARACTER_WORDS, amount, askWho, called, chosenLine, goneNote, lastRunLine, modelLine, modelRefusalWords, modelsNamed, money, nothingYet, outOfViewNote, recordFailed, pageSub, possessive, priceWords, readingRecord, routineBetween, routineRow, rowSub, whatDid, rowPrice, providerName, keyGroup, makerLine, cardWords } from './character-words.mjs';
 
 // A character is called by its name, or by its kind, never "it", "he" or "she" (WORDS.md rule 10).
 const teo = called({ name: 'Teo' }), resident = called({ name: '  ', kind: 'Resident' }), someone = called({ name: null }), bench = called({ name: null, being: false });
@@ -29,6 +29,9 @@ assert.equal(pageSub('resident', 'Terraces on the bay'), 'Resident · Terraces o
 assert.equal(pageSub(null, 'Terraces on the bay'), 'Terraces on the bay');
 assert.equal(whatDid(teo), 'What Teo did');
 assert.equal(nothingYet(teo), 'Teo has not done anything yet.');
+// A read that failed says so, never that nothing was done (ROOT's sweep of 27 October).
+assert.equal(recordFailed(teo), "Teo's record could not be read. Try again.");
+assert.equal(recordFailed(called({ kind: 'resident' })), "The resident's record could not be read. Try again.");
 assert.equal(rowSub({ model: 'Nemotron 3 Nano 30B', options: 7 }), 'Nemotron 3 Nano 30B · 7 choices');
 assert.equal(rowSub(null), 'Routine');
 assert.equal(routineBetween('Nemotron 3 Super 120B'), "Routine, between Nemotron 3 Super 120B's choices");
