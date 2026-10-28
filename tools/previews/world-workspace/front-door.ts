@@ -126,16 +126,18 @@ export function mountFrontDoor({ root, entries, credentials }: { root: HTMLEleme
   const actions = root.querySelector('.your-worlds-actions')!;
   offerOpenAndDetailsOnly(root);
   const createRow = root.querySelector('.your-worlds-create-row')!;
+  // As on Create: Open is the one white pill, its key inside it; Create a world and Integrations stand at the top right.
   for (const [selector, name] of [['.your-worlds-open', null], ['.your-worlds-create', 'add']] as const) {
     const control = root.querySelector(selector)!;
     if (name) control.prepend(icon(name));
     else {
-      control.classList.add('ux-entry-orb');
-      const ring = document.createElement('span'); ring.className = 'ux-orb-icon'; ring.setAttribute('aria-hidden', 'true'); ring.append(icon('forward')); control.append(ring);
+      control.classList.add('ux-entry-pill');
+      const key = document.createElement('span'); key.className = 'ux-entry-key'; key.setAttribute('aria-hidden', 'true'); key.textContent = '↵'; control.append(key);
     }
     const shortcut = control.querySelector('kbd');
     if (shortcut) { if (selector === '.your-worlds-open') shortcut.textContent = 'Enter'; control.append(shortcut); }
   }
+  root.querySelector('.your-worlds-corner')!.append(createRow);
   hero.append(title, lede);
   const strip = root.querySelector<HTMLElement>('.your-worlds-strip')!;
   root.insertBefore(hero, strip);
@@ -148,7 +150,6 @@ export function mountFrontDoor({ root, entries, credentials }: { root: HTMLEleme
   };
   const previous = arrow('Previous world', 'forward', -1), next = arrow('Next world', 'forward', 1);
   previous.classList.add('ux-entry-previous');
-  arrows.append(createRow);
   root.insertBefore(arrows, strip);
   let selected: SavedWorldEntry | null = null;
   const details = document.createElement('button'); details.type = 'button'; details.className = 'entry-command ux-entry-details-open'; details.textContent = 'Details';
