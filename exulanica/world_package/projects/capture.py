@@ -32,6 +32,7 @@ from exulanica.world.errors import InvalidThingPlacement
 from exulanica.world.placed_things import ThingKindReference, shipped_kind
 from exulanica.world.society_decision_contract import situation
 from exulanica.world.society_things import THING_NAMESPACE
+from exulanica.world.trajectories import export_trajectories
 from exulanica.world_package.projects.checkpoint import (
     ProjectError,
     decode,
@@ -238,6 +239,8 @@ class Capture:
     report: dict[str, Any] = field(default_factory=dict)
     # Decision evidence of one session, kept beside the checkpoint (None when there is none).
     evidence: dict[str, Any] | None = None
+    # Deterministic training trajectories (exulanica.world-trajectory/v1) for captured decisions.
+    trajectories: dict[str, Any] | None = None
 
 
 def _events(reader: WorldReader, version: str, subjects: set[str]) -> list[dict[str, Any]]:
@@ -737,6 +740,7 @@ def capture(
     # Every binding a decision of this capture is held under, by its digest.
     bindings_used: dict[str, dict[str, Any]] = {}
     residents: dict[str, dict[str, Any]] = {}
+    trajectory_inputs: list[dict[str, Any]] = []
     if include_models:
         society = reader.json("GET society models", f"/world/versions/{version}/society/models")
         contract = {
@@ -911,6 +915,21 @@ def capture(
                 decision["readable"] = _readable(request, receipt, event)
             decisions.append(decision)
             bindings_used[decision["binding_sha256"]] = binding
+            trajectory_inputs.append(
+                {
+                    "world_id": reader.world_id,
+                    "version_id": version_id,
+                    "request": request,
+                    "decision": receipt,
+                    "event": event,
+                    "status": receipt["status"],
+                    "disposition": disposition or (
+                        "applied" if receipt["status"] == "accepted" else receipt["status"]
+                    ),
+                    "reason": decision["reason_code"],
+                    "branches": list(record.get("branches") or record.get("asks") or ()),
+                }
+            )
 
     # A resident is kept where a model decides for them or a decision of theirs is kept.
     decided = {model["thing_id"] for model in models} | {d["thing_id"] for d in decisions}
@@ -968,6 +987,15 @@ def capture(
             **({"residents": kept} if kept else {}),
         }
     )
+    trajectories = (
+        export_trajectories(
+            trajectory_inputs,
+            world_id=reader.world_id,
+            version_id=version_id,
+        ).to_dict()
+        if trajectory_inputs
+        else None
+    )
     return Capture(
         checkpoint,
         dependencies,
@@ -986,4 +1014,5 @@ def capture(
             "world_writes": 0,
         },
         evidence,
+        trajectories,
     )

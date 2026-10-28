@@ -11,7 +11,16 @@ import { changeParts, thingName } from './build-words.mjs';
 import { LAYOUTS, earlierBreak, fitLayout, historyPath, pathLayout, pathView, rowsWindow, runBrackets, targetObject } from './history-rows.mjs';
 import { openKeepCard, type KeepCard } from './history-keep.ts';
 import { KEEP_WORDS } from './history-keep-words.mjs';
-import { PATH_WORDS, headLine } from './history-words.mjs';
+import {
+  PATH_WORDS,
+  TRAJECTORY_PROFILE,
+  downloadTrajectoryJsonl,
+  headLine,
+  historyRunTrajectories,
+  serializeTrajectoryJsonl,
+  trajectoryFilename,
+  trajectorySummaryWords,
+} from './history-words.mjs';
 import { MOMENT_FRAMING } from './moment-framing.mjs';
 import { page } from './world-ui.ts';
 // The light pages' frame (world-page-frame.css) holds History's head and key row.
@@ -86,6 +95,8 @@ export interface HistoryHost {
   readonly write?: ((method: 'POST' | 'DELETE', path: string, body?: unknown) => Promise<{ readonly status: number; readonly body: any }>) | null;
   /** Opens a link outside the workspace (the GitHub project). */
   open(url: string): void;
+  /** Optional hook or flag for exporting verified trajectories (`exulanica.world-trajectory/v1`). */
+  readonly exportTrajectories?: boolean | ((bundle: any, jsonl: string, filename: string) => void);
   /** The page closed: give the world its keys and focus back. */
   closed(): void;
 }
@@ -127,6 +138,8 @@ export function mountHistory(host: HistoryHost): History {
   let lived = false;
   /** Moments read back on demand, older than the newest page (oldest first), and whether the read has more before. */
   let earlier: Json[] = [];
+  let rawMoments: Json[] = [];
+  let trainingSummary: string | null = null;
   let momentsMore = false;
   let paging = false;
   let state: 'loading' | 'ready' | 'offline' = 'loading';
@@ -207,6 +220,7 @@ export function mountHistory(host: HistoryHost): History {
     const latest: Json[] = moments?.moments ?? [];
     const known = new Set(latest.map((one) => one.moment_id));
     const momentList: Json[] = [...earlier.filter((one) => !known.has(one.moment_id)), ...latest];
+    rawMoments = momentList;
     if (!earlier.length) momentsMore = moments?.more === true;
     const records: Json[] = characters?.records ?? [];
     const choices: Json[] = models?.choices ?? [];
@@ -496,6 +510,24 @@ export function mountHistory(host: HistoryHost): History {
     return Boolean(host.write) && state === 'ready' && !putting && Boolean(project && !project.link && project.project_id);
   }
 
+  /** [T] Export Trajectories: fetches `/society/trajectories` (or serializes loaded moments) and downloads JSONL. */
+  async function exportTrainingData() {
+    if (!made || state !== 'ready' || !moments().length) return;
+    const remote = await optional(`${version}/society/trajectories${scope}`);
+    if (!made) return;
+    const bundle = remote && remote.profile === TRAJECTORY_PROFILE
+      ? remote
+      : historyRunTrajectories(rawMoments.length ? rawMoments : moments(), { worldId: host.worldId, versionId: host.versionId });
+    const jsonl = serializeTrajectoryJsonl(bundle);
+    const filename = trajectoryFilename(host.title || host.worldId);
+    downloadTrajectoryJsonl(jsonl, filename);
+    if (typeof host.exportTrajectories === 'function') {
+      host.exportTrajectories(bundle, jsonl, filename);
+    }
+    trainingSummary = `${PATH_WORDS.trainingData} · ${trajectorySummaryWords(bundle)}`;
+    draw();
+  }
+
   function keepOnGitHub() {
     if (!offersGitHub() || card || !made) return;
     opened = null;
@@ -762,6 +794,7 @@ export function mountHistory(host: HistoryHost): History {
         content.append(openedView(moment, layout));
         if (moment.lines.length > 1) keys.append(keyButton(['↑', '↓'], PATH_WORDS.chooseLine, () => chooseLine(1)));
         if (host.openDecision && decisionOf(moment)) keys.append(keyButton(['Enter'], PATH_WORDS.seeDecision, () => seeDecision()));
+        if (host.exportTrajectories) keys.append(keyButton(['T'], PATH_WORDS.exportTrajectories, () => void exportTrainingData()));
       } else if (changes) {
         const list = changesView(changes, layout);
         content.append(list.view);
@@ -788,7 +821,13 @@ export function mountHistory(host: HistoryHost): History {
       if (url) keys.append(keyButton(['G'], PATH_WORDS.openOnGitHub, () => host.open(url)));
       else if (offersGitHub()) keys.append(keyButton(['G'], KEEP_WORDS.keepOnGitHub, () => keepOnGitHub()));
       else if (offersKeep()) keys.append(keyButton(['K'], KEEP_WORDS.keepInProject, () => void keepInProject()));
+      if (host.exportTrajectories && moments().length > 0) keys.append(keyButton(['T'], PATH_WORDS.exportTrajectories, () => void exportTrainingData()));
       keys.append(keyButton(['Esc'], PATH_WORDS.back, () => close()));
+    }
+    if (trainingSummary) {
+      const badge = element('p', 'wu-hr-training', trainingSummary);
+      badge.setAttribute('role', 'status');
+      content.append(badge);
     }
     lasting.keys.replaceChildren(keys);
     if (card && fadeNext) requestAnimationFrame(() => fadeUnderCard(content));
@@ -948,6 +987,8 @@ export function mountHistory(host: HistoryHost): History {
     chosen = null;
     opened = null;
     earlier = [];
+    rawMoments = [];
+    trainingSummary = null;
     momentsMore = false;
     offset = null;
     unlisten?.();
@@ -1007,6 +1048,7 @@ export function mountHistory(host: HistoryHost): History {
           else chooseLine(by);
         }
         else if (event.code === 'Enter') seeDecision();
+        else if (event.code === 'KeyT' && moments().length > 0) void exportTrainingData();
         return true;
       }
       if (event.code === 'Escape' || event.code === 'KeyH') close();
@@ -1017,6 +1059,7 @@ export function mountHistory(host: HistoryHost): History {
       } else if (event.code === 'KeyG' && githubUrl()) host.open(githubUrl() as string);
       else if (event.code === 'KeyG' && offersGitHub()) keepOnGitHub();
       else if (event.code === 'KeyK' && offersKeep()) void keepInProject();
+      else if (event.code === 'KeyT' && moments().length > 0) void exportTrainingData();
       return true;
     },
   };

@@ -44,6 +44,9 @@ interface DecisionPageState {
     readonly request?: Readonly<Record<string, unknown>>;
     readonly decision?: Readonly<Record<string, unknown>> | null;
   } | null;
+  readonly canExportTrajectories?: boolean;
+  readonly branches?: readonly Record<string, unknown>[];
+  readonly trainingSummary?: string | null;
 }
 interface DecisionPage { draw(state: DecisionPageState): void; close(): void; hide(hidden: boolean): void }
 // A joined path: the test runner still finds the file, and the type checker leaves the preview
@@ -514,6 +517,23 @@ describe("The told column ends cleanly (D4)", () => {
     expect(blocks.at(-1)?.textContent).toBe('And 4 earlier lines in the Raw Prompt.');
     expect(blocks.at(-1)?.classList.contains('wu-rd-faint')).toBe(true);
     expect(blocks.filter((block) => block.classList.contains('wu-rd-faint'))).toHaveLength(1);
+  });
+
+  it('offers [T] Export Trajectories on the decision page and displays counterfactual summary metrics', async () => {
+    const { root, act } = await open(
+      teo({
+        canExportTrajectories: true,
+        branches: [
+          { ask_id: 'a1', model: { name: 'Qwen3 235B' }, same_choice: false, kind: 'went', outcome: 'Walk to the market' },
+        ],
+      }),
+    );
+    expect(keys(root)).toContain('TExport Trajectories');
+    expect(press('KeyT').defaultPrevented).toBe(true);
+    expect(act).toHaveBeenCalledWith('export-trajectories');
+    expect(root.querySelector('.wu-rd-training')?.textContent).toBe(
+      'Training Data · Verified Decisions: 1 · Counterfactual Pairs: 1 · Agreement Rate: 0%',
+    );
   });
 });
 

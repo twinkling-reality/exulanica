@@ -7,9 +7,11 @@ import {
   assertNoFloats,
   canonicalJson,
   decisionTrajectoryRecord,
+  downloadTrajectoryJsonl,
   historyRunTrajectories,
   roundHalfDown,
   serializeTrajectoryJsonl,
+  trajectoryFilename,
   trajectorySummaryWords,
 } from './trajectory-export.mjs';
 
@@ -144,5 +146,11 @@ for (const line of lines) {
   assert.equal(parsed.profile, 'exulanica.world-trajectory/v1');
   assertNoFloats(parsed);
 }
+
+assert.equal(trajectoryFilename('Terraces on the bay'), 'terraces-on-the-bay-trajectories.jsonl');
+assert.equal(trajectoryFilename('world:generated:0b0e0c1d'), '0b0e0c1d-trajectories.jsonl');
+const downloaded = downloadTrajectoryJsonl(jsonl, trajectoryFilename('Terraces on the bay'));
+assert.equal(downloaded.filename, 'terraces-on-the-bay-trajectories.jsonl');
+assert.equal(downloaded.bytes, jsonl.length);
 
 console.log('trajectory export: ok');

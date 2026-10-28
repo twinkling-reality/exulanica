@@ -4963,6 +4963,171 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
     }
   },
   {
+    "path": "/world/versions/{version_id}/society/trajectories",
+    "method": "get",
+    "id": "society_trajectories_world_versions__version_id__society_trajectories_get",
+    "title": "Export verified world decision trajectories and counterfactual pairs.",
+    "description": "",
+    "group": "society",
+    "permission": {
+      "requires": [
+        "world.read"
+      ]
+    },
+    "parameters": [
+      {
+        "name": "version_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Version Id"
+        }
+      },
+      {
+        "name": "world_id",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "World Id"
+        }
+      },
+      {
+        "name": "format",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "enum": [
+                "json",
+                "jsonl",
+                "openai",
+                "openenv",
+                "dpo"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Format"
+        }
+      },
+      {
+        "name": "kind",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "enum": [
+                "all",
+                "sft",
+                "dpo"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Kind"
+        }
+      },
+      {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "maximum": 2000,
+          "minimum": 1,
+          "default": 2000,
+          "title": "Limit"
+        }
+      },
+      {
+        "name": "subject_id",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Subject Id"
+        }
+      },
+      {
+        "name": "request_id",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Request Id"
+        }
+      },
+      {
+        "name": "authorization",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Authorization"
+        }
+      }
+    ],
+    "request": null,
+    "responses": {
+      "200": {
+        "description": "Successful Response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "title": "Response Society Trajectories World Versions  Version Id  Society Trajectories Get"
+            }
+          }
+        }
+      },
+      "422": {
+        "description": "Validation Error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/HTTPValidationError"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
     "path": "/world/versions/{version_id}/society/play",
     "method": "post",
     "id": "start_playing_world_versions__version_id__society_play_post",

@@ -8,16 +8,20 @@ import { HISTORY } from './build-words.mjs';
 import {
   TRAJECTORY_PROFILE,
   TRAJECTORY_WORDS,
+  downloadTrajectoryJsonl,
   historyRunTrajectories,
   serializeTrajectoryJsonl,
+  trajectoryFilename,
   trajectorySummaryWords,
 } from './trajectory-export.mjs';
 
 export {
   TRAJECTORY_PROFILE,
   TRAJECTORY_WORDS,
+  downloadTrajectoryJsonl,
   historyRunTrajectories,
   serializeTrajectoryJsonl,
+  trajectoryFilename,
   trajectorySummaryWords,
 };
 

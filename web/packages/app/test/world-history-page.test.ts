@@ -24,6 +24,7 @@ interface HistoryHost {
   openDecision?(decision: { readonly momentId: string; readonly requestId: string | null; readonly tick: number; readonly subject: string | null }): void;
   readonly write?: ((method: 'POST' | 'DELETE', path: string, body?: unknown) => Promise<{ readonly status: number; readonly body: unknown }>) | null;
   open(url: string): void;
+  readonly exportTrajectories?: boolean | ((bundle: unknown, jsonl: string, filename: string) => void);
   closed(): void;
 }
 interface History { open(): Promise<void>; close(): void; dispose(): void; key(event: KeyboardEvent): boolean; readonly isOpen: boolean }
@@ -846,5 +847,75 @@ describe('History', () => {
     expect(made.root.querySelector('[role="dialog"]')).toBeNull();
     expect(history.isOpen).toBe(false);
     expect(made.closed).not.toHaveBeenCalled();
+  });
+
+  it('exports verified training trajectories and counterfactual pairs on [T] with summary metrics', async () => {
+    const { read, asked } = reads({
+      [`/world/versions/${VERSION}/society/trajectories`]: {
+        profile: 'exulanica.world-trajectory/v1',
+        world_id: WORLD,
+        version_id: VERSION,
+        sft_records: [
+          {
+            profile: 'exulanica.world-trajectory/v1',
+            record_kind: 'sft',
+            world_id: WORLD,
+            version_id: VERSION,
+            request_id: 'r430',
+            tick: 430,
+            subject_id: 'teo',
+            model_id: 'Nemotron 3 Nano 30B',
+            messages: [{ role: 'system', content: 'Decide.' }, { role: 'user', content: 'Options.' }],
+            offered_options: [{ option_id: 'option:1', label: 'Say something to Marco', kind: 'say_to', takes_line: true, target_id: 'marco' }],
+            chosen_action: { label: 'Say something to Marco', kind: 'say_to', line: 'Sardines, mostly.', target_id: 'marco' },
+            latency_ms: 640,
+            cost_usd: '0.0003',
+          },
+        ],
+        dpo_pairs: [
+          {
+            profile: 'exulanica.world-trajectory/v1',
+            record_kind: 'dpo',
+            pair_kind: 'counterfactual_branch',
+            world_id: WORLD,
+            version_id: VERSION,
+            request_id: 'm1',
+            tick: 412,
+            subject_id: 'teo',
+            context_messages: [{ role: 'system', content: 'Decide.' }],
+            offered_options: [{ option_id: 'option:1', label: 'Speak to Ines', kind: 'say_to', takes_line: true, target_id: 'ines' }],
+            chosen_valid_action: { label: 'Speak to Ines', kind: 'say_to', line: 'Morning, Ines.', target_id: 'ines', model_id: 'Nemotron 3 Nano 30B' },
+            rejected_or_alternative_action: { label: 'Walk to the market', kind: 'went', line: null, target_id: 'market:1', model_id: 'Qwen3 235B', same_choice: false },
+            verdict_reason: 'counterfactual_diverged',
+          },
+        ],
+        metrics: {
+          total_decisions: 2,
+          applied_count: 2,
+          refused_count: 0,
+          counterfactual_pairs: 1,
+          evaluated_branches: 2,
+          agreed_branches: 1,
+          agreement_rate_permille: 500,
+          mean_latency_ms: 640,
+        },
+      },
+    });
+    const exported = vi.fn();
+    const made = host(read, { exportTrajectories: exported });
+    const history = (await module()).mountHistory(made);
+    await history.open();
+    expect(keys(made.root)).toContain('TExport Trajectories');
+    history.key(press('KeyT'));
+    await vi.waitFor(() => expect(exported).toHaveBeenCalledTimes(1));
+    const [bundle, jsonl, filename] = exported.mock.calls[0]!;
+    expect(bundle.profile).toBe('exulanica.world-trajectory/v1');
+    expect(filename).toBe('terraces-on-the-bay-trajectories.jsonl');
+    expect(jsonl.split('\n')).toHaveLength(2);
+    expect(asked).toContain(`/world/versions/${VERSION}/society/trajectories?world_id=${encodeURIComponent(WORLD)}`);
+    expect(made.root.querySelector('.wu-hr-training')?.textContent).toBe(
+      'Training Data · Verified Decisions: 2 · Counterfactual Pairs: 1 · Agreement Rate: 50%',
+    );
+    history.close();
   });
 });

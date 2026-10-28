@@ -10,7 +10,9 @@ import {
   TRAJECTORY_PROFILE,
   TRAJECTORY_WORDS,
   decisionTrajectoryRecord,
+  downloadTrajectoryJsonl,
   serializeTrajectoryJsonl,
+  trajectoryFilename,
   trajectorySummaryWords,
 } from './trajectory-export.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -19,7 +21,9 @@ export {
   TRAJECTORY_PROFILE,
   TRAJECTORY_WORDS,
   decisionTrajectoryRecord,
+  downloadTrajectoryJsonl,
   serializeTrajectoryJsonl,
+  trajectoryFilename,
   trajectorySummaryWords,
 };
 

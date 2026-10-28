@@ -28,9 +28,9 @@ import uuid
 from collections import Counter
 from decimal import Decimal
 from statistics import median_low
-from typing import Annotated, Any, Final
+from typing import Annotated, Any, Final, Literal
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -70,9 +70,16 @@ from exulanica.world.society_model_choice_repository import (
     SocietyModelChoiceRepository,
 )
 from exulanica.world.society_repository import SocietyRepository
+from exulanica.world.trajectories import (
+    build_trajectory_bundle,
+    format_dpo_jsonl,
+    format_openai_tool_jsonl,
+    format_openenv_jsonl,
+    format_trajectory_jsonl,
+)
 from exulanica.world.worlds import require_world
 
-router = APIRouter(prefix="/world/versions/{version_id}/society/models", tags=["society"])
+router = APIRouter(prefix="/world/versions/{version_id}/society", tags=["society"])
 
 __all__ = [
     "CHOICE_CONFLICTS",
@@ -335,7 +342,7 @@ HISTORY_DEFAULT: Final = 200
 
 
 @router.get(
-    "/history",
+    "/models/history",
     summary="Every model choice made for the version's people, newest first, with when.",
 )
 def society_model_history(
@@ -390,7 +397,7 @@ def society_model_history(
     )
 
 
-@router.get("")
+@router.get("/models")
 def society_models(
     version_id: uuid.UUID,
     connection: ScopedConnection,
@@ -406,6 +413,82 @@ def society_models(
         )
     except RoleRefused as exc:
         return _role_refused(exc)
+
+
+@router.get(
+    "/trajectories",
+    summary="Export verified world decision trajectories and counterfactual pairs.",
+)
+def society_trajectories(
+    version_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+    format: Annotated[
+        Literal["json", "jsonl", "openai", "openenv", "dpo"] | None, Query()
+    ] = None,
+    kind: Annotated[Literal["all", "sft", "dpo"] | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=DECISIONS_READ)] = DECISIONS_READ,
+    subject_id: Annotated[uuid.UUID | None, Query()] = None,
+    request_id: Annotated[uuid.UUID | None, Query()] = None,
+) -> Any:
+    try:
+        role = _people_role()
+        society = _society(connection, session, request, world_id)
+        bundle = build_trajectory_bundle(
+            society,
+            version_id,
+            role=role,
+            limit=limit,
+            subject_id=subject_id,
+            request_id=request_id,
+        )
+    except UnavailableSocietyInput as exc:
+        return JSONResponse(
+            status_code=424, content={"code": "unavailable_society_input", "detail": str(exc)}
+        )
+    except RoleRefused as exc:
+        return _role_refused(exc)
+
+    payload = bundle.to_dict()
+    if kind == "sft":
+        payload["dpo_pairs"] = []
+    elif kind == "dpo":
+        payload["sft_records"] = []
+
+    if format == "jsonl":
+        return Response(
+            content=format_trajectory_jsonl(payload),
+            media_type="application/x-ndjson",
+            headers={"Cache-Control": "private, no-store"},
+        )
+    if format == "openai":
+        return Response(
+            content=format_openai_tool_jsonl(payload["sft_records"]),
+            media_type="application/x-ndjson",
+            headers={"Cache-Control": "private, no-store"},
+        )
+    if format == "openenv":
+        return Response(
+            content=format_openenv_jsonl(
+                payload["sft_records"],
+                world_id=world_id,
+                version_id=str(version_id),
+            ),
+            media_type="application/x-ndjson",
+            headers={"Cache-Control": "private, no-store"},
+        )
+    if format == "dpo":
+        return Response(
+            content=format_dpo_jsonl(payload["dpo_pairs"]),
+            media_type="application/x-ndjson",
+            headers={"Cache-Control": "private, no-store"},
+        )
+    return JSONResponse(
+        content=payload,
+        headers={"Cache-Control": "private, no-store"},
+    )
 
 
 def offered_models(
@@ -665,7 +748,7 @@ def society_models_view(
     }
 
 
-@router.post("")
+@router.post("/models")
 def choose_society_model(
     version_id: uuid.UUID,
     body: ModelChoiceBody,

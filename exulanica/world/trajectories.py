@@ -35,6 +35,11 @@ from exulanica.things.lines import LineRefused, check_line, names_listener, repe
 from exulanica.world.decision_roles import decision_roles
 from exulanica.world.role_decisions import ANSWER_BY, ANSWER_WITH_LINE_BY, AnsweringMechanism
 from exulanica.world.society_decision_contract import situation as build_situation
+from exulanica.world.trajectory_store import (
+    build_trajectory_bundle,
+    project_decisions_to_trajectory_inputs,
+    read_trajectory_decisions,
+)
 
 __all__ = [
     "TRAJECTORY_PROFILE",
@@ -44,14 +49,17 @@ __all__ = [
     "TrajectoryError",
     "TrajectoryMetrics",
     "assert_no_floats",
+    "build_trajectory_bundle",
     "compute_trajectory_metrics",
-    " export_trajectories".strip(),
+    "export_trajectories",
     "extract_dpo_pairs",
     "extract_sft_records",
     "format_dpo_jsonl",
     "format_openai_tool_jsonl",
     "format_openenv_jsonl",
     "format_trajectory_jsonl",
+    "project_decisions_to_trajectory_inputs",
+    "read_trajectory_decisions",
     "to_dpo_preference_example",
     "to_openai_tool_example",
     "to_openenv_episode",
@@ -249,14 +257,20 @@ def _build_messages(
     instruction = "You are deciding what one inhabitant of this world does next."
     lines: list[str] = []
     if context:
-        try:
-            role = decision_roles().for_request(
-                str(request.get("profile") or "exulanica.society-decision-request/v2")
-            )
-            if role is not None:
+        role = decision_roles().for_request(
+            str(request.get("profile") or "exulanica.society-decision-request/v2")
+        )
+        if role is not None:
+            try:
+                mechanism_raw = (request.get("provider_config") or {}).get("mechanism")
+                mechanism = (
+                    AnsweringMechanism(str(mechanism_raw))
+                    if mechanism_raw in {m.value for m in AnsweringMechanism}
+                    else AnsweringMechanism.TOOL_CALL
+                )
+                return role.adapter.messages(role, context, mechanism)
+            except Exception:
                 instruction = role.terms_of(context).instruction
-        except Exception:
-            pass
         try:
             lines.extend(build_situation(dict(context)))
         except Exception:
@@ -322,7 +336,6 @@ def validate_proposal_verdict(
 
     inferred_listener = listener_name
     if inferred_listener is None:
-        # Check if label names a listener after "say something to <Name>"
         lower = proposed_label.lower()
         if lower.startswith("say something to "):
             rest = proposed_label[len("say something to ") :].split(",")[0].strip()
@@ -374,10 +387,10 @@ def _normalize_action(
             raw_action.get("label")
             or raw_action.get("chosen_label")
             or raw_action.get("choice")
+            or raw_action.get("chose")
             or option.get("label")
         )
         if not isinstance(label, str) or not label.strip():
-            # Branch records in society_moments carry kind/target/said when label is not repeated.
             kind = str(raw_action.get("kind") or option.get("kind") or "carried_on")
             said = raw_action.get("said")
             line = (
@@ -606,10 +619,10 @@ def _unpack_decision_turn(
     )
     # Also check provider calls if any earlier attempt was rejected before a retry succeeded
     for call in provider_rec.get("calls") or ():
-        if isinstance(call, Mapping) and call.get("outcome") not in (
-            None,
-            "offered_label",
-            "accepted",
+        if isinstance(call, Mapping) and call.get("outcome") in (
+            "label_not_offered",
+            "line",
+            "answer_not_offered",
         ):
             rejected_proposals.append(call)
 
@@ -749,7 +762,6 @@ def extract_dpo_pairs(
         chosen = turn["chosen_action"]
         messages_sha256 = _canonical_sha256(turn["messages"])
 
-        # Determine the valid anchor action (either the applied choice, or a valid branch/fallback)
         valid_anchor: dict[str, Any] | None = None
         if (
             chosen is not None
@@ -771,7 +783,6 @@ def extract_dpo_pairs(
                 "model_id": turn["model_id"],
             }
         else:
-            # Look for an accepted counterfactual branch or fallback idle option as valid anchor
             for branch in turn["branches"]:
                 if not isinstance(branch, Mapping):
                     continue
@@ -793,7 +804,6 @@ def extract_dpo_pairs(
                         }
                         break
             if valid_anchor is None:
-                # Use the idle/wait option from offered_options as the deterministic fallback
                 fallback_opt = next(
                     (
                         o
@@ -811,7 +821,6 @@ def extract_dpo_pairs(
                     "model_id": "routine_fallback",
                 }
 
-        # 1. If the primary turn itself was refused/rejected, pair valid_anchor vs rejected proposal
         if turn["status"] != "accepted" or turn["disposition"] != "applied":
             rejected_action = (
                 {
@@ -860,7 +869,6 @@ def extract_dpo_pairs(
             }
             pairs.append(DpoPairRecord({**body, "record_sha256": _canonical_sha256(body)}))
 
-        # 2. Any explicit rejected attempts prior to retry or fallback
         for attempt_idx, attempt in enumerate(turn["rejected_proposals"]):
             if not isinstance(attempt, Mapping):
                 continue
@@ -910,7 +918,6 @@ def extract_dpo_pairs(
             }
             pairs.append(DpoPairRecord({**body, "record_sha256": _canonical_sha256(body)}))
 
-        # 3. Counterfactual branches (from asked_again / branches / counterfactual_alternatives)
         for branch_idx, branch in enumerate(turn["branches"]):
             if not isinstance(branch, Mapping):
                 continue

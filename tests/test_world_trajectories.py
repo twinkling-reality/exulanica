@@ -402,3 +402,48 @@ def test_metrics_determinism_and_zero_float_invariants() -> None:
             }
         ]
         export_trajectories(bad_nested)
+
+
+def test_project_checkpoint_and_github_trajectory_export(tmp_path) -> None:
+    from exulanica.world_package.projects.repository import (
+        TRAJECTORIES_FILE,
+        Author,
+        Project,
+        create,
+        project_trajectory_files,
+    )
+
+    from test_world_project import sample
+
+    project, dependencies = sample()
+    files = project_trajectory_files(project)
+    assert sorted(files) == sorted(
+        [
+            TRAJECTORIES_FILE,
+            "training/dpo.jsonl",
+            "training/sft.jsonl",
+            "training/trajectories.json",
+        ]
+    )
+    bundle = json.loads(files["training/trajectories.json"].decode("utf-8"))
+    assert bundle["profile"] == TRAJECTORY_PROFILE
+    assert bundle["metrics"]["total_decisions"] == 1
+    assert bundle["metrics"]["applied_count"] == 1
+    assert len(bundle["sft_records"]) == 1
+
+    folder = tmp_path / "project-with-trajectories"
+    create(
+        folder,
+        project,
+        author=Author("Synthetic Student", "student@example.invalid"),
+        dependencies=dependencies,
+    )
+    local = Project(folder)
+    published_with_trajectories = local.published_files("HEAD", include_trajectories=True)
+    assert TRAJECTORIES_FILE in published_with_trajectories
+    assert "training/trajectories.json" in published_with_trajectories
+    written = local.write_trajectories("HEAD")
+    assert TRAJECTORIES_FILE in written
+    assert (folder / TRAJECTORIES_FILE).is_file()
+    assert (folder / "training" / "sft.jsonl").is_file()
+

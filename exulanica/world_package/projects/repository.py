@@ -10,16 +10,25 @@ reach an enclosing checkout.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
+from exulanica.world.trajectories import (
+    TrajectoryBundle,
+    export_trajectories,
+    format_dpo_jsonl,
+    format_openai_tool_jsonl,
+    format_trajectory_jsonl,
+    project_decisions_to_trajectory_inputs,
+)
 from exulanica.world_package.projects.checkpoint import (
     MAX_BYTES,
     Conflict,
@@ -43,8 +52,49 @@ from exulanica.world_package.projects.summary import evidence_summary, report, s
 PROJECT_FILE = "world-project.json"
 DEPENDENCY_DIR = "dependencies"
 EVIDENCE_DIR = "evidence"
+TRAJECTORIES_FILE = "trajectories.jsonl"
+TRAINING_DIR = "training"
 Sessions = dict[str, dict[str, Any]]
 _TRAILER = re.compile(r"(?i)\b(co-authored-by|signed-off-by|generated[- ]with)\b")
+
+
+def project_trajectory_bundle(
+    checkpoint: Mapping[str, Any],
+    sessions: Sessions | Sequence[Mapping[str, Any]] = (),
+) -> TrajectoryBundle:
+    """Build a deterministic ``exulanica.world-trajectory/v1`` bundle from a checkpoint and its
+    session evidence files."""
+    checked = document(checkpoint)
+    source = checked.get("source") or {}
+    inputs = project_decisions_to_trajectory_inputs(checked, sessions)
+    return export_trajectories(
+        inputs,
+        world_id=str(source.get("world_id") or "world:default"),
+        version_id=str(source.get("version_id") or "version:default"),
+    )
+
+
+def project_trajectory_files(
+    checkpoint: Mapping[str, Any],
+    sessions: Sessions | Sequence[Mapping[str, Any]] = (),
+) -> dict[str, bytes]:
+    """Assemble deterministic training trajectory files (``trajectories.jsonl`` and
+    ``training/{trajectories.json,sft.jsonl,dpo.jsonl}``) when decisions exist."""
+    bundle = project_trajectory_bundle(checkpoint, sessions)
+    if bundle["metrics"]["total_decisions"] == 0:
+        return {}
+    jsonl = format_trajectory_jsonl(bundle)
+    sft_jsonl = format_openai_tool_jsonl(bundle["sft_records"])
+    dpo_jsonl = format_dpo_jsonl(bundle["dpo_pairs"])
+    files: dict[str, bytes] = {
+        TRAJECTORIES_FILE: (f"{jsonl}\n" if jsonl else "").encode("utf-8"),
+        f"{TRAINING_DIR}/trajectories.json": (
+            json.dumps(bundle.to_dict(), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+        ).encode("utf-8"),
+        f"{TRAINING_DIR}/sft.jsonl": (f"{sft_jsonl}\n" if sft_jsonl else "").encode("utf-8"),
+        f"{TRAINING_DIR}/dpo.jsonl": (f"{dpo_jsonl}\n" if dpo_jsonl else "").encode("utf-8"),
+    }
+    return files
 
 
 @dataclass(frozen=True)
@@ -176,16 +226,48 @@ class Project:
             result[name] = evidence_document(decode(data))
         return result
 
-    def published_files(self, revision: str) -> dict[str, bytes]:
-        """The files publication sends for a commit: the world and its evidence, as bytes."""
-        files = {PROJECT_FILE: pretty(self.at(revision))}
+    def published_files(
+        self, revision: str, *, include_trajectories: bool = False
+    ) -> dict[str, bytes]:
+        """The files publication sends for a commit: the world and its evidence, as bytes, plus
+        deterministic training trajectory files when requested."""
+        world = self.at(revision)
+        sessions = self.sessions_at(revision)
+        files = {PROJECT_FILE: pretty(world)}
         files.update(
             {
                 f"{EVIDENCE_DIR}/{name}": pretty_evidence(session)
-                for name, session in self.sessions_at(revision).items()
+                for name, session in sessions.items()
             }
         )
+        if include_trajectories:
+            files.update(project_trajectory_files(world, sessions))
         return files
+
+    def trajectories_at(self, revision: str = "HEAD") -> TrajectoryBundle:
+        """The ``exulanica.world-trajectory/v1`` bundle for a saved commit."""
+        return project_trajectory_bundle(self.at(revision), self.sessions_at(revision))
+
+    def trajectory_files(self, revision: str = "HEAD") -> dict[str, bytes]:
+        """Deterministic training trajectory files for a saved commit."""
+        return project_trajectory_files(self.at(revision), self.sessions_at(revision))
+
+    def write_trajectories(self, revision: str = "HEAD") -> list[str]:
+        """Write ``trajectories.jsonl`` and ``training/*`` files into the project folder."""
+        self._require()
+        files = self.trajectory_files(revision)
+        written: list[str] = []
+        for rel_path, data in sorted(files.items()):
+            target = self.folder / rel_path
+            if target.parent != self.folder:
+                if target.parent.is_symlink():
+                    raise ProjectError("training folder must not be a symlink")
+                target.parent.mkdir(parents=True, exist_ok=True)
+            if target.is_symlink():
+                raise ProjectError("trajectory files must not be symlinks")
+            target.write_bytes(data)
+            written.append(rel_path)
+        return written
 
     def working(self) -> dict[str, Any]:
         """The checkpoint as edited in the folder, which may be ahead of the last commit."""

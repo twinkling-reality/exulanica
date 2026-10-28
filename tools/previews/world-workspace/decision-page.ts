@@ -9,7 +9,23 @@
 import { CHARACTER_WORDS } from './character-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
 import { ABOVE_KEYS, CAP, FLOW_LAYOUTS, HEAD, choiceEnd, choiceLines, executionPipeline, flowLayout, flowSize, headBottom, pipelineLayout, rowMost, titleLines, toldHeight } from './decision-flow.mjs';
-import { DECISION_FLOW_WORDS, DECISION_WORDS, UNANSWERED_WORDS, agentUnansweredParts, askedPrint, choseOneOf, decidedByParts, notAskedWhy, ringPrint, unansweredParts } from './decision-words.mjs';
+import {
+  DECISION_FLOW_WORDS,
+  DECISION_WORDS,
+  UNANSWERED_WORDS,
+  agentUnansweredParts,
+  askedPrint,
+  choseOneOf,
+  decidedByParts,
+  decisionTrajectoryRecord,
+  downloadTrajectoryJsonl,
+  notAskedWhy,
+  ringPrint,
+  serializeTrajectoryJsonl,
+  trajectoryFilename,
+  trajectorySummaryWords,
+  unansweredParts,
+} from './decision-words.mjs';
 import { page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orbs, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
 import './world-ui-record-decision.css';
@@ -82,6 +98,12 @@ export interface DecisionPageState {
     readonly request?: Readonly<Record<string, unknown>>;
     readonly decision?: Readonly<Record<string, unknown>> | null;
   } | null;
+  /** Whether [T] Export Trajectories is offered in the key row. */
+  readonly canExportTrajectories?: boolean;
+  /** Counterfactual branches or alternative answers for this decision when exporting trajectories. */
+  readonly branches?: readonly Record<string, any>[];
+  /** Optional summary text shown after exporting training data. */
+  readonly trainingSummary?: string | null;
 }
 
 export interface DecisionPage {
@@ -282,6 +304,20 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
   // Each choice's lines as drawn in a window of this key (D3): measured once laid out, so the column is laid again by
   // the rows' own heights; another window or decision starts from the estimate.
   let rowLines: { key: string; lines: number[] } | null = null;
+  let localTrainingSummary: string | null = null;
+  const exportDecisionTrajectory = (state: DecisionPageState): void => {
+    const extracted = decisionTrajectoryRecord(state);
+    const records = [...(extracted.sft ? [extracted.sft] : []), ...extracted.dpoPairs];
+    const jsonl = serializeTrajectoryJsonl(records);
+    downloadTrajectoryJsonl(jsonl, trajectoryFilename(state.decided || state.title || 'decision'));
+    localTrainingSummary = `${DECISION_WORDS.trainingData} · ${trajectorySummaryWords({
+      applied_count: extracted.sft ? 1 : 0,
+      counterfactual_pairs: extracted.dpoPairs.length,
+      evaluated_branches: extracted.branches.length,
+    })}`;
+    act('export-trajectories');
+    render(state);
+  };
   const windowOf = () => {
     const viewportWidth = host.clientWidth || innerWidth;
     const layout: Size = flowSize(viewportWidth);
@@ -309,7 +345,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     const taken = choices.findIndex((choice) => choice.chosen);
     if (read) {
       const identity = JSON.stringify(choices);
-      if (identity !== listed) { listed = identity; offset = null; rowLines = null; }
+      if (identity !== listed) { listed = identity; offset = null; rowLines = null; localTrainingSummary = null; }
     }
     const blocks = sections.map((section) => blocksOf(section, state.personality ?? null));
     const by = smallPrint(state);
@@ -337,6 +373,8 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     head.append(title);
     if (by.length) head.append(sentence('p', 'wu-rd-by', by));
     if (read && state.why && by.length) head.append(element('p', 'wu-rd-hint', state.why));
+    const summaryText = state.trainingSummary ?? localTrainingSummary;
+    if (summaryText) head.append(element('p', 'wu-rd-training', summaryText));
     nodes.push(head);
 
     let told: HTMLElement | null = null, record: HTMLElement | null = null, takenRow: HTMLElement | null = null, lines: SVGSVGElement | null = null;
@@ -456,6 +494,7 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
     if (state.earlier || state.later) keys.push(shortcut(keyButton(['←', '→'], DECISION_WORDS.earlierLater, () => act(state.later ? 'later' : 'earlier')), 'ArrowLeft ArrowRight'));
     if (state.title) keys.push(shortcut(keyButton(['J'], DECISION_WORDS.fullRecord, () => act('record')), 'J'));
     if (state.title && state.canCompare && state.record === null) keys.push(shortcut(keyButton(['C'], COMPARE_WORDS.compareThisMoment, () => act('compare')), 'C'));
+    if (state.title && state.canExportTrajectories && state.record === null) keys.push(shortcut(keyButton(['T'], DECISION_WORDS.exportTrajectories, () => exportDecisionTrajectory(state)), 'T'));
     keys.push(shortcut(keyButton(['Esc'], CHARACTER_WORDS.back, () => act('back')), 'Escape'));
     nodes.push(keyRow(keys));
     sheet.content.replaceChildren(...nodes);
@@ -508,8 +547,13 @@ export function openDecisionPage(host: HTMLElement, act: (action: string) => voi
   // The up and down arrows scroll a column of more than twelve choices; every other key is the host's. The page hears
   // them before the host's window listener, which only stops them there.
   document.addEventListener('keydown', (event) => {
-    if (event.code !== 'ArrowUp' && event.code !== 'ArrowDown') return;
     if (event.metaKey || event.ctrlKey || event.altKey || sheet.root.hidden || !sheet.root.isConnected) return;
+    if (event.code === 'KeyT' && last && last.title && last.record === null) {
+      event.preventDefault();
+      exportDecisionTrajectory(last);
+      return;
+    }
+    if (event.code !== 'ArrowUp' && event.code !== 'ArrowDown') return;
     if (!last || last.record !== null || !flow || flow.above + flow.below === 0) return;
     event.preventDefault();
     scroll(event.code === 'ArrowUp' ? -1 : 1);

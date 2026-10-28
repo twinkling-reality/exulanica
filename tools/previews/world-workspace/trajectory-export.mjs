@@ -427,3 +427,42 @@ export function trajectorySummaryWords(metricsOrBundle) {
   }
   return parts.join(' · ');
 }
+
+/**
+ * Derive a clean download filename `<world>-trajectories.jsonl` from a world title or id.
+ */
+export function trajectoryFilename(worldTitleOrId = 'world') {
+  const raw = plain(String(worldTitleOrId ?? 'world')) ?? 'world';
+  const slug = raw
+    .toLowerCase()
+    .replace(/^world:(generated:)?/u, '')
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '')
+    .slice(0, 60) || 'world';
+  return `${slug}-trajectories.jsonl`;
+}
+
+/**
+ * Trigger a browser download of `exulanica.world-trajectory/v1` JSONL content.
+ */
+export function downloadTrajectoryJsonl(jsonl, filename = 'world-trajectories.jsonl') {
+  const content = String(jsonl ?? '');
+  if (typeof document === 'undefined' || !document.createElement) {
+    return { filename, bytes: content.length };
+  }
+  const url = typeof Blob !== 'undefined' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
+    ? URL.createObjectURL(new Blob([content], { type: 'application/x-ndjson;charset=utf-8' }))
+    : `data:application/x-ndjson;charset=utf-8,${encodeURIComponent(content)}`;
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.rel = 'noopener';
+  link.style.display = 'none';
+  document.body?.append(link);
+  link.click();
+  link.remove();
+  if (url.startsWith('blob:') && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+    URL.revokeObjectURL(url);
+  }
+  return { filename, bytes: content.length };
+}
