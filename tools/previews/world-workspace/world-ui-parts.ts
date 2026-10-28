@@ -4,7 +4,9 @@
 // show making a world's parts (world-ui-create.ts) with stand-in answers; ?empty leaves the
 // composer empty, ?chosen=<n> makes a card current and ?thumbs=<folder> draws the cards' pictures.
 // ?view=creature-describe, creature-making and creature-made show making a creature where it will
-// stand (world-ui-creature.ts) with the sheet's example words, over ?picture= as the world.
+// stand (world-ui-creature.ts) with the sheet's example words, over ?picture= as the world; ?notes adds the web notes
+// (the box under the line, and the making group's steps and notes, standing on the field's line), ?left the groups'
+// place beside a stand right of the middle.
 import {
   areaBanner, cardWords, chip, glyphRows, keyWord, label, mountUiScale, notes, orb, page, pill, promptColumn, promptRow,
   nameTag, outline, path, ring, rule, scaleOf, shade, sideCard, stepList, tip,
@@ -12,7 +14,7 @@ import {
 import { composer, createPage, createTitle, madeNote, makingSteps, quietCommand, webNotes, worldStrip } from './world-ui-create.ts';
 import { CREATE_WORDS, madeSpent, priceUpTo, refusalSpent, refusalWords, setValue, spentUpTo, webNotesLabel, webTip } from './create-words.mjs';
 import { draftSteps, madeColumns, startCards } from './create-steps.mjs';
-import { creatureField, madeGroup, makerLine, makingGroup, standLabel } from './world-ui-creature.ts';
+import { creatureField, madeGroup, makerLine, makingGroup, notesAsk, standLabel } from './world-ui-creature.ts';
 // The product's fonts and their tokens, as the app loads them (bootstrap.ts).
 import '../../../web/packages/presentation/src/tokens.css';
 
@@ -35,13 +37,28 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
     const made = layer.querySelector('textarea')!; made.value = query.has('empty') ? '' : words;
     const under = layer.querySelector('.wu-creature-line')!; under.textContent = makerLine(price, 18);
     const count = layer.querySelector('.wu-creature-count')!; count.textContent = `${made.value.length} of 400`;
+    if (query.has('notes')) layer.querySelector('.wu-creature-field')!.append(notesAsk({ searchesAtMost: 3, maximumUsd: '0.0453', onChange: press }).root);
     const over = add(standLabel(), layer); over.style.left = 'calc(960 * var(--u))'; over.style.top = 'calc(640 * var(--u))';
   } else if (view === 'creature-making') {
     const making = makingGroup({ words, priceUsdAtMost: price });
-    making.step('Making the creature 0:14');
+    if (query.has('notes')) {
+      making.root.classList.add('wu-creature-noted');
+      for (const [step, time] of [['Choosing what to look up', '0:02'], ['Searching the web', '0:05'], ['Writing notes from what it found', '0:09']]) making.passed(step!, time!);
+      making.notes([
+        { aspect: 'buildings', text: 'A rounded body and a short flat bill, like a small duck seen side on.' },
+        { aspect: 'materials_and_colour', text: 'Soft yellow down, paler on the breast, the bill a pale orange.' },
+        { aspect: 'landscape_and_plants', text: 'At home at the edge of ponds and shallow reedy water.' },
+        { aspect: 'scale', text: 'About the height of a bench seat, its legs short and set wide.' },
+        { aspect: 'clothing', text: 'No markings beyond a darker cap on the crown.' },
+      ], 3);
+    }
+    making.step('Making the creature', false, '0:14');
+    making.root.classList.toggle('wu-creature-left', query.has('left'));
     add(making.root, layer);
   } else {
-    add(madeGroup({ label: 'yellow pond wader', words, modelName: 'Nemotron 3 Super 120B', spentUsd: '0.00420000', sketch: query.has('sketch'), placeable: true }), layer);
+    const made = madeGroup({ label: 'yellow pond wader', words, modelName: 'Nemotron 3 Super 120B', spentUsd: '0.00420000', sketch: query.has('sketch'), placeable: true, notes: query.has('notes') ? 5 : 0 });
+    made.classList.toggle('wu-creature-left', query.has('left'));
+    add(made, layer);
   }
 } else if (view === 'create' || view === 'creating' || view === 'no-model' || view === 'refused') {
   // Making a world's parts (ROOT's composer mock) with the mock's example words and stand-in answers; ?picture= is

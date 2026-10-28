@@ -3,6 +3,7 @@
 // asked at the point 8 m ahead, the line under the field says the model's price and time, the words are made
 // into a draft followed until it is kept, and the kept kind is then held at the stand by build mode, whose own keys
 // place it. The server's answers are written down here; no model is asked and no 3D view is drawn.
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CreatureDraft, CreatureOffer, SocietyStand } from '../src/creature-drafts-api.js';
 import type { ReferenceNote, ReferenceRequest } from '../src/references-api.js';
@@ -471,6 +472,99 @@ describe('the making group beside the stand', () => {
       expect(root.querySelector('.wu-creature-made')!.classList.contains('wu-creature-left')).toBe(left);
       document.body.replaceChildren();
     }
+  });
+});
+
+describe('the creature panel inside the window', () => {
+  const frame = readFileSync(`${process.cwd()}/../tools/previews/world-workspace/world-page-frame.css`, 'utf8');
+  const creature = readFileSync(`${process.cwd()}/../tools/previews/world-workspace/world-ui-creature.css`, 'utf8');
+  /** `css`'s rules, each with the media query it stands in (these sheets nest one deep), their comments left out. */
+  const rules = (css: string): { readonly media: string | null; readonly selector: string; readonly body: string }[] => {
+    const found: { readonly media: string | null; readonly selector: string; readonly body: string }[] = [];
+    const parts = css.replace(/\/\*[\s\S]*?\*\//g, '').split(/([{}])/);
+    let media: string | null = null, selector: string | null = null;
+    for (let at = 0; at < parts.length; at += 1) {
+      const before = (parts[at - 1] ?? '').trim();
+      if (parts[at] === '{' && before.startsWith('@media')) media = before.slice('@media'.length).trim();
+      else if (parts[at] === '{') selector = before;
+      else if (parts[at] === '}' && selector !== null) { found.push({ media, selector, body: before }); selector = null; }
+      else if (parts[at] === '}') media = null;
+    }
+    return found;
+  };
+  /** Whether a query of max-width and max-height conditions, a comma between either, holds in a `width` by `height` window. */
+  const holds = (media: string | null, width: number, height: number): boolean => media === null || media.split(',').some((query) => {
+    const sides = [...query.matchAll(/\(max-(width|height):\s*(\d+)px\)/g)];
+    return sides.length > 0 && sides.every(([, side, px]) => (side === 'width' ? width : height) <= Number(px));
+  });
+  /** What `property` comes to in `selector`'s own rules in a `width` by `height` window: the last that sets it where its query holds. */
+  const value = (css: string, selector: string, property: string, width: number, height: number): string | undefined => {
+    let found: string | undefined;
+    for (const rule of rules(css).filter((one) => one.selector === selector && holds(one.media, width, height))) {
+      for (const declaration of rule.body.split(';')) {
+        const [name, ...rest] = declaration.split(':');
+        if (name?.trim() === property) found = rest.join(':').trim();
+      }
+    }
+    return found;
+  };
+
+  it("stands within the shared frame's margins at every window size, by the frame's own numbers (800x600 ran past the right edge)", () => {
+    for (const [width, height] of [[1920, 1080], [1700, 900], [1699, 899], [1440, 600], [1366, 768], [1280, 720], [1279, 699], [800, 600]] as const) {
+      const margins = {
+        side: value(frame, '.wu-frame', 'padding', width, height)?.split(' ')[1],
+        top: value(frame, '.wu-frame-head', 'padding-top', width, height),
+        bottom: value(frame, '.wu-frame', 'grid-template-rows', width, height)?.split(' ').at(-1),
+      };
+      for (const margin of Object.values(margins)) expect(margin).toMatch(/^\d+px$/);
+      expect({
+        side: value(creature, '.wu-creature-layer', '--frame-side', width, height),
+        top: value(creature, '.wu-creature-layer', '--frame-top', width, height),
+        bottom: value(creature, '.wu-creature-layer', '--frame-bottom', width, height),
+      }, `${width}x${height}`).toEqual(margins);
+    }
+    // The field's width, the groups' width and place, and their words' height are each held inside those margins.
+    const rule = (selector: string, property: string): string | undefined => value(creature, selector, property, 1920, 1080);
+    expect(rule('.wu-creature-field', 'width')).toMatch(/^min\(.+, calc\(100vw - 2 \* var\(--frame-side\)\)\)$/);
+    expect(rule('.wu-creature-group', '--group-width')).toMatch(/^min\(.+, calc\(100vw - 2 \* var\(--frame-side\)\)\)$/);
+    expect(rule('.wu-creature-group', 'width')).toBe('var(--group-width)');
+    for (const selector of ['.wu-creature-group', '.wu-creature-group.wu-creature-left']) {
+      expect(rule(selector, 'left')).toMatch(/^clamp\(var\(--frame-side\), .+, calc\(100vw - var\(--frame-side\) - var\(--group-width\)\)\)$/);
+    }
+    expect(rule('.wu-creature-body', 'max-height')).toMatch(/^calc\(100vh - .+ - var\(--frame-bottom\)\)$/);
+    expect(rule('.wu-creature-noted .wu-creature-body', 'max-height')).toMatch(/^calc\(100vh - .+ - var\(--frame-top\)\)$/);
+  });
+
+  it("keeps the making group's and the made card's words in a part that scrolls with the frame's fades and track where they take more room than the window leaves", async () => {
+    const { CREATURE_WORDS, madeGroup, makingGroup, placeRow } = await ui();
+    // happy-dom lays nothing out: a part is given the height its words take and the room it has.
+    const sized = (part: HTMLElement, words: number, room: number): void => {
+      Object.defineProperty(part, 'scrollHeight', { configurable: true, value: words });
+      Object.defineProperty(part, 'clientHeight', { configurable: true, value: room });
+    };
+    const making = makingGroup({ words: 'a round yellow body', priceUsdAtMost: '0.37355520' });
+    const group: HTMLElement = making.root;
+    document.body.append(group);
+    const body = group.querySelector<HTMLElement>('.wu-creature-group > .wu-frame-col > .wu-creature-body.wu-frame-scroll')!;
+    const track = group.querySelector<HTMLElement>('.wu-frame-col > .wu-frame-track')!;
+    expect(body.querySelector('.wu-creature-title')?.textContent).toBe(CREATURE_WORDS.making);
+    // Read again as its steps come.
+    sized(body, 900, 400);
+    making.passed('Searching the web', '0:05');
+    await vi.waitFor(() => expect(body.dataset.below).toBe('true'));
+    expect(track.hidden).toBe(false);
+    sized(body, 400, 400);
+    making.step('Making the creature', false, '0:14');
+    await vi.waitFor(() => expect(body.dataset.below).toBe('false'));
+    expect(track.hidden).toBe(true);
+    // The made card's words too, read again as its Place row changes.
+    const made: HTMLElement = madeGroup({ label: 'yellow pond wader', words: 'a round yellow body', modelName: null, spentUsd: null, sketch: false, placeable: true });
+    document.body.append(made);
+    const madeBody = made.querySelector<HTMLElement>('.wu-creature-made > .wu-frame-col > .wu-creature-body.wu-frame-scroll')!;
+    expect(madeBody.querySelector('.wu-creature-title')?.textContent).toBe('Yellow pond wader');
+    sized(madeBody, 600, 400);
+    placeRow(made, { placing: false, refused: 'It cannot stand here: something is in the way.' });
+    await vi.waitFor(() => expect(madeBody.dataset.below).toBe('true'));
   });
 });
 

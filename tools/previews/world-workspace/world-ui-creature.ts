@@ -5,6 +5,7 @@
 // draw; what a key does is world-creature.ts's. Their look lives in world-ui-creature.css, from world-ui.css's
 // tokens.
 import { glyphRows, shade } from './world-ui.ts';
+import { scrollingColumn } from './world-page-frame.ts';
 import './world-ui-creature.css';
 
 /** Each note aspect's label by its key, from the reference aspect catalogs (a later version's label wins). */
@@ -117,6 +118,21 @@ export function madeSmallPrint(modelName: string | null, spentUsd: string | null
 
 const quoted = (words: string): string => `“${words}”`;
 
+/**
+ * A group's words in a part of their own (world-page-frame.ts): where a short window leaves less room than they take,
+ * that part scrolls with the shared frame's fades and track, and the shade's soft backing stays whole around it.
+ */
+function groupBody(root: HTMLElement): HTMLElement {
+  const body = element('div', 'wu-creature-body');
+  const scroll = scrollingColumn(body);
+  root.append(scroll.column);
+  // A window's height moves the room the group has, and words come and go (a step's, placeRow's): read again whenever
+  // the part's own size or its words change.
+  if (typeof ResizeObserver === 'function') new ResizeObserver(() => scroll.update()).observe(body);
+  new MutationObserver(() => scroll.update()).observe(body, { childList: true, subtree: true, characterData: true });
+  return body;
+}
+
 export interface CreatureField {
   readonly root: HTMLElement;
   readonly input: HTMLTextAreaElement;
@@ -217,7 +233,7 @@ export function makingGroup({ words, priceUsdAtMost }: { readonly words: string;
   const step = element('p', 'wu-creature-step');
   const atMost = priceUsdAtMost === null ? null : `At most ${money(priceUsdAtMost)}.`;
   const small = element('p', 'wu-creature-small', [atMost, CREATURE_WORDS.leave].filter(Boolean).join(' '));
-  root.append(element('h2', 'wu-creature-title', CREATURE_WORDS.making), element('p', 'wu-creature-quote', quoted(words)), step, small);
+  groupBody(root).append(element('h2', 'wu-creature-title', CREATURE_WORDS.making), element('p', 'wu-creature-quote', quoted(words)), step, small);
   // The notes from the web, or why there are none, between the steps and the small print once the request ends.
   const fromWeb = element('div', 'wu-creature-notes');
   fromWeb.setAttribute('aria-live', 'polite');
@@ -292,7 +308,7 @@ export function madeGroup({ label, words, modelName, spentUsd, sketch, placeable
   const name = label === null ? CREATURE_WORDS.untitled : label.charAt(0).toUpperCase() + label.slice(1);
   const lines = [madeSmallPrint(modelName, spentUsd)];
   if (sketch && label !== null) lines.push(`${name} wears a sketch until the made look is ready.`);
-  root.append(
+  groupBody(root).append(
     element('h2', 'wu-creature-title', name),
     element('p', 'wu-creature-from', madeFromLine(notes)),
     element('p', 'wu-creature-quote', quoted(words)),
