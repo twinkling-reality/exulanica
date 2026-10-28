@@ -9,9 +9,9 @@ describe('the Atlas shell', () => {
   it('opens one World menu and returns from its destinations through the same hub', () => {
     const menu = updateWorldShell(initialWorldShell(), { type: 'toggle-menu' });
     expect(menu).toMatchObject({ primary: 'menu', camera: 'ground' });
-    const settings = updateWorldShell(menu, { type: 'toggle-controls' });
-    expect(settings.primary).toBe('controls');
-    expect(updateWorldShell(settings, { type: 'step-back' })).toEqual(menu);
+    const character = updateWorldShell(menu, { type: 'toggle-character' });
+    expect(character.primary).toBe('character');
+    expect(updateWorldShell(character, { type: 'step-back' })).toEqual(menu);
     expect(updateWorldShell(menu, { type: 'toggle-menu' })).toEqual(initialWorldShell());
   });
 
@@ -21,12 +21,6 @@ describe('the Atlas shell', () => {
     expect(make).toMatchObject({ primary: 'make', camera: 'ground' });
     expect(updateWorldShell(make, { type: 'step-back' })).toEqual(initialWorldShell());
     expect(updateWorldShell(make, { type: 'toggle-photos' }).primary).toBe('photos');
-  });
-
-  it('lets Customize close directly to the world even when opened from the World menu', () => {
-    const menu = updateWorldShell(initialWorldShell(), { type: 'toggle-menu' });
-    const options = updateWorldShell(menu, { type: 'toggle-options' });
-    expect(updateWorldShell(options, { type: 'show-world' })).toEqual(initialWorldShell());
   });
 
   it('opens a receipt lookup inside Compare and returns to Compare', () => {
@@ -44,9 +38,9 @@ describe('the Atlas shell', () => {
     const detail = updateWorldShell(index, { type: 'show-detail', id: 'entity-1' });
     expect(detail).toMatchObject({ primary: 'index', detailId: 'entity-1' });
 
-    const options = updateWorldShell(detail, { type: 'toggle-options' });
-    expect(options).toMatchObject({ primary: 'options', camera: 'ground', detailId: null });
-    expect(updateWorldShell(options, { type: 'toggle-options' })).toEqual(detail);
+    const menu = updateWorldShell(detail, { type: 'toggle-menu' });
+    expect(menu).toMatchObject({ primary: 'menu', camera: 'ground', detailId: null });
+    expect(updateWorldShell(menu, { type: 'toggle-menu' })).toEqual(detail);
   });
 
   it('models Map as a camera presentation and restores the exact prior Index context', () => {
@@ -67,8 +61,8 @@ describe('the Atlas shell', () => {
     const index = updateWorldShell(initialWorldShell(), { type: 'toggle-index' });
     const detail = updateWorldShell(index, { type: 'show-detail', id: 'entity-1' });
     const map = updateWorldShell(detail, { type: 'toggle-map' });
-    const controls = updateWorldShell(map, { type: 'toggle-controls' });
-    expect(updateWorldShell(controls, { type: 'toggle-controls' })).toEqual(map);
+    const menu = updateWorldShell(map, { type: 'toggle-menu' });
+    expect(updateWorldShell(menu, { type: 'toggle-menu' })).toEqual(map);
     expect(updateWorldShell(map, { type: 'toggle-map' })).toEqual(detail);
   });
 
@@ -116,11 +110,9 @@ describe('shell command ownership', () => {
     ['KeyH', 'h', 'toggle-menu'],
     ['KeyI', 'i', 'toggle-index'],
     ['KeyM', 'm', 'toggle-map'],
-    ['KeyO', 'o', 'toggle-options'],
     ['KeyK', 'k', 'toggle-character'],
     ['KeyR', 'r', 'toggle-decides'],
     ['KeyG', 'g', 'toggle-play'],
-    ['Slash', '?', 'toggle-controls'],
     ['Backspace', 'Backspace', 'selection-back'],
   ])('maps %s to its one shell command', (code, key, command) => {
     expect(commandForKeystroke(stroke({ code, key }))).toBe(command);

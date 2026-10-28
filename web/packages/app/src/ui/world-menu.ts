@@ -142,8 +142,6 @@ export function buildWorldMenu(options: {
     ...(options.onYourWorlds === undefined ? [] : [
       entry('worlds', say('worldMenu.worlds'), say('worldMenu.worlds.detail'), '', 'world-menu-worlds'),
     ]),
-    entry('options', 'Design', 'Light and material', 'O', 'world-menu-customize', 'Customize world'),
-    entry('controls', 'Settings', 'Display and controls', '?', 'world-menu-settings'),
   ]);
   const rail = el('footer', { class: 'world-menu-rail' }, [
     resume,

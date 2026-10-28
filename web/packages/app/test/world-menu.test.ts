@@ -18,11 +18,11 @@ describe('World menu', () => {
     menu.root.querySelector<HTMLButtonElement>('[data-command=world]')!.click();
     expect(onWorld).toHaveBeenCalledOnce();
     menu.root.querySelector<HTMLButtonElement>('[data-command=character]')!.click();
-    menu.root.querySelector<HTMLButtonElement>('[data-command=controls]')!.click();
+    menu.root.querySelector<HTMLButtonElement>('[data-command=map]')!.click();
     menu.root.querySelector<HTMLButtonElement>('.world-menu-rail-action')!.click();
 
     expect(onCommand).toHaveBeenNthCalledWith(1, 'character');
-    expect(onCommand).toHaveBeenNthCalledWith(2, 'controls');
+    expect(onCommand).toHaveBeenNthCalledWith(2, 'map');
     expect(onResume).toHaveBeenCalledOnce();
   });
 
@@ -84,16 +84,13 @@ describe('World menu', () => {
       .map((node) => node.textContent);
     expect(labels).toEqual([
       'World', 'Character', 'Library', 'Map', 'Compare', 'Companion', 'Create a world',
-      'Design', 'Settings',
     ]);
     expect(menu.root.querySelector('[data-command=experiment]')).toBeNull();
-    expect(menu.root.querySelector('[data-command=options]')?.getAttribute('aria-label'))
-      .toBe('Customize world');
     expect([...menu.root.querySelectorAll('.world-menu-entry:has(svg)')]
       .map((node) => node.getAttribute('data-command'))).toEqual([
-      'character', 'index', 'map', 'companion', 'options', 'controls',
+      'character', 'index', 'map', 'companion',
     ]);
-    expect(menu.root.querySelectorAll('.world-menu-entry svg[aria-hidden=true]')).toHaveLength(6);
+    expect(menu.root.querySelectorAll('.world-menu-entry svg[aria-hidden=true]')).toHaveLength(4);
     expect(menu.root.textContent).toContain('ArrowsMove');
     expect(menu.root.textContent).toContain('EnterOpen');
   });
@@ -108,7 +105,7 @@ describe('World menu', () => {
     const boxes = [
       [0, 0, 200, 200], [200, 0, 400, 100], [200, 100, 300, 200],
       [300, 100, 400, 200], [0, 200, 200, 300], [200, 200, 400, 300],
-      [0, 300, 100, 400], [100, 300, 200, 400], [200, 300, 400, 400],
+      [200, 300, 400, 400],
     ];
     entries.forEach((entry, index) => {
       const [left, top, right, bottom] = boxes[index]!;
@@ -134,7 +131,7 @@ describe('World menu', () => {
     move('ArrowRight');
     expect(document.activeElement).toBe(entries[5]);
     move('ArrowDown');
-    expect(document.activeElement).toBe(entries[8]);
+    expect(document.activeElement).toBe(entries[6]);
   });
 
   it('is hidden and inert outside the menu state', () => {

@@ -1843,36 +1843,6 @@ button.ghost {
   background: color-mix(in srgb, var(--surface) 90%, transparent);
 }
 
-.system-overlay {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  z-index: var(--z-overlay);
-  width: min(42rem, calc(100vw - 2 * var(--gap)));
-  max-height: min(46rem, calc(100vh - 2 * var(--gap)));
-  overflow-y: auto;
-  padding: clamp(1.1rem, 2vw, 1.6rem);
-  transform: translate(-50%, -50%);
-  color: var(--ink);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  border: 1px solid var(--edge);
-  border-radius: var(--radius-panel);
-  box-shadow:
-    0 0 0 100vmax color-mix(in srgb, var(--ground) 68%, transparent),
-    0 30px 90px color-mix(in srgb, var(--ui-shadow) 42%, transparent);
-  backdrop-filter: blur(var(--blur-system)) saturate(var(--saturation-system));
-}
-
-.system-overlay[hidden] { display: none; }
-
-.overlay-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 2rem;
-  margin-bottom: 1.4rem;
-}
-
 .overlay-kicker {
   margin: 0 0 0.2rem;
   color: var(--accent);
@@ -1882,14 +1852,6 @@ button.ghost {
   text-transform: uppercase;
 }
 
-.overlay-head h1 {
-  margin: 0;
-  font-size: clamp(1.8rem, 4vw, 2.7rem);
-  font-weight: 300;
-  letter-spacing: -0.045em;
-}
-
-.overlay-close,
 .text-action {
   padding: 0.2rem 0;
   color: var(--ink-soft);
@@ -1898,41 +1860,7 @@ button.ghost {
   border-radius: 0;
 }
 
-.overlay-close:hover,
 .text-action:hover { color: var(--ink); }
-
-.option-group {
-  padding: 1rem 0 0.65rem;
-  border-top: 1px solid var(--edge);
-}
-
-.option-group h2 {
-  margin: 0 0 0.55rem;
-  color: var(--ink-faint);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.option-field {
-  display: grid;
-  grid-template-columns: minmax(8rem, 1fr) minmax(11rem, 1.2fr);
-  align-items: center;
-  gap: 0.35rem 1.25rem;
-  min-height: 3.1rem;
-  color: var(--ink-soft);
-}
-
-.option-label { color: var(--ink); }
-
-.option-note {
-  grid-column: 2;
-  margin-top: -0.25rem;
-  color: var(--ink-faint);
-  font-size: 0.76rem;
-  line-height: 1.4;
-}
 
 select {
   min-height: 2.45rem;
@@ -1944,41 +1872,12 @@ select {
   font: inherit;
 }
 
-.range-control {
-  display: grid;
-  grid-template-columns: 1fr 3.2rem;
-  align-items: center;
-  gap: 0.7rem;
-}
-
-.range-control input {
-  width: 100%;
-  padding: 0;
-  accent-color: var(--accent);
-  background: none;
-  border: 0;
-}
-
-.option-value {
-  color: var(--ink-faint);
-  font: 500 0.75rem/1 var(--ui-font-utility);
-  text-align: right;
-}
-
-.overlay-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--edge);
-}
-
 /*
  * One command key, everywhere.
  *
- * A key legend appears in three places that used to draw it three ways: the Atlas command
- * tooltips, the Settings controls reference, and the plate footers. They are the same object in
- * every case, so they get the same badge, and a fourth surface inherits it by writing <kbd>.
+ * A key legend appears in two places that used to draw it two ways: the Atlas command tooltips
+ * and the plate footers. They are the same object in every case, so they get the same badge, and
+ * a third surface inherits it by writing <kbd>.
  *
  * The shape is a squircle rather than a rounded rectangle. `corner-shape` is a progressive
  * enhancement layered on top of an ordinary radius: where it is unsupported the badge is simply
@@ -1998,18 +1897,6 @@ kbd {
   border: 1px solid color-mix(in srgb, var(--ink) 26%, transparent);
   border-radius: 0.6em;
   corner-shape: squircle;
-}
-
-#shell[data-primary='options'] > :where(.rail, .detail, .confirm, .companion-encounter, .forming),
-#shell[data-primary='controls'] > :where(.rail, .detail, .confirm, .companion-encounter, .forming) {
-  pointer-events: none;
-  opacity: 0;
-}
-
-#shell[data-primary='options'] > :where(.atlas-commands, .map-caption),
-#shell[data-primary='controls'] > :where(.atlas-commands, .map-caption) {
-  pointer-events: none;
-  opacity: 0;
 }
 
 .viewport-boundary {
@@ -2737,27 +2624,6 @@ kbd {
   .legend-note { display: none; }
 }
 
-/* ------------------------------------------------------------------ Atlas workshop instrument */
-
-@media (min-width: 60.001rem) {
-  /* Where this sits and what it is made of belong to `.held-plate`. Only its inner grid is here. */
-  .atlas-instrument.options-view.system-overlay {
-    display: grid;
-    column-gap: 0;
-  }
-
-  .atlas-instrument.options-view.system-overlay[hidden] { display: none; }
-
-
-}
-
-@media (max-height: 50rem) and (min-width: 60.001rem) {
-  .atlas-instrument.options-view.system-overlay {
-    grid-template-rows: 4rem minmax(0, 1fr);
-  }
-
-}
-
 #shell[data-primary='index'] > .companion-encounter:not([data-state='open']) {
   opacity: 0;
   pointer-events: none;
@@ -2853,9 +2719,8 @@ kbd {
 /* ------------------------------------------------------------------ command actions */
 
 /*
- * One command action: the key badge, then what it does. Used by the plate footers, the Settings
- * dismiss, and the Customize return, so the same object cannot drift into three appearances.
- * The underline that used to carry "this is clickable" is gone; the badge carries it.
+ * One command action: the key badge, then what it does. The underline that used to carry "this is
+ * clickable" is gone; the badge carries it.
  */
 .command-action {
   display: inline-flex;

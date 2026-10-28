@@ -197,9 +197,9 @@ function capabilitySentences(plan: ActionPlan): string[] {
   const notNow: string[] = [];
   for (const entry of plan.capabilities ?? []) {
     const action = typeof entry['action'] === 'string' ? entry['action'] : '';
-    const id = action === 'change_appearance' ? 'design.open' : PLAN_ACTIONS[action];
+    const id = PLAN_ACTIONS[action];
     if (id === undefined || id === null) continue;
-    const label = action === 'change_appearance' ? 'Change how the world looks' : actionSpec(id).label;
+    const label = actionSpec(id).label;
     if (entry['offered'] === false) continue;
     if (entry['state'] === 'available' && entry['permitted'] !== false) now.push(label);
     else notNow.push(label);

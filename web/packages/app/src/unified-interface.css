@@ -66,8 +66,6 @@
   .region-minimap,
   .index-workspace,
   #shell[data-primary='index'] > .detail,
-  .atlas-instrument,
-  .settings-view,
   .map-caption
 ) {
   /*
@@ -94,8 +92,7 @@
 :where(
   .index-facets,
   .index-results,
-  #shell[data-primary='index'] > .detail,
-  .settings-pages
+  #shell[data-primary='index'] > .detail
 )::-webkit-scrollbar {
   width: 0.45rem;
   height: 0.45rem;
@@ -104,8 +101,7 @@
 :where(
   .index-facets,
   .index-results,
-  #shell[data-primary='index'] > .detail,
-  .settings-pages
+  #shell[data-primary='index'] > .detail
 )::-webkit-scrollbar-track {
   background: transparent;
 }
@@ -113,8 +109,7 @@
 :where(
   .index-facets,
   .index-results,
-  #shell[data-primary='index'] > .detail,
-  .settings-pages
+  #shell[data-primary='index'] > .detail
 )::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--ink) 20%, transparent);
   border-radius: 1px;
@@ -302,270 +297,9 @@
     background: var(--atlas-plane);
     border-bottom-color: var(--edge);
   }
-
-  /* Customize: the world/Companion is the large left subject; controls live on the right. */
-  /*
-   * Customize is a plate like every other destination. It used to fade its own left edge to
-   * transparent so the world could be seen "through" a full-bleed sheet; a bounded plate shows
-   * the world around itself instead, so the surface no longer has to pretend to be a window.
-   * It is the widest plate because it holds four columns, and that is the only thing it varies.
-   */
-  /*
-   * Customize is a flat run of option groups, not a nav/pages/register instrument, so it gets a
-   * single scrolling column rather than a three column grid. Forcing the grid on it stacked every
-   * group into one cell, because there are no children to fill columns two and three.
-   */
-  .atlas-instrument.options-view.system-overlay {
-    --plate-w: min(52rem, 56vw);
-    --plate-h: min(36rem, 74vh);
-    z-index: var(--z-overlay);
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    overflow-y: auto;
-  }
-
-  .options-view > .overlay-head {
-    position: sticky;
-    top: 0;
-    z-index: var(--z-local-2);
-    flex: 0 0 auto;
-    padding: 0.7rem 1.15rem 0.6rem;
-    background: var(--atlas-plane);
-    border-bottom: 1px solid var(--edge);
-  }
-
-  .options-view > .option-group {
-    flex: 0 0 auto;
-    padding: 0.85rem 1.15rem;
-    border-bottom: 1px solid var(--edge);
-    /* The head is sticky, so a section scrolled to the very top lands underneath it and loses
-     * its own label. Reserve the head's height, which is what the person came here to read. */
-    scroll-margin-top: 7.4rem;
-  }
-
-  .options-view > .overlay-actions {
-    position: sticky;
-    bottom: 0;
-    z-index: var(--z-local-2);
-    flex: 0 0 auto;
-    margin-top: auto;
-    padding: 0.6rem 1.15rem;
-    background: var(--atlas-plane);
-    border-top: 1px solid var(--edge);
-  }
-
-  .atlas-instrument :where(select, input:not([type='range'])) {
-    color: var(--ink);
-    background: color-mix(in srgb, var(--raised) 7%, transparent);
-    border: 1px solid var(--edge);
-    border-radius: 1px;
-  }
-
-  /* Settings follows the supplied category/row model, using the same Atlas material language. */
-  .settings-view.system-overlay {
-    --plate-w: min(56rem, 58vw);
-    --plate-h: min(36rem, 72vh);
-    z-index: var(--z-overlay);
-    display: grid;
-    grid-template-columns: clamp(12rem, 20vw, 16rem) minmax(22rem, 1fr);
-    grid-template-rows: 4.2rem minmax(0, 1fr) 3.8rem;
-  }
-
-  .settings-view.system-overlay[hidden] { display: none; }
-
-  .settings-head {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    margin: 0;
-    padding: 0.7rem min(32rem, 38vw) 0.6rem 1.35rem;
-    border-bottom: 1px solid var(--edge);
-  }
-
-  .settings-head h1 {
-    margin: 0;
-    font-family: var(--ui-font-display);
-    font-size: 2.1rem;
-    font-weight: 300;
-  }
-
-  .settings-categories {
-    grid-column: 1;
-    grid-row: 2;
-    display: grid;
-    align-content: start;
-    gap: 0.35rem;
-    padding: clamp(1rem, 2vw, 2rem) 1.2rem;
-    background: var(--plate-recess);
-    border-right: 1px solid var(--edge);
-  }
-
-  .settings-category {
-    position: relative;
-    min-height: 3.8rem;
-    padding: 0.8rem 1rem;
-    color: var(--ink-soft);
-    background: color-mix(in srgb, var(--raised) 3%, transparent);
-    border: 1px solid var(--edge);
-    border-radius: 1px;
-    font: 500 0.78rem/1.2 var(--ui-font-utility);
-    letter-spacing: 0.04em;
-    text-align: left;
-    text-transform: uppercase;
-  }
-
-  .settings-category:hover,
-  .settings-category:focus-visible,
-  .settings-category[aria-current='page'] {
-    color: var(--ink);
-    background: color-mix(in srgb, var(--raised) 10%, transparent);
-    border-color: color-mix(in srgb, var(--accent) 72%, transparent);
-    outline: none;
-  }
-
-  .settings-category[aria-current='page']::before {
-    content: '';
-    position: absolute;
-    inset: -1px auto -1px -1px;
-    width: 3px;
-    background: var(--accent);
-  }
-
-  .settings-pages {
-    grid-column: 2;
-    grid-row: 2;
-    min-width: 0;
-    overflow-y: auto;
-    padding: clamp(1.4rem, 3vw, 2.8rem) clamp(2rem, 5vw, 5rem);
-  }
-
-  .settings-page[hidden] { display: none; }
-
-  .settings-page-head {
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--edge);
-  }
-
-  .settings-page-head h2 {
-    margin: 0.15rem 0 0;
-    color: var(--ink);
-    font-family: var(--ui-font-display);
-    font-size: clamp(1.8rem, 3vw, 2.8rem);
-    font-weight: 300;
-    letter-spacing: -0.035em;
-  }
-
-  .settings-page-intro {
-    margin: 0.9rem 0 1.5rem;
-    color: var(--ink-soft);
-    font-size: 0.82rem;
-  }
-
-  .settings-rows { border-top: 1px solid var(--edge); }
-
-  .setting-row {
-    display: grid;
-    grid-template-columns: minmax(15rem, 1fr) minmax(12rem, 22rem);
-    gap: 2rem;
-    align-items: center;
-    min-height: 4.5rem;
-    padding: 0.7rem 0.9rem;
-    color: var(--ink);
-    background: color-mix(in srgb, var(--raised) 4%, transparent);
-    border-bottom: 1px solid var(--edge);
-  }
-
-  .setting-row:focus-within {
-    background: color-mix(in srgb, var(--raised) 9%, transparent);
-    box-shadow: inset 3px 0 0 var(--accent);
-  }
-
-  .setting-copy { display: grid; gap: 0.15rem; }
-  .setting-copy strong { font-size: 0.9rem; font-weight: 500; }
-  .setting-note { color: var(--ink-faint); font-size: 0.7rem; }
-
-  .setting-row select,
-  .setting-range {
-    width: 100%;
-    min-height: 2.35rem;
-    color: var(--ink);
-    background: color-mix(in srgb, var(--raised) 72%, transparent);
-    border: 1px solid var(--edge);
-    border-radius: 1px;
-  }
-
-  .setting-row select { padding-inline: 0.75rem; }
-
-  .setting-range {
-    display: grid;
-    grid-template-columns: 1fr 3.6rem;
-    align-items: center;
-    gap: 0.8rem;
-    padding: 0.45rem 0.75rem;
-  }
-
-  .setting-value {
-    color: var(--ink-soft);
-    font: 500 0.72rem/1 var(--ui-font-utility);
-    text-align: right;
-  }
-
-  .settings-control-list {
-    display: grid;
-    grid-template-columns: minmax(11rem, 17rem) 1fr;
-    margin: 1.2rem 0 0;
-    border-top: 1px solid var(--edge);
-  }
-
-  .settings-control-list dt,
-  .settings-control-list dd {
-    min-height: 3.2rem;
-    margin: 0;
-    padding: 0.8rem 1rem;
-    border-bottom: 1px solid var(--edge);
-  }
-
-  .settings-control-list dt { color: var(--accent); }
-  .settings-control-list dd { color: var(--ink-soft); }
-
-  .settings-actions {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    display: flex;
-    gap: 1.5rem;
-    justify-content: flex-end;
-    align-items: center;
-    padding: 0.75rem 1.35rem;
-    border-top: 1px solid var(--edge);
-  }
-
-  .settings-actions .text-action {
-    color: var(--ink-soft);
-    border-bottom: 1px solid var(--edge);
-  }
 }
 
 /* Companion geometry is owned by style.css. */
-
-@media (max-height: 50rem) and (min-width: 60.001rem) {
-  .atlas-instrument.options-view.system-overlay,
-  .settings-view.system-overlay {
-    --plate-h: 92vh;
-    grid-template-rows: 3.8rem minmax(0, 1fr) 3.4rem;
-  }
-
-  .atlas-instrument.options-view.system-overlay {
-    grid-template-rows: 3.8rem minmax(0, 1fr);
-  }
-
-  .settings-head { padding-block: 0.45rem; }
-
-  .settings-pages { padding-block: 1rem; }
-  .setting-row { min-height: 3.6rem; }
-  .settings-page-intro { margin-block: 0.55rem 0.8rem; }
-  .settings-control-list dt,
-  .settings-control-list dd { min-height: 2.6rem; padding-block: 0.55rem; }
-}
 
 /*
  * Access preferences outrank world material, and removing the blur is only half of that.

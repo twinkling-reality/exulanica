@@ -79,11 +79,8 @@ import { el } from './ui/dom.js';
 import { button, errorState } from './ui/system/components.js';
 import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system/layout.js';
 import { mountActions, type MountedActions } from './composition/actions.js';
-import { redrawWorldLook } from './composition/world-look-redraw.js';
-import { buildLookSheet, lookChoiceId, type LookSettingNow } from './ui/look-sheet.js';
 import type { WorldStylePackBinding } from './world-style-api.js';
-import { readLookLibrary, type LookLibrary } from './composition/look-library.js';
-import { lookToUse } from './composition/look-use.js';
+import { readLookLibrary } from './composition/look-library.js';
 import { buildTownLook } from './composition/town-look.js';
 import { buildTownSetting } from './composition/town-setting.js';
 import { fill, say } from './ui/copy.js';
@@ -928,8 +925,7 @@ async function mountWorld(): Promise<void> {
     reflectShell: () => reflectShell(),
     onAnswered: finishFirstUse,
     isSystemSurfaceOpen: () =>
-      shellState.primary === 'menu' || shellState.primary === 'options' ||
-      shellState.primary === 'controls' || shellState.primary === 'character' ||
+      shellState.primary === 'menu' || shellState.primary === 'character' ||
       shellState.primary === 'experiment' || shellState.primary === 'compare' ||
       shellState.primary === 'photos' || shellState.primary === 'make',
     onFirstUseAction: (action) => {
@@ -1268,9 +1264,7 @@ async function mountWorld(): Promise<void> {
     if (companion.panel.state() === 'open') companion.dismiss();
     if (command === 'index') dispatchShell({ type: 'toggle-index' });
     else if (command === 'character') dispatchShell({ type: 'toggle-character' });
-    else if (command === 'map') dispatchShell({ type: 'toggle-map' });
-    else if (command === 'options') dispatchShell({ type: 'toggle-options' });
-    else dispatchShell({ type: 'toggle-controls' });
+    else dispatchShell({ type: 'toggle-map' });
   };
   const worldMenu = buildWorldMenu({
     preview,
@@ -1382,107 +1376,12 @@ async function mountWorld(): Promise<void> {
     returnToWorlds,
   ]);
   let status: MountedStatusAndInspector;
-  // Look: the style pack a generated town, or a site made from a world kind, is drawn in, chosen in
-  // the Look sheet (ui/look-sheet.ts) and saved as an appearance version (`useStylePack`). Only those
-  // two are drawn in packs.
-  const lookAccess = state.credentials;
-  const drawnInPacks = state.activeWorldEntry?.generatedGround != null || state.activeWorldEntry?.generatedSite != null || state.activeWorldEntry?.generatedTerrain != null;
-  const lookOffered = drawnInPacks && lookAccess !== null && state.worldStyles !== null;
-  let openLook: () => Promise<void> = async () => undefined;
   const appearance = mountAppearance({
     env,
     state,
     applyProofLens: () => status.applyProofLens(),
     setCompanionAppearance: () => companion.applyAppearance(),
-    onCloseOptions: () => dispatchShell({ type: 'show-world' }),
-    onShowControls: () => dispatchShell({ type: 'toggle-controls' }),
-    onCloseControls: () => dispatchShell({ type: 'toggle-controls' }),
-    onShowCustomize: () => dispatchShell({ type: 'toggle-options' }),
-    ...(lookOffered ? { onChangeLook: () => void openLook() } : {}),
   });
-  let library: Promise<LookLibrary> | null = null;
-  const lookLibrary = (): Promise<LookLibrary> => (library ??= readLookLibrary(lookAccess!));
-  /** The exact pack this world's appearance names, by digest; null for none, which is the host's default. */
-  const boundLook = (): WorldStylePackBinding | null => state.worldStyleConnection?.state.current.stylePack ?? null;
-  const reflectLook = (): void => {
-    if (!lookOffered) { appearance.options.setLook(null); return; }
-    void lookLibrary().then(
-      async (looks) => {
-        const now = await looks.now(boundLook());
-        const title = looks.options.find((option) => lookChoiceId(option) === now.packId)?.title ?? null;
-        const earlier = now.how.earlier ?? null;
-        appearance.options.setLook(title === null || earlier === null ? title : `${title}, version ${earlier.version}`);
-      },
-      () => { library = null; appearance.options.setLook(null); },
-    );
-  };
-  reflectLook();
-  openLook = async () => {
-    let looks: LookLibrary;
-    let now: Awaited<ReturnType<LookLibrary['now']>>;
-    try {
-      looks = await lookLibrary();
-      now = await looks.now(boundLook());
-    } catch {
-      library = null;
-      appearance.options.reportWorldLifecycle('failed', 'The looks this server offers could not be read. Try again in a moment.');
-      return;
-    }
-    dispatchShell({ type: 'show-world' });
-    shell.querySelector('section.look-sheet')?.remove();
-    const offered = looks.options;
-    const bindingOf = (packId: string): WorldStylePackBinding | null => looks.binding(packId);
-    /** The world's setting as the sheet shows it: what the host offers, and the part the world states for each axis. */
-    const settingNow = (): LookSettingNow | null => (looks.settings === null ? null : {
-      offered: looks.settings,
-      chosen: Object.fromEntries((boundLook()?.setting?.parts ?? []).map((part) => [part.axis, part.key])),
-    });
-    // Whether the world behind the sheet is drawn in a look other than its own, from browsing.
-    let browsedAway = false;
-    const sheet = buildLookSheet({
-      worldTitle: state.activeWorldEntry?.title ?? 'This world',
-      onBrowse: (option, isNow) => {
-        browsedAway = !isNow;
-        // The look drawn now is drawn exactly as the world names it, an earlier version included;
-        // any other at the version the host offers now.
-        void redrawWorldLook(isNow ? boundLook() : bindingOf(lookChoiceId(option))).then((done) => {
-          // A world that cannot be drawn in another look while open is shown by its pictures.
-          if (!done.drawn) sheet.setLive(false);
-        });
-      },
-      onUse: async (option, say, setting, isNow) => {
-        // Which card was pressed decides: the Now card keeps the version the world names and takes
-        // a changed setting; any other asks for the pack as the host lists it (look-use.ts).
-        const { binding, named } = lookToUse({
-          option, isNow: isNow === true, setting, worn: boundLook(), listed: bindingOf(lookChoiceId(option))!,
-          earlierPackId: now.how.earlier?.packId ?? null,
-        });
-        const result = await appearance.useStylePack(binding);
-        if (!result.saved) return result.words;
-        browsedAway = false;
-        now = await looks.now(boundLook());
-        sheet.show(offered, now.packId, now.how, settingNow());
-        reflectLook();
-        // Saving names the pack; drawing the open world in it is the redraw's (LOOK's
-        // composition/world-look-redraw.ts), which keeps the old look up until the new one is ready.
-        say(`${result.words} Drawing the world in ${named}…`);
-        // Drawn as the world now names it: the pack, and the setting the host composed over it.
-        const drawn = await redrawWorldLook(boundLook() ?? binding);
-        return drawn.drawn
-          ? `${result.words} The world is now drawn in ${named}.`
-          : `${result.words} It could not be drawn now${drawn.reason === null ? '' : ` (${drawn.reason})`}, so it is drawn in ${named} the next time the world opens.`;
-      },
-      onClose: () => {
-        // Leaving without Use puts the world back in its own look, exactly the version it names.
-        if (browsedAway) void redrawWorldLook(boundLook());
-        sheet.root.remove();
-        canvas.focus({ preventScroll: true });
-      },
-    });
-    shell.append(sheet.root);
-    sheet.show(offered, now.packId, now.how, settingNow());
-    sheet.focus();
-  };
 
   status = mountStatusAndInspector({
     env,
@@ -1507,8 +1406,6 @@ async function mountWorld(): Promise<void> {
     ...(societyExperiment === null ? [] : [societyExperiment.root]),
     ...(societyComparison === null ? [] : [societyComparison.root]),
     minimap.root,
-    appearance.options.root,
-    appearance.settings.root,
     character.root,
     character.gestureRoot,
     viewportBoundary,
@@ -1746,11 +1643,6 @@ async function mountWorld(): Promise<void> {
       ...(state.worldEntries === null ? {} : {
         'world.make': { run: () => dispatchShell({ type: 'toggle-make' }) },
       }),
-      'design.open': { run: () => handleAtlasCommand('options'), active: () => shellState.primary === 'options' },
-      'settings.open': {
-        run: () => handleAtlasCommand('controls'),
-        active: () => shellState.primary === 'controls',
-      },
       'menu.open': { run: () => dispatchShell({ type: 'toggle-menu' }), active: () => shellState.primary === 'menu' },
     },
   });
@@ -1863,8 +1755,6 @@ async function mountWorld(): Promise<void> {
     shell.setAttribute('data-camera', shellState.camera);
     chrome.setIndexOpen(shellState.primary === 'index');
     worldIndex.root.setAttribute('aria-hidden', shellState.primary === 'index' ? 'false' : 'true');
-    appearance.options.setVisible(shellState.primary === 'options');
-    appearance.settings.setVisible(shellState.primary === 'controls');
     worldMenu.setVisible(shellState.primary === 'menu');
     societyExperiment?.setVisible(shellState.primary === 'experiment');
     societyComparison?.setVisible(shellState.primary === 'compare');
@@ -1877,8 +1767,7 @@ async function mountWorld(): Promise<void> {
       makeWorld.remove();
       makeWorld = null;
     }
-    const systemSurfaceOpen = shellState.primary === 'menu' || shellState.primary === 'options' ||
-      shellState.primary === 'controls' || shellState.primary === 'character' ||
+    const systemSurfaceOpen = shellState.primary === 'menu' || shellState.primary === 'character' ||
       shellState.primary === 'experiment' || shellState.primary === 'compare' ||
       shellState.primary === 'photos' || shellState.primary === 'make';
     // Every region but the toasts sits behind a major surface, so Tab cannot reach the rail or an
@@ -1897,8 +1786,6 @@ async function mountWorld(): Promise<void> {
     // On close, release the command bar before the dialog restores focus to its trigger. On open,
     // move focus into the dialog before making that same trigger inert.
     if (!systemSurfaceOpen) for (const surface of modalBackground) surface.inert = false;
-    appearance.options.setVisible(shellState.primary === 'options');
-    appearance.settings.setVisible(shellState.primary === 'controls');
     character.setVisible(shellState.primary === 'character');
     if (systemSurfaceOpen) for (const surface of modalBackground) surface.inert = true;
     // The closed Library is transparent, not hidden, so it stays inert unless it is the one open.

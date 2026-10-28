@@ -77,7 +77,7 @@
 #shell .atlas-commands button:hover { background: var(--surface); }
 #shell .atlas-command-tooltip { display: none; }
 #shell:not([data-primary='world']) .world-workspace { visibility: hidden; }
-#shell .held-plate, #shell .atlas-instrument, #shell .settings-view { background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); }
+#shell .held-plate { background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); }
 #shell[data-primary='index'] .index-workspace { top: 100px; bottom: 70px; left: 28px; right: 28px; width: auto; max-width: none; height: auto; max-height: none; transform: none; grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
 #shell .index-workspace .index-head { padding: 24px 28px 14px; }
 #shell .index-head h1 { font: 300 30px/1.2 var(--ui-font-display); letter-spacing: -.035em; }
@@ -96,10 +96,6 @@
 #shell .personal-intake label { margin-block: 14px; font-size: 13px; }
 #shell .personal-intake input:not([type='checkbox']), #shell .personal-intake select { padding: 10px; border: 1px solid var(--edge); background: var(--raised); border-radius: 4px; margin-top: 6px; }
 #shell .personal-intake button { margin: 8px 8px 8px 0; padding: 10px 14px; border-radius: 4px; }
-#shell .settings-view.system-overlay, #shell .atlas-instrument.options-view.system-overlay { top: 6vh; bottom: 7vh; max-height: 87dvh; }
-#shell .settings-page-head h2 { font-weight: 300; font-size: 28px; }
-#shell .setting-row { padding: 16px; border-radius: 4px; }
-#shell .setting-row select { border-radius: 4px; min-height: 42px; background: var(--raised); }
 #shell .map-caption { top: 240px; left: 28px; width: 280px; box-sizing: border-box; border: 1px solid var(--edge); border-radius: 4px; background: var(--atlas-plane); }
 #shell .gate { background: var(--atlas-plane); border-radius: 4px; padding: 36px; color: var(--ink); }
 :root[data-contrast='high'] #shell { --ink: #071728; --ink-soft: #203449; --ink-faint: #34495d; --edge: #647a90; }
@@ -141,20 +137,6 @@
 #shell[data-primary='index'] .index-workspace .index-plan { display: none; }
 #shell[data-primary='index'] .index-workspace { grid-template-columns: minmax(0, 1fr); }
 #shell .index-workspace .index-foot { grid-column: 1 / -1; }
-#shell .settings-view.system-overlay, #shell .atlas-instrument.options-view.system-overlay {
-  inset: 6vh var(--ui-plane-right) 7vh auto;
-  width: min(720px, 58vw);
-  max-width: none;
-  height: auto;
-  max-height: none;
-  margin: 0;
-  translate: none;
-  transform: var(--ui-plane-transform);
-  transform-origin: right center;
-  background: var(--atlas-plane);
-}
-#shell .settings-category { border-radius: 4px; }
-#shell .settings-view button, #shell .atlas-instrument button { border-radius: 4px; }
 #shell .index-workspace:has(.personal-intake .photo-review-workflow[open]) .index-results,
 #shell .index-workspace:has(.personal-intake .photo-review-workflow[open]) .index-plan,
 #shell .index-workspace:has(.personal-intake .photo-review-workflow[open]) .index-facets,
@@ -495,198 +477,6 @@
   animation: world-tool-arrive .18s ease-out;
 }
 
-/* A single quiet settings field: category first, controls second, world still visible beneath. */
-#shell .settings-view.system-overlay {
-  inset: 6vh var(--ui-plane-right) auto auto;
-  width: min(720px, 58vw);
-  max-width: none;
-  height: auto;
-  max-height: 87dvh;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, auto) auto;
-  color: var(--ink);
-  background: var(--atlas-plane);
-  border: 1px solid var(--edge);
-  border-radius: 4px;
-  box-shadow: var(--app-shadow);
-  transform: var(--ui-plane-transform);
-  transform-origin: right center;
-}
-#shell .atlas-instrument.options-view.system-overlay {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  overflow-y: auto;
-  padding: 0;
-  border-radius: var(--radius-chromatic);
-  backdrop-filter: none;
-}
-#shell .atlas-instrument.options-view.system-overlay[hidden] { display: none; }
-#shell .options-view > .overlay-head,
-#shell .options-view > .overlay-actions {
-  flex: 0 0 auto;
-  background: var(--atlas-plane);
-}
-#shell .options-view > .option-group { flex: 0 0 auto; }
-#shell .options-view > .overlay-head {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-local-3);
-  align-items: center;
-  margin: 0;
-  padding: 22px 28px;
-  border-bottom: 1px solid var(--edge);
-  background: var(--chromatic-head);
-}
-#shell .options-view .overlay-head h1 { color: var(--ink); font: 300 44px/1 var(--font-display); letter-spacing: -.055em; }
-#shell .options-view .overlay-head .overlay-kicker { color: var(--ink); }
-#shell .options-view .overlay-close {
-  min-height: 44px;
-  padding: 9px 14px;
-  color: var(--ink);
-  background: #ffffffd9;
-  border: 1px solid #ffffff;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 650;
-}
-#shell .options-view .overlay-close:hover,
-#shell .options-view .overlay-close:focus-visible { color: var(--ink); background: #fff; }
-#shell .options-view > .option-group { padding: 18px 28px 24px; }
-#shell .options-view .world-style-options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-#shell .options-view .world-style-head { grid-template-columns: minmax(0, 1fr) auto; margin-bottom: 0; }
-#shell .options-view .world-style-head :is(p, span):empty { display: none; }
-#shell .options-view .world-style-head :is(.option-note, .world-style-authority, .world-style-lifecycle) {
-  color: var(--ink-soft);
-  font-size: 13px;
-  line-height: 1.5;
-}
-#shell .options-view .world-style-head :is(.world-style-authority, .world-style-lifecycle) {
-  overflow-wrap: anywhere;
-  line-height: 1.5;
-}
-#shell .options-view .world-style-head :is(
-  .world-style-authority[data-state='failed'],
-  .world-style-lifecycle[data-state='failed'],
-  .world-style-lifecycle[data-state='stale']
-) {
-  margin: 7px 0 2px;
-  padding: 10px 13px;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--warning) 9%, var(--ui-chromatic-paper));
-  border-inline-start: 3px solid var(--warning);
-  border-radius: 0 9px 9px 0;
-  font-size: 13px;
-}
-#shell .options-view[data-world-dirty='true'] .world-style-state {
-  font-size: 12px;
-  font-weight: 700;
-}
-#shell .options-view .world-dna-strip { height: 14px; margin: 0; }
-#shell .options-view .world-style-field {
-  min-width: 0;
-  padding: 14px;
-  background: var(--surface);
-  border: 1px solid var(--edge);
-  border-radius: 16px;
-  box-shadow: 0 3px 16px #3d285912;
-}
-#shell .options-view .world-style-field .option-field { min-height: 0; gap: 10px; }
-#shell .options-view .world-style-field .option-label { font-size: 14px; font-weight: 600; }
-#shell .options-view .world-style-field-help { margin-top: 10px; color: var(--ink-soft); font-size: 12px; }
-#shell .options-view .world-style-field-help summary { color: var(--accent); cursor: pointer; }
-#shell .options-view .world-style-field-help p { margin: 8px 0 0; line-height: 1.5; }
-#shell .options-view .world-style-assurance { margin: 0; padding-top: 14px; font-size: 12px; }
-#shell .options-view .world-style-history { display: block; margin: 0; padding-top: 14px; }
-#shell .options-view .world-style-history > summary { color: var(--accent); cursor: pointer; font-size: 13px; font-weight: 650; }
-#shell .options-view .world-style-history-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; margin-top: 12px; }
-#shell .options-view .world-style-history-body .option-field { grid-template-columns: minmax(0, 1fr); }
-#shell .options-view .world-style-history-body .option-note { grid-column: 1; }
-#shell .options-view > .overlay-actions { margin-top: auto; }
-#shell .settings-head {
-  grid-column: 1;
-  grid-row: 1;
-  padding: 22px 28px 18px;
-  border: 0;
-}
-#shell .settings-head .overlay-kicker { display: none; }
-#shell .settings-head h1 {
-  font-size: clamp(27px, 3vw, 37px);
-  font-weight: 300;
-  letter-spacing: .065em;
-  text-transform: uppercase;
-}
-#shell .settings-categories {
-  grid-column: 1;
-  grid-row: 2;
-  display: flex;
-  gap: clamp(18px, 3vw, 38px);
-  padding: 0 28px;
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--edge) 68%, transparent);
-}
-#shell .settings-category {
-  min-height: 44px;
-  padding: 0 0 10px;
-  color: var(--ink-soft);
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid transparent;
-  border-radius: 0;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: .09em;
-}
-#shell .settings-category:hover,
-#shell .settings-category:focus-visible,
-#shell .settings-category[aria-current='page'] {
-  color: var(--ink);
-  background: transparent;
-  border-color: var(--ink);
-}
-#shell .settings-category[aria-current='page']::before { display: none; }
-#shell .settings-pages {
-  grid-column: 1;
-  grid-row: 3;
-  width: calc(100% - 56px);
-  margin-inline: auto;
-  padding: 24px 0 30px;
-}
-#shell .settings-page-head { padding: 0 0 16px; border-color: color-mix(in srgb, var(--edge) 68%, transparent); }
-#shell .settings-page-head .overlay-kicker { display: none; }
-#shell .settings-page-head h2 {
-  font-size: clamp(28px, 3.4vw, 36px);
-  font-weight: 400;
-  letter-spacing: -.025em;
-}
-#shell .settings-page-intro { font-size: 14px; font-weight: 400; }
-#shell .settings-rows { border-color: color-mix(in srgb, var(--edge) 68%, transparent); }
-#shell .setting-row {
-  min-height: 62px;
-  padding: 10px 4px;
-  background: transparent;
-  border-color: color-mix(in srgb, var(--edge) 68%, transparent);
-  border-radius: 0;
-}
-#shell .setting-row:focus-within {
-  background: color-mix(in srgb, var(--raised) 24%, transparent);
-  box-shadow: none;
-}
-#shell .setting-copy strong { font-size: 14px; font-weight: 600; }
-#shell .setting-note { font-size: 12px; font-weight: 400; line-height: 1.45; }
-#shell .settings-control-list :is(dt, dd) { background: transparent; border-color: color-mix(in srgb, var(--edge) 68%, transparent); }
-#shell .settings-actions {
-  grid-column: 1;
-  grid-row: 4;
-  padding: 14px 28px 18px;
-  background: transparent;
-  border-color: color-mix(in srgb, var(--edge) 68%, transparent);
-}
-#shell .settings-actions button { min-height: 38px; font-size: 13px; }
-#shell .settings-actions .command-action-label { color: var(--ink); font-size: 13px; font-weight: 600; }
-#shell .settings-actions kbd { color: var(--ink); border-color: var(--edge); background: #fff; font-size: 12px; }
-
 #shell .world-menu {
   position: fixed;
   inset: 0;
@@ -784,7 +574,6 @@
   border-color: color-mix(in srgb, var(--ui-spectrum-green) 52%, var(--ui-chromatic-ink));
 }
 #shell .world-menu-companion :is(.world-menu-entry-detail, kbd) { color: var(--ui-chromatic-paper); }
-#shell :is(.world-menu-customize, .world-menu-settings) .atlas-command-icon { color: var(--ui-chromatic-accent); }
 #shell .world-menu-entry:hover,
 #shell .world-menu-entry:focus-visible {
   border-color: var(--ui-chromatic-ink);
@@ -806,8 +595,6 @@
 }
 #shell .world-menu-world .world-menu-entry-label { font-size: clamp(54px, 5vw, 70px); font-weight: 300; letter-spacing: -.072em; }
 #shell :is(.world-menu-character, .world-menu-companion) .world-menu-entry-label { font-size: clamp(37px, 3.25vw, 44px); font-weight: 300; letter-spacing: -.062em; }
-#shell .world-menu-settings .world-menu-entry-label { font-size: clamp(29px, 2.75vw, 36px); }
-#shell :is(.world-menu-customize, .world-menu-settings) .world-menu-entry-label { font-weight: 300; }
 #shell .world-menu-entry-detail {
   max-width: 22ch;
   color: var(--chromatic-ink-soft);
@@ -869,8 +656,6 @@
 #shell :is(
   .index-workspace.rail,
   .detail,
-  .settings-view.system-overlay,
-  .atlas-instrument.options-view.system-overlay,
   .world-panel,
   .world-recipes,
   .character-studio,
@@ -897,8 +682,6 @@
 :root[data-contrast='high'] #shell :is(
   .index-workspace.rail,
   .detail,
-  .settings-view.system-overlay,
-  .atlas-instrument.options-view.system-overlay,
   .world-panel,
   .world-recipes,
   .character-studio,
@@ -912,7 +695,6 @@
   --focus: #005767;
   color: var(--ink);
 }
-#shell .settings-view.system-overlay .settings-head { background: var(--chromatic-head); }
 #shell :is(
   .index-workspace .index-head,
   .character-studio .character-header,
@@ -924,8 +706,6 @@
 #shell :is(
   .index-head h1,
   .character-header h1,
-  .settings-head h1,
-  .options-view .overlay-head h1,
   .world-panel-heading h2,
   .comparison-head h2
 ) {
@@ -990,11 +770,8 @@
 #shell .world-menu-compare { grid-column: span 2; --field-main: var(--ui-spectrum-orange); --field-counter: var(--ui-spectrum-rose); --pigment-x: 90%; --pigment-y: 0%; }
 #shell .world-menu-make { --field-main: var(--ui-spectrum-rose); --field-counter: var(--ui-spectrum-orange); --light-x: 88%; --light-y: 125%; --pigment-x: 0%; --pigment-y: -10%; }
 #shell .world-menu-companion { grid-column: span 2; }
-#shell .world-menu-settings { grid-column: span 2; }
-#shell .world-menu-grid:has(> .world-menu-entry:nth-child(7):last-child) .world-menu-settings { grid-column: span 1; }
-/* With Your worlds in the menu, Create a world, Your worlds, Design and Settings share one row. */
-#shell .world-menu-grid:has(> .world-menu-worlds) .world-menu-settings { grid-column: span 1; }
-#shell .world-menu-grid:has(> .world-menu-worlds) :is(.world-menu-make, .world-menu-worlds, .world-menu-customize, .world-menu-settings) .world-menu-entry-label {
+/* With Your worlds in the menu, Create a world and Your worlds share one row. */
+#shell .world-menu-grid:has(> .world-menu-worlds) :is(.world-menu-make, .world-menu-worlds) .world-menu-entry-label {
   font-size: clamp(21px, 1.9vw, 26px);
   white-space: normal;
 }
@@ -1051,8 +828,7 @@
   from { opacity: 0; translate: 38px 0; filter: brightness(1.18); }
   to { opacity: 1; translate: 0 0; filter: brightness(1); }
 }
-#shell[data-primary='index'] :is(.index-workspace.rail, .detail),
-#shell :is(.settings-view.system-overlay, .atlas-instrument.options-view.system-overlay) {
+#shell[data-primary='index'] :is(.index-workspace.rail, .detail) {
   animation: diegetic-plane-arrive 220ms cubic-bezier(.2,.8,.2,1);
 }
 

@@ -6,7 +6,7 @@
  * To retune the look, change a value here. The accent is one hue and the signal one more; status
  * colours are kept for status. Light values come first and are the default, matching the light
  * world the page draws; data-ui-scheme="dark" on the root element chooses the dark scheme, and
- * "system" follows the operating system (the Settings choice "Light or dark" writes it).
+ * "system" follows the operating system.
  *
  * These colour every application surface. The world profile keeps the Companion's roles
  * (--ui-companion-*) and the hues of the meaning roles (provenance, caution, error), which

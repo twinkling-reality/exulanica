@@ -101,9 +101,7 @@ export interface SessionState {
   mountedCompanionStage: CompanionStage | null;
   mountListeners: AbortController | null;
   stopWatching: (() => void) | null;
-  stopWorldStyleProposalInbox: (() => void) | null;
   disposeEnvironmentSelection: (() => void) | null;
-  settingsStylePreviewId: string | null;
 
   // -- what the world is currently drawing ----------------------------------------------------
   /**
@@ -249,9 +247,7 @@ export function createSessionState(): SessionState {
     mountedCompanionStage: null,
     mountListeners: null,
     stopWatching: null,
-    stopWorldStyleProposalInbox: null,
     disposeEnvironmentSelection: null,
-    settingsStylePreviewId: null,
 
     pointMaps: undefined,
     placedPointMaps: undefined,

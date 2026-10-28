@@ -86,7 +86,7 @@ def test_every_action_the_page_sends_by_a_route_is_an_entry_with_the_same_words_
     registry = _registry()
     routed = {ident: entry for ident, entry in registry.items() if entry["route"] is not None}
     # Counted from the page's own file, so a registry that changes shape fails here by name.
-    assert len(registry) == 39 and len(routed) == 25
+    assert len(registry) == 37 and len(routed) == 25
     offered = {action.id: action for action in action_catalog.offered()}
     assert set(offered) == set(routed)
     for ident, entry in routed.items():

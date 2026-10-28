@@ -649,14 +649,6 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     },
   },
   {
-    id: 'design.open', label: 'Design', hint: 'Light, colour and material of this world',
-    icon: 'design', group: 'system', placement: ['palette'], shortcut: 'O',
-  },
-  {
-    id: 'settings.open', label: 'Settings', hint: 'Display, movement and controls',
-    icon: 'settings', group: 'system', placement: ['palette'], shortcut: '?',
-  },
-  {
     id: 'menu.open', label: 'World menu', hint: 'Every place in the app',
     icon: 'menu', group: 'system', placement: ['top-bar'], shortcut: 'H',
   },

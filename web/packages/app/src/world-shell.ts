@@ -3,12 +3,12 @@
  *
  * Pointer lock still owns the input mode. This state only answers which product surface is
  * occupying the live world and which camera presentation is active. Keeping those answers in one
- * reducer prevents Index, Options, Map and an orphaned detail pane from independently claiming the
- * same pixels.
+ * reducer prevents Index, Map and an orphaned detail pane from independently claiming the same
+ * pixels.
  */
 
 export type PrimarySurface =
-  | 'world' | 'menu' | 'index' | 'options' | 'controls' | 'character' | 'experiment' | 'compare'
+  | 'world' | 'menu' | 'index' | 'character' | 'experiment' | 'compare'
   | 'photos' | 'make';
 export type CameraPresentation = 'ground' | 'map';
 
@@ -29,8 +29,6 @@ export type WorldShellEvent =
   | { readonly type: 'toggle-character' }
   | { readonly type: 'toggle-index' }
   | { readonly type: 'toggle-map' }
-  | { readonly type: 'toggle-options' }
-  | { readonly type: 'toggle-controls' }
   | { readonly type: 'toggle-experiment' }
   | { readonly type: 'toggle-compare' }
   | { readonly type: 'toggle-photos' }
@@ -46,8 +44,6 @@ export type WorldCommand =
   | 'toggle-character'
   | 'toggle-index'
   | 'toggle-map'
-  | 'toggle-options'
-  | 'toggle-controls'
   | 'toggle-decides'
   | 'toggle-play'
   | 'selection-back';
@@ -90,14 +86,6 @@ export function updateWorldShell(
       return state.camera === 'map'
         ? restoreSurface(state)
         : openTemporarySurface(state, { primary: 'world', camera: 'map', detailId: null });
-    case 'toggle-options':
-      if (state.primary === 'options') return restoreSurface(state);
-      if (state.primary === 'controls') return Object.freeze({ ...state, primary: 'options' });
-      return openTemporarySurface(state, { primary: 'options', camera: 'ground', detailId: null });
-    case 'toggle-controls':
-      if (state.primary === 'controls') return restoreSurface(state);
-      if (state.primary === 'options') return Object.freeze({ ...state, primary: 'controls' });
-      return openTemporarySurface(state, { primary: 'controls', camera: 'ground', detailId: null });
     case 'toggle-experiment':
       return state.primary === 'experiment'
         ? restoreSurface(state)
@@ -173,8 +161,6 @@ export function commandForKeystroke(stroke: CommandKeystroke): WorldCommand | nu
       return 'toggle-index';
     case 'KeyM':
       return 'toggle-map';
-    case 'KeyO':
-      return 'toggle-options';
     case 'KeyR':
       return 'toggle-decides';
     case 'KeyG':
@@ -182,6 +168,6 @@ export function commandForKeystroke(stroke: CommandKeystroke): WorldCommand | nu
     case 'Backspace':
       return 'selection-back';
     default:
-      return stroke.key === '?' ? 'toggle-controls' : null;
+      return null;
   }
 }

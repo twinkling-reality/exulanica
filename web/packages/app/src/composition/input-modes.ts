@@ -331,11 +331,6 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
         deps.mapPeek.press();
         return;
       }
-      if (command === 'toggle-options') {
-        event.preventDefault();
-        deps.handleAtlasCommand('options');
-        return;
-      }
       if (command === 'toggle-decides') {
         event.preventDefault();
         deps.toggleDecides();
@@ -344,11 +339,6 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
       if (command === 'toggle-play' && deps.togglePlay !== undefined) {
         event.preventDefault();
         deps.togglePlay();
-        return;
-      }
-      if (command === 'toggle-controls') {
-        event.preventDefault();
-        deps.handleAtlasCommand('controls');
         return;
       }
       if (command === 'selection-back' && deps.shellState().detailId !== null) {

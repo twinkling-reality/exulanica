@@ -303,12 +303,12 @@
  * values replace.
  */
 #shell :is(
-  .index-workspace.rail, .detail, .settings-view.system-overlay, .atlas-instrument.options-view.system-overlay,
+  .index-workspace.rail, .detail,
   .world-recipes, .character-studio, .society-comparison, .society-experiment-result, .lazy-panel, .photos-drawer,
   .world-menu
 ),
 :root[data-contrast] #shell :is(
-  .index-workspace.rail, .detail, .settings-view.system-overlay, .atlas-instrument.options-view.system-overlay,
+  .index-workspace.rail, .detail,
   .world-recipes, .character-studio, .society-comparison, .society-experiment-result, .lazy-panel, .photos-drawer,
   .world-menu
 ) {
@@ -338,7 +338,7 @@
  */
 #shell .x-region:not([data-region='dock']),
 #shell :is(
-  .index-workspace.rail, .detail, .settings-view.system-overlay, .atlas-instrument.options-view.system-overlay,
+  .index-workspace.rail, .detail,
   .world-recipes, .character-studio, .society-comparison, .society-experiment-result, .lazy-panel, .photos-drawer,
   .world-menu
 ) {
@@ -355,7 +355,7 @@
 }
 :root[data-ui-scheme='dark'] #shell .x-region:not([data-region='dock']),
 :root[data-ui-scheme='dark'] #shell :is(
-  .index-workspace.rail, .detail, .settings-view.system-overlay, .atlas-instrument.options-view.system-overlay,
+  .index-workspace.rail, .detail,
   .world-recipes, .character-studio, .society-comparison, .society-experiment-result, .lazy-panel, .photos-drawer,
   .world-menu
 ) {
@@ -373,7 +373,7 @@
 @media (prefers-color-scheme: dark) {
   :root[data-ui-scheme='system'] #shell .x-region:not([data-region='dock']),
   :root[data-ui-scheme='system'] #shell :is(
-    .index-workspace.rail, .detail, .settings-view.system-overlay, .atlas-instrument.options-view.system-overlay,
+    .index-workspace.rail, .detail,
   .world-recipes, .character-studio, .society-comparison, .society-experiment-result, .lazy-panel, .photos-drawer,
   .world-menu
   ) {
@@ -402,8 +402,7 @@
 #shell .world-menu-entry::after { display: none; }
 #shell .world-menu-world { --entry-background: var(--brand-blend); color: var(--color-text-on-brand); }
 #shell .world-menu-world :is(.world-menu-entry-detail, kbd) { color: var(--color-text-on-brand); }
-#shell .world-menu-entry .atlas-command-icon,
-#shell :is(.world-menu-customize, .world-menu-settings) .atlas-command-icon { color: var(--color-accent); }
+#shell .world-menu-entry .atlas-command-icon { color: var(--color-accent); }
 #shell .world-menu-entry-detail,
 #shell .world-menu-companion .world-menu-entry-detail { color: var(--color-text-muted); }
 #shell .world-menu-entry kbd,
@@ -441,15 +440,9 @@
 #shell .world-menu-session { color: var(--color-text-muted); }
 #shell .world-panel > details { background: var(--color-surface-raised); border-color: var(--color-border); }
 #shell .world-traffic-note { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text); }
-#shell .settings-actions kbd { background: var(--color-surface-raised); color: var(--color-text); }
-#shell .options-view .overlay-close { color: var(--color-text); background: var(--color-surface-raised); border-color: var(--color-border); }
-#shell .options-view .overlay-close:is(:hover, :focus-visible) {
-  color: var(--color-text);
-  background: linear-gradient(var(--color-surface-hover), var(--color-surface-hover)), var(--color-surface-raised);
-}
 #shell .character-description .character-apply { color: var(--color-text-on-accent); background: var(--color-accent); }
 #shell :is(
-  .index-workspace.rail, .detail, .settings-view.system-overlay, .atlas-instrument.options-view.system-overlay,
+  .index-workspace.rail, .detail,
   .world-recipes, .character-studio, .society-comparison, .society-experiment-result, .photos-drawer
 ) :is(input:not([type]), input[type='text'], input[type='search'], input[type='number'], textarea, select) {
   color: var(--color-text);

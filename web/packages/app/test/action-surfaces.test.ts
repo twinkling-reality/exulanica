@@ -140,14 +140,12 @@ describe('the command palette', () => {
 
 describe('one key for one action', () => {
   it('the registry’s shortcuts are the keys the shell answers', () => {
-    const shellKeys: Record<string, string> = { H: 'toggle-menu', K: 'toggle-character', I: 'toggle-index', M: 'toggle-map', O: 'toggle-options' };
+    const shellKeys: Record<string, string> = { H: 'toggle-menu', K: 'toggle-character', I: 'toggle-index', M: 'toggle-map' };
     for (const spec of ACTIONS) {
       const key = spec.shortcut;
       if (key === undefined || !(key in shellKeys)) continue;
       expect(commandForKeystroke({ code: `Key${key}`, key: key.toLowerCase(), modified: false, typing: false }), spec.id)
         .toBe(shellKeys[key]);
     }
-    expect(commandForKeystroke({ code: 'Slash', key: '?', modified: false, typing: false })).toBe('toggle-controls');
-    expect(actionSpec('settings.open').shortcut).toBe('?');
   });
 });

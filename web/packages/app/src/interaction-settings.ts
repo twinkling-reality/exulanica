@@ -3,12 +3,11 @@
  * which the settings page offers.
  *
  * The capabilities, their ranges, choices and defaults, and whether the settings page offers each,
- * are the server's registry (`exulanica/world/interaction-policy-registry.v1.json`). The settings
- * page draws its controls from `GET /world/interactions/catalog`, which serves that registry; the
- * device's stored preferences are checked against the same file as it is bundled, because they are
- * read before any request can answer. Nothing here restates a range or a choice. What the page adds
- * is its own: the preference field each capability is held in on this device, and the words each
- * control is shown with (held to the registry by interaction-settings.test.ts).
+ * are the server's registry (`exulanica/world/interaction-policy-registry.v1.json`), which
+ * `GET /world/interactions/catalog` serves; the device's stored preferences are checked against the
+ * same file as it is bundled, because they are read before any request can answer. Nothing here
+ * restates a range or a choice. What the page adds is its own: the preference field each capability
+ * is held in on this device (held to the registry by interaction-settings.test.ts).
  */
 
 import registryText from '../../../../exulanica/world/interaction-policy-registry.v1.json?raw';
@@ -148,36 +147,3 @@ export function isPreferenceOf(key: string, value: unknown): boolean {
   }
   return preferenceValue(key, value) !== undefined;
 }
-
-/** What a control is shown with. A choice's words are keyed by the registry's choices. */
-export interface SettingWords {
-  readonly label: string;
-  readonly note?: string;
-  readonly choices?: Readonly<Record<string, string>>;
-  /** How a range control's value is written, in the preference's own units. */
-  readonly shown?: (value: number) => string;
-  /** The step of a range control, in the preference's own units. */
-  readonly step?: number;
-}
-
-/** The words of every capability the registry states, shown or not, so showing one needs no code. */
-export const SETTING_WORDS: Readonly<Record<string, SettingWords>> = {
-  'comfort.field-of-view-degrees': { label: 'Field of view', shown: (value) => `${value}°`, step: 1 },
-  'comfort.look-sensitivity-milli': {
-    label: 'Look sensitivity', shown: (value) => `${value.toFixed(1)}×`, step: 0.1,
-  },
-  'comfort.vignette': {
-    label: 'Comfort vignette',
-    note: 'Darkens the periphery while traversing; it does not hide evidence.',
-    choices: { off: 'Off', subtle: 'Subtle', strong: 'Strong' },
-  },
-  'comfort.camera-bob': { label: 'Camera bob' },
-  'navigation.turn-mode': { label: 'Turning', choices: { smooth: 'Smooth', snap: 'Snap' } },
-  'navigation.transition-style': { label: 'Transitions', choices: { motion: 'Motion', fade: 'Fade' } },
-  'disclosure.provenance-detail': {
-    label: 'Provenance detail', choices: { standard: 'Standard', expanded: 'Expanded' },
-  },
-  'initiative.mode': {
-    label: 'Companion initiative', choices: { normal: 'Normal', minimal: 'Minimal', off: 'Off' },
-  },
-};

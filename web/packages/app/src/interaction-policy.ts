@@ -11,8 +11,6 @@ import {
   PREFERENCE_BINDINGS,
   capabilityValue,
   preferenceValue,
-  readCapabilities,
-  type InteractionCapability,
   type InteractionValue,
 } from './interaction-settings.js';
 import { worldPath } from './world-scope.js';
@@ -78,11 +76,6 @@ export function preferencesFromInteractionPolicy(
     if (value !== undefined) held[binding.field] = value;
   }
   return { ...local, ...held } as AtlasPreferences;
-}
-
-/** The reviewed capabilities the server serves, which the settings page draws its controls from. */
-export async function readInteractionCatalog(options: TransportOptions): Promise<readonly InteractionCapability[]> {
-  return readCapabilities(await new Transport(options).getJson<unknown>('/world/interactions/catalog'));
 }
 
 export class InteractionPolicyClient {

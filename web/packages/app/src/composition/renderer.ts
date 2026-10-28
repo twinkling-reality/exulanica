@@ -85,7 +85,6 @@ export interface MountedRenderer {
 export function disposeRenderer(state: SessionState): void {
   state.atlas?.dispose();
   state.atlas = null;
-  state.settingsStylePreviewId = null;
 }
 
 export async function mountRenderer(deps: RendererDependencies): Promise<MountedRenderer> {
@@ -93,7 +92,6 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
   const current = deps.snapshot;
 
   state.atlas?.dispose();
-  state.settingsStylePreviewId = null;
   const activeTheme = themeForPreferences(state.preferences, env.systemAppearance.matches);
   let lastMoving: boolean | null = null;
   let lastAnchorFocus: boolean | null = null;
