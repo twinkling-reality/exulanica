@@ -12,7 +12,6 @@ export const CHARACTER_WORDS = Object.freeze({
   back: 'Back',
   model: 'Model',
   personality: 'Personality',
-  writtenByYou: 'Written by you',
   noPersonality: 'No personality yet.',
   routine: 'Routine',
   /** Who decides where a model does not (T7): the chip on the card and tag, and a row's sub-line. */
@@ -273,9 +272,6 @@ export function modelLine(model) {
 }
 
 /** The page's Run section for a character with no model (DESIGN's J2). */
-export const routineRun = who => `${who.start} follows a routine. Choose an AI model to run.`;
-
-/** The same where this person cannot choose a model here (no [M] Model): no instruction it cannot follow. */
 export const followsRoutine = who => `${who.start} follows a routine.`;
 
 /** The host's money for models is spent (its codes, as the models read and a run's refusal name them). */
@@ -288,8 +284,7 @@ export const budgetSpent = who => `The budget for AI models here is spent, so ${
 export const spendingPaused = who => `Spending on AI models is paused here, so ${who.within} follows a routine.`;
 
 /** The Run section where the character's chosen model is refused here and others are not (J22). */
-export const modelCannot = (who, assignable) =>
-  `This model cannot decide for ${who.within} here, so ${who.within} follows a routine.${assignable ? ' Choose another model to run.' : ''}`;
+export const modelCannot = who => `This model cannot decide for ${who.within} here, so ${who.within} follows a routine.`;
 
 /**
  * Why a character's model does not run here, as the page's Run section says it (DESIGN's J2 and
@@ -297,9 +292,9 @@ export const modelCannot = (who, assignable) =>
  * refusal, and the chosen model's (`chosen` false with none chosen). The host's budget spent wins;
  * then spending held closed (N34); then nothing that can be asked because the models on this computer do not run (A2); then
  * nothing that can be asked at all; then a chosen model refused while others can be asked; then
- * no model chosen, with how to run only where [M] is drawn (`assignable`).
+ * no model chosen.
  */
-export function runSectionLine(who, { hostRefusal = null, offered = [], chosen = false, chosenRefusal = null, assignable = false }) {
+export function runSectionLine(who, { hostRefusal = null, offered = [], chosen = false, chosenRefusal = null }) {
   const refusals = offered.map(model => model.refusal ?? null);
   if (BUDGET_SPENT.includes(hostRefusal) || BUDGET_SPENT.includes(chosenRefusal)
     || (refusals.length > 0 && refusals.every(code => BUDGET_SPENT.includes(code)))) return budgetSpent(who);
@@ -307,22 +302,16 @@ export function runSectionLine(who, { hostRefusal = null, offered = [], chosen =
   const wouldOffer = refusals.filter(code => code !== 'provider_credential_absent');
   if (!hostRefusal && wouldOffer.length > 0 && wouldOffer.every(code => code === 'provider_not_running')) return notRunningHere(who);
   if (hostRefusal || !refusals.some(code => code === null)) return notConnected(who);
-  if (chosen && chosenRefusal) return modelCannot(who, assignable);
-  if (!chosen) return assignable ? routineRun(who) : followsRoutine(who);
+  if (chosen && chosenRefusal) return modelCannot(who);
+  if (!chosen) return followsRoutine(who);
   return null;
 }
 
 /** The page's Run section where no AI model can be asked here (spec 7, empty). */
 export const notConnected = who => `No AI model is connected here, so ${who.within} follows a routine.`;
 
-/**
- * Where no model can be offered because none is running on this computer (A2, DESIGN's "A2 amended"): how to have one,
- * plainly, naming no runner.
- */
-export const noModelRunning = who => `No AI model is running on this computer yet. Start one with a local model runner, and it can decide for ${who.within}, free.`;
-
-/** The page's Run section in that case (A2, DESIGN's words): why the routine decides, then how to have a model. */
-export const notRunningHere = who => `No AI model is running on this computer yet, so ${who.within} follows a routine. Start one with a local model runner, and it can decide for ${who.within}, free.`;
+/** The page's Run section where no model can be offered because none is running on this computer (A2): why the routine decides. */
+export const notRunningHere = who => `No AI model is running on this computer yet, so ${who.within} follows a routine.`;
 
 /** Routine's row in the model list. */
 export const routineRow = () => `${CHARACTER_WORDS.noModel} · ${CHARACTER_WORDS.free}`;
@@ -390,19 +379,17 @@ export function saidUnder({ to = null, hhmm = null }) {
 /**
  * Whose models a run asks (J28), each person with their own model (F9), the chosen character first, then the others in
  * the order served: "Teo's Nemotron 3 Nano 30B decides.", "Teo's Nemotron 3 Nano 30B and Ari's Qwen3 4B Instruct
- * decide.", three the same way, "Teo's Nemotron 3 Nano 30B and 3 more people's models decide.", then "Everyone else
- * carries on as before." unless nobody else lives in the world (`others` false). `whos` are called()'s for each character
+ * decide.", three the same way, "Teo's Nemotron 3 Nano 30B and 3 more people's models decide." `whos` are called()'s for each character
  * the run will ask, null when there is none; `models` their models' names in the same order, "model" where one is not
  * read yet. A model's name is kept whole on one line (no-break spaces), never "Nemotron" apart from "3 Super 120B".
  */
-export function modelsDecide(whos, { others = true, models = [] } = {}) {
+export function modelsDecide(whos, { models = [] } = {}) {
   const [first, ...rest] = whos ?? [];
   if (!first) return null;
   const own = (who, at) => `${possessive(at === 0 ? who.start : who.within)} ${plain(models[at])?.replace(/ /gu, '\u00a0') ?? 'model'}`;
-  const owners = rest.length === 0 ? `${own(first, 0)} decides.`
+  return rest.length === 0 ? `${own(first, 0)} decides.`
     : rest.length <= 2 ? `${[first, ...rest].map(own).slice(0, -1).join(', ')} and ${own(rest.at(-1), rest.length)} decide.`
       : `${own(first, 0)} and ${rest.length} more people's models decide.`;
-  return others ? `${owners} Everyone else carries on as before.` : owners;
 }
 
 /**
@@ -414,12 +401,6 @@ export function modelsNamed(names) {
   if (named.length <= 2) return named.join(' and ') || null;
   return `${named[0]} and ${named.length - 1} other models`;
 }
-
-/**
- * Under the Run question's model and cap (r08): when the run stops, naming no control, its minutes said as real
- * time so they are never read as the world's (DESIGN 03:57).
- */
-export const stopsAfter = minutes => `It stops after ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} of real time, or when you stop it.`;
 
 /** The Run question's way to another model (r08), where another is offered and this page may choose. */
 export const ANOTHER_MODEL = 'Choose another model';

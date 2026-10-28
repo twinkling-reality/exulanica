@@ -270,7 +270,7 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
   chips.append(chip('Qwen3 235B Instruct'), chip('Private', { quiet: true }));
   const question = sideCard({ question: true, scale: () => scaleOf(root) });
   add(question.root);
-  question.body.append(cardWords({ label: 'Teo', title: 'Run for 10 minutes', lines: ['Teo\'s model decides. Everyone else keeps their routine.'] }));
+  question.body.append(cardWords({ label: 'Teo', title: 'Run for 10 minutes', lines: ['Teo\'s model decides.'] }));
   const decide = add(div('wu-row'), question.body); decide.style.cssText = 'gap:calc(20 * var(--u));margin-top:calc(18 * var(--u))';
   decide.append(orb({ word: 'Run', onPress: press }));
   const most = add(div(''), decide); most.className = 'wu-small-text'; most.textContent = 'At most $0.05';

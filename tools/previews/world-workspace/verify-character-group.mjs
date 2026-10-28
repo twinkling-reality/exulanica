@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { GROUP_LAYOUT, SAID_READ, choosableModels, offersModels, deciderOf, freeHere, groupContent, groupHeld, groupPlace, keepLastSaid, lastSaid, noModelLine, noneRunningHere, overRows, questionGroup, readLastSaid } from './character-group.mjs';
-import { CHARACTER_WORDS, GROUP_WORDS, called, decidesPrint, modelsDecide, noModelRunning, quoted, runSpentWords, saidUnder, stopsAfter } from './character-words.mjs';
+import { GROUP_LAYOUT, SAID_READ, choosableModels, offersModels, deciderOf, freeHere, groupContent, groupHeld, groupPlace, keepLastSaid, lastSaid, noneRunningHere, overRows, questionGroup, readLastSaid } from './character-group.mjs';
+import { CHARACTER_WORDS, GROUP_WORDS, called, decidesPrint, modelsDecide, quoted, runSpentWords, saidUnder } from './character-words.mjs';
 import { dayWord } from './talk-words.mjs';
 
 // A chosen character's group (DESIGN's J30, the r05 picture): what it says and where it stands.
@@ -141,7 +141,7 @@ assert.equal(groupContent({ who: teo, said: { line: 'Hello.', to: null, tick: 10
 assert.equal(groupContent({ who: resident, doing: '  ' }).doing, null);
 assert.equal(groupContent({ who: resident }).name, 'Resident');
 // While their record is read: the name and that it is reading, no keys and no small print yet.
-assert.deepEqual({ ...groupContent({ who: teo, reading: true, decider: 'model', model: 'M' }), rows: [] }, { name: 'Teo', doing: "Reading Teo's record…", said: null, note: null, rows: [], print: null, after: null, refused: false, declared: null });
+assert.deepEqual({ ...groupContent({ who: teo, reading: true, decider: 'model', model: 'M' }), rows: [] }, { name: 'Teo', doing: "Reading Teo's record…", said: null, note: null, rows: [], print: null, refused: false, declared: null });
 
 // An outside AI agent decides (AG1d 2): its day and Follow only, no Model and no Run; the print; its own words as
 // parts, each only where declared, exactly as sent; a game's program keeps its words and has none.
@@ -163,44 +163,41 @@ const ari = called({ name: 'Ari' }), ines = called({ name: 'Ines' });
 const [nano, qwen, sup] = ['Nemotron 3 Nano 30B', 'Qwen3 235B Instruct', 'Nemotron 3 Super 120B'];
 // A model's name stays whole on one line in the note (DESIGN's fold-in): its spaces are no-break spaces.
 const whole = text => text.replace(/Nemotron 3 Nano 30B|Qwen3 235B Instruct|Nemotron 3 Super 120B|\bM\b(?= decides)/gu, name => name.replaceAll(' ', '\u00a0'));
-assert.equal(modelsDecide([teo], { models: [nano] }), whole("Teo's Nemotron 3 Nano 30B decides. Everyone else carries on as before."));
-assert.equal(modelsDecide([teo], { others: false, models: [nano] }), whole("Teo's Nemotron 3 Nano 30B decides."));
-assert.equal(modelsDecide([teo, ari], { models: [nano, qwen] }), whole("Teo's Nemotron 3 Nano 30B and Ari's Qwen3 235B Instruct decide. Everyone else carries on as before."));
+// Whose models decide, and nothing about everyone else (ROOT's sweep of 27 October).
+assert.equal(modelsDecide([teo], { models: [nano] }), whole("Teo's Nemotron 3 Nano 30B decides."));
+assert.equal(modelsDecide([teo, ari], { models: [nano, qwen] }), whole("Teo's Nemotron 3 Nano 30B and Ari's Qwen3 235B Instruct decide."));
 assert.equal(modelsDecide([teo, ari, resident], { models: [nano, qwen, sup] }),
-  whole("Teo's Nemotron 3 Nano 30B, Ari's Qwen3 235B Instruct and the resident's Nemotron 3 Super 120B decide. Everyone else carries on as before."));
+  whole("Teo's Nemotron 3 Nano 30B, Ari's Qwen3 235B Instruct and the resident's Nemotron 3 Super 120B decide."));
 assert.ok(!/Nemotron 3/u.test(modelsDecide([teo], { models: [sup] })), 'no break inside a model name');
-assert.equal(modelsDecide([teo, ari, resident, ines], { models: [nano, qwen, sup, nano] }), whole("Teo's Nemotron 3 Nano 30B and 3 more people's models decide. Everyone else carries on as before."));
-assert.equal(modelsDecide([teo, ari], { models: [nano] }), whole("Teo's Nemotron 3 Nano 30B and Ari's model decide. Everyone else carries on as before."), 'a model not read yet');
+assert.equal(modelsDecide([teo, ari, resident, ines], { models: [nano, qwen, sup, nano] }), whole("Teo's Nemotron 3 Nano 30B and 3 more people's models decide."));
+assert.equal(modelsDecide([teo, ari], { models: [nano] }), whole("Teo's Nemotron 3 Nano 30B and Ari's model decide."), 'a model not read yet');
 assert.equal(modelsDecide([]), null);
-assert.equal(stopsAfter(10), 'It stops after 10 minutes of real time, or when you stop it.');
-assert.equal(stopsAfter(1), 'It stops after 1 minute of real time, or when you stop it.');
 const limits = { wallSeconds: 600, usd: '0.05000000' };
 const asked = questionGroup({ who: teo, askers: [teo], models: ['Nemotron 3 Nano 30B'], limits, anotherModel: true });
 assert.equal(asked.name, 'Teo');
 assert.equal(asked.doing, 'Run for 10 minutes');
 assert.equal(asked.said, null);
-assert.equal(asked.note, whole("Teo's Nemotron 3 Nano 30B decides. Everyone else carries on as before."));
+assert.equal(asked.note, whole("Teo's Nemotron 3 Nano 30B decides."));
 assert.deepEqual(keys(asked), ['Enter Run', 'M Choose another model']);
 assert.deepEqual(asked.rows.map(row => row.action), ['run', 'model']);
 assert.equal(asked.print, 'At most $0.05');
-assert.equal(asked.after, 'It stops after 10 minutes of real time, or when you stop it.');
+assert.equal('after' in asked, false, 'no line on when it stops under the cap');
 assert.equal(asked.refused, false);
 assert.deepEqual(keys(questionGroup({ who: teo, models: ['M'], limits })), ['Enter Run'], 'no other model offered, or this page cannot choose: no M');
 assert.equal(questionGroup({ who: teo, models: ['M'], limits, busy: true }).rows[0].disabled, true);
 // A refusal takes the small print's place in its own sentence; Run stays (dimmed), its key still answers.
 const refusedRun = questionGroup({ who: teo, models: ['M'], limits, refusal: 'stale_society_state' });
 assert.equal(refusedRun.print, 'The world changed a moment ago. Press Run again.');
-assert.equal(refusedRun.after, null);
 assert.equal(refusedRun.refused, true);
 assert.equal(refusedRun.rows[0].disabled, false);
 assert.equal(questionGroup({ who: teo, models: ['M'], limits, refusal: 'unheard_of' }).print, 'The run did not start. Nothing was spent.');
-assert.equal(questionGroup({ who: teo, askers: [], models: ['M'], limits }).note, whole("Teo's M decides. Everyone else carries on as before."), 'the chosen one at least');
+assert.equal(questionGroup({ who: teo, askers: [], models: ['M'], limits }).note, whole("Teo's M decides."), 'the chosen one at least');
 assert.equal(questionGroup({ who: teo, models: ['M'], limits: { wallSeconds: 300, usd: '0.02000000' } }).doing, 'Run for 5 minutes');
 // Whose model is whose (F9): the note pairs each person with theirs, and the small print is the cap alone.
 const three = questionGroup({ who: teo, askers: [teo, ari, resident], models: [nano, qwen, sup], limits });
-assert.equal(three.note, whole("Teo's Nemotron 3 Nano 30B, Ari's Qwen3 235B Instruct and the resident's Nemotron 3 Super 120B decide. Everyone else carries on as before."));
+assert.equal(three.note, whole("Teo's Nemotron 3 Nano 30B, Ari's Qwen3 235B Instruct and the resident's Nemotron 3 Super 120B decide."));
 assert.equal(three.print, 'At most $0.05');
-assert.equal(questionGroup({ who: teo, askers: [teo, ari], models: [nano, nano], limits }).note, whole("Teo's Nemotron 3 Nano 30B and Ari's Nemotron 3 Nano 30B decide. Everyone else carries on as before."));
+assert.equal(questionGroup({ who: teo, askers: [teo, ari], models: [nano, nano], limits }).note, whole("Teo's Nemotron 3 Nano 30B and Ari's Nemotron 3 Nano 30B decide."));
 
 // Choose a model (r07; a gallery that teaches, A3): what this computer runs first, then the key group by price, Routine
 // last; each group under its label, a model's maker and size under its name, Current on theirs, the chosen row marked
@@ -303,22 +300,10 @@ for (const file of ['character-group.mjs', 'character-group.ts', 'character-grou
   assert.doesNotMatch(readFileSync(new URL(file, import.meta.url), 'utf8'), /\u2014/u, file);
 }
 
-// A2 (DESIGN's "A2 amended"): where every model this install would offer is refused as not running on this computer,
-// the card says, under its small print, how to have one, naming no runner.
+// A2: where no model runs on this computer the card says who decides and no how-to (ROOT's sweep of 27 October).
 const lone = called({ name: 'Ada' });
-const local = { refusal: 'provider_not_running' }, hosted = { refusal: 'provider_credential_absent' };
-const runOne = 'No AI model is running on this computer yet. Start one with a local model runner, and it can decide for Ada, free.';
-assert.equal(noModelRunning(lone), runOne);
-assert.equal(noModelLine({ takesModelChoices: true, models: [hosted, local] }, lone), runOne);
-assert.equal(noModelLine({ takesModelChoices: true, models: [hosted, { refusal: null }] }, lone), null, 'a model to choose: [M] is offered instead');
-assert.equal(noModelLine({ takesModelChoices: true, models: [hosted, { refusal: 'provider_not_admitted' }] }, lone), null, 'no model here by setting');
-assert.equal(noModelLine({ takesModelChoices: true, models: [{ refusal: 'process_budget_spent' }, local] }, lone), null, 'a key whose models are spent: not this line');
-assert.equal(noModelLine({ takesModelChoices: true, models: [hosted] }, lone), null, 'no model on this computer at all');
-assert.equal(noModelLine({ takesModelChoices: false, models: [local] }, lone), null, 'people no model runs');
-assert.equal(noModelLine(null, lone), null);
-assert.equal(groupContent({ who: lone, noModel: runOne }).after, runOne);
-assert.equal(groupContent({ who: lone, assignable: true, noModel: runOne }).after, null, 'never beside [M]');
-assert.equal(groupContent({ who: lone }).after, null);
+assert.equal(groupContent({ who: lone }).print, 'Ada follows a routine');
+assert.equal('after' in groupContent({ who: lone }), false);
 // A run whose every model is on this computer says it is free in place of its cap.
 const free = questionGroup({ who: lone, models: ['Qwen3 4B Instruct'], limits: { wallSeconds: 600, usd: '0.05000000' }, free: true });
 assert.equal(free.print, 'Free, on this computer');

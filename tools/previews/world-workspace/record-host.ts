@@ -4,7 +4,7 @@
 // (MOTION's, through history-host.ts). contextual-world.ts opens the pages, asks and answers keys; this says what
 // each page shows.
 import { agentUnansweredNotes, choiceRows, choicesLabel, choicesOver, decisionNotes, decisionTitle, lateNotes, overLabel, resultLines, toldLabel, toldSections, unansweredNotes } from './decision-words.mjs';
-import { COMPARE_WORDS, again as againName, answerTag, askLine, asking as askingWords, atMoment, atMost, cannotAskAgain, choseWords, compareMoments, explanation, laneMarks, nothingToAsk, resultOver, resultTitle, sameCounts, spentAsking, spentOf, useFor, whatEachChose } from './compare-words.mjs';
+import { COMPARE_WORDS, again as againName, answerTag, askLine, asking as askingWords, atMoment, atMost, cannotAskAgain, choseWords, compareMoments, laneMarks, nothingToAsk, resultOver, resultTitle, sameCounts, spentAsking, spentOf, useFor, whatEachChose } from './compare-words.mjs';
 import { CHARACTER_WORDS, decidesPrint, declaredParts, modelRefusalWords, quoted } from './character-words.mjs';
 import { deciderOf } from './character-group.mjs';
 import { thingName } from './build-words.mjs';
@@ -368,8 +368,6 @@ export function recordStates(host: RecordHost) {
       const held = model ? compare.offers.get(host.modelKey(model)) : null;
       const offer = held?.offer ?? null;
       const decisions = host.comparedDecisions(compare, offer);
-      const recorded = decisions.at(-1)?.model ?? null;
-      const recordedName = recorded ? host.modelName({ provider: recorded.provider, model_id: recorded.modelId }) ?? recorded.modelId : host.modelOf(showing.row).model?.name ?? '';
       const most = host.boundOf(decisions);
       const note = offer?.refusal ? modelRefusalWords(offer.refusal, who) : held?.failed ? CHARACTER_WORDS.askFailed : null;
       // Nothing to ask of any model (C4): none offered, or every one refused; the line stands alone.
@@ -380,7 +378,6 @@ export function recordStates(host: RecordHost) {
       return {
         nothing,
         big: offer && decisions.length ? askLine(who, decisions.length, compare.single !== null) : '',
-        explain: offer && decisions.length ? explanation(who, recordedName) : '',
         choices: models ? models.map((item) => ({ model: item, current: false, over: item.over ?? null })) : null,
         focus: compare.focus,
         figure: offer && decisions.length ? atMost(most) : null,

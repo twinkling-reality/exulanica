@@ -9,7 +9,6 @@ export const COMPARE_WORDS = Object.freeze({
   compare: 'Compare',
   compareThisMoment: 'Compare this moment',
   thisDecision: 'Ask this decision again',
-  askedOnce: 'Asked once of each. Nothing they choose happens in the world.',
   perMillion: 'Per million tokens',
   choose: 'Choose',
   stop: 'Stop',
@@ -31,10 +30,6 @@ export function askLine(who, count, single = false) {
   return count === 1 ? `Ask ${possessive(who.within)} last decision again` : `Ask ${possessive(who.within)} last ${count} decisions again`;
 }
 
-/** Under the Big line: who is asked. */
-export const explanation = (who, recorded) =>
-  `Each is asked exactly as ${possessive(who.within)} model was asked it, of the model you choose and once more of ${recorded}. Nothing in the world changes.`;
-
 /** The orb's figure before the asks: "At most $0.01". */
 export const atMost = usd => `At most ${amount(usd)}`;
 
@@ -42,7 +37,7 @@ export const atMost = usd => `At most ${amount(usd)}`;
 export const asking = (done, total, spentUsd, mostUsd) => `Asking ${done} of ${total} · ${amount(spentUsd)} of ${amount(mostUsd)}`;
 
 /** With nothing to ask (C4): the offer holds no decisions. */
-export const nothingToAsk = who => `${who.start} has no decisions to ask again yet. Run ${possessive(who.within)} model first.`;
+export const nothingToAsk = who => `${who.start} has no decisions to ask again yet.`;
 
 /** With nothing to ask (C4): the offer holds decisions and refuses every one; from one decision, that one. */
 export const cannotAskAgain = (who, single = false) =>

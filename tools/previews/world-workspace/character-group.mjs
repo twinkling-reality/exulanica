@@ -2,7 +2,7 @@
 // BUILD-SHEETS-CHARACTER-TALKING-BUILDING.md section 1): what it says, from the reads the page holds, and where
 // it stands. Pure: the reads come in as data and the words from character-words.mjs; character-group.ts draws
 // the answer. verify-character-group.mjs holds it.
-import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, decidesPrint, declaredParts, makerLine, modelsDecide, modelsNamed, noModelRunning, overLine, quoted, readingRecord, saidUnder, stopsAfter } from './character-words.mjs';
+import { ANOTHER_MODEL, CHARACTER_WORDS, GROUP_WORDS, decidesPrint, declaredParts, makerLine, modelsDecide, modelsNamed, overLine, quoted, readingRecord, saidUnder } from './character-words.mjs';
 import { RUN_WORDS, atMost, runFor, runRefusalWords } from './run-words.mjs';
 import { dayWord } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -107,8 +107,8 @@ export function deciderOf({ decider = null, model = null }) {
  * is on, Stop; without a model, Choose only where this page may choose one.
  */
 export function groupContent({ who, doing = null, said = null, toWho = null, startMinute = null, decider = 'routine', model = null,
-  connected = true, assignable = false, running = false, left = null, spent = null, following = false, reading = false, noModel = null, declared = null }) {
-  if (reading) return Object.freeze({ name: who.title, doing: readingRecord(who), said: null, note: null, rows: Object.freeze([]), print: null, after: null, refused: false, declared: null });
+  connected = true, assignable = false, running = false, left = null, spent = null, following = false, reading = false, declared = null }) {
+  if (reading) return Object.freeze({ name: who.title, doing: readingRecord(who), said: null, note: null, rows: Object.freeze([]), print: null, refused: false, declared: null });
   const hhmm = said && said.tick !== null && Number.isSafeInteger(startMinute) ? worldTime(said.tick, startMinute)?.hhmm ?? null : null;
   const spoken = said ? Object.freeze({ line: quoted(said.line), under: saidUnder({ to: said.to ? toWho : null, hhmm }) }) : null;
   const rows = [{ action: 'details', key: 'Enter', word: dayWord(who), shortcut: 'Enter' }];
@@ -124,8 +124,6 @@ export function groupContent({ who, doing = null, said = null, toWho = null, sta
     note: null,
     rows: Object.freeze(rows.map(row => Object.freeze(row))),
     print: decidesPrint(who, { decider, model, left: running && decided ? left : null, spent: running && decided ? spent : null }),
-    // Where [M] is not offered because no model is running on this computer, how to have one, under the small print (A2).
-    after: decider === 'routine' && !assignable && noModel ? noModel : null,
     refused: false,
     declared: decider === 'agent' ? declaredParts(declared) : null,
   });
@@ -134,23 +132,22 @@ export function groupContent({ who, doing = null, said = null, toWho = null, sta
 /**
  * The Run question (r08, R-RUN-BUILD-SHEET section 1): R turns the same group, in place, into the question. Top to
  * bottom: the name, "Run for 10 minutes", whose models the run asks, each person with their own (J28, F9: `askers`,
- * called()'s with the chosen character first, `models` their models' names in the same order; `others` whether anybody
- * else lives here), the rows "[Enter] Run" and, where another model is offered and this page may choose one, "[M] Choose
- * another model", then the cap as small print with when it stops under it. A refusal (`refusal`, the server's code) takes the small print's place in its own
+ * called()'s with the chosen character first, `models` their models' names in the same order), the rows "[Enter] Run"
+ * and, where another model is offered and this page may choose one, "[M] Choose another model", then the cap as small
+ * print. A refusal (`refusal`, the server's code) takes the small print's place in its own
  * sentence and dims Run, which still answers its key; `busy` while the start is asked, when Run does nothing.
  */
-export function questionGroup({ who, askers = [who], others = true, models = [], limits, refusal = null, busy = false, anotherModel = false, free = false }) {
+export function questionGroup({ who, askers = [who], models = [], limits, refusal = null, busy = false, anotherModel = false, free = false }) {
   const rows = [{ action: 'run', key: 'Enter', word: RUN_WORDS.run, shortcut: 'Enter', disabled: busy }];
   if (anotherModel) rows.push({ action: 'model', key: 'M', word: ANOTHER_MODEL, shortcut: 'M' });
   return Object.freeze({
     name: who.title,
     doing: runFor(limits),
     said: null,
-    note: modelsDecide(askers.length ? askers : [who], { others, models }),
+    note: modelsDecide(askers.length ? askers : [who], { models }),
     rows: Object.freeze(rows.map(row => Object.freeze(row))),
     // A run whose every model is on this computer costs nothing: it says so in place of its cap (A2).
     print: refusal ? runRefusalWords(refusal, modelsNamed(models)) : free ? CHARACTER_WORDS.freeHere : atMost(limits, true),
-    after: refusal ? null : stopsAfter(Math.round(limits.wallSeconds / 60)),
     refused: Boolean(refusal),
   });
 }
@@ -273,20 +270,6 @@ export const NOT_RUNNING = 'provider_not_running';
 export function noneRunningHere(read) {
   const models = read?.models ?? [];
   return models.some(model => model.local === true && model.refusal === NOT_RUNNING) && !models.some(model => model.local === true && !model.refusal);
-}
-
-/** The refusals of a model this install would never offer: a hosted one where it holds no key. */
-const NEVER_OFFERED = new Set(['provider_credential_absent']);
-
-/**
- * How to have a model, said of `who`, where the card offers none because none is running on this computer (A2): the
- * models read takes choices, and every model this install would offer is refused as not running here. Null otherwise:
- * a model to choose, one left out by setting (provider_not_admitted), or any other cause.
- */
-export function noModelLine(read, who) {
-  const refusals = (read?.models ?? []).map(model => model.refusal ?? null).filter(code => !NEVER_OFFERED.has(code));
-  if (!read?.takesModelChoices || !refusals.length || !refusals.every(code => code === 'provider_not_running')) return null;
-  return noModelRunning(who);
 }
 
 /** Whether every model a run asks runs on this computer: `chosen` the models chosen, as the models read names them. */

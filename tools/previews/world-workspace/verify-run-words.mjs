@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DEFAULT_RUN, MODEL_MINDS_REFUSALS, NOT_CONNECTED, RUN_REFUSALS, RUN_WORDS, atMost, defaultRunLimits, endedNote, OWN_ENDS, runFor, runSpent, runStopWords, runLength, runRefusalWords, runningLine, spentWords, stripWords, timeLeft, whoDecides, decidingWords, pillRunLine } from './run-words.mjs';
+import { DEFAULT_RUN, MODEL_MINDS_REFUSALS, NOT_CONNECTED, RUN_REFUSALS, RUN_WORDS, atMost, defaultRunLimits, endedNote, OWN_ENDS, runFor, runSpent, runStopWords, runLength, runRefusalWords, runningLine, spentWords, stripWords, timeLeft, decidingWords, pillRunLine } from './run-words.mjs';
 import { called } from './character-words.mjs';
 
 const python = path => readFileSync(new URL('../../../' + path, import.meta.url), 'utf8');
@@ -36,9 +36,9 @@ for (const code of ['process_budget_spent', 'process_share_spent']) {
 for (const code of ['toString', 'http_500', null]) assert.equal(runRefusalWords(code), 'The run did not start. Nothing was spent.');
 
 // One noun: a run, never a session; never a code, an id or an em dash.
-const who = called({ name: 'Teo' }), resident = called({ name: null, kind: 'resident' });
+const who = called({ name: 'Teo' });
 const limits = defaultRunLimits(60_000, 1);
-const sentences = [...Object.values(RUN_WORDS), ...Object.values(RUN_REFUSALS), ...Object.values(MODEL_MINDS_REFUSALS), ...Object.values(NOT_CONNECTED), runFor(limits), runLength(limits), whoDecides(who), whoDecides(resident)];
+const sentences = [...Object.values(RUN_WORDS), ...Object.values(RUN_REFUSALS), ...Object.values(MODEL_MINDS_REFUSALS), ...Object.values(NOT_CONNECTED), runFor(limits), runLength(limits)];
 for (const words of sentences) {
   assert.doesNotMatch(words, /session|entity|provider/i, words);
   assert.doesNotMatch(words, /_|\u2014|\b(he|she)\b/i, words);
@@ -65,8 +65,6 @@ assert.equal(atMost(limits, true), 'At most $0.05');
 assert.equal(runLength(limits), '10 minutes · at most $0.05');
 // A run whose every model is on this computer says no money figure: free (A2).
 assert.equal(runLength(limits, true), '10 minutes · Free');
-assert.equal(whoDecides(who), "Teo's model decides. Everyone else keeps their routine.");
-assert.equal(whoDecides(resident), "The resident's model decides. Everyone else keeps their routine.");
 const now = Date.parse('2026-10-14T17:20:00Z');
 const open = { endsBy: '2026-10-14T17:29:13Z', limits: { usd: '0.05000000' }, used: { decisions: 4, usd: '0.00110000', unresolved: { count: 0, usd: '0.00000000' } } };
 assert.equal(timeLeft(open.endsBy, now), '9:13');

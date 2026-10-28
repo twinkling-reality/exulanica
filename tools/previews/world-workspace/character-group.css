@@ -21,7 +21,6 @@
 /* The Run question (r08): whose models decide, at .92; when it stops, under the print at .86. */
 .cg-note { margin-top: var(--space-16); max-width: max(440px, calc(520 * var(--u))); text-wrap: pretty; font: 400 max(16px, calc(18 * var(--u)))/max(22px, calc(24 * var(--u))) var(--font-sans); color: rgba(255, 255, 255, .92); }
 /* A line after the small print (A2's how to have a model) wraps where the line said does. */
-.cg-after { display: inline-block; max-width: max(440px, calc(520 * var(--u))); text-wrap: pretty; color: rgba(255, 255, 255, .86); }
 /* A refusal takes the print's place in the refused ink, and Run dims (it still answers Enter). */
 .cg-print.cg-refused { color: var(--refused-ink); }
 .cg-group[data-refused="true"] .cg-rows > .wu-row:first-child { opacity: .55; }

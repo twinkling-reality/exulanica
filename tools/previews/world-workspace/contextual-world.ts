@@ -11,7 +11,7 @@ import { accessHeaders } from '/src/config.ts';
 import { SocietyClient } from '/src/society-api.ts';
 import { SocietyModelsClient } from '/src/society-models-api.ts';
 import { characterFacts, mountCharacterPresence } from './character-presence.ts';
-import { SAID_READ, choosableModels, deciderOf, freeHere, groupContent, keepLastSaid, noModelLine, offersModels, overBudget, overRows, questionGroup } from './character-group.mjs';
+import { SAID_READ, choosableModels, deciderOf, freeHere, groupContent, keepLastSaid, offersModels, overBudget, overRows, questionGroup } from './character-group.mjs';
 import { mountModelGallery } from './model-gallery.ts';
 import { compareFirst, compareStep } from './compare-words.mjs';
 import { PAGE_FRAMING, PERSON_RING_METRES, askNames, chosenCard, chosenDecision, didRows, doingLine, easePose, modelAnswered, modelChoosableFor, outsideDecider, outsideOf, ownPeople, unlistedOutside, pageFraming, pairFraming, ranIn, ringRadii, subjectWho, tagWords } from './character-view.mjs';
@@ -19,7 +19,7 @@ import { CHARACTER_WORDS, called, deciderWords, goneNote, lastRunLine, modelRefu
 import { openCharacterPage } from './character-page.ts';
 import { mountHistory } from './history.ts';
 import { WATCH_MS, mountRunWatch } from './run-watch.ts';
-import { runLength, runRefusalWords, runSpent, runStopWords, runningLine, timeLeft, whoDecides } from './run-words.mjs';
+import { runLength, runRefusalWords, runSpent, runStopWords, runningLine, timeLeft } from './run-words.mjs';
 import { recordEntityModel } from './entity-model-actions.mjs';
 import { assignmentSubject } from './entity-properties.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -538,14 +538,14 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     if (asking) {
       // J28: the run asks everyone with a model, the chosen character first, each as the tag calls them (J20).
       const askerIds = [row.scene.id, ...(subjectReads.models?.choices ?? []).filter(item => item.model && item.subjectId !== row.scene.id).map(item => item.subjectId)];
-      return questionGroup({ who: view.who, askers: askerIds.map(id => id === row.scene.id ? view.who : whoOf(id)), others: (subjectReads.society?.state?.inhabitants?.length ?? 0) > askerIds.length,
+      return questionGroup({ who: view.who, askers: askerIds.map(id => id === row.scene.id ? view.who : whoOf(id)),
         models: askerIds.map(id => subjectReads.models?.choices.find(item => item.subjectId === id)?.model?.name), limits: asking.shown, refusal: asking.refusal, busy: asking.busy, anotherModel: assignable && choosableModels(subjectReads.models).length > 1,
         free: freeHere(subjectReads.models, askerIds.map(id => subjectReads.models?.choices.find(item => item.subjectId === id)?.model)) });
     }
     const said = saidLines.of(row.scene.id, now);
     return groupContent({ who: view.who, doing: view.doing, said, toWho: said?.to ? whoOf(said.to) : null, startMinute: view.facts?.startMinute ?? null,
       decider: deciderOf({ decider: view.decider ?? null, model: view.model ?? null }), model: view.model ?? null, connected, assignable,
-      running: Boolean(runWatch.run), left: runWatch.run ? timeLeft(runWatch.run.endsBy, Date.now()) : null, spent: spentInRun(row.scene.id), following: followView.active(), reading: view.reading, noModel: noModelLine(subjectReads.models, view.who), declared: view.outside?.declared ?? null });
+      running: Boolean(runWatch.run), left: runWatch.run ? timeLeft(runWatch.run.endsBy, Date.now()) : null, spent: spentInRun(row.scene.id), following: followView.active(), reading: view.reading, declared: view.outside?.declared ?? null });
   }
   let groupActions = new Set(), groupFirst = 0;
   // Choose a model on the gallery page (G2, model-gallery.ts) over the world or the day page: the page's own write; the Run
@@ -715,13 +715,13 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       model: subjectReads.models ? (model ? { name: model.name, price: served?.price ?? null, local: served?.local === true } : null) : undefined,
       connected,
       runLine: subjectReads.models ? runSectionLine(view.who, { hostRefusal: subjectReads.models.hostRefusal, offered: subjectReads.models.models,
-        chosen: Boolean(model), chosenRefusal: choice?.refusal ?? null, assignable }) : null,
-      run: { open: Boolean(run), big: run ? runningLine(run, Date.now(), runFree(), runSpent(subjectReads.models?.runSpending ?? null, subjectReads.models?.runSpendingPartial === true)) : runLength(limits, runFree()), small: whoDecides(view.who), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal, view.model ?? null) : null },
+        chosen: Boolean(model), chosenRefusal: choice?.refusal ?? null }) : null,
+      run: { open: Boolean(run), big: run ? runningLine(run, Date.now(), runFree(), runSpent(subjectReads.models?.runSpending ?? null, subjectReads.models?.runSpendingPartial === true)) : runLength(limits, runFree()), busy: pageView.run.busy, refusal: pageView.run.refusal ? runRefusalWords(pageView.run.refusal, view.model ?? null) : null },
       // A row's choices are counted as each decision is read, so its sub-line is worded as the page draws.
       did: pageView.did ? pageView.did.map(row => ({ time: row.time, what: row.what, sub: row.sub, decision: Boolean(row.requestId), heard: row.heard === true, ...(row.heard ? {} : { model: row.model ?? null, choices: row.model ? decisionOptions(row.requestId) ?? null : null, decisions: row.decisions ?? null, decider: row.decider === 'person' || row.decider === 'external' || row.decider === 'agent' ? row.decider : null, unanswered: row.unanswered ?? null }), ...records.dayRow(pageView, row) })) : null,
       didFocus: pageView.didFocus, lastRun, lastRunWhy, canAsk: !readOnly,
       ask: pageView.ask ? { questions: ASK_ASPECTS.map(aspect => askWords(aspect, view.who)), focus: pageView.ask.focus, busy: pageView.ask.busy,
-        asked: pageView.ask.asked, answer: pageView.ask.answer, failure: pageView.ask.failure } : null,
+        answer: pageView.ask.answer, failure: pageView.ask.failure } : null,
       personality: pageView.personality ? { character: pageView.personality.character, shown: pageView.personality.shown } : null,
       editing: pageView.editing ? { session: pageView.editing.session, refusal: pageView.editing.refusal, busy: pageView.editing.busy } : null,
       canCompare: comparable(pageView) && (pageView.did ?? []).some(modelAnswered),
@@ -782,7 +782,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     else if (action === 'compareStart' && compare && !compare.asking) void compareAsk(pageView);
     else if (action === 'row' && pageView.did?.[index] && !pageView.did[index].heard) { pageView.didFocus = index; pageView.didMoved = index > (dayFocus({ rows: pageView.did, focus: null }) ?? -1); drawPage(); }
     else if (action === 'inspect' && !pageView.ask) void openDecision(index ?? pageView.didFocus);
-    else if (action === 'ask' && !readOnly) { pageView.ask = { focus: 0, busy: false, asked: null, answer: null, failure: null, serial: 0 }; drawPage(); }
+    else if (action === 'ask' && !readOnly) { pageView.ask = { focus: 0, busy: false, answer: null, failure: null, serial: 0 }; drawPage(); }
     else if (action === 'question' && pageView.ask) void askQuestion(index ?? pageView.ask.focus);
     else if (action === 'personality' && pageView.personality && pageView.placedId && !readOnly) {
       const written = pageView.personality.character;
@@ -828,7 +828,7 @@ export async function mountContextualWorld({ state, renderer, selection, objects
     const showing = pageView, ask = showing?.ask, aspect = ASK_ASPECTS[index];
     if (!ask || ask.busy || !aspect) return;
     const serial = ++ask.serial, who = subjectView(showing.row).who;
-    Object.assign(ask, { focus: index, busy: true, asked: null, answer: null, failure: null });
+    Object.assign(ask, { focus: index, busy: true, answer: null, failure: null });
     drawPage();
     const still = () => showing === pageView && showing.ask === ask && ask.serial === serial;
     try {
@@ -843,7 +843,6 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       // The answer names people and places by placeholder; they are drawn by this world's names, each being as the page names it (D2).
       const names = askNames({ known: selection.societyNames?.(), versionId: entry.authoredVersionId, subjectId: showing.row.scene.id, nameOf: calledWithin });
       const drawn = text => drawSimulated([{ kind: 'text', text }], answer, names).map(piece => piece.text).join('');
-      ask.asked = askWords(aspect, who);
       ask.answer = answer.clauses.map(clause => ({ text: drawn(clause.text), note: clause.type === 'meta' }));
     } catch (error) {
       if (still()) ask.failure = error?.plain ? error.message : CHARACTER_WORDS.askFailed;

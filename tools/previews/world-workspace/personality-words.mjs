@@ -13,7 +13,8 @@ export const PERSONALITY_WORDS = Object.freeze({
   cancel: 'Cancel',
   unsaved: 'This could not be saved. Try again.',
   record: 'Personality, as you wrote it',
-  writtenByYou: 'Written by you',
+  /** The note after a save the society reads. */
+  saved: 'Saved.',
   none: 'No personality yet.',
   /** Teo's day (r06) where its owner has written none; [N] Personality writes one. */
   noneWritten: 'No personality written yet.',
@@ -22,14 +23,8 @@ export const PERSONALITY_WORDS = Object.freeze({
 /** The personality on Teo's day (r06): as the person wrote it, in curly quotes. */
 export const writtenWords = about => `“${(about || '').trim()}”`;
 
-/** Under the fields, where the society reads personalities. */
-export const readsEach = who => `${possessive(who.start)} model reads this each time it decides.`;
-
 /** Where the world's people were added before personalities could be written. */
 export const notRead = who => `This world's people were added before personalities could be written, so ${possessive(who.within)} model does not read this.`;
-
-/** The note after a save the society reads. */
-export const savedNote = who => `Saved. ${possessive(who.start)} model reads it from the next minute.`;
 
 /** The most characters of each part (the character module's parameters, ability-modules.v1.json). */
 export const PERSONALITY_LIMITS = Object.freeze({ name: 40, about: 300 });

@@ -26,10 +26,8 @@
 .wu-orb-row .wu-small-text { margin-top: calc(8 * var(--u)); }
 .wu-orb-row > div { min-width: 0; flex: 1; }
 .wu-ask-answer { margin-top: calc(24 * var(--u)); }
-.wu-ask-asked { margin: 0 0 calc(10 * var(--u)); }
 .wu-ask-line { margin: 0 0 calc(12 * var(--u)); font: 400 calc(18 * var(--u))/1.5 var(--font-sans); }
 .wu-cmp-ask .wu-big { margin: calc(4 * var(--u)) 0 calc(10 * var(--u)); }
-.wu-cmp-ask .wu-cmp-explain { margin: 0 0 calc(22 * var(--u)); max-width: calc(470 * var(--u)); }
 .wu-cmp-ask .wu-orb-row { margin-top: calc(28 * var(--u)); }
 .wu-cmp-nothing { margin: calc(10 * var(--u)) 0 0; max-width: calc(470 * var(--u)); }
 .wu-cmp-ask[data-asking] .wu-model-rows { opacity: .38; }

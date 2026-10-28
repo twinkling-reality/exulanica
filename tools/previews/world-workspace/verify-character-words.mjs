@@ -90,31 +90,32 @@ for (const words of said) {
 // Why a character's model does not run (J2, J22): the cause the models read states, asking for
 // nothing the page cannot do.
 const open = [{ refusal: null }, { refusal: 'model_no_longer_offered' }];
-assert.equal(runSectionLine(teo, { offered: open, assignable: true }), 'Teo follows a routine. Choose an AI model to run.');
+// No model chosen: who decides, and no how-to (ROOT's sweep of 27 October).
+assert.equal(runSectionLine(teo, { offered: open }), 'Teo follows a routine.');
 assert.equal(runSectionLine(resident, { offered: open }), 'The resident follows a routine.');
 assert.equal(runSectionLine(teo, { offered: open, chosen: true }), null, 'a chosen model that may be asked runs');
 for (const unasked of [{ hostRefusal: 'provider_credential_absent', offered: open }, { hostRefusal: 'models_not_run_here', offered: open },
   { offered: [{ refusal: 'provider_not_admitted' }], chosen: true, chosenRefusal: 'provider_not_admitted' }, { offered: [] }]) {
-  assert.equal(runSectionLine(resident, { ...unasked, assignable: true }), 'No AI model is connected here, so the resident follows a routine.');
+  assert.equal(runSectionLine(resident, { ...unasked }), 'No AI model is connected here, so the resident follows a routine.');
 }
 for (const spent of [{ hostRefusal: 'process_budget_spent', offered: open }, { offered: open, chosen: true, chosenRefusal: 'process_share_spent' },
   { offered: [{ refusal: 'process_budget_spent' }, { refusal: 'process_share_spent' }] }]) {
-  assert.equal(runSectionLine(teo, { ...spent, assignable: true }), 'The budget for AI models here is spent, so Teo follows a routine.');
+  assert.equal(runSectionLine(teo, { ...spent }), 'The budget for AI models here is spent, so Teo follows a routine.');
 }
-// A2: the only models offered run on this computer and none runs now: say so, and how to have one.
-assert.equal(runSectionLine(teo, { offered: [{ refusal: 'provider_credential_absent' }, { refusal: 'provider_not_running' }], assignable: true }),
-  'No AI model is running on this computer yet, so Teo follows a routine. Start one with a local model runner, and it can decide for Teo, free.');
+// A2: the only models offered run on this computer and none runs now: say so.
+assert.equal(runSectionLine(teo, { offered: [{ refusal: 'provider_credential_absent' }, { refusal: 'provider_not_running' }] }),
+  'No AI model is running on this computer yet, so Teo follows a routine.');
 assert.equal(runSectionLine(teo, { hostRefusal: 'models_not_run_here', offered: [{ refusal: 'provider_not_running' }] }),
   'No AI model is connected here, so Teo follows a routine.', 'a host that asks no model says so first');
 assert.equal(runSectionLine(teo, { offered: [{ refusal: 'process_budget_spent' }, { refusal: 'provider_not_running' }] }),
   'No AI model is connected here, so Teo follows a routine.', 'a key whose models are spent: never the line about this computer');
 // N34: spending held closed until an operator acts is paused, not spent and not a missing model.
-assert.equal(runSectionLine(teo, { hostRefusal: 'spending_suspended', offered: open, assignable: true }),
+assert.equal(runSectionLine(teo, { hostRefusal: 'spending_suspended', offered: open }),
   'Spending on AI models is paused here, so Teo follows a routine.');
 assert.equal(runSectionLine(teo, { hostRefusal: 'spending_suspended', offered: open, chosen: true, chosenRefusal: 'process_share_spent' }),
   'The budget for AI models here is spent, so Teo follows a routine.', 'a spent budget wins');
-assert.equal(runSectionLine(teo, { offered: open, chosen: true, chosenRefusal: 'provider_changed', assignable: true }),
-  'This model cannot decide for Teo here, so Teo follows a routine. Choose another model to run.');
+assert.equal(runSectionLine(teo, { offered: open, chosen: true, chosenRefusal: 'provider_changed' }),
+  'This model cannot decide for Teo here, so Teo follows a routine.');
 assert.equal(runSectionLine(resident, { offered: open, chosen: true, chosenRefusal: 'model_no_longer_offered' }),
   'This model cannot decide for the resident here, so the resident follows a routine.');
 // T7: where a person playing or an outside program decides, the chip, the row and the card say so.

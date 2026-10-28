@@ -10,7 +10,7 @@ import { label, orb as runOrb, page, type Page } from './world-ui.ts';
 import { element, ground, keyButton, keyRow, orb as portraitOrb, pictureBox, px, sentence, type Parts } from './world-ui-record.ts';
 import { CHARACTER_WORDS, askWho, modelLine, routineRow, priceWords, whatDid, nothingYet, readingRecord, called } from './character-words.mjs';
 import type { ModelCard } from '../../../web/packages/app/src/society-models-api.ts';
-import { PERSONALITY_LIMITS, PERSONALITY_WORDS, counter, length, notRead, readsEach, savedNote, writtenWords } from './personality-words.mjs';
+import { PERSONALITY_LIMITS, PERSONALITY_WORDS, counter, length, notRead, writtenWords } from './personality-words.mjs';
 import { COMPARE_WORDS } from './compare-words.mjs';
 import { PATH_WORDS, agentUnansweredWords, byParts, plural, unansweredParts } from './history-words.mjs';
 import { DAY_LAYOUTS, dayLayout, dayView, stepChoice } from './day-rows.mjs';
@@ -77,7 +77,6 @@ export interface CharacterPageState {
     readonly open: boolean;
     /** "10 minutes · at most $0.05", or the running line. */
     readonly big: string;
-    readonly small: string;
     readonly busy: boolean;
     /** A refusal in plain words, or null. */
     readonly refusal: string | null;
@@ -93,8 +92,7 @@ export interface CharacterPageState {
     readonly questions: readonly string[];
     readonly focus: number;
     readonly busy: boolean;
-    /** The question answered, its answer's lines (a note line marked), or a failure. */
-    readonly asked: string | null;
+    /** The answer's lines (a note line marked), or a failure. */
     readonly answer: readonly { readonly text: string; readonly note: boolean }[] | null;
     readonly failure: string | null;
   } | null;
@@ -119,7 +117,6 @@ export interface CharacterPageState {
     /** With nothing to ask of any model (C4), the one line drawn alone: no rows, orb or arrows. */
     readonly nothing: string | null;
     readonly big: string;
-    readonly explain: string;
     /** The models to ask beside the recorded one: neither Routine nor the character's own. */
     readonly choices: readonly ModelChoice[] | null;
     readonly focus: number;
@@ -159,7 +156,7 @@ export interface CharacterPage {
   close(): void;
 }
 
-/** How long "Saved. Teo's model reads it from the next minute." stays in the who column (frame 11). */
+/** How long "Saved." stays in the who column (frame 11). */
 export const SAVED_NOTE_MS = 4000;
 
 /**
@@ -316,10 +313,10 @@ function drawWho(state: CharacterPageState, layout: Layout, saved: boolean): { c
     block.dataset['section'] = 'personality';
     // As the person wrote it: the words, or the name where only a name is written.
     const written = state.personality.character?.about?.trim() || state.personality.character?.name?.trim();
-    if (written) block.append(element('p', 'wu-day-persona', writtenWords(written)), element('p', 'wu-day-by', PERSONALITY_WORDS.writtenByYou));
+    if (written) block.append(element('p', 'wu-day-persona', writtenWords(written)));
     else block.append(element('p', 'wu-day-none', PERSONALITY_WORDS.noneWritten));
     if (saved) {
-      const note = element('p', 'wu-day-saved', savedNote(state.who));
+      const note = element('p', 'wu-day-saved', PERSONALITY_WORDS.saved);
       note.setAttribute('role', 'status');
       block.append(note);
     }
@@ -330,7 +327,7 @@ function drawWho(state: CharacterPageState, layout: Layout, saved: boolean): { c
 }
 
 /**
- * Who decides (Sans 18, with the Current tag for a model), then the small print: the price, the last run or, while one
+ * Who decides (Sans 18), then the small print: the price, the last run or, while one
  * is on, the running line; and where a run is offered and not on, what [R] would start, its length and most it may
  * spend ("10 minutes · at most $0.05") and who it asks, so a run never starts without its limits on screen.
  */
@@ -340,9 +337,8 @@ function decidesBlock(state: CharacterPageState): HTMLElement[] {
   const decides = element('p', 'wu-day-decides');
   if (state.decides) decides.append(state.decides);
   else if (state.model) decides.append(sentence('span', '', [{ model: state.model.name }]));
-  else if (state.model === null) decides.append(state.runLine ?? CHARACTER_WORDS.routine);
+  else if (state.model === null) { if (state.runLine) decides.append(state.runLine); }
   else decides.append(CHARACTER_WORDS.readingModels);
-  if (state.model && !state.decider) decides.append(element('span', 'wu-hr-tag', CHARACTER_WORDS.current));
   block.append(decides);
   if (state.decider === 'agent') {
     // An outside AI agent decides (AG1d 6): its own words as sent, as text, then what it costs this world; no price,
@@ -366,7 +362,7 @@ function decidesBlock(state: CharacterPageState): HTMLElement[] {
       if (index) figures.append(' \u00b7 ');
       figures.append(element('span', 'wu-nowrap', part));
     });
-    lines.push(figures, state.run.small);
+    lines.push(figures);
   }
   // Why a chosen model does not run here (J22); with no model, who decides already says the routine.
   if (state.model && state.runLine) lines.push(state.runLine);
@@ -570,7 +566,7 @@ function drawSide(state: CharacterPageState, layout: Layout, width: number, act:
       side.append(line);
       return side;
     }
-    side.append(element('p', 'wu-big', compare.big), element('p', 'wu-small-text wu-cmp-explain', compare.explain));
+    side.append(element('p', 'wu-big', compare.big));
     if (!compare.choices) side.append(element('p', 'wu-char-note', CHARACTER_WORDS.readingModels));
     else side.append(element('div', 'wu-model-head wu-small-text wu-faint', CHARACTER_WORDS.perMillion),
       modelRows(compare.choices, compare.focus, COMPARE_WORDS.compare, compare.asking ? null : (index) => act('compareChoose', index), null, false));
@@ -587,7 +583,7 @@ function drawSide(state: CharacterPageState, layout: Layout, width: number, act:
         if (index) figure.append(' · ');
         figure.append(element('span', 'wu-nowrap', part));
       });
-      words.append(figure, element('p', 'wu-small-text', COMPARE_WORDS.askedOnce));
+      words.append(figure);
       row.append(button, words);
       side.append(row);
     }
@@ -612,7 +608,6 @@ function drawSide(state: CharacterPageState, layout: Layout, width: number, act:
   if (ask.busy) answer.append(element('p', 'wu-char-note', CHARACTER_WORDS.askReading));
   else if (ask.failure) answer.append(element('p', 'wu-small-text wu-refused', ask.failure));
   else if (ask.answer) {
-    if (ask.asked) answer.append(element('p', 'wu-ask-asked wu-small-text wu-faint', ask.asked));
     if (!ask.answer.length) answer.append(element('p', 'wu-char-note', CHARACTER_WORDS.noAnswer));
     for (const line of ask.answer) answer.append(element('p', line.note ? 'wu-char-note' : 'wu-ask-line', line.text));
   }
@@ -650,11 +645,12 @@ function drawEditor(state: CharacterPageState, editing: NonNullable<CharacterPag
   };
   const name = field(PERSONALITY_WORDS.name, written?.name ?? '', PERSONALITY_LIMITS.name, false, 'wu-day-name-field');
   const about = field(PERSONALITY_WORDS.about, written?.about ?? '', PERSONALITY_LIMITS.about, true, 'wu-day-about-field');
-  const reads = element('p', 'wu-day-reads', state.personality?.shown ? readsEach(state.who) : notRead(state.who));
+  // Where the world's people do not read personalities, the field says so; where they do, it needs no words.
+  const reads = state.personality?.shown ? null : element('p', 'wu-day-reads', notRead(state.who));
   const refusal = element('p', 'wu-day-refused', editing.refusal ?? '');
   refusal.setAttribute('role', 'status');
   refusal.hidden = !editing.refusal;
-  column.append(portrait(state, layout), element('div', 'wu-hr-over', state.sub), name.wrap, about.wrap, reads, refusal);
+  column.append(portrait(state, layout), element('div', 'wu-hr-over', state.sub), name.wrap, about.wrap, ...(reads ? [reads] : []), refusal);
   const save = key(['Enter'], PERSONALITY_WORDS.save, 'Enter', () => act('save'), editing.busy);
   const cancel = key(['Esc'], PERSONALITY_WORDS.cancel, 'Escape', () => act('back'));
   const counts = () => {

@@ -10,8 +10,6 @@ export const RUN_WORDS = Object.freeze({
   stop: 'Stop',
   running: 'Running',
   left: 'left',
-  back: 'Back',
-  stopsByItself: 'It stops by itself, or when you press Stop.',
   /** A run whose every model is on this computer, in place of its money figure (A2). */
   free: 'Free',
 });
@@ -75,9 +73,6 @@ export const atMost = (limits, start = false) => `${start ? 'At' : 'at'} most ${
 
 /** The page's Run line: "10 minutes · at most $0.05"; "10 minutes · Free" where every model it asks is on this computer (A2). */
 export const runLength = (limits, free = false) => `${minutesWords(limits.wallSeconds)} · ${free ? RUN_WORDS.free : atMost(limits)}`;
-
-/** What a run does, said of the chosen character. */
-export const whoDecides = who => `${possessive(who.start)} model decides. Everyone else keeps their routine.`;
 
 /** "9:13", the time left of an open run, from `now` (milliseconds). */
 export function timeLeft(endsBy, now) {

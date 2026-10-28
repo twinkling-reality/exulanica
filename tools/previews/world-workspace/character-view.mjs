@@ -3,7 +3,6 @@
 // words from character-words.mjs; character-presence.ts draws the answer. verify-character-view.mjs
 // holds it.
 import { CHARACTER_WORDS, OUTSIDE_AGENT, called, chosenLine, deciderWords, readingRecord, routineBetween, rowSub } from './character-words.mjs';
-import { RUN_WORDS, atMost, runFor, runRefusalWords, whoDecides } from './run-words.mjs';
 import { plural } from './history-words.mjs';
 import { heardRow, saidRow } from './talk-words.mjs';
 import { worldTime } from './world-clock.mjs';
@@ -201,18 +200,6 @@ export function easePose(from, to, t) {
   const turn = Math.atan2(Math.sin(to.yaw - from.yaw), Math.cos(to.yaw - from.yaw));
   const mix = key => from[key] + (to[key] - from[key]) * k;
   return Object.freeze({ x: mix('x'), y: mix('y'), z: mix('z'), yaw: from.yaw + turn * k, pitch: mix('pitch') });
-}
-
-/**
- * The question before a run (frame 08): the character's name over "Run for 10 minutes", what a run
- * does, its model, the orb with the most it can spend, and [Enter] Run, [Esc] Back; a refusal in
- * the card where it happened. A playing world needs no answer of its own: the run opens on it.
- */
-export function runQuestion({ who, model, limits, refusal = null, busy = false }) {
-  const answers = [{ action: 'run', keys: ['Enter'], word: RUN_WORDS.run, shortcut: 'Enter' }];
-  answers.push({ action: 'back', keys: ['Esc'], word: RUN_WORDS.back, shortcut: 'Escape' });
-  return Object.freeze({ label: who.title, title: runFor(limits), lines: [whoDecides(who)], chip: model, orbWord: RUN_WORDS.run,
-    big: atMost(limits, true), small: RUN_WORDS.stopsByItself, refusal: refusal ? runRefusalWords(refusal, model) : null, answers, busy });
 }
 
 /**

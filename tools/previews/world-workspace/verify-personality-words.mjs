@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { PERSONALITY_LIMITS, PERSONALITY_REFUSALS, PERSONALITY_WORDS, counter, length, notRead, personalityBody, personalityRecordLines, personalityRefusalWords, readsEach, savedNote, writtenWords } from './personality-words.mjs';
+import { PERSONALITY_LIMITS, PERSONALITY_REFUSALS, PERSONALITY_WORDS, counter, length, notRead, personalityBody, personalityRecordLines, personalityRefusalWords, writtenWords } from './personality-words.mjs';
 import { called } from './character-words.mjs';
 
 const repository = path => readFileSync(new URL('../../../' + path, import.meta.url), 'utf8');
@@ -34,9 +34,9 @@ assert.equal(length('Puddle'), 6);
 assert.equal(length('Düsseldorf'), 10);
 assert.equal(counter('Puddle', 40), '6 of 40');
 const teo = called({ name: 'Teo' }), resident = called({ name: null, kind: 'resident' });
-assert.equal(readsEach(teo), "Teo's model reads this each time it decides.");
 assert.equal(notRead(resident), "This world's people were added before personalities could be written, so the resident's model does not read this.");
-assert.equal(savedNote(teo), "Saved. Teo's model reads it from the next minute.");
+// After a save the note says it is saved, and nothing on when the model reads it (ROOT's sweep of 27 October).
+assert.equal(PERSONALITY_WORDS.saved, 'Saved.');
 
 // Teo's day (r06) and its fields (r11): the personality as written in curly quotes, the line where none is written,
 // and the counts over the fields ("3 of 40", "89 of 300").

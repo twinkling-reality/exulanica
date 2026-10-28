@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { COMPARE_WORDS, again, answerTag, askLine, asking, atMoment, cannotAskAgain, atMost, choseWords, compareMoments, explanation, laneMarks, nothingToAsk, resultOver, resultSub, resultTitle, sameCounts, spentAsking, spentOf, useFor, whatEachChose } from './compare-words.mjs';
+import { COMPARE_WORDS, again, answerTag, askLine, asking, atMoment, cannotAskAgain, atMost, choseWords, compareMoments, laneMarks, nothingToAsk, resultOver, resultSub, resultTitle, sameCounts, spentAsking, spentOf, useFor, whatEachChose } from './compare-words.mjs';
 import { called } from './character-words.mjs';
 import { compareFirst, compareStep } from './compare-words.mjs';
 
@@ -11,14 +11,13 @@ assert.equal(askLine(teo, 12), "Ask Teo's last 12 decisions again");
 assert.equal(askLine(resident, 3), "Ask the resident's last 3 decisions again");
 assert.equal(askLine(teo, 1), "Ask Teo's last decision again");
 assert.equal(askLine(teo, 1, true), 'Ask this decision again');
-assert.equal(explanation(teo, NANO), "Each is asked exactly as Teo's model was asked it, of the model you choose and once more of Nemotron 3 Nano 30B. Nothing in the world changes.");
 assert.equal(atMost('0.00740060'), 'At most $0.0074');
 assert.equal(atMost('0.012'), 'At most $0.01');
-assert.equal(COMPARE_WORDS.askedOnce, 'Asked once of each. Nothing they choose happens in the world.');
+assert.equal('askedOnce' in COMPARE_WORDS, false, 'no line restating that nothing happens');
 // C2: while the asks run, the count and the spend so far.
 assert.equal(asking(5, 24, 0.0008, '0.01'), 'Asking 5 of 24 · $0.0008 of $0.01');
-assert.equal(nothingToAsk(teo), "Teo has no decisions to ask again yet. Run Teo's model first.");
-assert.equal(nothingToAsk(resident), "The resident has no decisions to ask again yet. Run the resident's model first.");
+assert.equal(nothingToAsk(teo), 'Teo has no decisions to ask again yet.');
+assert.equal(nothingToAsk(resident), 'The resident has no decisions to ask again yet.');
 assert.equal(cannotAskAgain(teo), "Teo's last decisions cannot be asked again here.");
 assert.equal(cannotAskAgain(resident, true), 'This decision cannot be asked again here.');
 

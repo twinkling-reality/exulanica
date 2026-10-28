@@ -24,8 +24,6 @@ export interface GroupContent {
   readonly rows: readonly GroupRow[];
   /** Who decides for them now, or the run's model and cap; null while their record is read. */
   readonly print: string | null;
-  /** Under the print, fainter: when a run stops (r08); null otherwise. */
-  readonly after: string | null;
   /** The print is a refusal: in the refused ink, Run dimmed. */
   readonly refused: boolean;
   /** Under the print, an outside AI agent's own words about itself as parts, its declared ones marked (AG1d 2). */
@@ -110,7 +108,6 @@ export function characterGroup({ scale, onAction }: { readonly scale: () => numb
       if (content.print) {
         const print = text('p', 'cg-print', content.print);
         if (content.refused) { print.classList.add('cg-refused'); print.setAttribute('role', 'status'); }
-        if (content.after) { print.append(document.createElement('br'), text('span', 'cg-after', content.after)); }
         parts.push(print);
       }
       if (content.declared) {
