@@ -9,6 +9,8 @@ import { PROVIDER_NAMES } from './create-words.mjs';
 
 export const GALLERY_WORDS = Object.freeze({
   title: who => `Choose an AI model for ${who.within}`,
+  /** The list opened with nobody to choose for (the Integrations page's Models): the models, and nothing chosen. */
+  browse: 'Models',
   noModel: CHARACTER_WORDS.noModel,
   choose: who => `Choose it for ${who.within}`,
   chooseRoutine: who => `Choose the routine for ${who.within}`,
@@ -85,9 +87,10 @@ function runsOn(model, fromServer) {
  * computer first, then by price), a guest's too-dear rows faint in their provider's group (U2, U3b), the runner's rows
  * being checked and the fold of those not able under this computer's (L1c), then No AI model with Routine. Each
  * choosable row has its number key; faint rows have none and never take the focus. `current` is the person's model
- * (null: their routine); `fromServer` a guest's page.
+ * (null: their routine); `fromServer` a guest's page; `browse` the list with nobody to choose for, which names no one
+ * and offers no number keys.
  */
-export function galleryPage({ read, who = called({ name: null, kind: null }), doing = null, current = null, fromServer = false }) {
+export function galleryPage({ read, who = called({ name: null, kind: null }), doing = null, current = null, fromServer = false, browse = false }) {
   const models = choosableModels(read);
   const sameAs = model => current !== null && model.provider === current.provider && model.modelId === (current.modelId ?? current.model_id);
   const groups = new Map();
@@ -120,18 +123,19 @@ export function galleryPage({ read, who = called({ name: null, kind: null }), do
       sub: named(row) ? rowSub(read, named(row)) : row.sub, line: row.line, current: row.current })));
   }
   const routineKey = String(choosable.length + 1);
-  const routine = Object.freeze({ key: routineKey, name: CHARACTER_WORDS.routine, sub: null, cost: CHARACTER_WORDS.free, current: current === null, model: null });
+  // A list for nobody holds nobody's choice: no row is current in it.
+  const routine = Object.freeze({ key: routineKey, name: CHARACTER_WORDS.routine, sub: null, cost: CHARACTER_WORDS.free, current: !browse && current === null, model: null });
   const free = hereLabel(fromServer);
   const ordered = [...groups.values()].sort((one, other) => Number(one.label !== free) - Number(other.label !== free));
   return Object.freeze({
-    over: [who.title, doing].filter(Boolean).join(' · '),
-    title: GALLERY_WORDS.title(who),
+    over: browse ? '' : [who.title, doing].filter(Boolean).join(' · '),
+    title: browse ? GALLERY_WORDS.browse : GALLERY_WORDS.title(who),
     groups: Object.freeze([...ordered.map(one => Object.freeze({ ...one, rows: Object.freeze(one.rows), faint: Object.freeze(one.faint) })),
       Object.freeze({ label: GALLERY_WORDS.noModel, rows: Object.freeze([routine]), faint: Object.freeze([]), fold: null })]),
     // Every row a number or the arrows reach, in the page's order: the models, then Routine.
     rows: Object.freeze([...ordered.flatMap(one => one.rows), routine]),
     // The keys as the frame draws them: caps, then the word; the number keys from 1 to the last row's.
-    keys: Object.freeze([{ caps: ['↑', '↓'], word: GALLERY_WORDS.move }, { caps: ['1', routineKey], through: true, word: GALLERY_WORDS.chooseAtOnce },
+    keys: Object.freeze([{ caps: ['↑', '↓'], word: GALLERY_WORDS.move }, ...(browse ? [] : [{ caps: ['1', routineKey], through: true, word: GALLERY_WORDS.chooseAtOnce }]),
       { caps: ['Esc'], word: GALLERY_WORDS.back }].map(key => Object.freeze(key))),
   });
 }
@@ -149,11 +153,11 @@ export function firstFocus(page) {
  * at the pinned revision, what a check on this computer found (L1c), its maker's words, the facts from its card, and
  * choosing it. Routine in focus is its name and choosing it.
  */
-export function galleryDetail({ read, row, who = called({ name: null, kind: null }) }) {
+export function galleryDetail({ read, row, who = called({ name: null, kind: null }), browse = false }) {
   const model = row?.model ?? null;
   if (!model) {
     return Object.freeze({ name: CHARACTER_WORDS.routine, by: null, link: null, why: Object.freeze([]), words: null,
-      facts: Object.freeze([]), act: GALLERY_WORDS.chooseRoutine(who) });
+      facts: Object.freeze([]), act: browse ? null : GALLERY_WORDS.chooseRoutine(who) });
   }
   const card = model.card ?? null;
   const why = [];
@@ -183,7 +187,7 @@ export function galleryDetail({ read, row, who = called({ name: null, kind: null
     why: Object.freeze(why),
     words: card ? Object.freeze({ said: cardWords(model).said }) : null,
     facts: Object.freeze(facts.map(([key, value]) => Object.freeze({ key, value }))),
-    act: GALLERY_WORDS.choose(who),
+    act: browse ? null : GALLERY_WORDS.choose(who),
   });
 }
 

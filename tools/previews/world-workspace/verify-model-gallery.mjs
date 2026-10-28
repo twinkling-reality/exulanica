@@ -119,6 +119,17 @@ assert.equal(checkedHere.by, null);
 const idle = galleryPage({ read: { ...read, models: [{ ...models[3], refusal: 'provider_not_running' }, ...models.slice(0, 3)] }, who: sami });
 assert.deepEqual(idle.groups.map(group => group.label), ['With your Nebius key', 'No AI model']);
 
+// Opened from the Integrations page with nobody to choose for: "Models", the same groups and rows, no number keys
+// and nothing to choose.
+const listed = galleryPage({ read, browse: true });
+assert.equal(listed.title, 'Models');
+assert.equal(listed.over, '');
+assert.deepEqual(listed.groups.map(group => group.label), page.groups.map(group => group.label));
+assert.deepEqual(listed.keys.map(key => key.word), ['Move', 'Back']);
+assert.equal(listed.rows.some(row => row.current), false, 'nobody\'s choice is current in a list for nobody');
+assert.equal(galleryDetail({ read, row: rowForKey(listed, '3'), browse: true }).act, null);
+assert.equal(galleryDetail({ read, row: rowForKey(listed, '5'), browse: true }).act, null);
+
 // No em dash, no score words: nothing ranks a model (Nebius 5(f)).
 const source = readFileSync(new URL('./model-gallery.mjs', import.meta.url), 'utf8');
 assert.equal(source.includes('\u2014'), false);

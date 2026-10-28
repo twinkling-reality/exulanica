@@ -1,60 +1,52 @@
-// The Integrations page (DESIGN's build sheet of 24 October, frames r30-integrations-a and -b; WORDS.md "The
-// Integrations page" and its rulings of 11:16 on 25 October): one light page over the front door, opened from
-// "Integrations" beside "Create a world". Each row is the catalog's
-// (integrations.v1.json) and says what this install serves now: the models read's refusal of each provider, the
-// bridges the door admits, the AI grants that stand in any saved world and whom each decides for, by the names their
-// society gives them. Nothing is set up here. Enter opens a row's guide elsewhere; the one action is Del, which ends
-// the one AI grant that stands through the door's own revoke and then says who decides again, as the record shows.
-// A guest's page, or a hosted account's (frame r30-integrations-c), says only what this server offers, from the models
-// read alone: no door read, no grant, no Del. Words and rules are integration-words.mjs's; the look is
-// world-ui-integrations.css's.
+// The Integrations page (ROOT's mock, integrations-owner.html and -guest.html, and the user's yes of 27 October): on
+// Create's dark plane, "Integrations" over one row per service this server reads. Each row's mark, name and one plain
+// line are the served catalog's (GET /integrations); its state, with a dot lit when on and ringed where it is not on
+// this server, and its one action come from the live reads (integration-words.mjs's integrationRows). Models opens the
+// model picker that exists as a list, Guide opens the service's guide elsewhere, Connect asks the chosen world's
+// follower to keep it in a project (POST /world/github-projects), and End ends a grant through the door's own revoke.
+// A guest's page reads the host's figures from the session's allowance and makes no door, GitHub or spending read. The
+// look is world-ui-integrations.css's, over create-world.css's plane.
 import { DoorBridgesClient, type DoorBridge } from '../../../web/packages/app/src/door-bridges-api.ts';
 import { DoorGrantsClient, type DoorGrant } from '../../../web/packages/app/src/door-grants-api.ts';
+import { SocietyModelsClient } from '../../../web/packages/app/src/society-models-api.ts';
 import { worldPath } from '../../../web/packages/app/src/world-scope.ts';
 import { button } from '../../../web/packages/app/src/ui/system/components.ts';
 import { accessHeaders, type Credentials } from '../../../web/packages/app/src/config.ts';
 import type { SavedWorldEntry } from '../../../web/packages/app/src/world-entry-api.ts';
-import { lightHint, lightPage, quietCommand } from './world-ui-create.ts';
+import { createPage, createTitle, quietCommand } from './world-ui-create.ts';
 import { tabStops } from './create-world.ts';
 import { wrapStop } from './create-steps.mjs';
-import {
-  INTEGRATIONS, INTEGRATION_WORDS, alreadyEnded, catalogRows, endable, endedState, guestRow, guestState, guideAddress, handedBackLine, markShapes,
-  namesFor, namesOf, refusedLine, releasedSubjects, rowState, severalLine, standingGrants, stepRow,
-} from './integration-words.mjs';
+import { INTEGRATION_WORDS, alreadyEnded, guideAddress, integrationRows, markShapes, namesFor, standingGrants } from './integration-words.mjs';
+import { mountModelGallery } from './model-gallery.ts';
+import { called } from './character-words.mjs';
 import { mountUiScale } from './world-ui.ts';
 import './world-ui-integrations.css';
 
-/** A row of the catalog, as catalogRows gives it. */
+type Json = Record<string, any>;
+
+/** A row as integrationRows gives it. */
 interface Row {
   readonly key: string;
-  readonly group: string;
   readonly name: string;
   readonly line: string;
-  readonly from: { readonly provider?: string; readonly door?: string; readonly ai?: boolean };
-  readonly connects: string;
-  readonly reads: string;
-  readonly goes_to: string;
-  readonly ends?: { readonly ended: string; readonly one: string; readonly several: string; readonly refused: string };
-  readonly guide: { readonly document: string; readonly heading: string };
-  readonly mark: readonly Readonly<Record<string, Readonly<Record<string, string | number>>>>[];
+  readonly mark: readonly Json[];
+  readonly state: { readonly words: string; readonly kind: 'on' | 'off' | 'na' | 'refused' } | null;
+  readonly action: { readonly kind: 'models' | 'guide' | 'connect' | 'end'; readonly word: string } & Json | null;
 }
 
-/** A grant that stands, as the page keeps it (standingGrants), with whom it decides for by name. */
-interface Standing {
+/** A grant that stands, as the page keeps it (standingGrants). */
+interface Grant {
   readonly grantId: string;
   readonly worldId: string;
   readonly versionId: string | null;
+  readonly bridge: string;
+  readonly named: string | null;
   readonly ai: boolean;
   readonly things: readonly string[];
-  readonly names: readonly string[];
 }
 
-/** What the page read: each null where its read did not answer, and the rows it decides say nothing. */
-interface Reads {
-  readonly models: readonly unknown[] | null;
-  readonly bridges: readonly DoorBridge[] | null;
-  readonly standing: readonly Standing[] | null;
-}
+/** A standing grant with whom it decides for by name. */
+type Standing = Grant & { readonly names: readonly string[] };
 
 /** What main.ts's front door holds while the page is open. */
 export interface IntegrationsSurface {
@@ -65,13 +57,14 @@ export interface IntegrationsSurface {
 /** What the page needs from the front door. */
 export interface IntegrationsOptions {
   readonly credentials: Credentials;
-  /** The saved worlds, whose grants the page reads. */
+  /** The saved worlds, whose grants the page reads and whose titles its lines name. */
   readonly entries: readonly SavedWorldEntry[];
-  /** The chosen world's still picture, faded behind the page; null for none. */
-  readonly picture: () => string | null;
+  /** The front door's chosen world, which Connect asks to keep and Models lists the models of; null for none. */
+  readonly chosen?: () => SavedWorldEntry | null;
 }
 
 const SVG = 'http://www.w3.org/2000/svg';
+const TITLE_ID = 'wu-int-title';
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = '', text = ''): HTMLElementTagNameMap[K] {
   const made = document.createElement(tag);
@@ -87,36 +80,43 @@ async function readJson(access: Credentials, path: string, signal: AbortSignal):
   return response.json();
 }
 
+/** A write with the page's own credentials; throws with the problem's code where it is refused. */
+async function writeJson(access: Credentials, path: string, body: unknown, signal: AbortSignal): Promise<unknown> {
+  const response = await fetch(access.baseUrl + path, {
+    method: 'POST', headers: { ...accessHeaders(access), Accept: 'application/json', 'Content-Type': 'application/json' }, credentials: 'same-origin',
+    cache: 'no-store', signal, body: JSON.stringify(body),
+  });
+  const answer = await response.json().catch(() => null) as Json | null;
+  if (!response.ok) throw Object.assign(new Error('write'), { status: response.status, code: answer?.['code'] ?? null });
+  return answer;
+}
+
 /** A version's society, read once for every grant that names it. */
 const societyPath = (worldId: string, versionId: string): string => worldPath(`/world/versions/${encodeURIComponent(versionId)}/society`, worldId);
 
 /**
- * The grants that stand in any of `worldIds`, the AI grants' with whom they decide for by name; and each version's
- * society read, by world and version, for the names the ended line says. Throws where any read does not answer, so a
- * count is never made from part of them.
+ * The grants that stand in any of `worldIds`, each with whom it decides for by name in the society its version holds.
+ * Throws where any read does not answer, so a row is never made from part of them.
  */
-async function readStanding(credentials: Credentials, worldIds: readonly string[], signal: AbortSignal): Promise<{ standing: Standing[]; societies: Map<string, unknown> }> {
+async function readStanding(credentials: Credentials, worldIds: readonly string[], signal: AbortSignal): Promise<Standing[]> {
   const reads = await Promise.all(worldIds.map(worldId => new DoorGrantsClient({ ...credentials, worldId, signal }).read()));
-  const grants: readonly Omit<Standing, 'names'>[] = standingGrants(reads.flatMap((read: ReadonlyMap<string, DoorGrant>) => [...read.values()]));
+  const grants = standingGrants(reads.flatMap((read: ReadonlyMap<string, DoorGrant>) => [...read.values()])) as readonly Grant[];
   const societies = new Map<string, unknown>();
   for (const grant of grants) {
-    if (!grant.ai || grant.versionId === null) continue;
+    if (grant.versionId === null) continue;
     const key = `${grant.worldId}\n${grant.versionId}`;
-    if (!societies.has(key)) societies.set(key, await readJson(credentials, societyPath(grant.worldId, grant.versionId), signal));
+    if (!societies.has(key)) societies.set(key, await readJson(credentials, societyPath(grant.worldId, grant.versionId), signal).catch(() => null));
   }
-  const standing = grants.map(grant => ({
-    ...grant, names: grant.ai && grant.versionId !== null ? namesFor(societies.get(`${grant.worldId}\n${grant.versionId}`), grant) : [],
-  }));
-  return { standing, societies };
+  return grants.map(grant => ({ ...grant, names: grant.versionId === null ? [] : namesFor(societies.get(`${grant.worldId}\n${grant.versionId}`), grant) }));
 }
 
 /** A row's mark: the catalog's line drawing, drawn as shapes, never a picture. */
-function markOf(row: Row): HTMLElement {
+function markOf(mark: readonly Json[]): HTMLElement {
   const frame = element('span', 'wu-int-mark');
   frame.setAttribute('aria-hidden', 'true');
   const svg = document.createElementNS(SVG, 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
-  for (const shape of markShapes(row.mark) as readonly { tag: string; attributes: readonly [string, string][] }[]) {
+  for (const shape of markShapes(mark) as readonly { tag: string; attributes: readonly [string, string][] }[]) {
     const drawn = document.createElementNS(SVG, shape.tag);
     for (const [name, value] of shape.attributes) drawn.setAttribute(name, value);
     svg.append(drawn);
@@ -126,28 +126,31 @@ function markOf(row: Row): HTMLElement {
 }
 
 /**
- * Offers "Integrations" beside "Create a world" in the front door's glass once `offer` (the draft offer the front door
- * read) says whose page this is: the install owner's own page, or a guest's or hosted account's read-only page, where
- * nothing is set up.
+ * Offers "Integrations" beside "Create a world" once `offer` (the drafts offer the front door read) says whose page this
+ * is: the install owner's own (own_key), or a guest's, who sees what this server offers them.
  */
 export function offerIntegrations(row: HTMLElement, offer: Readonly<Record<string, unknown>> | null, options: IntegrationsOptions): HTMLButtonElement | null {
   if (typeof offer?.['own_key'] !== 'boolean' || !row.isConnected || row.querySelector('.ux-entry-integrations')) return null;
   const guest = offer['own_key'] !== true;
+  const notes = (offer['notes'] ?? null) as Json | null;
   const opener = button({ label: INTEGRATION_WORDS.button, variant: 'secondary', size: 'lg', className: 'entry-command ux-entry-integrations' });
-  opener.addEventListener('click', () => { mountIntegrations({ ...options, guest, onClose: () => opener.focus({ preventScroll: true }) }); });
+  opener.addEventListener('click', () => { mountIntegrations({ ...options, guest, notes, onClose: () => opener.focus({ preventScroll: true }) }); });
   row.append(opener);
   return opener;
 }
 
 /**
- * Opens the Integrations page over the front door, a guest's where `guest` (own_key false). `onClose` hears it go (Esc
- * or Back).
+ * Opens the Integrations page over the front door, a guest's where `guest` (own_key false). `notes` is the drafts
+ * offer's web notes, as the front door read it. `onClose` hears it go (Esc or Your worlds).
  */
-export function mountIntegrations({ credentials, entries, picture, onClose, guest = false }: IntegrationsOptions & { readonly onClose: () => void; readonly guest?: boolean }): IntegrationsSurface {
+export function mountIntegrations({ credentials, entries, chosen = () => null, onClose, guest = false, notes = null }: IntegrationsOptions & {
+  readonly onClose: () => void; readonly guest?: boolean; readonly notes?: Json | null;
+}): IntegrationsSurface {
   const lifetime = new AbortController();
   const signal = lifetime.signal;
-  const page = lightPage({ form: 'integrations', picture: picture(), labelledBy: 'wu-int-title' });
-  const host = element('div', 'wu-root wu-integrations-host');
+  const page = createPage({ labelledBy: TITLE_ID });
+  page.form('integrations');
+  const host = element('div', 'wu-root wu-create-host wu-int-host');
   host.append(page.root);
   document.body.append(host);
   mountUiScale(host, signal);
@@ -156,145 +159,114 @@ export function mountIntegrations({ credentials, entries, picture, onClose, gues
     if (closed) return;
     closed = true;
     lifetime.abort();
+    gallery.close();
     host.remove();
     onClose();
   };
+  page.corner.append(quietCommand({ onPress: close, place: 'corner' }));
+  const list = element('ul', 'wu-int-list');
+  list.setAttribute('aria-labelledby', TITLE_ID);
+  page.column.append(createTitle(INTEGRATION_WORDS.title, TITLE_ID), list);
 
-  const title = element('h1', 'wu-light-title', guest ? INTEGRATION_WORDS.guestTitle : INTEGRATION_WORDS.title);
-  title.id = 'wu-int-title';
-  page.head.append(element('p', 'wu-int-over', INTEGRATION_WORDS.overLabel), title, element('p', 'wu-int-sub', guest ? INTEGRATION_WORDS.guestSub : INTEGRATION_WORDS.sub), element('p', 'wu-int-small', INTEGRATION_WORDS.small));
-
-  const rows = (guest ? catalogRows(INTEGRATIONS).map(guestRow) : catalogRows(INTEGRATIONS)) as readonly Row[];
-  let reads: Reads | null = null;
-  let societies = new Map<string, unknown>();
-  /** The row each key and the open lines are for, by its key. */
-  let focusKey = rows[0]?.key ?? '';
-  /** Whom the record shows handed back on each row whose grant Del ended, until the page is opened again. */
-  const ended = new Map<string, readonly string[]>();
-  /** The rows whose end the server refused or did not answer: their grant still stands. */
-  const refused = new Set<string>();
-  let ending = false;
-
-  /** The rows this install shows: all of them until the reads answer, then each one whose state it can give. */
-  const shown = (): readonly Row[] => (reads === null ? rows : rows.filter(row => stateOf(row) !== null));
-  /** A row's state: undefined where its read has not answered, null where the row is left out. */
-  const stateOf = (row: Row): { words: string; on: boolean } | null | undefined => {
-    if (reads === null) return undefined;
-    if (guest) return reads.models === null ? undefined : guestState(row, reads.models);
-    const needed = row.from.provider ? reads.models : row.from.door === 'bridges' ? reads.bridges : reads.standing;
-    if (needed === null) return undefined;
-    return rowState(row, { models: reads.models ?? [], bridges: reads.bridges ?? [], standing: reads.standing ?? [] });
+  const worlds = new Map(entries.map(entry => [entry.worldId, entry.title]));
+  const picked = (): { worldId: string; versionId: string; title: string } | null => {
+    const entry = chosen();
+    return entry ? { worldId: entry.worldId, versionId: entry.authoredVersionId, title: entry.title } : null;
   };
+  // Each read the rows need, null until it answers (a guest's door, GitHub and spending reads are never made).
+  const reads: Json = {
+    catalog: null, models: null, notes, allowance: null, spending: null, keeping: null, bridges: null, standing: null,
+    worlds, chosen: null, ended: new Map<string, string>(), connected: null, guest,
+  };
+  let busy = false;
 
-  const list = element('div', 'wu-int-list');
-  page.lower.append(list);
-  // Enter's key is a press like Del and Esc (fold-in e): the quiet command's look, as a link to the focused row's guide.
-  const guideLink = element('a', 'wu-qcmd wu-int-guide');
-  guideLink.dataset['place'] = 'row';
-  guideLink.target = '_blank';
-  guideLink.rel = 'noopener';
+  // The model picker that exists, opened over this page as a list: nobody to choose for, so nothing is chosen.
+  let societyModels: unknown = null;
+  const gallery = mountModelGallery({
+    root: host, read: () => societyModels as never, still: () => null, portrait: () => null, fromServer: () => guest,
+    about: () => ({ who: called({ name: null, kind: null }), doing: null, current: null }),
+    refusal: () => '', chosen: () => {}, closed: () => list.querySelector<HTMLElement>('.wu-int-act[data-kind="models"]')?.focus({ preventScroll: true }),
+  });
 
-  /** The key row: ↑ ↓ Choose, Enter How to set it up ↗, Del End this grant where one stands, Esc Back. */
-  const drawKeys = (row: Row | undefined): void => {
-    const choose = lightHint('↑ ↓', INTEGRATION_WORDS.choose, 'ArrowUp ArrowDown');
-    const setUp = lightHint('Enter', INTEGRATION_WORDS.setUp, 'Enter');
-    guideLink.replaceChildren(...setUp.childNodes);
-    guideLink.setAttribute('aria-keyshortcuts', 'Enter');
-    if (row) guideLink.href = guideAddress(INTEGRATIONS, row.guide);
-    const keys: HTMLElement[] = [choose, guideLink];
-    if (row && endable(row, reads?.standing ?? []) && !ended.has(row.key)) {
-      keys.push(quietCommand({ key: 'Del', word: INTEGRATION_WORDS.end, shortcut: 'Delete', place: 'row', onPress: () => void endGrant(row) }));
+  const act = async (row: Row): Promise<void> => {
+    const action = row.action;
+    if (!action || busy) return;
+    if (action.kind === 'guide') { window.open(guideAddress(reads.catalog, action['guide']), '_blank', 'noopener'); return; }
+    if (action.kind === 'models') {
+      const entry = chosen();
+      if (!entry) return;
+      busy = true;
+      try {
+        societyModels = await new SocietyModelsClient({ ...credentials, worldId: entry.worldId }).read(entry.authoredVersionId);
+        if (!signal.aborted) gallery.open({ key: entry.entryId, scene: { id: '' } });
+      } catch { /* No models read: the list does not open. */ } finally { busy = false; }
+      return;
     }
-    keys.push(quietCommand({ key: 'Esc', word: INTEGRATION_WORDS.back, shortcut: 'Escape', place: 'row', onPress: close }));
-    page.keys.replaceChildren(...keys);
-  };
-
-  const draw = (): void => {
-    const visible = shown();
-    if (!visible.some(row => row.key === focusKey)) focusKey = visible[0]?.key ?? '';
-    const hadFocus = list.contains(document.activeElement);
-    const groups = INTEGRATIONS.groups.map((group: { key: string; label: string }) => {
-      const own = visible.filter(row => row.group === group.key);
-      if (!own.length) return null;
-      const label = element('p', 'wu-int-label', group.label);
-      label.id = `wu-int-group-${group.key}`;
-      const section = element('section', 'wu-int-group');
-      section.setAttribute('aria-labelledby', label.id);
-      section.append(label, ...own.map(drawRow));
-      return section;
-    }).filter((section: HTMLElement | null): section is HTMLElement => section !== null);
-    list.replaceChildren(...groups);
-    drawKeys(visible.find(row => row.key === focusKey));
-    if (hadFocus) list.querySelector<HTMLElement>('.wu-int-row[data-focus="true"]')?.focus({ preventScroll: true });
+    busy = true;
+    try {
+      if (action.kind === 'end') {
+        try {
+          await new DoorGrantsClient({ ...credentials, worldId: action['worldId'], signal }).revoke(action['grantId']);
+          reads['ended'].set(action['grantId'], 'ended');
+        } catch (error) {
+          if (signal.aborted) return;
+          reads['ended'].set(action['grantId'], alreadyEnded((error as Json | null)?.['code']) ? 'ended' : 'refused');
+        }
+      } else if (action.kind === 'connect') {
+        const world = picked();
+        if (!world) return;
+        try {
+          await writeJson(credentials, worldPath('/world/github-projects', world.worldId), { version_id: world.versionId, readable: false }, signal);
+          reads['connected'] = world.title;
+        } catch {
+          if (signal.aborted) return;
+          reads['connected'] = 'refused';
+        }
+      }
+    } finally {
+      busy = false;
+    }
+    if (!signal.aborted) draw();
   };
 
   const drawRow = (row: Row): HTMLElement => {
-    const focused = row.key === focusKey;
-    const item = element('article', 'wu-int-row');
+    const item = element('li', 'wu-int-row');
     item.dataset['key'] = row.key;
-    item.dataset['focus'] = String(focused);
-    item.tabIndex = focused ? 0 : -1;
-    item.setAttribute('aria-labelledby', `wu-int-name-${row.key}`);
-    const name = element('p', 'wu-int-name', row.name);
-    name.id = `wu-int-name-${row.key}`;
-    const words = element('div', 'wu-int-words');
-    words.append(name, element('p', 'wu-int-line', row.line));
-    const state = element('p', 'wu-int-state');
-    const handedBack = ended.get(row.key);
-    const now = handedBack === undefined ? stateOf(row) : { words: endedState(row), on: false };
-    if (now) {
-      state.dataset['on'] = String(now.on);
-      if (now.on) state.append(element('span', 'wu-int-dot'));
-      state.append(now.words);
-    }
+    const words = element('span', 'wu-int-words');
+    words.append(element('span', 'wu-int-name', row.name), element('span', 'wu-int-line', row.line));
+    const state = element('span', 'wu-int-state');
     state.setAttribute('role', 'status');
-    item.append(markOf(row), words, state);
-    if (focused) {
-      const open = element('dl', 'wu-int-open');
-      for (const [label, value] of [[INTEGRATION_WORDS.connects, row.connects], [INTEGRATION_WORDS.reads, row.reads], [INTEGRATION_WORDS.goesTo, row.goes_to]] as const) {
-        open.append(element('dt', '', label), element('dd', '', value));
-      }
-      item.append(open);
-      const faint = handedBack !== undefined ? handedBackLine(row, handedBack)
-        : refused.has(row.key) ? refusedLine(row) : severalLine(row, reads?.standing ?? []);
-      if (faint) item.append(element('p', 'wu-int-faint', faint));
+    if (row.state) {
+      state.dataset['kind'] = row.state.kind;
+      const dot = element('i');
+      dot.setAttribute('aria-hidden', 'true');
+      state.append(dot, row.state.words);
     }
-    item.addEventListener('click', () => { if (focusKey !== row.key) { focusKey = row.key; draw(); } item.ownerDocument.querySelector<HTMLElement>(`.wu-int-row[data-key="${row.key}"]`)?.focus({ preventScroll: true }); });
+    let control: HTMLElement;
+    if (row.action) {
+      const pressed = element('button', 'wu-int-act', row.action.word);
+      pressed.type = 'button';
+      pressed.dataset['kind'] = row.action.kind;
+      pressed.setAttribute('aria-describedby', `wu-int-name-${row.key.replace(/[^a-z0-9-]/giu, '-')}`);
+      pressed.addEventListener('click', () => void act(row));
+      control = pressed;
+    } else control = element('span', 'wu-int-act wu-int-none');
+    words.firstElementChild!.id = `wu-int-name-${row.key.replace(/[^a-z0-9-]/giu, '-')}`;
+    item.append(markOf(row.mark), words, state, control);
     return item;
   };
 
-  /**
-   * Ends the row's one standing grant through the door's revoke, then names whom the record shows handed back. A
-   * refused or unanswered end leaves the grant standing and says so; one refused because it had already ended says
-   * it ended.
-   */
-  const endGrant = async (row: Row): Promise<void> => {
-    const grant = endable(row, reads?.standing ?? []) as Standing | null;
-    if (!grant || ending || ended.has(row.key)) return;
-    ending = true;
-    try {
-      await new DoorGrantsClient({ ...credentials, worldId: grant.worldId, signal }).revoke(grant.grantId);
-      let names: readonly string[] = [];
-      if (grant.versionId !== null && grant.things.length) {
-        const history = await readJson(credentials, worldPath(`/world/versions/${encodeURIComponent(grant.versionId)}/society/models/history`, grant.worldId), signal).catch(() => null);
-        names = namesOf(societies.get(`${grant.worldId}\n${grant.versionId}`), releasedSubjects(history, grant.things));
-      }
-      if (signal.aborted) return;
-      refused.delete(row.key);
-      ended.set(row.key, names);
-    } catch (error) {
-      if (signal.aborted) return;
-      const code = (error as { readonly code?: unknown } | null)?.code;
-      if (alreadyEnded(code)) { refused.delete(row.key); ended.set(row.key, []); } else refused.add(row.key);
-    } finally {
-      ending = false;
-    }
-    draw();
+  const draw = (): void => {
+    reads['chosen'] = picked();
+    const hadFocus = list.contains(document.activeElement) ? (document.activeElement as HTMLElement).closest<HTMLElement>('.wu-int-row')?.dataset['key'] ?? null : null;
+    list.replaceChildren(...(integrationRows(reads) as readonly Row[]).map(drawRow));
+    if (hadFocus) list.querySelector<HTMLElement>(`.wu-int-row[data-key="${CSS.escape(hadFocus)}"] .wu-int-act`)?.focus({ preventScroll: true });
   };
 
-  // Keys: ↑ ↓ choose a row, Enter opens its guide, Del ends its one grant, Esc goes back; Tab stays on this page, and
-  // nothing reaches the front door under it.
-  page.root.addEventListener('keydown', (event) => {
+  // Keys: the model list over the page hears its own first; Tab stays on this page; Esc goes back to Your worlds; nothing
+  // reaches the front door under it.
+  host.addEventListener('keydown', (event) => {
+    if (gallery.isOpen) { if (gallery.key(event)) event.stopPropagation(); return; }
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (event.code === 'Tab') {
       const next = wrapStop(tabStops(page.root), document.activeElement, event.shiftKey);
@@ -302,44 +274,30 @@ export function mountIntegrations({ credentials, entries, picture, onClose, gues
       if (next !== null) { event.preventDefault(); next.focus(); }
       return;
     }
-    const visible = shown();
-    const at = visible.findIndex(row => row.key === focusKey);
-    const row = visible[at];
-    if (event.key === 'Escape') close();
-    else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-      focusKey = visible[stepRow(at, visible.length, event.key)]?.key ?? focusKey;
-      draw();
-      list.querySelector<HTMLElement>('.wu-int-row[data-focus="true"]')?.focus({ preventScroll: true });
-    } else if (event.key === 'Enter' && row && !(document.activeElement instanceof HTMLButtonElement || document.activeElement instanceof HTMLAnchorElement)) {
-      window.open(guideAddress(INTEGRATIONS, row.guide), '_blank', 'noopener');
-    } else if ((event.key === 'Delete' || event.key === 'Backspace') && row) void endGrant(row);
-    else { event.stopPropagation(); return; }
-    event.preventDefault();
+    if (event.key === 'Escape') { event.preventDefault(); close(); }
     event.stopPropagation();
   });
   page.root.tabIndex = -1;
-
   draw();
   page.root.focus({ preventScroll: true });
-  list.querySelector<HTMLElement>('.wu-int-row[data-focus="true"]')?.focus({ preventScroll: true });
 
-  const worldIds = [...new Set(entries.map(entry => entry.worldId))];
-  // A guest's page reads the models alone: it makes no door read, so it lists no grant and settles none.
-  void Promise.allSettled([
-    readJson(credentials, '/models', signal),
-    guest ? Promise.resolve(new Map<string, DoorBridge>()) : new DoorBridgesClient({ ...credentials, signal }).read(),
-    guest ? Promise.resolve({ standing: [], societies: new Map<string, unknown>() }) : readStanding(credentials, worldIds, signal),
-  ]).then(([models, bridges, standing]) => {
-    if (signal.aborted) return;
-    const served = models.status === 'fulfilled' ? (models.value as { models?: unknown }).models : null;
-    if (standing.status === 'fulfilled') societies = standing.value.societies;
-    reads = {
-      models: Array.isArray(served) ? served : null,
-      bridges: bridges.status === 'fulfilled' ? [...bridges.value.values()] : null,
-      standing: standing.status === 'fulfilled' ? standing.value.standing : null,
-    };
-    draw();
-  });
+  const settle = (key: string, read: Promise<unknown>): void => {
+    void read.then((value) => { reads[key] = value; }, () => { reads[key] = null; }).finally(() => { if (!signal.aborted) draw(); });
+  };
+  settle('catalog', readJson(credentials, '/integrations', signal));
+  settle('models', readJson(credentials, '/models', signal).then(value => {
+    const served = (value as { models?: unknown } | null)?.models;
+    if (!Array.isArray(served)) throw new Error('models');
+    return served;
+  }));
+  if (guest) {
+    settle('allowance', readJson(credentials, '/auth/session', signal).then(value => (value as Json | null)?.['allowance'] ?? null));
+  } else {
+    settle('spending', readJson(credentials, '/spending', signal).then(value => (value as Json | null)?.['providers'] ?? null));
+    settle('keeping', readJson(credentials, '/world/github-projects/kept', signal));
+    settle('bridges', new DoorBridgesClient({ ...credentials, signal }).read().then((read: ReadonlyMap<string, DoorBridge>) => [...read.values()]));
+    settle('standing', readStanding(credentials, [...new Set(entries.map(entry => entry.worldId))], signal));
+  }
 
   return {
     get isConnected() { return page.root.isConnected && !closed; },

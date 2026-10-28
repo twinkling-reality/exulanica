@@ -1,79 +1,13 @@
-/* The light plane (DESIGN's frames 20 to 22, rulings N1 to N20; L7: a one-lane part in its world-ui-<area> file): the
-   light page the Integrations page stands on (integrations.ts, world-ui-integrations.css), its quiet command and key
-   row, and the in-world made note. Create a world itself is the composer page (create-world.css). Built from
-   world-ui.css's --u and tokens and front-door.css's --nav-shape and --nav-edge (the page carries .ux-noveuis); the
-   light plane's own inks live here (N16). Sizes are CSS pixels at 1920 by 1080 multiplied by --ui-scale; text under
-   16 px keeps a 12 px floor, a key cap's glyph 9 px (L5). The light plane ignores the system theme, as the in-world
-   surfaces do (N16). */
+/* The quiet command (5.11), drawn on the dark pages (Create's and the Integrations page's corner, which
+   create-world.css finishes), and the in-world made note (frame 22, N13). Built from world-ui.css's --u and tokens.
+   Sizes are CSS pixels at 1920 by 1080 multiplied by --ui-scale; text under 16 px keeps a 12 px floor, a key cap's
+   glyph 9 px (L5). */
 
-.wu-light {
-  --l-ink: #121715;
-  --l-muted: #344750;
-  --l-faint: #5b6b72;
-  --l-sub: #24333a;
-  --refused-ink-light: #8f2f25;
-  --l-focus: var(--accent);
-  --l-rim: linear-gradient(110deg, rgb(100 150 166 / 36%), rgb(255 255 255 / 50%) 57%, rgb(27 48 52 / 20%));
-  position: absolute; inset: 0; overflow: hidden; isolation: isolate; background: #ffffff; color: var(--l-ink); font-family: var(--font-sans);
-  text-shadow: none; pointer-events: auto;
-  /* On the light pages' frame (world-page-frame.css), whose scrolling column's track takes the page's quiet ink. */
-  --hr-quiet: var(--l-muted);
-}
-.wu-light :focus-visible { outline: 1px solid var(--l-focus); outline-offset: 2px; }
-/* The page's own container takes focus for its keys and status: no ring round the whole page; every control inside
-   keeps its own (C5). */
-.wu-light:focus { outline: none; }
-
-/* The chosen world's still picture (N18) and its veils. */
-.wu-light-world { position: absolute; inset: 0; z-index: -3; background: #ffffff center / cover no-repeat; }
-.wu-light-veil { position: absolute; inset: 0; z-index: -2; pointer-events: none;
-  background: linear-gradient(90deg, rgba(255, 255, 255, .94) 0%, rgba(255, 255, 255, .86) 38%, rgba(255, 255, 255, .40) 60%, rgba(255, 255, 255, 0) 78%),
-    linear-gradient(0deg, rgba(255, 255, 255, .92) 0%, rgba(255, 255, 255, .55) 22%, rgba(255, 255, 255, 0) 40%); }
-
-/* The wordmark, as the front door's .ux-entry-brand. */
-.wu-light-wordmark { position: absolute; left: calc(58 * var(--u)); top: calc(34 * var(--u)); margin: 0; font: 400 calc(28 * var(--u))/1.4 var(--font-sans); letter-spacing: -.035em; color: var(--l-ink); }
-
-/* The stepped surface: front-door.css's .ux-entry-hero::before, unchanged, 46u above and left of the head in the
-   column, so it scrolls with the parts it holds. */
-.wu-light-surface { position: absolute; z-index: -1; left: 0; top: calc(var(--light-top) - 46 * var(--u)); width: calc(930 * var(--u)); height: calc(470 * var(--u)); pointer-events: none;
-  background: radial-gradient(ellipse at 12% 75%, rgb(125 166 179 / 38%), transparent 80%), linear-gradient(105deg, rgb(168 203 210 / 64%), rgb(232 240 237 / 14%) 94%);
-  -webkit-mask: var(--nav-shape) center / 100% 100% no-repeat; mask: var(--nav-shape) center / 100% 100% no-repeat; }
-
-/* Where the parts sit: one column in reading order in the frame's body, scrolling where it is longer than the window.
-   The column reaches 46u left of the frame's side for the stepped surface; its first line stands lower on a tall
-   window. */
-.wu-light-column { grid-area: 2 / 1; z-index: 0; margin-left: calc(-46 * var(--u)); }
-.wu-light-body { position: relative; flex: 1 1 auto; overflow-x: hidden; display: flex; flex-direction: column; align-items: flex-start;
-  --light-top: calc(196 * var(--u)); padding-top: var(--light-top); padding-left: calc(46 * var(--u)); padding-bottom: calc(40 * var(--u)); }
-.wu-light-head { position: relative; flex: none; width: min(calc(840 * var(--u)), 100%); }
-.wu-light-lower { flex: none; align-self: stretch; margin-top: auto; }
-/* The key row is the frame's own row under the body: the quiet command at its start, the keys at its end. */
-.wu-light-quiet { grid-area: 3 / 1; align-self: center; justify-self: start; }
-.wu-light-keys { grid-area: 3 / 1; align-self: center; justify-self: end; }
-@media (max-height: 899px) {
-  .wu-light-body { --light-top: calc(150 * var(--u)); }
-}
-@media (max-height: 699px) {
-  .wu-light-body { --light-top: calc(110 * var(--u)); padding-bottom: calc(24 * var(--u)); }
-}
-
-.wu-light-title { margin: 0; font: 200 calc(60 * var(--u))/1.1 var(--font-sans); letter-spacing: -.025em; color: var(--l-ink); }
-.wu-light-title:focus { outline: none; }
-.wu-light-label { display: block; margin: 0 0 calc(12 * var(--u)); font: 500 max(12px, calc(14 * var(--u)))/1 var(--font-sans); letter-spacing: .02em; color: var(--l-muted); }
-.wu-light-line { margin: calc(12 * var(--u)) 0 0; max-width: calc(700 * var(--u)); font: 400 max(12px, calc(15 * var(--u)))/1.5 var(--font-sans); color: var(--l-muted); text-wrap: pretty; }
-.wu-light-line[data-tone="refused"] { color: var(--refused-ink-light); }
-
-/* ---------- The quiet command (5.11) and the key row (N5) ---------- */
+/* ---------- The quiet command (5.11) ---------- */
 .wu-qcmd { position: relative; display: inline-flex; align-items: center; gap: calc(10 * var(--u)); min-height: 44px; margin: 0; padding: 0 calc(14 * var(--u)); border: 0; background: none; cursor: pointer;
-  font: 400 max(12px, calc(13 * var(--u)))/1 var(--font-sans); color: var(--l-ink); white-space: nowrap; transition: background var(--t-hover) var(--ease); border-radius: calc(9 * var(--u)); }
-.wu-qcmd::after { content: ''; position: absolute; inset: 6px 0; border-radius: calc(9 * var(--u)); padding: 1px; pointer-events: none; background: var(--l-rim);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+  font: 400 max(12px, calc(13 * var(--u)))/1 var(--font-sans); color: inherit; white-space: nowrap; transition: background var(--t-hover) var(--ease); border-radius: calc(9 * var(--u)); }
 .wu-qcmd:hover { background: rgb(255 255 255 / 18%); }
-.wu-qcmd-key { font: 400 max(9px, calc(10 * var(--u)))/1 var(--font-mono); color: var(--l-muted); border: 1px solid rgba(18, 23, 21, .35); border-radius: calc(5 * var(--u)); padding: calc(4 * var(--u)) calc(5 * var(--u)); }
-/* A key in the row says what it does; it is not a button. */
-.wu-light-hint { cursor: default; }
-.wu-light-hint::after { content: none; }
-.wu-light-hint:hover { background: none; }
+.wu-qcmd-key { font: 400 max(9px, calc(10 * var(--u)))/1 var(--font-mono); color: inherit; border: 1px solid currentColor; border-radius: calc(5 * var(--u)); padding: calc(4 * var(--u)) calc(5 * var(--u)); }
 
 /* ---------- The made note (frame 22, N13): glass in the world, centred at bottom 96 (L1), one plain line ---------- */
 .wu-made-note { position: absolute; left: 50%; bottom: calc(96 * var(--u)); transform: translateX(-50%);
@@ -86,15 +20,6 @@
   .wu-made-note, .wu-made-note[data-leaving="true"] { animation-duration: 120ms; }
   .wu-made-note { animation-name: wu-fade; }
 }
-/* Reduced transparency makes the plane opaque white (N16); the note's glass is the core's opaque one. */
-@media (prefers-reduced-transparency: reduce) {
-  .wu-light-veil { background: #ffffff; }
-}
-/* More contrast makes the faint ink #3d4a50 (N16). */
-@media (prefers-contrast: more) {
-  .wu-light { --l-faint: #3d4a50; }
-}
 @media (forced-colors: active) {
-  .wu-light-surface { background: Canvas; mask: none; -webkit-mask: none; border: 1px solid CanvasText; }
   .wu-qcmd { border: 1px solid ButtonText; }
 }

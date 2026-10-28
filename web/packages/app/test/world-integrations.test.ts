@@ -1,47 +1,63 @@
 // @vitest-environment happy-dom
-// The Integrations page (tools/previews/world-workspace/integrations.ts, DESIGN's frames r30-integrations-a and -b)
-// over stand-in answers of the server's own reads: GET /models, GET /door/bridges, GET /door/grants for each saved
-// world, a version's society for whom a grant decides for, and its model history after Del ends a grant through
-// POST /door/grants/{id}/revoke, the one thing this page writes; and a guest's page, which reads the models alone.
+// The Integrations page (tools/previews/world-workspace/integrations.ts, ROOT's mock of 27 October) over stand-in
+// answers of the server's own reads: the served catalog (GET /integrations), GET /models, the owner's GET /spending,
+// GET /world/github-projects/kept, GET /door/bridges and GET /door/grants for each saved world with a version's society
+// for whom a grant decides for; and a guest's page, which reads the host's figures from GET /auth/session's allowance.
+// The page writes two things: a grant's end through POST /door/grants/{id}/revoke, and Connect's project request.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../tools/previews/world-workspace/front-door.ts', () => ({
-  chosenWorldPicture: () => null,
   openMadeWorld: async () => {},
 }));
 
-interface Options { credentials: unknown; entries: readonly { worldId: string }[]; picture: () => string | null }
+interface Entry { worldId: string; entryId: string; title: string; authoredVersionId: string }
+interface Options { credentials: unknown; entries: readonly Entry[]; chosen?: () => Entry | null }
 interface IntegrationsPage {
   offerIntegrations(row: HTMLElement, offer: Record<string, unknown> | null, options: Options): HTMLButtonElement | null;
-  mountIntegrations(options: Options & { onClose: () => void }): { readonly isConnected: boolean; remove(): void };
+  mountIntegrations(options: Options & { onClose: () => void; guest?: boolean; notes?: Record<string, unknown> | null }): { readonly isConnected: boolean; remove(): void };
 }
 // Joined paths: the test runner still finds the files, and the type checker leaves the preview modules out.
 const page = async (): Promise<IntegrationsPage> => import('../../../../tools/previews/world-workspace/' + 'integrations.ts') as Promise<IntegrationsPage>;
 
 const CREDENTIALS = { baseUrl: 'https://host.test', token: 'install-token' };
-const ENTRIES = [{ worldId: 'world:a' }, { worldId: 'world:b' }, { worldId: 'world:a' }];
-
+const ENTRIES: readonly Entry[] = [
+  { worldId: 'world:a', entryId: 'e-a', title: 'Fishing village', authoredVersionId: 'v-1' },
+  { worldId: 'world:b', entryId: 'e-b', title: 'Night market', authoredVersionId: 'v-2' },
+];
+const NOTES = { offered: true, code: null, searches_at_most: 3, maximum_usd: '0.02000000' };
+const mark = [{ circle: { cx: 12, cy: 12, r: 3 } }];
+const CATALOG = {
+  profile: 'exulanica.integrations/v1', version: 1, guides: 'https://example.test/blob/main/',
+  entries: [
+    { key: 'nebius_token_factory', kind: 'provider', local: false, name: 'Nebius Token Factory', line: 'Open models answer for your people.', mark, guide: { document: 'docs/development-setup.md', heading: 'Your own key' } },
+    { key: 'ollama_local', kind: 'provider', local: true, name: 'Ollama', line: 'Runs open models on this computer.', mark, guide: { document: 'docs/development-setup.md', heading: 'A runner' } },
+    { key: 'tavily_search', kind: 'web', name: 'Tavily', line: 'Searches the web before something is made.', mark },
+    { key: 'github', kind: 'github', name: 'GitHub', line: 'Keeps a world’s versions in a repository.', mark },
+    { key: 'door', kind: 'door', name: 'Agents and games', line: 'Act for people you grant them, through MCP.', mark },
+    { key: 'door.agent', kind: 'grant', ai: true, name: 'AI agents', line: 'Decide for people you grant them, through MCP.', mark: [{ path: { d: 'M1 1h2' } }] },
+    { key: 'door.game', kind: 'grant', ai: false, name: 'Games', line: 'Play people you grant them, or bring their own.', mark },
+  ],
+};
 const model = (provider: string, name: string, refusal: string | null = null) => ({ provider, model_id: name, name, runtime: { provider_refusal: refusal } });
-const KEYED = [model('nebius_token_factory', 'Nemotron 3 Super'), model('ollama_local', 'Qwen3 4B Instruct')];
-const AGENTS = { bridge: 'agents', label: 'Outside AI agents', game: 'AI agents', run_by: 'owner', ai: true };
+const MODELS = [model('nebius_token_factory', 'Nemotron 3 Super'), model('ollama_local', 'Qwen3 4B', 'provider_not_running')];
+const AGENTS = { bridge: 'agents', label: 'AI agents', game: 'AI agents', run_by: 'owner', ai: true };
 const grant = (id: string, world: string, things: string[] = [], extra: Record<string, unknown> = {}) => ({
-  grant_id: id, world_id: world, bridge: 'agents', grant_seq: 1, state: 'active', ended: null, ai: true, declared: null,
+  grant_id: id, world_id: world, bridge: 'agents', grant_seq: 1, state: 'active', ended: null, ai: true,
+  declared: { name: 'Claude Code', maker: 'Anthropic', mind: null },
   scope: { things, version_id: 'v-1', visitors_maximum: 1 }, issued_at: '2026-10-25T10:00:00Z', expires_at: '2026-10-25T12:00:00Z', ...extra,
 });
 const SOCIETY = { state: { inhabitants: [
-  { id: 'p-1', display_name: 'Uma Sorrel', came_by: 'drawn' },
-  { id: 'p-2', display_name: 'Esme Oak', came_by: 'drawn' },
+  { id: 'p-1', display_name: 'Ada', came_by: 'drawn' },
+  { id: 'p-2', display_name: 'Theo', came_by: 'drawn' },
 ] } };
 
 interface Served {
-  models?: unknown[] | null;
-  bridges?: unknown[];
-  grants?: Record<string, unknown[] | null>;
-  history?: unknown;
-  /** How the revoke answers: as the server does, or refused with a status and code. */
+  catalog?: unknown;
+  models?: unknown[];
+  grants?: Record<string, unknown[]>;
   revoke?: { status: number; code: string };
 }
-interface Call { readonly method: string; readonly path: string }
+interface Call { readonly method: string; readonly path: string; readonly body: unknown }
 
 /** Answers the page's reads as the server does, and records each request. */
 function serve(served: Served): Call[] {
@@ -50,46 +66,43 @@ function serve(served: Served): Call[] {
   vi.stubGlobal('fetch', vi.fn(async (address: string, init?: RequestInit) => {
     const url = new URL(address);
     const method = init?.method ?? 'GET';
-    calls.push({ method, path: `${url.pathname}${url.search}` });
+    calls.push({ method, path: `${url.pathname}${url.search}`, body: init?.body ? JSON.parse(String(init.body)) : null });
     const answer = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-    if (url.pathname === '/models') return served.models === null ? answer(503, { code: 'unavailable' }) : answer(200, { models: served.models ?? KEYED });
-    if (url.pathname === '/door/bridges') return answer(200, { bridges: served.bridges ?? [AGENTS] });
-    if (url.pathname === '/door/grants') {
-      const listed = grants[url.searchParams.get('world_id') ?? ''];
-      return listed === null ? answer(503, { code: 'unavailable' }) : answer(200, { grants: listed ?? [], next: null });
-    }
+    if (url.pathname === '/integrations') return answer(200, served.catalog ?? CATALOG);
+    if (url.pathname === '/models') return answer(200, { models: served.models ?? MODELS });
+    if (url.pathname === '/spending') return answer(200, { providers: [{ provider: 'nebius_token_factory', available_usd: '3.20000000', available_calls: 400 }] });
+    if (url.pathname === '/auth/session') return answer(200, { kind: 'guest', allowance: [
+      { provider: 'nebius_token_factory', state: 'active', available_usd: '0.48000000', available_calls: 20 },
+      { provider: 'tavily_search', state: 'active', available_usd: '0.00000000', available_calls: 15 },
+    ] });
+    if (url.pathname === '/world/github-projects/kept') return answer(200, { profile: 'exulanica.world-github-keeping/v1', kept_here: true, on_github: 0 });
+    if (url.pathname === '/world/github-projects' && method === 'POST') return answer(202, { request_id: 'q1' });
+    if (url.pathname === '/door/bridges') return answer(200, { bridges: [AGENTS] });
+    if (url.pathname === '/door/grants') return answer(200, { grants: grants[url.searchParams.get('world_id') ?? ''] ?? [], next: null });
     const revoke = /^\/door\/grants\/([^/]+)\/revoke$/u.exec(url.pathname);
     if (revoke && method === 'POST') {
       if (served.revoke) return answer(served.revoke.status, { code: served.revoke.code, detail: 'refused' });
-      const one = Object.values(grants).flatMap(list => list ?? []).find(row => (row as { grant_id: string }).grant_id === decodeURIComponent(revoke[1]!));
+      const one = Object.values(grants).flat().find(row => (row as { grant_id: string }).grant_id === decodeURIComponent(revoke[1]!));
       return answer(200, { grant: { ...(one as object), state: 'revoked', ended: 'revoked' } });
     }
     if (/^\/world\/versions\/v-1\/society$/u.test(url.pathname)) return answer(200, SOCIETY);
-    if (/^\/world\/versions\/v-1\/society\/models\/history$/u.test(url.pathname)) return answer(200, served.history ?? { choices: [] });
     return answer(404, { code: 'unknown_reference' });
   }));
   return calls;
 }
 
-const settle = async (): Promise<void> => { for (let i = 0; i < 12; i++) await new Promise((resolve) => setTimeout(resolve, 0)); };
-const key = (target: Element, name: string): KeyboardEvent => {
-  const event = new KeyboardEvent('keydown', { key: name, code: name, bubbles: true, cancelable: true });
-  target.dispatchEvent(event);
-  return event;
-};
+const settle = async (): Promise<void> => { for (let i = 0; i < 16; i++) await new Promise((resolve) => setTimeout(resolve, 0)); };
 const rows = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('.wu-int-row')];
-const stateOf = (name: string): { words: string; on: boolean } => {
-  const row = rows().find(one => one.querySelector('.wu-int-name')?.textContent === name)!;
-  const state = row.querySelector<HTMLElement>('.wu-int-state')!;
-  return { words: state.textContent ?? '', on: state.querySelector('.wu-int-dot') !== null };
-};
-const focused = (): HTMLElement => document.querySelector<HTMLElement>('.wu-int-row[data-focus="true"]')!;
-const keyWords = (): string[] => [...document.querySelectorAll('.wu-light-keys .wu-qcmd-word')].map(word => word.textContent ?? '');
-const faint = (): string | null => focused().querySelector('.wu-int-faint')?.textContent ?? null;
+const shown = (): string[][] => rows().map(row => [
+  row.querySelector('.wu-int-name')?.textContent ?? '', row.querySelector('.wu-int-line')?.textContent ?? '',
+  row.querySelector('.wu-int-state')?.textContent ?? '', row.querySelector<HTMLElement>('.wu-int-state')?.dataset['kind'] ?? '',
+  row.querySelector('button.wu-int-act')?.textContent ?? '',
+]);
+const actOn = (name: string): HTMLButtonElement => rows().find(row => row.querySelector('.wu-int-name')?.textContent === name)!.querySelector<HTMLButtonElement>('button.wu-int-act')!;
 
-async function open(served: Served, onClose = () => {}): Promise<Call[]> {
+async function open(served: Served, more: { guest?: boolean } = {}, onClose = () => {}): Promise<Call[]> {
   const calls = serve(served);
-  (await page()).mountIntegrations({ credentials: CREDENTIALS, entries: ENTRIES, picture: () => null, onClose });
+  (await page()).mountIntegrations({ credentials: CREDENTIALS, entries: ENTRIES, chosen: () => ENTRIES[0]!, onClose, notes: NOTES, ...more });
   await settle();
   return calls;
 }
@@ -97,228 +110,84 @@ async function open(served: Served, onClose = () => {}): Promise<Call[]> {
 afterEach(() => { vi.unstubAllGlobals(); document.body.replaceChildren(); });
 
 describe('the Integrations button on the front door', () => {
-  it('stands beside Create a world once the offer says whose page it is', async () => {
-    const { offerIntegrations } = await page();
-    const row = document.createElement('div'); row.className = 'your-worlds-create-row'; document.body.append(row);
-    const options = { credentials: CREDENTIALS, entries: ENTRIES, picture: () => null };
-    expect(offerIntegrations(row, null, options)).toBeNull();
-    expect(offerIntegrations(row, {}, options)).toBeNull();
-    expect(row.children).toHaveLength(0);
-    const opener = offerIntegrations(row, { own_key: true }, options)!;
-    expect(opener.textContent).toBe('Integrations');
-    expect(row.querySelectorAll('.ux-entry-integrations')).toHaveLength(1);
-    // Offered once, however often the offer is read.
-    expect(offerIntegrations(row, { own_key: true }, options)).toBeNull();
-  });
-
-  it('opens the page, and Esc gives the focus back to the button', async () => {
+  it('stands beside Create a world once the offer says whose page it is, and opens the page; Esc gives the focus back', async () => {
     serve({});
     const { offerIntegrations } = await page();
     const row = document.createElement('div'); document.body.append(row);
-    const opener = offerIntegrations(row, { own_key: true }, { credentials: CREDENTIALS, entries: ENTRIES, picture: () => null })!;
+    const options = { credentials: CREDENTIALS, entries: ENTRIES, chosen: () => ENTRIES[0]! };
+    expect(offerIntegrations(row, null, options)).toBeNull();
+    expect(offerIntegrations(row, {}, options)).toBeNull();
+    const opener = offerIntegrations(row, { own_key: true, notes: NOTES }, options)!;
+    expect(opener.textContent).toBe('Integrations');
+    expect(offerIntegrations(row, { own_key: true }, options)).toBeNull();
     opener.click();
     await settle();
-    expect(document.querySelector('.wu-light[data-form="integrations"]')).not.toBeNull();
-    expect(document.getElementById('wu-int-title')?.textContent).toBe('What your worlds connect to');
-    key(focused(), 'Escape');
-    expect(document.querySelector('.wu-integrations-host')).toBeNull();
+    expect(document.querySelector('.wu-create[data-form="integrations"]')).not.toBeNull();
+    expect(document.getElementById('wu-int-title')?.textContent).toBe('Integrations');
+    expect(document.querySelector('.wu-create-mark')?.textContent).toBe('exulanica');
+    expect(document.querySelector('.wu-create-corner .wu-qcmd-word')?.textContent).toBe('Your worlds');
+    document.querySelector<HTMLElement>('.wu-int-host')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }));
+    expect(document.querySelector('.wu-int-host')).toBeNull();
     expect(document.activeElement).toBe(opener);
   });
 });
 
 describe('the Integrations page', () => {
-  it('says what a keyed install with its runner on serves, from the server\'s own reads, each world\'s grants read once', async () => {
-    const calls = await open({});
-    expect(rows().map(row => row.querySelector('.wu-int-name')?.textContent)).toEqual(['Nebius Token Factory', 'A model on this computer', 'A game', 'An AI agent you build']);
-    expect(stateOf('Nebius Token Factory')).toEqual({ words: 'Your key is set', on: true });
-    expect(stateOf('A model on this computer')).toEqual({ words: 'Running · Qwen3 4B Instruct', on: true });
-    expect(stateOf('A game')).toEqual({ words: 'None admitted on this install', on: false });
-    expect(stateOf('An AI agent you build')).toEqual({ words: 'No grant yet', on: false });
-    expect(calls.filter(call => call.path.startsWith('/door/grants')).map(call => call.path)).toEqual(['/door/grants?world_id=world%3Aa', '/door/grants?world_id=world%3Ab']);
-    // Nothing is written by opening it, and no society is read where no AI grant stands.
+  it('draws each row from data: the served catalog names it, describes it and draws its mark; the live reads say its state', async () => {
+    const calls = await open({ grants: { 'world:a': [grant('g1', 'world:a', ['p-1', 'p-2'])] } });
+    expect(shown()).toEqual([
+      ['Nebius Token Factory', 'Open models answer for your people.', 'Key set · $3.20 left', 'on', 'Models'],
+      ['Ollama', 'Runs open models on this computer.', 'Not running', 'off', 'Guide'],
+      ['Tavily', 'Searches the web before something is made.', 'Up to 3 searches a making', 'on', ''],
+      ['GitHub', 'Keeps a world’s versions in a repository.', 'Not connected', 'off', 'Connect'],
+      ['Claude Code', 'Decides for Ada and Theo in Fishing village.', 'Deciding', 'on', 'End'],
+    ]);
+    // A grant's mark is the catalog's for its kind, drawn as plain shapes.
+    expect(rows()[4]!.querySelector('.wu-int-mark svg path')?.getAttribute('d')).toBe('M1 1h2');
+    // Nothing is written by opening it; the owner's figures are their own spending, never a guest's session read.
     expect(calls.filter(call => call.method !== 'GET')).toEqual([]);
-    expect(calls.some(call => call.path.includes('/society'))).toBe(false);
-    // The first row is focused and opened to its three lines.
-    expect(focused().querySelector('.wu-int-name')?.textContent).toBe('Nebius Token Factory');
-    expect([...focused().querySelectorAll('dt')].map(term => term.textContent)).toEqual(['Connects', 'Reads', 'Goes to']);
-    expect(focused().querySelector('dd')?.textContent).toBe('The open models offered with your Nebius key, each from its maker, priced per million tokens.');
-    expect(rows().filter(row => row.querySelector('dl')).length).toBe(1);
-    // Marks are line drawings: shapes in a 24 by 24 box, never a picture.
-    for (const row of rows()) {
-      expect(row.querySelector('.wu-int-mark svg')?.getAttribute('viewBox')).toBe('0 0 24 24');
-      expect(row.querySelector('.wu-int-mark image, .wu-int-mark img')).toBeNull();
-    }
-    expect(keyWords()).toEqual(['Choose', 'How to set it up ↗', 'Back']);
-  });
-
-  it('says what is not set up, and leaves out what this install does not run', async () => {
-    await open({ models: [model('nebius_token_factory', 'Nemotron 3 Super', 'provider_credential_absent'), model('ollama_local', 'Qwen3 4B Instruct', 'provider_not_running')], bridges: [] });
-    expect(stateOf('Nebius Token Factory')).toEqual({ words: 'No key yet', on: false });
-    expect(stateOf('A model on this computer')).toEqual({ words: 'Not running', on: false });
+    expect(calls.map(call => call.path)).toContain('/spending');
+    expect(calls.map(call => call.path)).not.toContain('/auth/session');
+    // Another catalog's words are the page's words: the page names no service itself.
     document.body.replaceChildren();
-    await open({ models: [model('nebius_token_factory', 'Nemotron 3 Super'), model('ollama_local', 'Qwen3 4B Instruct', 'provider_not_admitted')] });
-    expect(rows().map(row => row.querySelector('.wu-int-name')?.textContent)).toEqual(['Nebius Token Factory', 'A game', 'An AI agent you build']);
+    await open({ catalog: { ...CATALOG, entries: CATALOG.entries.filter(entry => entry.key !== 'github').map(entry => (entry.key === 'ollama_local' ? { ...entry, name: 'A runner here' } : entry)) } });
+    expect(shown().map(row => row[0])).toEqual(['Nebius Token Factory', 'A runner here', 'Tavily', 'Agents and games']);
   });
 
-  it('says nothing of a row whose read did not answer, rather than a state it cannot know', async () => {
-    await open({ models: null, grants: { 'world:a': [grant('g-1', 'world:a', ['p-1'])], 'world:b': null } });
-    expect(stateOf('Nebius Token Factory')).toEqual({ words: '', on: false });
-    expect(stateOf('An AI agent you build')).toEqual({ words: '', on: false });
-    expect(stateOf('A game')).toEqual({ words: 'None admitted on this install', on: false });
-    expect(keyWords()).not.toContain('End this grant');
+  it('ends a grant through the door\'s revoke when End is pressed, and says it ended; a refused end says so and keeps End', async () => {
+    const calls = await open({ grants: { 'world:a': [grant('g1', 'world:a', ['p-1'])] } });
+    actOn('Claude Code').click();
+    await settle();
+    expect(calls.filter(call => call.method === 'POST').map(call => call.path)).toEqual(['/door/grants/g1/revoke']);
+    expect(shown().at(-1)).toEqual(['Claude Code', 'Decides for Ada in Fishing village.', 'Ended', 'off', '']);
+    document.body.replaceChildren();
+    await open({ grants: { 'world:a': [grant('g1', 'world:a', ['p-1'])] }, revoke: { status: 409, code: 'grant_not_active' } });
+    actOn('Claude Code').click();
+    await settle();
+    expect(shown().at(-1)).toEqual(['Claude Code', 'Decides for Ada in Fishing village.', 'It could not be ended. Try again.', 'refused', 'End']);
   });
 
-  it('names whom a standing agent grant decides for, and Del ends it through the door\'s revoke, saying who decides again', async () => {
-    const calls = await open({
-      grants: { 'world:a': [grant('g-1', 'world:a', ['p-1']), grant('g-0', 'world:a', ['p-2'], { ended: 'expired' })] },
-      history: { choices: [{ choice_seq: 4, subjects: ['p-1'], decider: { kind: 'routine' } }, { choice_seq: 3, subjects: ['p-1'], decider: { kind: 'external' } }] },
-    });
-    expect(stateOf('An AI agent you build')).toEqual({ words: 'Deciding for Uma Sorrel', on: true });
-    expect(calls.filter(call => call.path.includes('/society')).map(call => call.path)).toEqual(['/world/versions/v-1/society?world_id=world%3Aa']);
-    // Del is offered only on the agent's row.
-    expect(keyWords()).not.toContain('End this grant');
-    key(focused(), 'Delete');
+  it('asks the chosen world\'s follower to keep it when Connect is pressed', async () => {
+    const calls = await open({});
+    actOn('GitHub').click();
     await settle();
-    expect(calls.some(call => call.method === 'POST')).toBe(false);
-    for (let i = 0; i < 3; i++) key(focused(), 'ArrowDown');
-    expect(focused().querySelector('.wu-int-name')?.textContent).toBe('An AI agent you build');
-    expect(keyWords()).toEqual(['Choose', 'How to set it up ↗', 'End this grant', 'Back']);
-    expect(focused().querySelector('dl dd:last-of-type')?.textContent).toBe("The agent you run. You can end the grant at any moment, and the person's own routine decides again.");
-    key(focused(), 'Delete');
-    await settle();
-    expect(calls.filter(call => call.method === 'POST').map(call => call.path)).toEqual(['/door/grants/g-1/revoke']);
-    expect(stateOf('An AI agent you build')).toEqual({ words: 'Ended.', on: false });
-    expect(faint()).toBe("Uma Sorrel's own routine decides again.");
-    expect(keyWords()).not.toContain('End this grant');
-    // Ended once: Del again writes nothing.
-    key(focused(), 'Delete');
-    await settle();
-    expect(calls.filter(call => call.method === 'POST')).toHaveLength(1);
+    expect(calls.filter(call => call.method === 'POST').map(call => [call.path, call.body])).toEqual([['/world/github-projects?world_id=world%3Aa', { version_id: 'v-1', readable: false }]]);
+    expect(shown()[3]!.slice(2)).toEqual(['Asked to keep Fishing village', 'off', '']);
   });
 
-  it('names no one where the record does not show their routine deciding again, and both where it shows two', async () => {
-    await open({
-      grants: { 'world:b': [grant('g-1', 'world:b', ['p-1'])] },
-      history: { choices: [{ choice_seq: 3, subjects: ['p-1'], decider: { kind: 'external' } }] },
-    });
-    for (let i = 0; i < 3; i++) key(focused(), 'ArrowDown');
-    key(focused(), 'Delete');
-    await settle();
-    expect(stateOf('An AI agent you build')).toEqual({ words: 'Ended.', on: false });
-    expect(faint()).toBeNull();
-    vi.unstubAllGlobals(); document.body.replaceChildren();
-    await open({
-      grants: { 'world:b': [grant('g-1', 'world:b', ['p-1', 'p-2'])] },
-      history: { choices: [{ choice_seq: 4, subjects: ['p-1', 'p-2'], decider: { kind: 'routine' } }] },
-    });
-    for (let i = 0; i < 3; i++) key(focused(), 'ArrowDown');
-    key(focused(), 'Delete');
-    await settle();
-    expect(faint()).toBe('Their own routines decide again: Uma Sorrel and Esme Oak.');
-  });
-
-  it('keeps a grant the server would not end standing, says so, and offers Del again', async () => {
-    const calls = await open({ grants: { 'world:a': [grant('g-1', 'world:a', ['p-1'])] }, revoke: { status: 503, code: 'door_unavailable' } });
-    for (let i = 0; i < 3; i++) key(focused(), 'ArrowDown');
-    key(focused(), 'Delete');
-    await settle();
-    expect(calls.filter(call => call.method === 'POST')).toHaveLength(1);
-    expect(stateOf('An AI agent you build')).toEqual({ words: 'Deciding for Uma Sorrel', on: true });
-    expect(faint()).toBe('It could not be ended just then; it still stands.');
-    expect(keyWords()).toContain('End this grant');
-    key(focused(), 'Delete');
-    await settle();
-    expect(calls.filter(call => call.method === 'POST')).toHaveLength(2);
-  });
-
-  it('says a grant the server answers had already ended has ended', async () => {
-    await open({ grants: { 'world:a': [grant('g-1', 'world:a', ['p-1'])] }, revoke: { status: 409, code: 'grant_ended' } });
-    for (let i = 0; i < 3; i++) key(focused(), 'ArrowDown');
-    key(focused(), 'Delete');
-    await settle();
-    expect(stateOf('An AI agent you build')).toEqual({ words: 'Ended.', on: false });
-    expect(faint()).toBeNull();
-    expect(keyWords()).not.toContain('End this grant');
-  });
-
-  it('counts several standing agent grants, offers no Del for them, and says how each ends instead', async () => {
-    const calls = await open({ grants: { 'world:a': [grant('g-1', 'world:a', ['p-1'])], 'world:b': [grant('g-2', 'world:b')] } });
-    expect(stateOf('An AI agent you build')).toEqual({ words: '2 grants', on: true });
-    for (let i = 0; i < 3; i++) key(focused(), 'ArrowDown');
-    expect(focused().querySelector('.wu-int-faint')?.textContent).toBe('Each grant ends by itself at most a day after it was given.');
-    expect(keyWords()).not.toContain('End this grant');
-    key(focused(), 'Delete');
-    await settle();
-    expect(calls.some(call => call.method === 'POST')).toBe(false);
-  });
-
-  it('says a grant that decides for nobody yet stands', async () => {
-    await open({ grants: { 'world:a': [grant('g-1', 'world:a')] } });
-    expect(stateOf('An AI agent you build')).toEqual({ words: 'Deciding for nobody yet', on: true });
-  });
-
-  it('keeps its keys from the front door under it, opens the focused row\'s guide in a new tab, and holds ↑ ↓ at the ends', async () => {
-    const opened = vi.fn();
-    vi.stubGlobal('open', opened);
-    await open({});
-    const reached = vi.fn();
-    document.addEventListener('keydown', reached);
-    key(focused(), 'ArrowUp');
-    expect(focused().querySelector('.wu-int-name')?.textContent).toBe('Nebius Token Factory');
-    for (let i = 0; i < 6; i++) key(focused(), 'ArrowDown');
-    expect(focused().querySelector('.wu-int-name')?.textContent).toBe('An AI agent you build');
-    key(focused(), 'Enter');
-    expect(opened).toHaveBeenCalledWith('https://github.com/twinkling-reality/exulanica/blob/main/docs/capabilities/outside-agents.md#on-your-own-install', '_blank', 'noopener');
-    // Enter's key is a press drawn as the quiet command, a link to the focused row's guide (fold-in e).
-    const guide = document.querySelector<HTMLAnchorElement>('a.wu-int-guide')!;
-    expect(guide.href).toBe('https://github.com/twinkling-reality/exulanica/blob/main/docs/capabilities/outside-agents.md#on-your-own-install');
-    expect([guide.classList.contains('wu-qcmd'), guide.classList.contains('wu-light-hint'), guide.dataset['place']]).toEqual([true, false, 'row']);
-    key(focused(), 'n');
-    expect(reached).not.toHaveBeenCalled();
-    document.removeEventListener('keydown', reached);
-  });
-});
-
-describe("a guest's Integrations page", () => {
-  /** Opens the page from the button, as a guest or an account on a hosted server meets it (own_key false). */
-  async function openAsGuest(served: Served): Promise<Call[]> {
-    const calls = serve(served);
-    const row = document.createElement('div'); document.body.append(row);
-    (await page()).offerIntegrations(row, { own_key: false }, { credentials: CREDENTIALS, entries: ENTRIES, picture: () => null })!.click();
-    await settle();
-    return calls;
-  }
-
-  it('says only what this server offers, from the models read alone, and sets up or ends nothing', async () => {
-    const opened = vi.fn();
-    vi.stubGlobal('open', opened);
-    const calls = await openAsGuest({ grants: { 'world:a': [grant('g-1', 'world:a', ['p-1'])] } });
-    expect(document.getElementById('wu-int-title')?.textContent).toBe('What this server connects to');
-    expect(document.querySelector('.wu-int-sub')?.textContent).toBe("Each one says what it connects, what it reads and where anything goes. This server's owner set them up. On your own install, you set up your own and can end them.");
-    expect(rows().map(row => row.querySelector('.wu-int-name')?.textContent)).toEqual(['Nebius Token Factory', 'A model on this server', 'A game', 'An AI agent you build']);
-    expect(stateOf('Nebius Token Factory')).toEqual({ words: "This server's budget", on: true });
-    expect(stateOf('A model on this server')).toEqual({ words: 'Running · Qwen3 4B Instruct', on: true });
-    expect(stateOf('A game')).toEqual({ words: 'On your own install', on: false });
-    expect(stateOf('An AI agent you build')).toEqual({ words: 'On your own install', on: false });
-    expect(focused().querySelector('dl dd:last-of-type')?.textContent).toBe("Nebius Token Factory, under this server's own key.");
-    // No door read at all: a guest's page lists no grant and settles none.
-    expect(calls.map(call => `${call.method} ${call.path}`)).toEqual(['GET /models']);
-    for (let i = 0; i < 3; i++) key(focused(), 'ArrowDown');
-    expect(focused().querySelector('dl dd:last-of-type')?.textContent).toBe('The agent you run, on your own install.');
-    expect(focused().querySelector('.wu-int-faint')).toBeNull();
-    expect(keyWords()).toEqual(['Choose', 'How to set it up ↗', 'Back']);
-    key(focused(), 'Delete');
-    await settle();
-    expect(calls).toHaveLength(1);
-    key(focused(), 'Enter');
-    expect(opened).toHaveBeenCalledWith('https://github.com/twinkling-reality/exulanica/blob/main/docs/capabilities/outside-agents.md#on-your-own-install', '_blank', 'noopener');
-  });
-
-  it('leaves out a provider this server cannot use and a runner it does not run', async () => {
-    await openAsGuest({ models: [model('nebius_token_factory', 'Nemotron 3 Super'), model('ollama_local', 'Qwen3 4B Instruct', 'provider_not_running')] });
-    expect(rows().map(row => row.querySelector('.wu-int-name')?.textContent)).toEqual(['Nebius Token Factory', 'A game', 'An AI agent you build']);
-    vi.unstubAllGlobals(); document.body.replaceChildren();
-    await openAsGuest({ models: [model('nebius_token_factory', 'Nemotron 3 Super', 'provider_credential_absent')] });
-    expect(rows().map(row => row.querySelector('.wu-int-name')?.textContent)).toEqual(['A game', 'An AI agent you build']);
+  it('shows a guest the host\'s figures from their allowance, and Not on this server for what they cannot use', async () => {
+    const calls = await open({ models: [model('nebius_token_factory', 'Nemotron 3 Super')] }, { guest: true });
+    expect(shown()).toEqual([
+      ['Nebius Token Factory', 'Open models answer for your people.', 'Host’s key · $0.48 left', 'on', 'Models'],
+      ['Ollama', 'Runs open models on this computer.', 'Not on this server', 'na', ''],
+      ['Tavily', 'Searches the web before something is made.', 'Up to 3 searches a making · 15 left', 'on', ''],
+      ['GitHub', 'Keeps a world’s versions in a repository.', 'Not on this server', 'na', ''],
+      ['Agents and games', 'Act for people you grant them, through MCP.', 'Not on this server', 'na', ''],
+    ]);
+    // A guest's page reads no door, GitHub or spending, and writes nothing.
+    const paths = calls.map(call => call.path);
+    expect(paths).toContain('/auth/session');
+    expect(paths.some(path => path.startsWith('/door/') || path.startsWith('/world/github-projects') || path === '/spending')).toBe(false);
+    expect(calls.filter(call => call.method !== 'GET')).toEqual([]);
   });
 });

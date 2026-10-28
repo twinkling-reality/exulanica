@@ -207,13 +207,10 @@ for (const file of ['create-words.mjs', 'create-steps.mjs', 'world-ui-create.ts'
   assert.doesNotMatch(readFileSync(new URL(file, import.meta.url), 'utf8'), /\u2014/u, file);
 }
 
-// The light plane's stylesheet: its inks once (N9, N16), more contrast's faint, every size through
-// --u, and text under 16 px never below 12 px (a key cap's glyph 9 px, L5).
+// The quiet command's and the made note's stylesheet: every size through --u, text under 16 px never below 12 px (a
+// key cap's glyph 9 px, L5), and less motion honoured.
 const css = readFileSync(new URL('world-ui-create.css', import.meta.url), 'utf8');
-for (const token of ['--l-ink: #121715', '--l-muted: #344750', '--l-faint: #5b6b72', '--refused-ink-light: #8f2f25', '--l-faint: #3d4a50']) {
-  assert.equal(css.split(token).length - 1, 1, token);
-}
-for (const query of ['prefers-reduced-motion: reduce', 'prefers-reduced-transparency: reduce', 'prefers-contrast: more']) assert.ok(css.includes(query), query);
+assert.ok(css.includes('prefers-reduced-motion: reduce'));
 for (const [, size] of css.matchAll(/(?:font:\s*\d+\s+|font-size:\s*)calc\((\d+(?:\.\d+)?) \* var\(--u\)\)/gu)) {
   assert.ok(Number(size) >= 16, `a ${size} px text scales below 12 px; wrap it in max(12px, ...)`);
 }

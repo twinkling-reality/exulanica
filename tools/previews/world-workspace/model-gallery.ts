@@ -26,8 +26,11 @@ export interface GalleryHooks {
   fromServer(): boolean;
   /** Who it is for, what they are doing and their model now (null: their routine). */
   about(row: Json): { readonly who: Json; readonly doing: string | null; readonly current: Json | null };
-  /** Records `selected` (null: the routine) for the row's person under `key`, answering the verified models read. */
-  write(row: Json, selected: Json | null, key: string): Promise<SocietyModels>;
+  /**
+   * Records `selected` (null: the routine) for the row's person under `key`, answering the verified models read.
+   * Absent, the page is a list to read with nobody to choose for (the Integrations page's Models): nothing is chosen.
+   */
+  write?(row: Json, selected: Json | null, key: string): Promise<SocietyModels>;
   /** A refused write in words. */
   refusal(error: Json, row: Json): string;
   /** A model was chosen and the read verified. */
@@ -63,7 +66,7 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
 
   function view() {
     const read = hooks.read(), about = hooks.about(row as Json), fromServer = hooks.fromServer();
-    const shown = galleryPage({ read, who: about.who, doing: about.doing, current: about.current, fromServer });
+    const shown = galleryPage({ read, who: about.who, doing: about.doing, current: about.current, fromServer, browse: !hooks.write });
     return { read, about, fromServer, shown };
   }
 
@@ -81,12 +84,15 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
     content.replaceChildren();
     const head = element('div', 'wu-g2-head wu-frame-head');
     const over = element('div', 'wu-g2-over');
-    // The person's round portrait at the start of the over line, sized by the stylesheet's steps.
-    const face = orb(String(row.scene?.id ?? ''), 0, hooks.portrait(row), String(about.who?.title ?? ''));
-    face.style.width = face.style.height = '';
-    face.classList.add('wu-frame-face');
-    over.append(face, element('span', '', shown.over));
-    head.append(over, element('h1', 'wu-g2-title wu-frame-title', shown.title));
+    // The person's round portrait at the start of the over line, sized by the stylesheet's steps; a list for nobody has none.
+    if (shown.over) {
+      const face = orb(String(row.scene?.id ?? ''), 0, hooks.portrait(row), String(about.who?.title ?? ''));
+      face.style.width = face.style.height = '';
+      face.classList.add('wu-frame-face');
+      over.append(face, element('span', '', shown.over));
+      head.append(over);
+    }
+    head.append(element('h1', 'wu-g2-title wu-frame-title', shown.title));
     head.querySelector('h1')!.tabIndex = -1;
     const list = element('div', 'wu-g2-list');
     for (const group of shown.groups) {
@@ -102,7 +108,7 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
         if (one.current) name.append(element('span', 'wu-g2-current', CHARACTER_WORDS.current));
         words.append(name);
         if (one.sub) words.append(subLine(one.sub));
-        button.append(element('span', 'wu-g2-num', one.key), words, element('span', 'wu-g2-cost', one.cost));
+        button.append(element('span', hooks.write ? 'wu-g2-num' : 'wu-g2-num empty', hooks.write ? one.key : ''), words, element('span', 'wu-g2-cost', one.cost));
         button.addEventListener('click', () => { focus = index; refusal = null; draw(true); });
         block.append(button);
       }
@@ -125,7 +131,7 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
       list.append(block);
     }
     const chosenRow = shown.rows[focus];
-    const detail = galleryDetail({ read, row: chosenRow, who: about.who });
+    const detail = galleryDetail({ read, row: chosenRow, who: about.who, browse: !hooks.write });
     // The card's words scroll; its action row and a refusal stay at its bottom.
     const card = element('div', 'wu-g2-detail'), words = element('div', 'wu-g2-scroll');
     const named = element('div', 'wu-g2-named');
@@ -155,9 +161,12 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
       words.append(facts);
     }
     const listPart = scrollingColumn(list), wordsPart = scrollingColumn(words);
-    const act = element('div', 'wu-g2-act');
-    act.append(keyButton(['Enter'], detail.act, () => void use(focus)));
-    card.append(wordsPart.column, act);
+    card.append(wordsPart.column);
+    if (detail.act) {
+      const act = element('div', 'wu-g2-act');
+      act.append(keyButton(['Enter'], detail.act, () => void use(focus)));
+      card.append(act);
+    }
     if (refusal) card.append(element('p', 'wu-g2-refused', refusal));
     if (busy) card.setAttribute('aria-busy', 'true');
     const keys = element('div', 'wu-g2-keys wu-frame-keys');
@@ -192,7 +201,8 @@ export function mountModelGallery(hooks: GalleryHooks): Gallery {
   }
 
   async function use(index: number) {
-    if (!row || busy) return;
+    // A list for nobody chooses nothing: its Enter and number keys do nothing.
+    if (!row || busy || !hooks.write) return;
     const { shown } = view();
     const chosenRow = shown.rows[index];
     if (!chosenRow) return;

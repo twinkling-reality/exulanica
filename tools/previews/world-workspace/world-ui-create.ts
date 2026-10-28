@@ -3,11 +3,10 @@
 // blurred behind it, the composer with its web search toggle, its price and the Create pill, the strip of ready
 // worlds along the foot, and the making view's steps and web notes. They only draw; what a press does is the
 // caller's (create-world.ts), and which key does what is create-steps.mjs's createKey. Their look lives in
-// create-world.css. The light plane's parts (lightPage, lightLabel, lightLine, quietCommand, lightHint) are the
-// Integrations page's, and madeNote the in-world made note's; their look lives in world-ui-create.css.
+// create-world.css. The quiet command (quietCommand) is Create's and the Integrations page's corner, and madeNote the
+// in-world made note; their base look lives in world-ui-create.css.
 import type { Step } from './world-ui.ts';
 import { CREATE_WORDS, NOTES_WORDS, aspectLabel } from './create-words.mjs';
-import { scrollingColumn } from './world-page-frame.ts';
 import './front-door.css';
 import './world-ui-create.css';
 import './create-world.css';
@@ -45,7 +44,8 @@ function lineIcon(paths: readonly string[], circle = false): SVGSVGElement {
 /* ---------- Create a world: the page, the composer, the strip and the making view ---------- */
 
 /** The page before Create, and while a world is made. */
-export type CreateForm = 'create' | 'creating';
+/** The dark page's forms: Create before a making and the making view, and the Integrations page (integrations.ts). */
+export type CreateForm = 'create' | 'creating' | 'integrations';
 
 export interface CreatePage {
   readonly root: HTMLElement;
@@ -422,81 +422,9 @@ export function webNotes(): WebNotes {
   };
 }
 
-/* ---------- The light plane: the Integrations page's parts, and the in-world made note ---------- */
+/* ---------- The quiet command, and the in-world made note ---------- */
 
-/** The light page's one form: the Integrations page over the front door (integrations.ts). */
-export type LightForm = 'integrations';
-
-export interface LightPage {
-  readonly root: HTMLElement;
-  /** The title and what follows it. */
-  readonly head: HTMLElement;
-  /** What stands under the head in the page's column. */
-  readonly lower: HTMLElement;
-  /** The quiet command's place. */
-  readonly quiet: HTMLElement;
-  /** The key row at the bottom right (N5). */
-  readonly keys: HTMLElement;
-  /** The stepped surface behind the head. */
-  readonly surface: HTMLElement;
-  /** Swaps the page's form in place, the picture kept. */
-  form(next: LightForm): void;
-  /** The chosen world's still picture; null leaves the plane. */
-  picture(address: string | null): void;
-}
-
-/**
- * The light page: the chosen world's still picture under its veils, the wordmark and the stepped surface, on the
- * light pages' frame. A modal dialog named by `labelledBy` (the caller's title).
- */
-export function lightPage({ form = 'integrations', picture = null, labelledBy }: { readonly form?: LightForm; readonly picture?: string | null; readonly labelledBy?: string } = {}): LightPage {
-  const root = element('section', 'wu-light wu-frame ux-noveuis');
-  root.setAttribute('role', 'dialog');
-  root.setAttribute('aria-modal', 'true');
-  if (labelledBy) root.setAttribute('aria-labelledby', labelledBy);
-  root.dataset.form = form;
-  const world = element('div', 'wu-light-world'), veil = element('div', 'wu-light-veil'), surface = element('div', 'wu-light-surface');
-  for (const quietPart of [world, veil, surface]) quietPart.setAttribute('aria-hidden', 'true');
-  const wordmark = element('p', 'wu-light-wordmark', CREATE_WORDS.wordmark);
-  const head = element('div', 'wu-light-head'), lower = element('div', 'wu-light-lower');
-  const quiet = element('div', 'wu-light-quiet'), keys = element('div', 'wu-light-keys wu-frame-keys');
-  // The light pages' frame (world-page-frame.css): the parts flow in one column, the stepped surface behind the head
-  // with them, which fills the window down to the key row and scrolls with its fades and track where it is longer.
-  const body = element('div', 'wu-light-body');
-  body.append(surface, head, lower);
-  const column = scrollingColumn(body);
-  column.column.classList.add('wu-light-column');
-  const measure = new ResizeObserver(() => column.update());
-  for (const part of [body, head, lower]) measure.observe(part);
-  root.append(world, veil, wordmark, column.column, keys, quiet);
-  const page: LightPage = {
-    root, head, lower, quiet, keys, surface,
-    form(next) { root.dataset.form = next; },
-    picture(address) { world.style.backgroundImage = address ? `url(${JSON.stringify(address)})` : ''; },
-  };
-  page.picture(picture);
-  return page;
-}
-
-/** A section label on the light plane. */
-export function lightLabel(words: string, forId?: string): HTMLElement {
-  const made = forId ? element('label', 'wu-light-label', words) : element('p', 'wu-light-label', words);
-  if (forId && made instanceof HTMLLabelElement) made.htmlFor = forId;
-  return made;
-}
-
-/**
- * A line on the light plane; `refused` in the light refusal ink (N9). A polite status where it changes while the page
- * is open.
- */
-export function lightLine(words: string, { tone = 'plain', live = false }: { readonly tone?: 'plain' | 'refused'; readonly live?: boolean } = {}): HTMLParagraphElement {
-  const line = element('p', 'wu-light-line', words);
-  if (tone === 'refused') line.dataset.tone = 'refused';
-  if (live) line.setAttribute('role', 'status');
-  return line;
-}
-
-/** Where Esc's command is drawn: the light plane's quiet place, inside a row, or Create's top right corner. */
+/** Where Esc's command is drawn: in its own place, inside a row, or a dark page's top right corner. */
 export type QuietPlace = 'quiet' | 'row' | 'corner';
 
 /**
@@ -515,16 +443,6 @@ export function quietCommand({ key = 'Esc', word = CREATE_WORDS.yourWorlds, shor
   button.setAttribute('aria-keyshortcuts', shortcut);
   button.addEventListener('click', () => onPress());
   return button;
-}
-
-/** A key the row says: a cap and a word, not a button. */
-export function lightHint(key: string, word: string, shortcut: string): HTMLSpanElement {
-  const hint = element('span', 'wu-qcmd wu-light-hint');
-  const cap = element('span', 'wu-qcmd-key', key);
-  cap.setAttribute('aria-hidden', 'true');
-  hint.append(cap, element('span', 'wu-qcmd-word', word));
-  hint.setAttribute('aria-keyshortcuts', shortcut);
-  return hint;
 }
 
 export interface MadeNote {

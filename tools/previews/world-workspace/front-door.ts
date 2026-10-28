@@ -66,10 +66,6 @@ export async function openFromFrontDoor(entryId: string): Promise<void> {
   return new Promise(resolve => window.addEventListener('pagehide', () => resolve(), { once: true }));
 }
 
-/** The chosen world's still picture, which Create a world draws behind its light page (N18); null for none. */
-let chosenPicture: string | null = null;
-export const chosenWorldPicture = (): string | null => chosenPicture;
-
 /**
  * Opens a world Create a world just made (or reopened, for Blank): through its opening, with its
  * name, as Open does for a saved world. Settles as this page goes.
@@ -184,8 +180,7 @@ export function mountFrontDoor({ root, entries, credentials }: { root: HTMLEleme
     title.textContent = entry.title;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!reduce) title.animate([{ opacity: 0, filter: 'blur(7px)', transform: 'translateY(5px)' }, { opacity: 1, filter: 'blur(0px)', transform: 'translateY(0px)' }], { duration: 420, easing: 'cubic-bezier(.25,.46,.45,.94)' });
-    chosenPicture = backdropPicture(entry);
-    preview.select(entry, chosenPicture);
+    preview.select(entry, backdropPicture(entry));
     const inset = card.offsetLeft - strip.offsetLeft;
     if (inset < strip.scrollLeft || inset + card.offsetWidth > strip.scrollLeft + strip.clientWidth) strip.scrollTo({ left: Math.max(0, inset - 4), behavior: reduce ? 'instant' : 'smooth' });
     const cards = [...strip.querySelectorAll('.your-worlds-card')], index = cards.indexOf(card);
@@ -210,6 +205,6 @@ export function mountFrontDoor({ root, entries, credentials }: { root: HTMLEleme
   // A world this person is having made still runs: its card waits here (N12). The offer it reads also says whether
   // this page is the install owner's own, which alone offers Integrations beside Create a world.
   if (credentials) {
-    void showBeingMade(root, credentials).then(offer => offerIntegrations(createRow as HTMLElement, offer, { credentials, entries, picture: chosenWorldPicture }));
+    void showBeingMade(root, credentials).then(offer => offerIntegrations(createRow as HTMLElement, offer, { credentials, entries, chosen: () => selected }));
   }
 }

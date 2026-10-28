@@ -1,68 +1,39 @@
-/* The Integrations page over the front door (integrations.ts; DESIGN's frames r30-integrations-a and -b and their
-   sheet, BUILD-SHEETS-1024.md): the light page with the chosen world faded behind, what this is at the left, the
-   rows at the right in the model gallery's rhythm, the focused one opened to its three lines. Built on the light
-   plane's tokens (world-ui-create.css) and world-ui.css's --u; sizes are CSS pixels at 1920 by 1080 times
-   --ui-scale, text under 16 px keeping a 12 px floor and a key cap's glyph 9 px (L5). */
-
-.wu-integrations-host { position: fixed; inset: 0; z-index: 55; }
+/* The Integrations page over the front door (integrations.ts), from ROOT's mock (integrations-owner.html and -guest.html)
+   on Create's dark plane (create-world.css's .wu-create, its wordmark and its corner): "Integrations" over one list,
+   a row per service at 72 px, its mark, its name and one plain line, its state with a dot (lit when on, ringed where
+   it is not on this server) and one action. The mock's CSS pixels at every window; type IBM Plex Sans 400 and 500. */
 
 /* The front door's button beside Create a world, in the same glass: tops aligned, the arrows' 4 px between. */
 body.ux-review #shell .ux-world-entry .ux-entry-integrations { vertical-align: top; margin-left: 4px; }
 
-/* The world faded behind, under the page's own wash, as the frames draw it. */
-.wu-light[data-form="integrations"] { background: #eef1f0; }
-.wu-light[data-form="integrations"] .wu-light-world { background-color: #eef1f0; background-position: right 30% center; opacity: .22; }
-.wu-light[data-form="integrations"] .wu-light-veil {
-  background: linear-gradient(90deg, #eef1f0 0%, rgba(238, 241, 240, .94) 40%, rgba(238, 241, 240, .62) 72%, rgba(238, 241, 240, .36) 100%),
-    linear-gradient(0deg, #eef1f0 0%, rgba(238, 241, 240, 0) 45%); }
-.wu-light[data-form="integrations"] .wu-light-surface { display: none; }
-.wu-light[data-form="integrations"] .wu-light-wordmark { top: calc(40 * var(--u)); font-size: calc(26 * var(--u)); letter-spacing: -.01em; }
+/* The column wider than Create's, a little higher, with the mock's 28 px under the title. */
+.wu-create[data-form="integrations"] { --int-hair: rgb(255 255 255 / 9%); --int-on: #8fd19e; }
+.wu-create[data-form="integrations"] .wu-create-column { top: max(96px, 14vh); width: min(760px, calc(100vw - var(--c-col) - 48px)); }
+.wu-create[data-form="integrations"] .wu-create-title { margin-bottom: 28px; }
 
-/* Two columns in the page's body (world-ui-create.css's frame), side by side and never past the window's sides: they
-   share the width between them, the left up to 600u and the right up to 900u, and scroll together under the head's
-   top where they are taller than the window. */
-.wu-light[data-form="integrations"] .wu-light-body { --light-top: calc(150 * var(--u));
-  display: grid; grid-template-columns: minmax(0, calc(600 * var(--u))) minmax(0, calc(900 * var(--u))); column-gap: var(--frame-gap);
-  align-items: start; align-content: start; justify-content: start; }
-@media (max-height: 699px) { .wu-light[data-form="integrations"] .wu-light-body { --light-top: calc(110 * var(--u)); } }
-
-/* Left: the over-label, the title and what the page is. */
-.wu-light[data-form="integrations"] .wu-light-head { width: auto; }
-.wu-int-over { margin: 0; font: 400 max(12px, calc(14 * var(--u)))/1 var(--font-mono); letter-spacing: .02em; color: var(--l-muted); }
-.wu-light[data-form="integrations"] .wu-light-title { margin-top: calc(16 * var(--u)); font-size: calc(64 * var(--u)); line-height: 1.05; text-wrap: balance; }
-.wu-int-sub { margin: calc(22 * var(--u)) 0 0; font: 400 calc(19 * var(--u))/1.45 var(--font-sans); color: var(--l-sub); text-wrap: pretty; }
-.wu-int-small { margin: calc(18 * var(--u)) 0 0; font: 400 max(12px, calc(14 * var(--u)))/1.5 var(--font-sans); color: var(--l-muted); text-wrap: pretty; }
-
-/* Right: the groups and their rows. */
-.wu-light[data-form="integrations"] .wu-light-lower { min-width: 0; margin-top: 0; }
-.wu-int-group { margin-bottom: calc(30 * var(--u)); }
-.wu-int-label { margin: 0 0 calc(10 * var(--u)) calc(18 * var(--u)); font: 400 max(12px, calc(13 * var(--u)))/1 var(--font-mono); letter-spacing: .02em; color: var(--l-muted); }
-.wu-int-row { position: relative; display: grid; grid-template-columns: calc(34 * var(--u)) minmax(0, 1fr) auto; column-gap: calc(16 * var(--u)); align-items: start;
-  padding: calc(16 * var(--u)) calc(18 * var(--u)); border: 1.5px solid transparent; border-bottom: 1px solid rgba(18, 23, 21, .10); cursor: pointer; }
-.wu-int-row:last-child { border-bottom-color: transparent; }
-.wu-int-row[data-focus="true"] { border: 1.5px solid #6496a6; border-radius: calc(12 * var(--u)); background: rgba(255, 255, 255, .72);
-  box-shadow: 0 calc(10 * var(--u)) calc(28 * var(--u)) rgba(18, 40, 44, .10); margin: 2px 0; }
-.wu-int-row:focus-visible { outline: none; }
-.wu-int-mark { width: calc(34 * var(--u)); height: calc(34 * var(--u)); border-radius: calc(9 * var(--u)); display: grid; place-items: center;
-  background: linear-gradient(180deg, #f7faf9, #e3ebea); box-shadow: inset 0 0 0 1px rgba(100, 150, 166, .45); }
-.wu-int-mark svg { width: calc(20 * var(--u)); height: calc(20 * var(--u)); stroke: #3f6f80; stroke-width: 1.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
-.wu-int-name { margin: 0; font: 400 calc(19 * var(--u))/1.25 var(--font-sans); color: var(--l-ink); }
-.wu-int-line { margin: calc(5 * var(--u)) 0 0; font: 400 max(12px, calc(14 * var(--u)))/1.45 var(--font-sans); color: var(--l-muted); text-wrap: pretty; }
-.wu-int-state { margin: 0; padding-top: calc(3 * var(--u)); font: 400 max(12px, calc(14 * var(--u)))/1.25 var(--font-sans); color: var(--l-muted); text-align: right; white-space: nowrap; }
-.wu-int-state[data-on="true"] { color: var(--l-ink); }
-.wu-int-dot { display: inline-block; width: calc(7 * var(--u)); height: calc(7 * var(--u)); border-radius: 50%; background: #6496a6; margin-right: calc(8 * var(--u)); vertical-align: 1px; }
-
-/* The focused row opened to its three lines, and the faint line where several grants stand. */
-.wu-int-open { grid-column: 2 / 4; margin: calc(14 * var(--u)) 0 0; display: grid; grid-template-columns: calc(96 * var(--u)) 1fr; row-gap: calc(9 * var(--u)); column-gap: calc(14 * var(--u)); }
-.wu-int-open dt { font: 400 max(12px, calc(12 * var(--u)))/1.6 var(--font-mono); letter-spacing: .02em; color: var(--l-muted); }
-.wu-int-open dd { margin: 0; font: 400 max(12px, calc(15 * var(--u)))/1.5 var(--font-sans); color: var(--l-ink); text-wrap: pretty; }
-.wu-int-faint { grid-column: 2 / 4; margin: calc(12 * var(--u)) 0 0; font: 400 max(12px, calc(14 * var(--u)))/1.45 var(--font-sans); color: var(--l-faint); }
-
-/* The key row (the frame's), Esc among its keys; Enter's key is the link to the focused row's guide. */
-.wu-int-guide { color: inherit; text-decoration: none; }
+.wu-int-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--int-hair); }
+.wu-int-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto 92px; align-items: center; gap: 16px; min-height: 72px; padding: 12px 0;
+  border-bottom: 1px solid var(--int-hair); }
+.wu-int-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: rgb(255 255 255 / 7%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 8%) inset; }
+.wu-int-mark svg { width: 20px; height: 20px; fill: none; stroke: var(--c-ink-2); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.wu-int-words { display: grid; gap: 3px; min-width: 0; }
+.wu-int-name { font: 500 15px/1.3 var(--font-sans); color: var(--c-ink); }
+.wu-int-line { font: 400 13px/1.4 var(--font-sans); color: var(--c-ink-2); text-wrap: pretty; }
+.wu-int-state { display: inline-flex; align-items: center; gap: 8px; font: 400 13px/1 var(--font-sans); color: var(--c-ink-2); white-space: nowrap; }
+.wu-int-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--c-ink-3); }
+.wu-int-state[data-kind="on"] i { background: var(--int-on); box-shadow: 0 0 6px rgb(143 209 158 / 60%); }
+.wu-int-state[data-kind="na"] { color: var(--c-ink-3); }
+.wu-int-state[data-kind="na"] i { background: none; box-shadow: inset 0 0 0 1.25px var(--c-ink-3); }
+/* A refused End or Connect says so in its place, wrapping where it must. */
+.wu-int-state[data-kind="refused"] { white-space: normal; max-width: 260px; line-height: 1.35; color: #f0b8ad; }
+.wu-int-state[data-kind="refused"] i { display: none; }
+.wu-int-act { justify-self: end; height: 30px; padding: 0 14px; border: 1px solid rgb(255 255 255 / 18%); border-radius: 999px; background: none;
+  color: var(--c-ink); font: 400 13px/1 var(--font-sans); cursor: pointer; }
+.wu-int-act:hover { border-color: rgb(255 255 255 / 34%); }
+.wu-int-none { border: 0; padding: 0; }
 
 @media (forced-colors: active) {
-  .wu-int-row[data-focus="true"] { border-color: Highlight; }
   .wu-int-mark svg { stroke: CanvasText; }
-  .wu-int-dot { background: CanvasText; }
+  .wu-int-state i, .wu-int-state[data-kind="on"] i { background: CanvasText; }
 }
