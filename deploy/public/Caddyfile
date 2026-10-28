@@ -30,8 +30,9 @@
 	}
 	# Caddy's own list of compressible types (caddy 2.11.4's default, written out because a match
 	# replaces it), application/octet-stream (a world's texture sets, about a third of their size
-	# compressed) and application/vnd.exulanica.owd (its baked tiles, about a fifth): both would
-	# otherwise cross raw. A range request is answered uncompressed, as before.
+	# compressed), application/vnd.exulanica.owd (its baked tiles, about a fifth) and
+	# model/gltf-binary (the style packs' models, about a fifth): each would otherwise cross raw.
+	# A range request is answered uncompressed, as before.
 	encode {
 		zstd
 		gzip
@@ -71,6 +72,7 @@
 			header Content-Type text/*
 			header Content-Type application/octet-stream*
 			header Content-Type application/vnd.exulanica.owd*
+			header Content-Type model/gltf-binary*
 		}
 	}
 	reverse_proxy client:8080 {

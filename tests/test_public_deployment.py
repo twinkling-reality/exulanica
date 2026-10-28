@@ -23,6 +23,7 @@ import stat
 import subprocess
 
 import pytest
+from exulanica.world.assets import GLB_MEDIA_TYPE
 from exulanica.world.baked_tiles import TILE_MEDIA_TYPE
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -96,12 +97,12 @@ def test_the_edge_reaches_the_client_proxy_and_never_the_api():
 
 
 def test_the_edge_compresses_binary_assets_as_well_as_text():
-    """A world's texture sets are served as application/octet-stream and its baked tiles as their
-    own container type, which Caddy's own match leaves raw: the edge's match keeps its text types
-    and adds those two."""
+    """A world's texture sets are served as application/octet-stream, its baked tiles as their
+    own container type and the style packs' models as GLB, which Caddy's own match leaves raw: the
+    edge's match keeps its text types and adds those three."""
     matched = set(re.findall(r"header Content-Type (\S+)", _directives(CADDYFILE)))
     assert {"text/*", "application/json*", "application/javascript*"} <= matched
-    assert {"application/octet-stream*", f"{TILE_MEDIA_TYPE}*"} <= matched
+    assert {"application/octet-stream*", f"{TILE_MEDIA_TYPE}*", f"{GLB_MEDIA_TYPE}*"} <= matched
 
 
 def _script_value(name: str) -> str:
