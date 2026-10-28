@@ -176,59 +176,18 @@ export function createKey(event, state) {
 /** What the page hands the opening world after a world is made, under this key in sessionStorage. */
 export const MADE_HANDOFF_KEY = 'exulanica.made.v1';
 
-/** A spelled number the drafter ends a part's label with, to tell like parts apart ("bed one", "house two"). */
-const SPELLED = /\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)$/iu;
-/** A figure a part's label ends with ("house 2"). */
-const FIGURE = /\s+\d+$/u;
-
 /**
- * "In it" on the made note: each kind of part a world was made with, named once as a person would name it, in the
- * draft's order: the drafter's spelled numbering always left off, and a figure only where another part of the same name
- * has one too ("route 66" stays).
+ * The handoff written for `entryId` once its draft is ready, or once Blank opened it: its made note's one line
+ * (create-words.mjs's madeLine), or none; `build` opens the world in build mode with no banner and no note (N4).
  */
-export function partNames(labels) {
-  const figured = new Map();
-  for (const label of labels) {
-    const stem = label.trim().replace(FIGURE, '');
-    if (stem !== label.trim()) figured.set(stem, (figured.get(stem) ?? 0) + 1);
-  }
-  const names = [];
-  for (const label of labels) {
-    let name = label.trim().replace(SPELLED, '');
-    const stem = name.replace(FIGURE, '');
-    if (stem !== name && (figured.get(stem) ?? 0) > 1) name = stem;
-    if (name && !names.includes(name)) names.push(name);
-  }
-  return names.join(', ');
-}
-
-/**
- * The made note's columns in order (N13), each { label, value }; an empty one is left out. `web`, where web notes
- * were used, stands after Set (WORDS.md "Web notes in Create, the words", item 5).
- * @param {{ inIt?: string | null, set?: string | null, web?: string | null, notInItYet?: string | null, spent?: string | null }} values
- * @returns {{ label: string, value: string }[]}
- */
-export function madeColumns({ inIt = null, set = null, web = null, notInItYet = null, spent = null }) {
-  return [[CREATE_WORDS.inIt, inIt], [CREATE_WORDS.set, set], [CREATE_WORDS.fromTheWeb, web], [CREATE_WORDS.notInItYet, notInItYet], [CREATE_WORDS.spent, spent]]
-    .filter(([, value]) => typeof value === 'string' && value.trim())
-    .map(([label, value]) => ({ label, value }));
-}
-
-/**
- * The handoff written for `entryId` once its draft is ready, or once Blank opened it: `build` opens
- * the world in build mode with no banner and no note (N4).
- */
-export const writeMade = (entryId, columns, { build = false } = {}) => JSON.stringify({ entryId, columns, ...(build ? { build: true } : {}) });
+export const writeMade = (entryId, line, { build = false } = {}) => JSON.stringify({ entryId, line, ...(build ? { build: true } : {}) });
 
 /** The handoff read back for `entryId`, or null where it names another world or is not well formed. */
 export function readMade(text, entryId) {
   try {
     const value = JSON.parse(text ?? 'null');
-    if (!value || value.entryId !== entryId || !Array.isArray(value.columns)) return null;
-    const labels = new Set([CREATE_WORDS.inIt, CREATE_WORDS.set, CREATE_WORDS.fromTheWeb, CREATE_WORDS.notInItYet, CREATE_WORDS.spent]);
-    const columns = value.columns.filter(one => one && labels.has(one.label) && typeof one.value === 'string' && one.value.trim())
-      .map(one => ({ label: one.label, value: one.value }));
-    return { entryId, columns, build: value.build === true };
+    if (!value || value.entryId !== entryId) return null;
+    return { entryId, line: typeof value.line === 'string' && value.line.trim() ? value.line : null, build: value.build === true };
   } catch {
     return null;
   }

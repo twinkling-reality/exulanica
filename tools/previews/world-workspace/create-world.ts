@@ -24,12 +24,12 @@ import {
 } from './world-ui-create.ts';
 import type { Step } from './world-ui.ts';
 import {
-  CREATE_WORDS, REFUSAL_WORDS, STEP_WORDS, budgetShort, ceilingAmount, madeSpent, priceUp, priceUpTo, refusalSpent, refusalWords, setValue, spentUpTo,
-  stepTime, stoppedLine, sumUsd, webColumn, webNotesLabel, webTip,
+  CREATE_WORDS, REFUSAL_WORDS, STEP_WORDS, budgetShort, ceilingAmount, madeLine, priceUp, priceUpTo, refusalSpent, refusalWords, spentUpTo,
+  stepTime, stoppedLine, sumUsd, webNotesLabel, webTip,
 } from './create-words.mjs';
 import {
-  MADE_HANDOFF_KEY, SHORT_CODE, afterRead, createKey, draftSteps, madeColumns, moveChoice, notesNotUsedLine, notesOutcome, notesSteps, offerState,
-  partNames, pollDelay, spentOf, startCards, withNotesSpent, wrapStop, writeMade,
+  MADE_HANDOFF_KEY, SHORT_CODE, afterRead, createKey, draftSteps, moveChoice, notesNotUsedLine, notesOutcome, notesSteps, offerState,
+  pollDelay, spentOf, startCards, withNotesSpent, wrapStop, writeMade,
 } from './create-steps.mjs';
 import { openMadeWorld } from './front-door.ts';
 import { mountUiScale } from './world-ui.ts';
@@ -609,7 +609,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       if (raw['state'] === 'ready') {
         frame.stop();
         const used = noted?.state === 'used' && typeof noted.notes === 'number' && typeof noted.searches === 'number';
-        await made(words, frame, raw, spent, most, used ? webColumn(noted.notes as number, noted.searches as number) : null);
+        await made(words, frame, raw, spent, used ? noted.notes as number : null);
         return;
       }
       if (raw['state'] === 'refused') {
@@ -636,18 +636,12 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
     if (lines() > QUOTE_LINES[1]) quote.dataset.size = '15';
   };
 
-  /** Ready: the made note's columns handed to the world's arrival, then the world opens (frame 22). */
-  const made = async (words: string, frame: MakingFrame, raw: RawDraft, spent: ReturnType<typeof spentOf>, most: string | null, web: string | null = null): Promise<void> => {
+  /** Ready: the made note's line handed to the world's arrival, then the world opens (frame 22). */
+  const made = async (words: string, frame: MakingFrame, raw: RawDraft, spent: ReturnType<typeof spentOf>, notes: number | null = null): Promise<void> => {
     const draft = parseWorldMakingDraft(raw);
     if (draft.entry === null) { back(words, frame, { code: 'world_draft_failed', spent: null }); return; }
-    const columns = madeColumns({
-      inIt: partNames(draft.made.map((part) => part.label)) || null,
-      set: setValue(raw['land'] as Parameters<typeof setValue>[0], raw['setting'] as Parameters<typeof setValue>[1]),
-      web,
-      notInItYet: draft.leftOut.join(', ') || null,
-      spent: spent !== null && most !== null ? madeSpent(spent, most) : null,
-    });
-    try { sessionStorage.setItem(MADE_HANDOFF_KEY, writeMade(draft.entry.entryId, columns)); } catch { /* The world opens without its note. */ }
+    const line = madeLine({ notes, spent, leftOut: draft.leftOut });
+    try { sessionStorage.setItem(MADE_HANDOFF_KEY, writeMade(draft.entry.entryId, line)); } catch { /* The world opens without its note. */ }
     keptWords = '';
     await openMadeWorld(draft.entry);
   };
@@ -682,7 +676,7 @@ export function mountCreateWorld({ root, credentials, entries, onClose }: {
       const entry = await card.start();
       if (signal.aborted) return;
       if (key === 'blank') {
-        try { sessionStorage.setItem(MADE_HANDOFF_KEY, writeMade(entry.entryId, [], { build: true })); } catch { /* Opens without build mode. */ }
+        try { sessionStorage.setItem(MADE_HANDOFF_KEY, writeMade(entry.entryId, null, { build: true })); } catch { /* Opens without build mode. */ }
       }
       await openMadeWorld(entry);
     } catch (error) {

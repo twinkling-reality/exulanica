@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { CREATE_WORDS } from './create-words.mjs';
 import {
-  MADE_HANDOFF_KEY, afterRead, canCreate, createKey, draftSteps, madeColumns, moveChoice, offerState, partNames, pollDelay, readMade, spentOf,
+  MADE_HANDOFF_KEY, afterRead, canCreate, createKey, draftSteps, moveChoice, offerState, pollDelay, readMade, spentOf,
   wrapStop,
   startCards, writeMade, notesNotUsedLine, notesOutcome, notesSteps, withNotesSpent,
 } from './create-steps.mjs';
@@ -132,26 +132,19 @@ assert.equal(createKey(key('Enter'), { page: 'create', focus: 'button' }), 'pass
 assert.equal(createKey(key('Escape'), { page: 'creating', focus: 'page' }), 'leave');
 for (const code of ['Enter', 'KeyW', 'ArrowLeft', 'Space']) assert.equal(createKey(key(code), { page: 'creating', focus: 'page' }), 'silence', code);
 
-// The made note's columns, in order, an empty one left out (N13), and the handoff round trip.
-assert.deepEqual(madeColumns({ inIt: 'Four pools, a hotel', set: 'on gentle hills, with mountains far off', notInItYet: '', spent: '$0.31 of at most $1.43' }).map(one => one.label), ['In it', 'Set', 'Spent']);
-const columns = madeColumns({ inIt: 'Four pools', notInItYet: 'a lighthouse', spent: '$0.31 of at most $1.43' });
-// "In it" names each kind of part once, as a person would, without the drafter's numbering of like parts (REHEARSAL
-// run 3: a snowy village's card read "village path, bed one, bedroom one, house one, bed two, bedroom two, house two").
-assert.equal(partNames(['village path', 'bed one', 'bedroom one', 'house one', 'bed two', 'bedroom two', 'house two']), 'village path, bed, bedroom, house');
-assert.equal(partNames(['street', 'footway', 'home', 'street tree']), 'street, footway, home, street tree');
-// A number is the drafter's only where it tells like parts apart; one that is part of a name stays.
-assert.equal(partNames(['house 1', 'house 2', 'route 66']), 'house, route 66');
-assert.equal(partNames(['Barn Two']), 'Barn');
-assert.equal(partNames([]), '');
+// The handoff carries the made note's one line (create-words.mjs's madeLine) to the opening world, for that world only.
+const line = '12 notes from the web · spent $0.0058 · not in it yet: fishing, wooden boats';
 assert.equal(MADE_HANDOFF_KEY, 'exulanica.made.v1');
-assert.deepEqual(readMade(writeMade('w-1', columns), 'w-1'), { entryId: 'w-1', columns, build: false });
+assert.deepEqual(readMade(writeMade('w-1', line), 'w-1'), { entryId: 'w-1', line, build: false });
 // Blank's handoff opens build mode, with no note; a handoff that says nothing of it opens none.
-assert.deepEqual(readMade(writeMade('w-1', [], { build: true }), 'w-1'), { entryId: 'w-1', columns: [], build: true });
-assert.equal(readMade(JSON.stringify({ entryId: 'w-1', columns: [], build: 'yes' }), 'w-1').build, false);
-assert.equal(readMade(writeMade('w-1', columns), 'w-2'), null);
+assert.deepEqual(readMade(writeMade('w-1', null, { build: true }), 'w-1'), { entryId: 'w-1', line: null, build: true });
+assert.equal(readMade(JSON.stringify({ entryId: 'w-1', line: null, build: 'yes' }), 'w-1').build, false);
+assert.equal(readMade(writeMade('w-1', line), 'w-2'), null);
 assert.equal(readMade('{', 'w-1'), null);
 assert.equal(readMade(null, 'w-1'), null);
-assert.deepEqual(readMade(JSON.stringify({ entryId: 'w-1', columns: [{ label: 'Code', value: 'x' }, { label: 'Spent', value: '$0' }] }), 'w-1').columns, [{ label: 'Spent', value: '$0' }]);
+// A handoff of the labelled columns before 27 October, or a line of nothing, opens with no note.
+assert.equal(readMade(JSON.stringify({ entryId: 'w-1', columns: [{ label: 'Spent', value: '$0' }] }), 'w-1').line, null);
+assert.equal(readMade(JSON.stringify({ entryId: 'w-1', line: '  ' }), 'w-1').line, null);
 
 export default true;
 
@@ -170,5 +163,3 @@ assert.equal(notesNotUsedLine(null, 'reference_not_for_this_tool'), 'This kind o
 assert.deepEqual(withNotesSpent({ spentUsd: 0.0009, unknownUsd: 0 }, '0.0002', '0.0153'), { spentUsd: 0.0011, unknownUsd: 0 });
 assert.deepEqual(withNotesSpent({ spentUsd: 0.0009, unknownUsd: 0 }, null, '0.0153'), { spentUsd: 0.0009, unknownUsd: 0.0153 });
 assert.equal(withNotesSpent(null, '0.0002', '0.0153'), null);
-// The made note's column for the notes stands after Set, and the handoff keeps it.
-assert.deepEqual(madeColumns({ inIt: 'a', set: 'b', web: '7 notes from 3 searches', spent: 'c' }).map((one) => one.label), ['In it', 'Set', 'From the web', 'Spent']);

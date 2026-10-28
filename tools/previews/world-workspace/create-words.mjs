@@ -33,12 +33,6 @@ export const CREATE_WORDS = Object.freeze({
   leave: 'You can leave this page. It carries on, and it waits in Your worlds.',
   beingMade: 'Being made…',
   madeFromYourWords: 'Made from your words',
-  inIt: 'In it',
-  set: 'Set',
-  notInItYet: 'Not in it yet',
-  /** The made note's column after Set where web notes were used (WORDS.md "Web notes in Create, the words", item 5). */
-  fromTheWeb: 'From the web',
-  spent: 'Spent',
   /** No AI model to make a world (N7): no key, or models not run here. */
   noModel: 'Making a world from your words needs an AI model, and none is connected here. You can still start from these:',
   /** The budget for AI models is spent (N7, J22, M11). */
@@ -275,29 +269,6 @@ export const spentUpTo = ({ spentUsd, unknownUsd = 0 }, maximumUsd) =>
 export const refusalSpent = ({ spentUsd, unknownUsd = 0 }) =>
   Number(spentUsd) > 0 || Number(unknownUsd) > 0 ? `Spent ${spentSoFar(spentUsd, unknownUsd)} before it stopped.` : null;
 
-const quoted = words => words.map(phrase => `“${phrase}”`).join(', ');
-const capital = words => words.charAt(0).toUpperCase() + words.slice(1);
-const lower = words => words.charAt(0).toLowerCase() + words.slice(1);
-
-/**
- * The made note's Set value (TERRAIN's WORDING.md, N13, N26): the Set line without its "Set" and its
- * full stop, and without "You can change this later in Design.", starting with a capital as every
- * value in the note does. A setting taken: its titles (every one after the first in lower case),
- * then the land, then the words. `land` is the draft read's served `land` ({ title, chosen_by,
- * words, fell_back }); `setting` its `setting` ({ parts, words }). Null for a town, or a server that
- * makes places level (no `land`).
- */
-export function setValue(land, setting = null) {
-  if (!land || typeof land.title !== 'string') return null;
-  if (land.fell_back) return `On level ground, since this place did not fit the land ${land.title}`;
-  if (setting && Array.isArray(setting.parts) && setting.parts.length > 0) {
-    const titles = setting.parts.map((part, at) => (at === 0 ? capital(part.title) : lower(part.title))).join(', ');
-    return `${titles}, ${land.title}, for your words ${quoted(setting.words ?? [])}`;
-  }
-  if (land.chosen_by === 'words' && Array.isArray(land.words) && land.words.length > 0) return `${capital(land.title)}, for your words ${quoted(land.words)}`;
-  return capital(land.title);
-}
-
 /**
  * Web notes in Create (DESIGN's words of 11:55 on 25 October, WORDS.md "Web notes in Create, the words"): the check
  * box on frame 20 and its line, the notes' steps on frame 21 before the drafting's, the notes at the page's right
@@ -334,8 +305,20 @@ export const notesAskLine = (searches, mostUsd) =>
 export const notesFoot = (searches) =>
   `A model wrote these from ${counted(searches, 'web search', 'web searches')}. They help plan the place and are never facts about it.`;
 
-/** The made note's column (item 5): the counts the draft read states. */
-export const webColumn = (notes, searches) => `${counted(notes, 'note', 'notes')} from ${counted(searches, 'search', 'searches')}`;
+/**
+ * The note a world Create made opens with (N13; ROOT's sweep of 27 October): one plain line of what the making used and
+ * left out, each part only where it has something to say, "12 notes from the web · spent $0.0058 · not in it yet:
+ * fishing, wooden boats". `notes` is how many web notes the drafter was handed, `spent` the draft read's spend
+ * ({ spentUsd, unknownUsd }), `leftOut` the phrases it left out. Null where there is nothing to say.
+ */
+export function madeLine({ notes = null, spent = null, leftOut = [] }) {
+  const parts = [];
+  if (Number.isSafeInteger(notes) && notes > 0) parts.push(`${counted(notes, 'note', 'notes')} from the web`);
+  if (spent !== null) parts.push(`spent ${amount(spent.spentUsd)}${Number(spent.unknownUsd ?? 0) > 0 ? `, up to ${amount(spent.unknownUsd)} not known yet` : ''}`);
+  const left = leftOut.map((phrase) => phrase.trim()).filter(Boolean);
+  if (left.length > 0) parts.push(`not in it yet: ${left.join(', ')}`);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
 
 /**
  * The toggle's details, shown on hover and keyboard focus (the composer page's mock): the planner's limit and the most

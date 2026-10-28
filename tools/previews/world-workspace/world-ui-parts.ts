@@ -12,8 +12,8 @@ import {
   nameTag, outline, path, ring, rule, scaleOf, shade, sideCard, stepList, tip,
 } from './world-ui.ts';
 import { composer, createPage, createTitle, madeNote, makingSteps, quietCommand, webNotes, worldStrip } from './world-ui-create.ts';
-import { CREATE_WORDS, madeSpent, priceUpTo, refusalSpent, refusalWords, setValue, spentUpTo, webNotesLabel, webTip } from './create-words.mjs';
-import { draftSteps, madeColumns, startCards } from './create-steps.mjs';
+import { CREATE_WORDS, madeLine, priceUpTo, refusalSpent, refusalWords, spentUpTo, webNotesLabel, webTip } from './create-words.mjs';
+import { draftSteps, startCards } from './create-steps.mjs';
 import { creatureField, madeGroup, makingGroup, standLabel } from './world-ui-creature.ts';
 // The product's fonts and their tokens, as the app loads them (bootstrap.ts).
 import '../../../web/packages/presentation/src/tokens.css';
@@ -115,8 +115,7 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
 } else if (view === 'made') {
   // Frame 22's made note over the world, with the banner's made form.
   add(areaBanner({ name: 'Glass terraces', over: CREATE_WORDS.madeFromYourWords }).root).style.opacity = '1';
-  const land = { title: 'on a coast, with a beach below and a terraced hill behind', chosen_by: 'words', words: ['by the sea'], fell_back: false };
-  add(madeNote(madeColumns({ inIt: 'Four pools, a hotel, two pavilions, 40 people', set: setValue(land), notInItYet: 'A lighthouse', spent: madeSpent({ spentUsd: 0.31 }, '1.4227') })).root);
+  add(madeNote(madeLine({ notes: 12, spent: { spentUsd: '0.0058', unknownUsd: '0' }, leftOut: ['fishing', 'wooden boats'] }) ?? '').root);
 } else if (view === 'page') {
   const shown = page({ form: 'character' });
   shown.open(root);

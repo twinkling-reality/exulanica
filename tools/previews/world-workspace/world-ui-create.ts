@@ -527,8 +527,6 @@ export function lightHint(key: string, word: string, shortcut: string): HTMLSpan
   return hint;
 }
 
-export interface MadeNoteColumn { readonly label: string; readonly value: string }
-
 export interface MadeNote {
   readonly root: HTMLElement;
   /** Fades it out over 300 ms and removes it (the first key or click, N14). */
@@ -536,21 +534,14 @@ export interface MadeNote {
 }
 
 /**
- * The made note (frame 22, N13): glass, centred at bottom 96, its columns in order, each a label
- * over a value that wraps within its column; an empty one is left out. Announced once (N20).
+ * The made note (frame 22, N13; ROOT's sweep of 27 October): glass, centred at bottom 96, one plain line of what the
+ * making used and left out (create-words.mjs's madeLine). Announced once (N20).
  */
-export function madeNote(columns: readonly MadeNoteColumn[]): MadeNote {
+export function madeNote(line: string): MadeNote {
   const root = element('div', 'wu-made-note wu-glass');
   root.setAttribute('role', 'status');
   // The status region goes on the page empty and is filled after (N24), so it is announced once.
-  const fill = (): void => {
-    for (const column of columns) {
-      if (!column.value.trim()) continue;
-      const part = element('div', 'wu-made-column');
-      part.append(element('p', 'wu-made-label', column.label), element('p', 'wu-made-value', column.value));
-      root.append(part);
-    }
-  };
+  const fill = (): void => { root.append(element('p', 'wu-made-line', line)); };
   window.setTimeout(fill, 0);
   let leaving = 0;
   return {

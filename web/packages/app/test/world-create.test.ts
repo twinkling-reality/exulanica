@@ -25,7 +25,7 @@ interface CreateParts {
   makingSteps(): { readonly root: HTMLElement; set(steps: readonly Step[]): void };
   webNotes(): { readonly root: HTMLElement; notes(label: string, notes: readonly { aspect: string; text: string }[]): void; instead(label: string, line: string): void };
   quietCommand(options: { onPress: () => void; place?: 'quiet' | 'row' | 'corner' }): HTMLButtonElement;
-  madeNote(columns: readonly { label: string; value: string }[]): { readonly root: HTMLElement; dismiss(): void };
+  madeNote(line: string): { readonly root: HTMLElement; dismiss(): void };
 }
 interface CreateSteps { startCards(recipes?: readonly unknown[], kinds?: readonly unknown[]): StripCard[] }
 // Joined paths: the test runner still finds the files, and the type checker leaves the preview
@@ -245,16 +245,17 @@ describe('the making view', () => {
 });
 
 describe('the made note', () => {
-  it('is announced once, leaves an empty column out and leaves when dismissed', async () => {
+  it('is announced once, says its one plain line with no labels, and leaves when dismissed', async () => {
     vi.useFakeTimers();
     const { madeNote } = await parts();
-    const note = madeNote([{ label: 'In it', value: 'Four pools, a hotel' }, { label: 'Not in it yet', value: ' ' }, { label: 'Spent', value: '$0.31 of at most $1.43' }]);
+    const note = madeNote('12 notes from the web · spent $0.0058 · not in it yet: fishing, wooden boats');
     document.body.append(note.root);
     expect(note.root.getAttribute('role')).toBe('status');
     // On the page empty, then filled, so it is announced once (N24).
     expect(note.root.childElementCount).toBe(0);
     vi.advanceTimersByTime(0);
-    expect([...note.root.querySelectorAll('.wu-made-label')].map((one) => one.textContent)).toEqual(['In it', 'Spent']);
+    expect(note.root.textContent).toBe('12 notes from the web · spent $0.0058 · not in it yet: fishing, wooden boats');
+    expect(note.root.querySelector('.wu-made-label')).toBeNull();
     note.dismiss();
     expect(note.root.dataset.leaving).toBe('true');
     vi.advanceTimersByTime(300);
@@ -1062,8 +1063,8 @@ describe('Create a world with web notes', () => {
     expect(words.slice(0, 4)).toEqual(['Waiting to start', 'Choosing what to look up', 'Searching the web', 'Writing notes from what it found']);
     expect(words.filter((one) => one === 'Waiting to start')).toHaveLength(1);
     await settle(); await settle();
-    const handed = JSON.parse(sessionStorage.getItem('exulanica.made.v1') ?? 'null') as { columns: { label: string; value: string }[] } | null;
-    expect(handed?.columns.find((column) => column.label === 'From the web')?.value).toBe('2 notes from 3 searches');
+    const handed = JSON.parse(sessionStorage.getItem('exulanica.made.v1') ?? 'null') as { line: string | null } | null;
+    expect(handed?.line?.startsWith('2 notes from the web · spent $')).toBe(true);
   });
 
   it('drafts from the words alone where no notes came, and says why where they would stand', async () => {

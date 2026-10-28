@@ -1509,8 +1509,8 @@ export async function mountContextualWorld({ state, renderer, selection, objects
       : areaBanner({ name: entry.title, sub: populationLine(selection.people?.clock().population ?? null) ?? undefined });
     root.append(banner.root);
     void banner.play().then(() => banner.remove());
-    if (made !== null && made.columns.length > 0) {
-      const note = madeNote(made.columns);
+    if (made !== null && made.line !== null) {
+      const note = madeNote(made.line);
       root.append(note.root);
       const gone = new AbortController();
       lifetime.signal.addEventListener('abort', () => gone.abort(), { once: true });

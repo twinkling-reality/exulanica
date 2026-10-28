@@ -75,14 +75,12 @@
 .wu-light-hint::after { content: none; }
 .wu-light-hint:hover { background: none; }
 
-/* ---------- The made note (frame 22, N13): glass in the world, centred at bottom 96 (L1) ---------- */
-.wu-made-note { position: absolute; left: 50%; bottom: calc(96 * var(--u)); transform: translateX(-50%); display: grid; grid-auto-flow: column; grid-auto-columns: auto; gap: 0 calc(40 * var(--u));
-  width: max-content; max-width: calc(100vw - 160 * var(--u)); padding: calc(22 * var(--u)) calc(30 * var(--u)); border-radius: calc(20 * var(--u)); pointer-events: auto; text-shadow: none;
+/* ---------- The made note (frame 22, N13): glass in the world, centred at bottom 96 (L1), one plain line ---------- */
+.wu-made-note { position: absolute; left: 50%; bottom: calc(96 * var(--u)); transform: translateX(-50%);
+  width: max-content; max-width: calc(100vw - 160 * var(--u)); padding: calc(14 * var(--u)) calc(22 * var(--u)); border-radius: calc(14 * var(--u)); pointer-events: auto; text-shadow: none;
   animation: wu-note-in var(--t-note-in) var(--ease) both; }
 .wu-made-note[data-leaving="true"] { animation: wu-note-out var(--t-note-out) var(--ease) both; }
-.wu-made-label { margin: 0 0 calc(10 * var(--u)); font: 500 max(12px, calc(13 * var(--u)))/1 var(--font-sans); letter-spacing: .03em; color: var(--ink-3); }
-/* Values wrap within their column (N13). */
-.wu-made-value { margin: 0; max-width: calc(380 * var(--u)); font: 400 calc(18 * var(--u))/1.3 var(--font-sans); color: var(--ink); }
+.wu-made-line { margin: 0; font: 400 max(14px, calc(16 * var(--u)))/1.4 var(--font-sans); color: var(--ink); text-wrap: pretty; }
 
 @media (prefers-reduced-motion: reduce) {
   .wu-made-note, .wu-made-note[data-leaving="true"] { animation-duration: 120ms; }

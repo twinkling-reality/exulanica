@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import {
-  NOTES_WORDS, aspectLabel, notesAskLine, notesFoot, sumUsd, webColumn, webNotesLabel, webTip,
+  NOTES_WORDS, aspectLabel, madeLine, notesAskLine, notesFoot, sumUsd, webNotesLabel, webTip,
   CREATE_WORDS, PROVIDER_NAMES, REFUSAL_BY_CODE, REFUSAL_WORDS, STEP_WORDS, budgetShort, cardSub, ceilingAmount, countWords, keyName, leftAmount, madeSpent, hostKeepsLine, priceLine,
-  priceUp, priceUpTo, refusalSpent, refusalWords, setValue, spendLine, spentUpTo, startsLeftLine, stepTime, stoppedLine,
+  priceUp, priceUpTo, refusalSpent, refusalWords, spendLine, spentUpTo, startsLeftLine, stepTime, stoppedLine,
 } from './create-words.mjs';
 
 // Frame 20's words, as WORDS.md "Making a world" and N1 to N20 say them.
@@ -100,7 +100,13 @@ assert.equal(CREATE_WORDS.beingMade, 'Being made…');
 assert.equal(spendLine({ spentUsd: 0.12 }, '1.43'), 'Spent $0.12 of at most $1.43');
 assert.equal(spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), 'Spent $0.12 of at most $1.43, and up to $0.03 not known yet');
 assert.equal(CREATE_WORDS.madeFromYourWords, 'Made from your words');
-assert.deepEqual([CREATE_WORDS.inIt, CREATE_WORDS.set, CREATE_WORDS.notInItYet, CREATE_WORDS.spent], ['In it', 'Set', 'Not in it yet', 'Spent']);
+// The made note: one plain line, each part only where it has something to say, no labels and no Set sentence (ROOT's
+// sweep of 27 October).
+assert.equal(madeLine({ notes: 12, spent: { spentUsd: 0.0058, unknownUsd: 0 }, leftOut: ['fishing', 'wooden boats'] }), '12 notes from the web · spent $0.0058 · not in it yet: fishing, wooden boats');
+assert.equal(madeLine({ notes: 1, spent: null, leftOut: [] }), '1 note from the web');
+assert.equal(madeLine({ notes: null, spent: { spentUsd: 0.31, unknownUsd: 0.02 }, leftOut: [' ', 'a lighthouse'] }), 'spent $0.31, up to $0.02 not known yet · not in it yet: a lighthouse');
+assert.equal(madeLine({ notes: 0, spent: null, leftOut: [] }), null);
+assert.equal(madeLine({}), null);
 assert.equal(madeSpent({ spentUsd: 0.31 }, '1.4227'), '$0.31 of at most $1.43');
 
 // Money (rule 5): a limit rounded up to the cent; under a cent four places; "less than $0.0001"; "$0".
@@ -180,22 +186,11 @@ for (const key of Object.values(REFUSAL_BY_CODE)) assert.ok(Object.hasOwn(REFUSA
 assert.equal(refusalSpent({ spentUsd: 0.02 }), 'Spent $0.02 before it stopped.');
 assert.equal(refusalSpent({ spentUsd: 0 }), null);
 
-// The Set value (TERRAIN's WORDING.md without its "Set", N13): the five cases.
-const coast = 'on a coast, with a beach below and a terraced hill behind';
-// N26: each starts with a capital; a setting is its titles, then the land, then the words.
-assert.equal(setValue({ title: 'on gentle hills, with mountains far off', chosen_by: 'default', words: [], fell_back: false }), 'On gentle hills, with mountains far off');
-assert.equal(setValue({ title: 'in a valley between two long ridges', chosen_by: 'words', words: ['valley'], fell_back: false }), 'In a valley between two long ridges, for your words “valley”');
-assert.equal(setValue({ title: coast, chosen_by: 'setting', words: [], fell_back: false }, { parts: [{ axis: 'ground', key: 'sea', title: 'By the sea' }], words: ['by the sea'] }),
-  `By the sea, ${coast}, for your words “by the sea”`);
-assert.equal(setValue({ title: coast, chosen_by: 'setting', words: [], fell_back: false }, { parts: [{ title: 'Night' }, { title: 'By the sea' }], words: ['at night', 'by the sea'] }),
-  `Night, by the sea, ${coast}, for your words “at night”, “by the sea”`);
-assert.equal(setValue({ title: coast, chosen_by: 'words', words: ['coast'], fell_back: true }), `On level ground, since this place did not fit the land ${coast}`);
 // N25's sentences and codes.
 assert.equal(CREATE_WORDS.notOffered, 'Making a world from your words isn’t offered here. You can still start from these:');
 assert.equal(refusalWords('world_draft_price_unavailable'), 'The price can’t be read right now. Trying again.');
 assert.equal(refusalWords('tile_budget_reached'), 'You’ve reached today’s limit for new worlds. Try again tomorrow.');
 assert.equal(refusalWords('world_not_drafted'), 'No world could be made from these words. Try again, or say it another way.');
-assert.equal(setValue(null), null);
 
 // Never on screen: a code, "US$", "provider", "session", an em dash; no line ends in the old "Design" line.
 const said = [
@@ -203,7 +198,7 @@ const said = [
   priceLine('1.43'), priceLine('1.43', '0.05'), priceUp('$1.60'), budgetShort('0.0344', '0.01'), spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), startsLeftLine(2),
   refusalSpent({ spentUsd: 0.02 }), stoppedLine(bound, { spentUsd: 0.0058368 }),
   priceUpTo('1.43', '0.05'), spentUpTo({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), webTip(3, '0.05'), webNotesLabel(3),
-  setValue({ title: coast, chosen_by: 'setting', words: [], fell_back: false }, { parts: [{ title: 'By the sea' }], words: ['by the sea'] }),
+  madeLine({ notes: 12, spent: { spentUsd: 0.0058, unknownUsd: 0.001 }, leftOut: ['fishing', 'wooden boats'] }),
 ];
 for (const line of said) {
   assert.doesNotMatch(line, /\u2014|US\$|provider|session|[a-z]+_[a-z_]+|Design\./u, line);
@@ -255,7 +250,7 @@ const words = process.env.WORDS_MD;
 if (words && existsSync(words)) {
   const text = readFileSync(words, 'utf8').replace(/\s+/gu, ' ');
   for (const line of [CREATE_WORDS.title, CREATE_WORDS.describeIt, CREATE_WORDS.orStartFrom, CREATE_WORDS.buildItYourself, CREATE_WORDS.loading,
-    CREATE_WORDS.noModel, CREATE_WORDS.budgetSpent, CREATE_WORDS.leave, CREATE_WORDS.madeFromYourWords, CREATE_WORDS.notInItYet,
+    CREATE_WORDS.noModel, CREATE_WORDS.budgetSpent, CREATE_WORDS.leave, CREATE_WORDS.madeFromYourWords,
     STEP_WORDS.queued, STEP_WORDS.choosing, STEP_WORDS.drafting, STEP_WORDS.making, STEP_WORDS.land,
     REFUSAL_WORDS.hourlyLimit.replace('’', "'"), REFUSAL_WORDS.capacity, REFUSAL_WORDS.tooSlow, REFUSAL_WORDS.interrupted, REFUSAL_WORDS.failed,
     spendLine({ spentUsd: 0.12 }, '0.21'), '2 more worlds can be started this hour.', 'Spent $0.02 before it stopped.',
@@ -274,9 +269,6 @@ assert.equal(notesFoot(3), 'A model wrote these from 3 web searches. They help p
 assert.equal(NOTES_WORDS.notMade, 'The web notes could not be made, so it is made from your words alone.');
 assert.equal(NOTES_WORDS.nothingFound, 'The searches found nothing to use, so it is made from your words alone.');
 assert.equal(NOTES_WORDS.notReached, 'This kind of place is made from your words alone, so the notes were not used.');
-assert.equal(CREATE_WORDS.fromTheWeb, 'From the web');
-assert.equal(webColumn(7, 3), '7 notes from 3 searches');
-assert.equal(webColumn(1, 1), '1 note from 1 search');
 // Each note's aspect by the aspect catalog's label, never a key the page names.
 assert.equal(aspectLabel('landscape_and_plants'), 'Landscape and plants');
 assert.equal(sumUsd('0.20766720', '0.0153'), '0.22296720');
