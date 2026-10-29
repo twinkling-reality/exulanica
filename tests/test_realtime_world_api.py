@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+import pytest
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.routes.realtime_world import get_realtime_room, register_realtime_room
@@ -29,6 +30,7 @@ from exulanica.world.realtime_runtime import (
 )
 from exulanica.world.society_sessions import SESSION_OPENED
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 TOKEN = "realtime-test-owner-token-0123456789abcdef"
 
@@ -208,7 +210,7 @@ def test_society_hydration_and_checkpoint_roundtrip_restores_exact_state_sha256(
     assert len(room.checkpoints) == 1
     expected_sha256 = room.state_sha256()
 
-    repo = RealtimeCheckpointRepository(None, workspace_id)
+    repo = RealtimeCheckpointRepository(workspace_id)
     saved_record = repo.save_checkpoint(room, room.checkpoints[-1])
     assert saved_record["profile"] == EPOCH_CHECKPOINT_PROFILE
     assert saved_record["state_sha256"] == expected_sha256
@@ -511,8 +513,9 @@ def test_websocket_realtime_stream_20hz_deltas_and_nonblocking_proposals(tmp_pat
         assert ckpt_msg["tick"] == 6
 
 
-def test_postgres_checkpoint_table_persistence_and_hydration(spine_schema) -> None:
-    """When PostgreSQL is available, checkpoints persist to world_realtime_checkpoint."""
+def test_postgres_hydration_restores_the_process_checkpoint(spine_schema) -> None:
+    """A room hydrated from PostgreSQL restores this process's checkpoint, and nothing makes a
+    checkpoint table at run time: a table comes from a migration, with grants and an erasure."""
     from pg_harness import open_scratch_connection
 
     clear_in_memory_checkpoints()
@@ -534,11 +537,8 @@ def test_postgres_checkpoint_table_persistence_and_hydration(spine_schema) -> No
             room.step_tick(tier2_dispatch_limit=4)
 
         expected_sha = room.state_sha256()
-        repo = RealtimeCheckpointRepository(conn, workspace_id)
+        repo = RealtimeCheckpointRepository(workspace_id)
         repo.save_checkpoint(room, room.checkpoints[-1])
-
-        # Clear process cache so restoration must read from PostgreSQL table
-        clear_in_memory_checkpoints()
 
         restored = hydrate_room_from_postgres(
             conn,
@@ -550,5 +550,36 @@ def test_postgres_checkpoint_table_persistence_and_hydration(spine_schema) -> No
         assert restored.state_sha256() == expected_sha
         assert restored.tick == 10
         assert restored.epoch_seq == 1
+        table = conn.execute("select to_regclass('world_realtime_checkpoint')").fetchone()
+        assert table is not None and table[0] is None
     finally:
         conn.close()
+
+
+@pytest.mark.parametrize("headers", [{}, {"Authorization": "Bearer not-a-configured-token"}])
+def test_websocket_realtime_stream_refuses_a_caller_without_a_held_token(
+    tmp_path: Path, headers: dict[str, str]
+) -> None:
+    """The stream answers only a bearer token the installation holds: never a workspace named in the
+    address, nor the workspace of a room already open at the version."""
+    clear_in_memory_checkpoints()
+    workspace_id = uuid.uuid4()
+    version_id = uuid.uuid4()
+    world_id = "ws-refused-world"
+    app, _held = _build_test_app(tmp_path, workspace_id)
+    room = hydrate_room_from_society_state(
+        world_id=world_id, version_id=str(version_id), seed="ws-refused-seed"
+    )
+    register_realtime_room(app, workspace_id, room)
+
+    with TestClient(app) as client:
+        with (
+            pytest.raises(WebSocketDisconnect) as refused,
+            client.websocket_connect(
+                f"/world/versions/{version_id}/realtime/stream"
+                f"?world_id={world_id}&workspace_id={workspace_id}",
+                headers=headers,
+            ) as ws,
+        ):
+            ws.receive_json()
+        assert refused.value.code == 1008

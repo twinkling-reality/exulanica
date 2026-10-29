@@ -29044,18 +29044,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
-       "anyOf": [
-        {
-         "type": "string",
-         "minLength": 1,
-         "maxLength": 200
-        },
-        {
-         "type": "null"
-        }
-       ],
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
        "title": "World Id"
       }
      },
@@ -29189,18 +29182,11 @@
      {
       "name": "world_id",
       "in": "query",
-      "required": false,
+      "required": true,
       "schema": {
-       "anyOf": [
-        {
-         "type": "string",
-         "minLength": 1,
-         "maxLength": 200
-        },
-        {
-         "type": "null"
-        }
-       ],
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
        "title": "World Id"
       }
      },

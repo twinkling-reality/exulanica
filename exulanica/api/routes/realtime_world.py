@@ -321,7 +321,7 @@ def get_realtime_state(
     connection: ReadOnlyConnection,
     session: CurrentSession,
     request: Request,
-    world_id: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
+    world_id: Annotated[str, Query(min_length=1, max_length=200)],
     observer_x_mm: int = 0,
     observer_y_mm: int | None = None,
     observer_z_mm: int = 0,
@@ -378,7 +378,7 @@ def post_realtime_step(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
-    world_id: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
+    world_id: Annotated[str, Query(min_length=1, max_length=200)],
 ) -> dict[str, Any]:
     """Advance the 20 Hz room by 1..100 ticks and apply player actions / Tier 2 proposals."""
     room = _resolve_or_hydrate_room(
@@ -390,7 +390,7 @@ def post_realtime_step(
         bootstrap=body.bootstrap,
     )
     resolved_y_mm = body.observer_y_mm if body.observer_y_mm is not None else body.observer_z_mm
-    repo = RealtimeCheckpointRepository(connection, session.workspace_id)
+    repo = RealtimeCheckpointRepository(session.workspace_id)
     return _execute_room_steps(
         room,
         repo,
@@ -405,31 +405,23 @@ def post_realtime_step(
     )
 
 
-def _authenticate_websocket(websocket: WebSocket) -> uuid.UUID | None:
-    """Resolve the caller's workspace_id for a WebSocket stream connection."""
+def _authenticate_websocket(websocket: WebSocket) -> uuid.UUID:
+    """The caller's workspace for a stream connection, from its bearer token alone.
+
+    A caller with no token, or a token the installation does not hold, is refused: the stream once
+    took a ``workspace_id`` from its address, or the workspace of any room open at the version, or a
+    fixed workspace, so anyone who could reach it could watch and steer another workspace's room.
+    """
     services = getattr(websocket.app.state, "services", None)
+    tokens = getattr(services, "tokens", None) if services is not None else None
     auth_header = websocket.headers.get("authorization")
-    if auth_header and services is not None and getattr(services, "tokens", None) is not None:
-        scheme, _, token = auth_header.partition(" ")
-        if scheme.lower() != "bearer" or not token.strip():
-            raise TokenNotAccepted("invalid bearer header")
-        session, _held = services.tokens.grant_for(token.strip())
-        return session.workspace_id
-
-    ws_param = websocket.query_params.get("workspace_id")
-    if ws_param:
-        try:
-            return uuid.UUID(ws_param)
-        except ValueError:
-            pass
-
-    rooms = _rooms_map(websocket.app)
-    version_str = str(websocket.path_params.get("version_id", ""))
-    for (ws_id_str, ver_str), _room in rooms.items():
-        if ver_str == version_str:
-            return uuid.UUID(ws_id_str)
-
-    return uuid.UUID("00000000-0000-0000-0000-000000000001")
+    if not auth_header or tokens is None:
+        raise TokenNotAccepted("a stream needs a bearer token")
+    scheme, _, token = auth_header.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        raise TokenNotAccepted("invalid bearer header")
+    session, _held = tokens.grant_for(token.strip())
+    return session.workspace_id
 
 
 @router.websocket("/stream")
@@ -444,7 +436,6 @@ async def websocket_realtime_stream(
         await websocket.close(code=1008)
         return
 
-    assert workspace_id is not None
     await websocket.accept()
 
     observer_x_mm = int(websocket.query_params.get("observer_x_mm", "0"))
@@ -467,7 +458,7 @@ async def websocket_realtime_stream(
         )
         rooms[key] = room
 
-    repo = RealtimeCheckpointRepository(None, workspace_id)
+    repo = RealtimeCheckpointRepository(workspace_id)
 
     # Emit initial 20 Hz AOI delta frame immediately on connection
     initial_frame = _build_aoi_snapshot_frame(

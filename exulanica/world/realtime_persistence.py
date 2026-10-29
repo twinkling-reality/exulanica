@@ -10,11 +10,14 @@ and societies in PostgreSQL:
      and its recorded model / Door / player deciders (``world_society_model_choice``).
    - Builds an authoritative :class:`~exulanica.world.realtime_runtime.RealtimeWorldRoom` with
      integer-millimeter coordinates and deterministic AOI spatial hashing.
-2. **Durable Epoch Checkpoint Persistence (:class:`RealtimeCheckpointRepository`)**:
-   - Persists :meth:`~exulanica.world.realtime_runtime.RealtimeWorldRoom.flush_epoch_checkpoint`
+2. **Epoch checkpoints (:class:`RealtimeCheckpointRepository`)**:
+   - Keeps :meth:`~exulanica.world.realtime_runtime.RealtimeWorldRoom.flush_epoch_checkpoint`
      envelopes (``exulanica.realtime-epoch-checkpoint/v1``: canonical ``state_sha256``, tick,
-     positions, and applied/refused Tier 2 decision receipts) into PostgreSQL and verifies
-     exact ``state_sha256`` round-trip restoration.
+     positions, and applied/refused Tier 2 decision receipts) in this process, keyed by
+     workspace, world and version, and verifies exact ``state_sha256`` round-trip restoration.
+   - No table holds them. A table may only come from a migration, with its grants and a place in
+     the workspace's erasure; this module once created one at run time, which only an owner
+     connection could do and which no erasure reached, so a durable store waits for that migration.
 """
 
 from __future__ import annotations
@@ -22,11 +25,10 @@ from __future__ import annotations
 import hashlib
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import Any, Final
+from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
-from psycopg.types.json import Jsonb
 
 from exulanica.canonical import canonical_json
 from exulanica.world.deciders import decider as validate_decider
@@ -43,7 +45,6 @@ from exulanica.world.realtime_runtime import (
 from exulanica.world.society_sessions import sessions_from
 
 __all__ = [
-    "CHECKPOINT_TABLE_DDL",
     "RealtimeCheckpointRepository",
     "clear_in_memory_checkpoints",
     "default_generated_town_places",
@@ -51,30 +52,9 @@ __all__ = [
     "hydrate_room_from_society_state",
 ]
 
-CHECKPOINT_TABLE_DDL: Final = """
-create table if not exists world_realtime_checkpoint (
-    workspace_id uuid not null,
-    world_id text not null,
-    version_id uuid not null,
-    epoch_seq bigint not null check (epoch_seq > 0),
-    start_tick bigint not null check (start_tick >= 0),
-    end_tick bigint not null check (end_tick >= start_tick),
-    world_minute bigint not null check (world_minute >= 0),
-    state_sha256 text not null check (state_sha256 ~ '^[0-9a-f]{64}$'),
-    checkpoint_sha256 text not null check (checkpoint_sha256 ~ '^[0-9a-f]{64}$'),
-    positions jsonb not null,
-    receipt_batch jsonb not null,
-    crossings_bound jsonb not null,
-    room_state jsonb not null,
-    checkpoint_record jsonb not null,
-    recorded_at timestamptz not null default statement_timestamp(),
-    primary key (workspace_id, world_id, version_id, epoch_seq)
-)
-"""
 
-# Process-level fallback cache keyed by (str(workspace_id), world_id, str(version_id))
-# so non-DDL runtime roles and unit tests without table creation still persist checkpoints
-# across requests and connections within the process.
+# The process's checkpoints, keyed by (str(workspace_id), world_id, str(version_id)), held across
+# requests and connections for as long as the process runs.
 _PROCESS_CHECKPOINTS: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
 
 
@@ -401,34 +381,19 @@ def hydrate_room_from_society_state(
 
 
 class RealtimeCheckpointRepository:
-    """Durable PostgreSQL + process repository for ``exulanica.realtime-epoch-checkpoint/v1``."""
+    """This process's store for ``exulanica.realtime-epoch-checkpoint/v1``, one per workspace."""
 
-    def __init__(
-        self,
-        connection: psycopg.Connection | None,
-        workspace_id: uuid.UUID,
-    ) -> None:
-        self.connection = connection
+    def __init__(self, workspace_id: uuid.UUID) -> None:
         self.workspace_id = workspace_id
-
-    def _ensure_table(self) -> bool:
-        if self.connection is None:
-            return False
-        try:
-            with self.connection.transaction():
-                self.connection.execute(CHECKPOINT_TABLE_DDL)
-            return True
-        except Exception:
-            return False
 
     def save_checkpoint(
         self,
         room: RealtimeWorldRoom,
         checkpoint: EpochCheckpoint | None = None,
     ) -> dict[str, Any]:
-        """Persist a flushed ``EpochCheckpoint`` and its canonical room state into PostgreSQL."""
+        """Keep a flushed ``EpochCheckpoint`` and its canonical room state for this workspace."""
         record = room.to_checkpoint_record(checkpoint)
-        # Verify zero-float canonical serialization before persisting
+        # Verify zero-float canonical serialization before keeping it
         canonical_json(record)
 
         key = (str(self.workspace_id), room.world_id, str(room.version_id))
@@ -436,77 +401,6 @@ class RealtimeCheckpointRepository:
         bucket[:] = [item for item in bucket if item["epoch_seq"] != record["epoch_seq"]]
         bucket.append(record)
         bucket.sort(key=lambda item: int(item["epoch_seq"]))
-
-        if self.connection is not None and self._ensure_table():
-            try:
-                version_uuid = uuid.UUID(str(room.version_id))
-            except ValueError:
-                version_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, str(room.version_id))
-            try:
-                with self.connection.transaction():
-                    self.connection.execute(
-                        """
-                        insert into world_realtime_checkpoint (
-                            workspace_id,
-                            world_id,
-                            version_id,
-                            epoch_seq,
-                            start_tick,
-                            end_tick,
-                            world_minute,
-                            state_sha256,
-                            checkpoint_sha256,
-                            positions,
-                            receipt_batch,
-                            crossings_bound,
-                            room_state,
-                            checkpoint_record
-                        ) values (
-                            %(workspace_id)s,
-                            %(world_id)s,
-                            %(version_id)s,
-                            %(epoch_seq)s,
-                            %(start_tick)s,
-                            %(end_tick)s,
-                            %(world_minute)s,
-                            %(state_sha256)s,
-                            %(checkpoint_sha256)s,
-                            %(positions)s,
-                            %(receipt_batch)s,
-                            %(crossings_bound)s,
-                            %(room_state)s,
-                            %(checkpoint_record)s
-                        )
-                        on conflict (workspace_id, world_id, version_id, epoch_seq)
-                        do update set
-                            state_sha256 = excluded.state_sha256,
-                            checkpoint_sha256 = excluded.checkpoint_sha256,
-                            positions = excluded.positions,
-                            receipt_batch = excluded.receipt_batch,
-                            crossings_bound = excluded.crossings_bound,
-                            room_state = excluded.room_state,
-                            checkpoint_record = excluded.checkpoint_record
-                        """,
-                        {
-                            "checkpoint_record": Jsonb(record),
-                            "checkpoint_sha256": record["checkpoint_sha256"],
-                            "crossings_bound": Jsonb(record["crossings_bound"]),
-                            "end_tick": record["end_tick"],
-                            "epoch_seq": record["epoch_seq"],
-                            "positions": Jsonb(record["positions"]),
-                            "receipt_batch": Jsonb(record["receipt_batch"]),
-                            "room_state": Jsonb(record["room_state"]),
-                            "start_tick": record["start_tick"],
-                            "state_sha256": record["state_sha256"],
-                            "version_id": version_uuid,
-                            "world_id": room.world_id,
-                            "world_minute": record["world_minute"],
-                            "workspace_id": self.workspace_id,
-                        },
-                    )
-            except Exception:
-                pass
-
         return record
 
     def load_checkpoint_record(
@@ -516,54 +410,8 @@ class RealtimeCheckpointRepository:
         version_id: str | uuid.UUID,
         epoch_seq: int | None = None,
     ) -> dict[str, Any] | None:
-        """Load the latest (or specified ``epoch_seq``) checkpoint record from PostgreSQL."""
-        version_str = str(version_id)
-        if self.connection is not None:
-            try:
-                version_uuid = uuid.UUID(version_str)
-            except ValueError:
-                version_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, version_str)
-            try:
-                with self.connection.transaction():
-                    if epoch_seq is None:
-                        row = (
-                            self.connection.cursor(row_factory=dict_row)
-                            .execute(
-                                """
-                                select checkpoint_record
-                                  from world_realtime_checkpoint
-                                 where workspace_id = %s
-                                   and world_id = %s
-                                   and version_id = %s
-                                 order by epoch_seq desc
-                                 limit 1
-                                """,
-                                (self.workspace_id, world_id, version_uuid),
-                            )
-                            .fetchone()
-                        )
-                    else:
-                        row = (
-                            self.connection.cursor(row_factory=dict_row)
-                            .execute(
-                                """
-                                select checkpoint_record
-                                  from world_realtime_checkpoint
-                                 where workspace_id = %s
-                                   and world_id = %s
-                                   and version_id = %s
-                                   and epoch_seq = %s
-                                """,
-                                (self.workspace_id, world_id, version_uuid, epoch_seq),
-                            )
-                            .fetchone()
-                        )
-                    if row is not None and isinstance(row.get("checkpoint_record"), Mapping):
-                        return dict(row["checkpoint_record"])
-            except Exception:
-                pass
-
-        key = (str(self.workspace_id), world_id, version_str)
+        """The latest (or the given ``epoch_seq``) checkpoint record kept for this world version."""
+        key = (str(self.workspace_id), world_id, str(version_id))
         bucket = _PROCESS_CHECKPOINTS.get(key, [])
         if not bucket:
             return None
@@ -675,7 +523,7 @@ def hydrate_room_from_postgres(
         except Exception:
             version_exists = False
 
-    repo = RealtimeCheckpointRepository(connection, workspace_id)
+    repo = RealtimeCheckpointRepository(workspace_id)
     if prefer_checkpoint and resolved_world_id:
         restored = repo.restore_room(world_id=resolved_world_id, version_id=version_id)
         if restored is not None:
@@ -721,10 +569,10 @@ def hydrate_room_from_postgres(
                     """
                     select document
                       from world_society_model_choice
-                     where workspace_id = %s and society_id = %s
+                     where workspace_id = %s and world_id = %s and society_id = %s
                      order by choice_seq asc
                     """,
-                    (workspace_id, society_id),
+                    (workspace_id, resolved_world_id, society_id),
                 )
                 .fetchall()
             )

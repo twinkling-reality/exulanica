@@ -707,6 +707,11 @@ NOT_PROJECTED: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
             "a read-only preview of a made building's storeys for the workspace's build mode; no "
             "Companion plan step prepares through it"
         ),
+        ("POST", "/world/versions/{version_id}/realtime/step"): (
+            "advances the workspace's 20 Hz room in the API's process by up to 100 ticks with the "
+            "moves and proposals the caller sends; it writes no record a version action reads, and "
+            "no Companion plan step makes it"
+        ),
         ("POST", "/world/versions/{version_id}/society/decisions/{request_id}/asks"): (
             "asks another model a recorded decision again and keeps its answer beside the "
             "original, never applied; it changes nothing a version action reads"

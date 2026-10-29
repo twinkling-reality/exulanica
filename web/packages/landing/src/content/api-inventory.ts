@@ -30931,18 +30931,11 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
       {
         "name": "world_id",
         "in": "query",
-        "required": false,
+        "required": true,
         "schema": {
-          "anyOf": [
-            {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 200
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
           "title": "World Id"
         }
       },
@@ -31080,18 +31073,11 @@ export const API_INVENTORY: readonly InventoryOperation[] = [
       {
         "name": "world_id",
         "in": "query",
-        "required": false,
+        "required": true,
         "schema": {
-          "anyOf": [
-            {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 200
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
           "title": "World Id"
         }
       },
