@@ -257,9 +257,9 @@ def _build_messages(
     instruction = "You are deciding what one inhabitant of this world does next."
     lines: list[str] = []
     if context:
-        role = decision_roles().for_request(
-            str(request.get("profile") or "exulanica.society-decision-request/v2")
-        )
+        # The request names its own role by profile; one that names none has no role to render with.
+        profile = request.get("profile")
+        role = decision_roles().for_request(profile) if isinstance(profile, str) else None
         if role is not None:
             try:
                 mechanism_raw = (request.get("provider_config") or {}).get("mechanism")
