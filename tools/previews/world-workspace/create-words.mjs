@@ -255,11 +255,11 @@ export const madeSpent = ({ spentUsd, unknownUsd = 0 }, maximumUsd) =>
 export const spendLine = (spent, maximumUsd) => `Spent ${madeSpent(spent, maximumUsd)}`;
 
 /**
- * The price in the composer's foot (the composer page's mock): "up to $0.26", the most a world made now may spend.
+ * The price in the composer's foot (the composer page's mock): "Up to $0.26", the most a world made now may spend.
  * Where less than that is left here (the offer's `left_usd`), the most is what is left (A1b), rounded down.
  */
 export const priceUpTo = (maximumUsd, leftUsd = null) =>
-  `up to ${leftUsd !== null && Number(leftUsd) < Number(maximumUsd) ? leftAmount(leftUsd) : ceilingAmount(maximumUsd)}`;
+  `Up to ${leftUsd !== null && Number(leftUsd) < Number(maximumUsd) ? leftAmount(leftUsd) : ceilingAmount(maximumUsd)}`;
 
 /** Under the making view's steps, live: "Spent $0.0061 of up to $0.26", with a part not known yet (N10, J5). */
 export const spentUpTo = ({ spentUsd, unknownUsd = 0 }, maximumUsd) =>
@@ -307,16 +307,16 @@ export const notesFoot = (searches) =>
 
 /**
  * The note a world Create made opens with (N13; ROOT's sweep of 27 October): one plain line of what the making used and
- * left out, each part only where it has something to say, "12 notes from the web · spent $0.0058 · not in it yet:
+ * left out, each part only where it has something to say, "12 notes from the web · $0.0058 · Not in it yet:
  * fishing, wooden boats". `notes` is how many web notes the drafter was handed, `spent` the draft read's spend
  * ({ spentUsd, unknownUsd }), `leftOut` the phrases it left out. Null where there is nothing to say.
  */
 export function madeLine({ notes = null, spent = null, leftOut = [] }) {
   const parts = [];
   if (Number.isSafeInteger(notes) && notes > 0) parts.push(`${counted(notes, 'note', 'notes')} from the web`);
-  if (spent !== null) parts.push(`spent ${amount(spent.spentUsd)}${Number(spent.unknownUsd ?? 0) > 0 ? `, up to ${amount(spent.unknownUsd)} not known yet` : ''}`);
+  if (spent !== null) parts.push(`${amount(spent.spentUsd)}${Number(spent.unknownUsd ?? 0) > 0 ? `, up to ${amount(spent.unknownUsd)} not known yet` : ''}`);
   const left = leftOut.map((phrase) => phrase.trim()).filter(Boolean);
-  if (left.length > 0) parts.push(`not in it yet: ${left.join(', ')}`);
+  if (left.length > 0) parts.push(`Not in it yet: ${left.join(', ')}`);
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 

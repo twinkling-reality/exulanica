@@ -133,7 +133,7 @@ assert.equal(createKey(key('Escape'), { page: 'creating', focus: 'page' }), 'lea
 for (const code of ['Enter', 'KeyW', 'ArrowLeft', 'Space']) assert.equal(createKey(key(code), { page: 'creating', focus: 'page' }), 'silence', code);
 
 // The handoff carries the made note's one line (create-words.mjs's madeLine) to the opening world, for that world only.
-const line = '12 notes from the web · spent $0.0058 · not in it yet: fishing, wooden boats';
+const line = '12 notes from the web · $0.0058 · Not in it yet: fishing, wooden boats';
 assert.equal(MADE_HANDOFF_KEY, 'exulanica.made.v1');
 assert.deepEqual(readMade(writeMade('w-1', line), 'w-1'), { entryId: 'w-1', line, build: false });
 // Blank's handoff opens build mode, with no note; a handoff that says nothing of it opens none.

@@ -64,7 +64,7 @@ assert.equal(DEFAULT_RUN.usd, '0.05000000');
 // The frames' words (08, 09).
 assert.equal(runFor(limits), 'Run · 10 Minutes');
 assert.equal(atMost(limits, true), 'At most $0.05');
-assert.equal(runLength(limits), '10 minutes · at most $0.05');
+assert.equal(runLength(limits), '10 minutes · At most $0.05');
 // A run whose every model is on this computer says no money figure: free (A2).
 assert.equal(runLength(limits, true), '10 minutes · Free');
 const now = Date.parse('2026-10-14T17:20:00Z');

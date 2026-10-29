@@ -75,7 +75,7 @@ describe('making a creature where it will stand', () => {
     expect(root.textContent).toContain('The creature appears here');
     // "Make a creature" over Create's composer, its price in the foot; the model is named on the made card alone.
     expect(root.querySelector('.wu-creature-field .wu-creature-heading')?.textContent).toBe('Make a creature');
-    expect(root.querySelector('.wu-creature-field .wu-composer-price')?.textContent).toBe('up to $0.38');
+    expect(root.querySelector('.wu-creature-field .wu-composer-price')?.textContent).toBe('Up to $0.38');
     expect(root.querySelector('.wu-creature-field textarea')?.getAttribute('placeholder')).toBe('What does the creature look like?');
     expect(root.textContent).not.toContain('Nemotron');
   });
@@ -123,7 +123,7 @@ describe('making a creature where it will stand', () => {
     const parts = [...card.querySelectorAll('.wu-creature-title, .wu-creature-from, .wu-creature-quote, [aria-keyshortcuts], .wu-creature-small')].map((part) => part.textContent);
     expect(parts).toEqual([
       'Made from your words', 'Yellow pond wader', '“a round yellow body with a pale flat bill on two short legs”', 'Place',
-      'Made by Nemotron 3 Super 120B · spent $0.0042',
+      'Nemotron 3 Super 120B · $0.0042',
     ]);
     expect(card.textContent).toBe(parts.join(''));
     // Made, it is held at the stand at once and the keys go back to build mode, which places it; the step then ends.
@@ -720,10 +720,10 @@ describe('web notes before a creature is made', () => {
     expect(root.querySelector(`#${chip.getAttribute('aria-describedby')}`)?.textContent)
       .toBe('Looks up what such a creature looks like before it is made: up to 3 searches with Tavily, which keeps them. Adds at most $0.02.');
     const price = () => root.querySelector('.wu-creature-field .wu-composer-price')?.textContent;
-    expect(price()).toBe('up to $0.10');
+    expect(price()).toBe('Up to $0.10');
     tick(root);
     expect(chip.getAttribute('aria-pressed')).toBe('true');
-    expect(price()).toBe('up to $0.12');
+    expect(price()).toBe('Up to $0.12');
     // Nothing of the old box: no sentence on where the words go under the field, no model named.
     expect(root.textContent).not.toContain('Read the web first');
     expect(root.textContent).not.toContain('Nemotron');
@@ -748,7 +748,7 @@ describe('web notes before a creature is made', () => {
     expect(requested).toEqual([{ purpose: 'things', description: 'a little yellow robot duck', idempotencyKey: 'key-1' }]);
     expect(asked).toEqual([{ words: 'a little yellow robot duck', referenceId: 'ref-1' }]);
     expect(root.textContent).toContain('Made from your words and 7 notes from the web');
-    expect(root.querySelector('.wu-creature-made .wu-creature-small')?.textContent).toBe('Made by Nemotron 3 Super 120B · spent $0.0053');
+    expect(root.querySelector('.wu-creature-made .wu-creature-small')?.textContent).toBe('Nemotron 3 Super 120B · $0.0053');
   });
 
   it('shows every note beside the steps under the searches sent, after one "Waiting to start", each step timed in seconds', async () => {
@@ -800,7 +800,7 @@ describe('web notes before a creature is made', () => {
     tick(root);
     opened.key(press('Enter'));
     await settle();
-    expect(root.querySelector('.wu-creature-made .wu-creature-small')?.textContent).toBe('Made by Nemotron 3 Super 120B');
+    expect(root.querySelector('.wu-creature-made .wu-creature-small')?.textContent).toBe('Nemotron 3 Super 120B');
     expect(root.textContent).not.toContain('spent');
   });
 });

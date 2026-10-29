@@ -67,12 +67,13 @@ export function money(usd: string): string {
 }
 
 /**
- * The made group's small print, the one place the model is named: "Made by <model> · spent $x", the whole spend where
+ * The made group's small print, the one place the model is named: "<model> · $x", the whole spend where
  * served (M2); empty where neither is.
  */
 export function madeSmallPrint(modelName: string | null, spentUsd: string | null): string {
-  return [modelName === null ? null : `Made by ${modelName}`, spentUsd === null ? null : `spent ${money(spentUsd)}`]
-    .filter((part): part is string => part !== null).join(' · ');
+  const spent = spentUsd === null ? '' : money(spentUsd);
+  return [modelName, spent || null]
+    .filter((part): part is string => part !== null && part !== '').join(' · ');
 }
 
 const quoted = (words: string): string => `“${words}”`;

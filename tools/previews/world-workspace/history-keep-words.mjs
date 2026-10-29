@@ -10,8 +10,8 @@ export const KEEP_WORDS = Object.freeze({
   back: 'Back',
   account: 'GitHub account',
   name: 'Repository name',
-  readable: 'What goes there: this world\'s kept changes, with names and the words people wrote.',
-  notReadable: 'What goes there: this world\'s kept changes, without names or the words people wrote.',
+  readable: 'This world\'s kept changes, with names and the words people wrote.',
+  notReadable: 'This world\'s kept changes, without names or the words people wrote.',
   checking: 'Checking your GitHub account…',
   putting: 'Putting it on GitHub…',
   refusals: Object.freeze({

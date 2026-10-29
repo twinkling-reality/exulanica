@@ -136,15 +136,14 @@ export const deciderWords = decider => decider === 'person' ? CHARACTER_WORDS.pe
 
 /**
  * An outside AI agent's own words about itself (AG1d 2), as parts: ours (`declared` false, the faint ink) around its
- * declared name, maker and mind (`declared` true), each only where it declared one: "In its own words: Scout, made by
- * Harbour Lab, thinking with Nemotron 3 Nano 30B.", "In its own words: Scout."; null with no name. Shown as sent.
+ * declared name, maker and mind (`declared` true), each only where it declared one: "Scout · Harbour Lab ·
+ * Nemotron 3 Nano 30B", "Scout"; null with no name. Shown as sent.
  */
 export function declaredParts(declared) {
   if (!plain(declared?.name)) return null;
-  const parts = [{ words: 'In its own words: ', declared: false }, { words: declared.name, declared: true }];
-  if (plain(declared.maker)) parts.push({ words: ', made by ', declared: false }, { words: declared.maker, declared: true });
-  if (plain(declared.mind)) parts.push({ words: ', thinking with ', declared: false }, { words: declared.mind, declared: true });
-  parts.push({ words: '.', declared: false });
+  const parts = [{ words: declared.name, declared: true }];
+  if (plain(declared.maker)) parts.push({ words: ' · ', declared: false }, { words: declared.maker, declared: true });
+  if (plain(declared.mind)) parts.push({ words: ' · ', declared: false }, { words: declared.mind, declared: true });
   return Object.freeze(parts.map(part => Object.freeze(part)));
 }
 
@@ -165,9 +164,9 @@ export function amount(usd) {
 /** A price: like amount(), but a price of nothing is "Free" (WORDS.md: "Free" only for a price). */
 export const money = usd => Number(usd) === 0 ? CHARACTER_WORDS.free : amount(usd);
 
-/** "Last run 06:00 to 07:15 · 12 decisions · spent $0.0042". */
+/** "Last run 06:00 to 07:15 · 12 decisions · $0.0042". */
 export function lastRunLine({ from, to, decisions, spent }) {
-  return [`Last run ${from} to ${to}`, `${decisions} ${decisions === 1 ? 'decision' : 'decisions'}`, `spent ${amount(spent)}`].join(' · ');
+  return [`Last run ${from} to ${to}`, `${decisions} ${decisions === 1 ? 'decision' : 'decisions'}`, amount(spent)].join(' · ');
 }
 
 /** Whether a served model runs on this computer: its provider serves from the local host. */

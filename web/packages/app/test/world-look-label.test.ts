@@ -58,9 +58,9 @@ describe('an outside AI agent looked at and chosen (AG1d)', () => {
     document.body.append(shown.root);
     shown.set({ name: 'Visitor', doing: null, said: null, note: null, rows: [], list: null, refused: false, after: null,
       print: 'An outside AI agent decides for the visitor.',
-      declared: [{ words: 'In its own words: ', declared: false }, { words: '<b>Scout</b>', declared: true }, { words: '.', declared: false }] });
+      declared: [{ words: '<b>Scout</b>', declared: true }] });
     const declared = shown.root.querySelector('.cg-declared')!;
-    expect(declared.textContent).toBe('In its own words: <b>Scout</b>.');
+    expect(declared.textContent).toBe('<b>Scout</b>');
     expect(declared.querySelector('b')).toBeNull();
     expect([...declared.querySelectorAll('.cg-declared-own')].map((node) => node.textContent)).toEqual(['<b>Scout</b>']);
     expect(shown.root.querySelector('.cg-print')?.nextElementSibling).toBe(declared);

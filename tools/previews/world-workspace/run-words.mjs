@@ -75,10 +75,10 @@ const minutesWords = seconds => { const count = Math.round(seconds / 60); return
 /** The question card's title: "Run · 10 Minutes". */
 export const runFor = limits => `Run · ${minutesWords(limits.wallSeconds).replace(/minutes?$/u, m => m.charAt(0).toUpperCase() + m.slice(1))}`;
 
-/** The most a run may spend: "At most $0.05" heads the card; "at most $0.05" sits in a line. */
-export const atMost = (limits, start = false) => `${start ? 'At' : 'at'} most ${amount(limits.usd)}`;
+/** The most a run may spend: "At most $0.05" heads the card and sits in a line. */
+export const atMost = (limits) => `At most ${amount(limits.usd)}`;
 
-/** The page's Run line: "10 minutes · at most $0.05"; "10 minutes · Free" where every model it asks is on this computer (A2). */
+/** The page's Run line: "10 minutes · At most $0.05"; "10 minutes · Free" where every model it asks is on this computer (A2). */
 export const runLength = (limits, free = false) => `${minutesWords(limits.wallSeconds)} · ${free ? RUN_WORDS.free : atMost(limits)}`;
 
 /** "9:13", the time left of an open run, from `now` (milliseconds). */

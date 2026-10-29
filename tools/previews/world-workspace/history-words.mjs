@@ -30,10 +30,10 @@ export const PATH_WORDS = Object.freeze({
   madeFromWords: 'Made from your words',
   blankWorld: 'Started from a blank world',
   now: 'Now',
-  personPlaying: 'By a person playing',
-  outsideProgram: 'By an outside program',
+  personPlaying: 'A person playing',
+  outsideProgram: 'An outside program',
   /** An outside AI agent at the door decided (AG1d 4). */
-  outsideAgent: 'By an outside AI agent',
+  outsideAgent: 'An outside AI agent',
   earlierLater: 'Previous / Next',
   openMoment: 'Open Moment',
   // A grouped changes dot, chosen (H15).
@@ -60,7 +60,7 @@ export const HEAD_WORDS = Object.freeze({
   putting: 'Putting it on GitHub…',
   unreachable: 'GitHub could not be reached. Your changes are kept here and sent when it answers.',
   // Sending has stopped for good: said after "Kept on GitHub in <name> · ", in the refusal ink (GH6).
-  stopped: 'sending has stopped. Your changes are kept on this computer.',
+  stopped: 'Sending has stopped. Your changes are kept on this computer.',
   refusals: Object.freeze({
     nothing_to_keep: 'Nothing to keep in a project yet: change something first.',
     world_unreadable: 'Not kept: the world could not be read. Try again.',
@@ -335,24 +335,24 @@ export function answerParts(modelName, same, outcome) {
   return same ? sameChoiceParts(modelName) : [modelPart(modelName), `: ${outcome}`];
 }
 
-/** Who decided, as parts: "By Nemotron 3 Nano 30B", "By a person playing", "By an outside AI agent" (AG1d), "By an outside program"; a routine's
+/** Who decided, as parts: "Nemotron 3 Nano 30B", "A person playing", "An outside AI agent" (AG1d), "An outside program"; a routine's
  * moment has none (null). */
 export function byParts(decider) {
-  if (decider?.kind === 'model' && decider.model?.name) return ['By ', modelPart(decider.model.name)];
+  if (decider?.kind === 'model' && decider.model?.name) return [modelPart(decider.model.name)];
   if (decider?.kind === 'person') return [PATH_WORDS.personPlaying];
   if (decider?.kind === 'agent') return [PATH_WORDS.outsideAgent];
   if (decider?.kind === 'external') return [PATH_WORDS.outsideProgram];
   return null;
 }
 
-/** An outside AI agent's turn whose choice was not taken (AG1d 5): "Routine · no answer from the outside AI agent" where
- * it did not answer at all ('silent'), else "Routine · no usable answer from the outside AI agent". */
-export const agentUnansweredWords = unanswered => `Routine · ${unanswered === 'silent' ? 'no answer' : 'no usable answer'} from the outside AI agent`;
+/** An outside AI agent's turn whose choice was not taken (AG1d 5): "Routine · No Answer" where
+ * it did not answer at all ('silent'), else "Routine · No Usable Answer". */
+export const agentUnansweredWords = unanswered => `Routine · ${unanswered === 'silent' ? 'No Answer' : 'No Usable Answer'}`;
 
-/** A model's decision whose choice was not taken, as parts (U3, DESIGN 12:42): "Routine · no usable answer from Nemotron 3
- * Ultra 550B"; one whose choice came after the world had moved on, "Routine · Qwen3 235B chose too late". */
+/** A model's decision whose choice was not taken, as parts (U3, DESIGN 12:42): "Routine · Nemotron 3
+ * Ultra 550B · No Usable Answer"; one whose choice came after the world had moved on, "Routine · Qwen3 235B · Chose Too Late". */
 export function unansweredParts(modelName, late = false) {
-  return late ? ['Routine · ', modelPart(modelName), ' chose too late'] : ['Routine · no usable answer from ', modelPart(modelName)];
+  return late ? ['Routine · ', modelPart(modelName), ' · Chose Too Late'] : ['Routine · ', modelPart(modelName), ' · No Usable Answer'];
 }
 
 /** A line said, its speaker first: "Teo: “Morning, Ines.”" (quoted as said, never edited). */
@@ -418,7 +418,7 @@ export function changesWords(count) {
 // -- Runs, the creation, the head.
 
 /**
- * A run over its moments (sheet section 8): "Teo's and Ines's models were deciding · 06:00 to 07:15 · spent
+ * A run over its moments (sheet section 8): "Teo's and Ines's models were deciding · 06:00 to 07:15 ·
  * $0.0042"; one character "Teo's model was deciding"; three or more "3 characters' models were deciding"; while on
  * "… are deciding · 06:00 to now · 1:52 left"; without the clock "75 minutes of world time · …". `spent: null`
  * leaves the money out (the opened moment's small print).
@@ -434,7 +434,7 @@ export function runSpanWords({ names, from, to, worldMinutes, spent, running, le
   if (from && (to || running)) parts.push(`${from} to ${running ? 'now' : to}`);
   else if (Number.isSafeInteger(worldMinutes)) parts.push(`${plural(worldMinutes, 'minute')} of world time`);
   if (running && left) parts.push(`${left} left`);
-  else if (!running && spent !== null && Number(spent) > 0) parts.push(`spent ${money(spent)}`);
+  else if (!running && spent !== null && Number(spent) > 0) parts.push(money(spent));
   return parts.join(' · ');
 }
 
@@ -464,7 +464,7 @@ export function headLine(project, request = null, putting = false) {
   // answers or not and nothing here starts it again, so "sent when it answers" would be untrue (GH6, DESIGN's form).
   if (github?.paused) return { words: `Kept on GitHub in ${name} · ${HEAD_WORDS.stopped}`, refused: true };
   if (github && !github.reached) return { words: HEAD_WORDS.unreachable, refused: false };
-  const visibility = github && github.visibility !== 'unstated' ? `, ${github.visibility.toLowerCase()}` : '';
-  const state = github && github.not_sent > 0 ? `${plural(github.not_sent, 'change')} not sent yet` : 'up to date';
-  return { words: `Kept on GitHub in ${name}${visibility} · ${state}`, refused: false };
+  const visibility = github && github.visibility !== 'unstated' ? `${github.visibility.charAt(0).toUpperCase()}${github.visibility.slice(1).toLowerCase()}` : null;
+  const state = github && github.not_sent > 0 ? `${plural(github.not_sent, 'change')} not sent yet` : 'Synced';
+  return { words: [`Kept on GitHub in ${name}`, visibility, state].filter(Boolean).join(' · '), refused: false };
 }

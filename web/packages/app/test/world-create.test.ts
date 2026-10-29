@@ -72,8 +72,8 @@ describe('the composer', () => {
     // In the foot's order: the toggle's place, the reason, the price, then Create.
     expect([...box.root.querySelector('.wu-composer-foot')!.children].map((one) => one.className)).toEqual(['wu-composer-web', 'wu-composer-why', 'wu-composer-price', 'wu-composer-pill']);
     expect([why.hidden, price.hidden]).toEqual([true, true]);
-    box.say(null, 'up to $0.26');
-    expect([why.hidden, price.textContent]).toEqual([true, 'up to $0.26']);
+    box.say(null, 'Up to $0.26');
+    expect([why.hidden, price.textContent]).toEqual([true, 'Up to $0.26']);
     box.say('Reading what you can make here…', null);
     expect([why.textContent, price.hidden]).toEqual(['Reading what you can make here…', true]);
     // Pressed again on the same reason, it is said again: emptied, then said.
@@ -248,13 +248,13 @@ describe('the made note', () => {
   it('is announced once, says its one plain line with no labels, and leaves when dismissed', async () => {
     vi.useFakeTimers();
     const { madeNote } = await parts();
-    const note = madeNote('12 notes from the web · spent $0.0058 · not in it yet: fishing, wooden boats');
+    const note = madeNote('12 notes from the web · $0.0058 · Not in it yet: fishing, wooden boats');
     document.body.append(note.root);
     expect(note.root.getAttribute('role')).toBe('status');
     // On the page empty, then filled, so it is announced once (N24).
     expect(note.root.childElementCount).toBe(0);
     vi.advanceTimersByTime(0);
-    expect(note.root.textContent).toBe('12 notes from the web · spent $0.0058 · not in it yet: fishing, wooden boats');
+    expect(note.root.textContent).toBe('12 notes from the web · $0.0058 · Not in it yet: fishing, wooden boats');
     expect(note.root.querySelector('.wu-made-label')).toBeNull();
     note.dismiss();
     expect(note.root.dataset.leaving).toBe('true');
@@ -344,7 +344,7 @@ describe('Create a world as a page', () => {
     expect(document.querySelector('.wu-create-mark')!.textContent).toBe('exulanica');
     expect(document.querySelector('h1.wu-create-title')!.textContent).toBe('Create a world');
     expect(document.activeElement).toBe(field());
-    expect(price()).toBe('up to $1.43');
+    expect(price()).toBe('Up to $1.43');
     expect(why()).toBe('');
     expect([...document.querySelectorAll('.wu-strip-card')].map(nameOf)).toEqual(['Small town', 'Blank']);
     expect(document.querySelector('.wu-create-corner .wu-qcmd')!.textContent).toBe('EscYour worlds');
@@ -417,11 +417,11 @@ describe('Create a world as a page', () => {
   it('says the most is what is left where less than the whole is left, and the whole where it is (A1b)', async () => {
     serve(offerOf({ left_usd: '0.05' }));
     await mount();
-    expect(price()).toBe('up to $0.05');
+    expect(price()).toBe('Up to $0.05');
     document.body.replaceChildren();
     serve(offerOf({ own_key: true }));
     await mount();
-    expect(price()).toBe('up to $1.43');
+    expect(price()).toBe('Up to $1.43');
   });
 
   describe('the first Enter', () => {
@@ -491,7 +491,7 @@ describe('Create a world as a page', () => {
       await new Promise((resolve) => setTimeout(resolve, 1_100));
       await settle();
       expect(reads).toBe(3);
-      expect([why(), price()]).toEqual(['', 'up to $1.43']);
+      expect([why(), price()]).toEqual(['', 'Up to $1.43']);
       key(field(), 'Enter');
       await settle();
       expect(starts.map((one) => one.words)).toEqual(['A quiet valley']);
@@ -533,7 +533,7 @@ describe('Create a world as a page', () => {
       expect(document.activeElement).toBe(field());
       release();
       await settle();
-      expect([why(), price()]).toEqual(['', 'up to $1.43']);
+      expect([why(), price()]).toEqual(['', 'Up to $1.43']);
       key(field(), 'Enter');
       await settle();
       expect(starts.map((one) => one.words)).toEqual(['A quiet valley']);
@@ -545,7 +545,7 @@ describe('Create a world as a page', () => {
       type(field(), '');
       key(field(), 'Enter');
       expect(why()).toBe('Prompt');
-      expect(price()).toBe('up to $1.43');
+      expect(price()).toBe('Up to $1.43');
       expect(starts).toEqual([]);
       type(field(), 'A');
       expect(why()).toBe('');
@@ -874,7 +874,7 @@ describe('Create a world as a page', () => {
     key(field(), 'Enter');
     await settle(); await settle();
     expect(why()).toBe('These words don’t describe a place, so no world could be made from them. Try a place and what is in it. Spent $0.02 before it stopped.');
-    expect(price()).toBe('up to $1.43');
+    expect(price()).toBe('Up to $1.43');
     expect(field().value).toBe('Purple');
     expect(opened).toEqual([]);
     // A word typed takes the refusal away.
@@ -916,7 +916,7 @@ describe('Create a world as a page', () => {
       await pressedWith('1.6');
       expect(starts.map((one) => one.most)).toEqual(['1.4227']);
       expect(why()).toBe('The price went up before it started. It can now spend at most $1.60.');
-      expect(price()).toBe('up to $1.60');
+      expect(price()).toBe('Up to $1.60');
       // Create again starts at the new price.
       key(field(), 'Enter');
       await settle();
@@ -1036,11 +1036,11 @@ describe('Create a world with web notes', () => {
     expect(document.getElementById(chip().getAttribute('aria-describedby')!)!.textContent)
       .toBe('Looks up what such a place looks like before it is made: up to 3 searches with Tavily, which keeps them. Adds at most $0.02.');
     // On, the price is the whole most with the notes; off, the draft's alone.
-    expect(price()).toBe('up to $1.44');
+    expect(price()).toBe('Up to $1.44');
     chip().click();
-    expect(price()).toBe('up to $1.43');
+    expect(price()).toBe('Up to $1.43');
     chip().click();
-    expect(price()).toBe('up to $1.44');
+    expect(price()).toBe('Up to $1.44');
     type(field(), 'a cozy little town by the sea at dusk');
     key(field(), 'Enter');
     // The making view at once, the wait first, before the notes request answers.
@@ -1064,7 +1064,7 @@ describe('Create a world with web notes', () => {
     expect(words.filter((one) => one === 'Queued')).toHaveLength(1);
     await settle(); await settle();
     const handed = JSON.parse(sessionStorage.getItem('exulanica.made.v1') ?? 'null') as { line: string | null } | null;
-    expect(handed?.line?.startsWith('2 notes from the web · spent $')).toBe(true);
+    expect(handed?.line?.startsWith('2 notes from the web · $')).toBe(true);
   });
 
   it('drafts from the words alone where no notes came, and says why where they would stand', async () => {
@@ -1117,7 +1117,7 @@ describe('Create a world with web notes', () => {
       expect(starts).toHaveLength(1);
       expect(making()).toBe(false);
       expect(why()).toBe('The price went up before it started. It can now spend at most $1.60.');
-      expect(price()).toBe('up to $1.62');
+      expect(price()).toBe('Up to $1.62');
       expect(field().value).toBe('a cozy little town by the sea at dusk');
     });
 
@@ -1139,7 +1139,7 @@ describe('Create a world with web notes', () => {
       expect(starts.map((one) => one.reference)).toEqual(['r-1', 'r-1']);
       expect(making()).toBe(false);
       expect(why()).toBe('The price changed before it started. Here is the new most it can spend.');
-      expect(price()).toBe('up to $1.44');
+      expect(price()).toBe('Up to $1.44');
     });
 
     it('leaves the making view for any other refusal, its sentence said and the words kept', async () => {

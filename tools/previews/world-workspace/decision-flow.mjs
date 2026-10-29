@@ -269,10 +269,10 @@ function formatUsd(value, known = true) {
   if (value === null || value === undefined || value === '') return null;
   const num = Number(value);
   if (!Number.isFinite(num) || num < 0) return null;
-  if (num === 0) return known ? '$0' : 'at most $0';
+  if (num === 0) return known ? '$0' : 'At most $0';
   const digits = num < 0.0001 ? 6 : 4;
   const text = num.toFixed(digits).replace(/0+$/u, '').replace(/\.$/u, '');
-  return `${known ? '' : 'at most '}$${text}`;
+  return `${known ? '' : 'At most '}$${text}`;
 }
 
 function formatLatency(ms) {
@@ -290,7 +290,7 @@ function parseDoneMetrics(done) {
   const costMatch = /\$([0-9]+(?:\.[0-9]+)?)/u.exec(text);
   const atMost = /at most/iu.test(text);
   return {
-    latencyMs: secMatch ? Math.round(Number(secMatch[1]) * 1000) : underMatch ? 50 : null,
+    latencyMs: underMatch ? 50 : secMatch ? Math.round(Number(secMatch[1]) * 1000) : null,
     costUsd: costMatch ? costMatch[1] : null,
     costKnown: !atMost,
   };
@@ -417,7 +417,7 @@ export function executionPipeline(input = {}) {
   const costText = decider === 'person' || decider === 'external' || decider === 'agent' ? null : formatUsd(rawCost, costKnown);
   const latencyText = formatLatency(latencyMs);
   const notCalled = Boolean(unanswered && unanswered.asks < 1);
-  const inferenceSummary = [modelName, notCalled ? 'not called' : latencyText].filter(Boolean).join(' · ');
+  const inferenceSummary = [modelName, notCalled ? 'Not Called' : latencyText].filter(Boolean).join(' · ');
   const inferenceDetail = [
     providerLabel,
     totalTokens !== null ? `${totalTokens} tok (${promptTokens} in / ${completionTokens} out)` : null,

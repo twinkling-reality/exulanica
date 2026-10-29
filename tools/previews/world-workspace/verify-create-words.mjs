@@ -77,12 +77,12 @@ assert.equal(CREATE_WORDS.readyWorld, 'Ready World');
 assert.equal(CREATE_WORDS.empty, 'Empty');
 assert.deepEqual([CREATE_WORDS.previous, CREATE_WORDS.next], ['Previous', 'Next']);
 assert.equal(NOTES_WORDS.toggle, 'Web Search');
-assert.equal(priceUpTo('0.2577'), 'up to $0.26');
-assert.equal(priceUpTo('0.20766720', '0.05'), 'up to $0.05');
-assert.equal(priceUpTo('0.20766720', '0.0599'), 'up to $0.05');
-assert.equal(priceUpTo('0.20766720', '0.20766720'), 'up to $0.21');
-assert.equal(priceUpTo('0.20766720', null), 'up to $0.21');
-assert.equal(priceUpTo('0.20766720', '0.00428'), 'up to $0.0042');
+assert.equal(priceUpTo('0.2577'), 'Up to $0.26');
+assert.equal(priceUpTo('0.20766720', '0.05'), 'Up to $0.05');
+assert.equal(priceUpTo('0.20766720', '0.0599'), 'Up to $0.05');
+assert.equal(priceUpTo('0.20766720', '0.20766720'), 'Up to $0.21');
+assert.equal(priceUpTo('0.20766720', null), 'Up to $0.21');
+assert.equal(priceUpTo('0.20766720', '0.00428'), 'Up to $0.0042');
 assert.equal(spentUpTo({ spentUsd: 0.0061 }, '0.2577'), 'Spent $0.0061 of up to $0.26');
 assert.equal(spentUpTo({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), 'Spent $0.12 of up to $1.43, and up to $0.03 not known yet');
 assert.equal(spentUpTo({ spentUsd: 0 }, '0.26'), 'Spent $0 of up to $0.26');
@@ -102,9 +102,9 @@ assert.equal(spendLine({ spentUsd: 0.12, unknownUsd: 0.03 }, '1.43'), 'Spent $0.
 assert.equal(CREATE_WORDS.madeFromYourWords, 'Made from your words');
 // The made note: one plain line, each part only where it has something to say, no labels and no Set sentence (ROOT's
 // sweep of 27 October).
-assert.equal(madeLine({ notes: 12, spent: { spentUsd: 0.0058, unknownUsd: 0 }, leftOut: ['fishing', 'wooden boats'] }), '12 notes from the web · spent $0.0058 · not in it yet: fishing, wooden boats');
+assert.equal(madeLine({ notes: 12, spent: { spentUsd: 0.0058, unknownUsd: 0 }, leftOut: ['fishing', 'wooden boats'] }), '12 notes from the web · $0.0058 · Not in it yet: fishing, wooden boats');
 assert.equal(madeLine({ notes: 1, spent: null, leftOut: [] }), '1 note from the web');
-assert.equal(madeLine({ notes: null, spent: { spentUsd: 0.31, unknownUsd: 0.02 }, leftOut: [' ', 'a lighthouse'] }), 'spent $0.31, up to $0.02 not known yet · not in it yet: a lighthouse');
+assert.equal(madeLine({ notes: null, spent: { spentUsd: 0.31, unknownUsd: 0.02 }, leftOut: [' ', 'a lighthouse'] }), '$0.31, up to $0.02 not known yet · Not in it yet: a lighthouse');
 assert.equal(madeLine({ notes: 0, spent: null, leftOut: [] }), null);
 assert.equal(madeLine({}), null);
 assert.equal(madeSpent({ spentUsd: 0.31 }, '1.4227'), '$0.31 of at most $1.43');

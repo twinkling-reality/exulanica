@@ -150,11 +150,11 @@ const declared = { name: 'Scout', maker: 'Harbour Lab', mind: 'Nemotron 3 Nano 3
 const agentGroup = groupContent({ who: visitor, decider: 'agent', declared, assignable: true, connected: true });
 assert.deepEqual(agentGroup.rows.map(row => `${row.key} ${row.word}`), ['Enter Activity', 'V Follow']);
 assert.equal(agentGroup.print, 'An outside AI agent decides for the visitor.');
-assert.equal(agentGroup.declared.map(part => part.words).join(''), 'In its own words: Scout, made by Harbour Lab, thinking with Nemotron 3 Nano 30B.');
+assert.equal(agentGroup.declared.map(part => part.words).join(''), 'Scout · Harbour Lab · Nemotron 3 Nano 30B');
 assert.deepEqual(agentGroup.declared.filter(part => part.declared).map(part => part.words), ['Scout', 'Harbour Lab', 'Nemotron 3 Nano 30B']);
-assert.equal(groupContent({ who: visitor, decider: 'agent', declared: { name: 'Scout', maker: '', mind: null } }).declared.map(part => part.words).join(''), 'In its own words: Scout.');
+assert.equal(groupContent({ who: visitor, decider: 'agent', declared: { name: 'Scout', maker: '', mind: null } }).declared.map(part => part.words).join(''), 'Scout');
 assert.equal(groupContent({ who: visitor, decider: 'agent', declared: null }).declared, null);
-assert.equal(groupContent({ who: visitor, decider: 'agent', declared: { name: ' <b>x</b> ', maker: 'm', mind: null } }).declared[1].words, ' <b>x</b> ', 'as sent, never reworded');
+assert.equal(groupContent({ who: visitor, decider: 'agent', declared: { name: ' <b>x</b> ', maker: 'm', mind: null } }).declared[0].words, ' <b>x</b> ', 'as sent, never reworded');
 assert.equal(groupContent({ who: visitor, decider: 'external', declared }).declared, null);
 assert.equal(deciderOf({ decider: 'agent', model: 'M' }), 'agent');
 

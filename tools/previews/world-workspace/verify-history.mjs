@@ -23,15 +23,15 @@ assert.deepEqual([creationWhen(at(16, 9, 12), now), creationWhen(at(15, 21, 40),
 // The head's GitHub line (sheet section 2), refusals marked for the refusal ink.
 const github = { reached: true, visibility: 'PRIVATE', not_sent: 0, paused: null };
 const linked = (state) => ({ link: { repository: 'learner/terraces-on-the-bay', publish: 'automatic' }, github: { ...github, ...state } });
-assert.deepEqual(headLine(linked({})), { words: 'Kept on GitHub in terraces-on-the-bay, private · up to date', refused: false });
-assert.equal(headLine(linked({ not_sent: 3 })).words, 'Kept on GitHub in terraces-on-the-bay, private · 3 changes not sent yet');
-assert.equal(headLine(linked({ not_sent: 1 })).words, 'Kept on GitHub in terraces-on-the-bay, private · 1 change not sent yet');
+assert.deepEqual(headLine(linked({})), { words: 'Kept on GitHub in terraces-on-the-bay · Private · Synced', refused: false });
+assert.equal(headLine(linked({ not_sent: 3 })).words, 'Kept on GitHub in terraces-on-the-bay · Private · 3 changes not sent yet');
+assert.equal(headLine(linked({ not_sent: 1 })).words, 'Kept on GitHub in terraces-on-the-bay · Private · 1 change not sent yet');
 // A pause reads the page's own words, never the follower's reason, and promises no sending (GH6).
-assert.deepEqual(headLine(linked({ paused: { reason: 'the repository is no longer private' } })), { words: 'Kept on GitHub in terraces-on-the-bay · sending has stopped. Your changes are kept on this computer.', refused: true });
+assert.deepEqual(headLine(linked({ paused: { reason: 'the repository is no longer private' } })), { words: 'Kept on GitHub in terraces-on-the-bay · Sending has stopped. Your changes are kept on this computer.', refused: true });
 assert.equal(headLine(linked({ reached: false })).words, HEAD_WORDS.unreachable);
 // A pause GitHub no longer answers for (a deleted repository) is still a pause: sending will not resume on its own (GH6).
 const gone = { reason: 'GitHub refused or failed the request.' };
-assert.deepEqual(headLine(linked({ reached: false, paused: gone })), { words: 'Kept on GitHub in terraces-on-the-bay · sending has stopped. Your changes are kept on this computer.', refused: true });
+assert.deepEqual(headLine(linked({ reached: false, paused: gone })), { words: 'Kept on GitHub in terraces-on-the-bay · Sending has stopped. Your changes are kept on this computer.', refused: true });
 assert.equal(headLine({ link: null }).words, 'Saved Locally · Not on GitHub');
 assert.equal(headLine(null).words, 'Not Saved to GitHub');
 assert.equal(headLine(null, { refused: null }).words, 'Starting a project…');
@@ -39,7 +39,7 @@ assert.deepEqual(headLine(null, { refused: { code: 'world_unreadable' } }), { wo
 assert.equal(headLine(undefined).words, '');
 // After Create in H12's question, until the follower links the project; a linked project says where it is.
 assert.deepEqual(headLine({ link: null }, null, true), { words: 'Putting it on GitHub…', refused: false });
-assert.equal(headLine(linked({}), null, true).words, 'Kept on GitHub in terraces-on-the-bay, private · up to date');
+assert.equal(headLine(linked({}), null, true).words, 'Kept on GitHub in terraces-on-the-bay · Private · Synced');
 
 // The path (r23) from the moments read as JOURNEY's R1 serves it (society_moments.read_moments) and the other reads.
 const things = { 'bench:1': 'bench', 'market:1': 'market', 'lantern:1': 'lantern', 'pond:part': null };
@@ -94,21 +94,21 @@ const [creation, single, met, went, asked] = path.items;
 // A single change's words are the whole of it: it keeps no list and opens nothing (H15).
 assert.equal('changes' in single, false);
 assert.equal(creation.quote, 'Glass terraces with pools above the sea, and a grand hotel at the top');
-assert.deepEqual([met.shown, met.more, text(met.by), met.subjects], [['Teo: “Morning, Ines. The boats are out early.”'], null, 'By Nemotron 3 Nano 30B', ['teo', 'ines']]);
+assert.deepEqual([met.shown, met.more, text(met.by), met.subjects], [['Teo: “Morning, Ines. The boats are out early.”'], null, 'Nemotron 3 Nano 30B', ['teo', 'ines']]);
 // A model's name is a part the page keeps on one line.
-assert.deepEqual(met.by, ['By ', { model: 'Nemotron 3 Nano 30B' }]);
+assert.deepEqual(met.by, [{ model: 'Nemotron 3 Nano 30B' }]);
 // An exchange: the first two lines on the card, the rest counted; every line, with its own decider, opened.
 assert.deepEqual([asked.shown, asked.more], [['Marco: “Did they bring in anything good?”', 'Teo: “Sardines, mostly.”'], '1 more line']);
 assert.deepEqual(asked.lines.map((line) => [line.subject, line.quote, text(line.by)]), [
-  ['marco', '“Did they bring in anything good?”', 'By a person playing'],
-  ['teo', '“Sardines, mostly.”', 'By Nemotron 3 Nano 30B'],
-  ['marco', '“Any for the hotel?”', 'By a person playing'],
+  ['marco', '“Did they bring in anything good?”', 'A person playing'],
+  ['teo', '“Sardines, mostly.”', 'Nemotron 3 Nano 30B'],
+  ['marco', '“Any for the hotel?”', 'A person playing'],
 ]);
-assert.deepEqual([text(went.by), text(asked.by)], ['By Nemotron 3 Super 120B', 'By a person playing']);
+assert.deepEqual([text(went.by), text(asked.by)], ['Nemotron 3 Super 120B', 'A person playing']);
 // A meeting the routine made, where a model said the line, names that model (H19); routine throughout, nobody.
 const routineMet = (lineDecider) => historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'routine', model: null }, branches: [],
   said: [said(412, 'teo', 'ines', 'Morning, Ines.', lineDecider)] }] }, names, partsOf, clock, now).items.find((item) => item.kind === 'moment');
-assert.deepEqual([text(routineMet(model('Nemotron 3 Super 120B')).by), routineMet({ kind: 'routine', model: null }).by], ['By Nemotron 3 Super 120B', null]);
+assert.deepEqual([text(routineMet(model('Nemotron 3 Super 120B')).by), routineMet({ kind: 'routine', model: null }).by], ['Nemotron 3 Super 120B', null]);
 // Its title is that decision's too, the speaker first, wherever the engine's meeting put them; a routine line keeps
 // "met", and a meeting a decision to talk opened says "talked with" (DESIGN, 24 October).
 const titled = (moment) => historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'routine', model: null }, branches: [], ...moment }] },
@@ -126,16 +126,16 @@ assert.equal(text(titled({ said: [], decider: model('Nemotron 3 Super 120B') }).
 const agentNames = { ...names, agent: (id) => id === 'teo' };
 const byAgent = historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'external', model: null }, branches: [],
   said: [said(412, 'teo', 'ines', 'Morning, Ines.', { kind: 'external', model: null })] }] }, agentNames, partsOf, clock, now).items.find((item) => item.kind === 'moment');
-assert.deepEqual([text(byAgent.by), text(byAgent.lines[0].by)], ['By an outside AI agent', 'By an outside AI agent']);
+assert.deepEqual([text(byAgent.by), text(byAgent.lines[0].by)], ['An outside AI agent', 'An outside AI agent']);
 const byGame = historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'external', model: null }, branches: [], said: [] }] },
   names, partsOf, clock, now).items.find((item) => item.kind === 'moment');
-assert.equal(text(byGame.by), 'By an outside program', "a game's program keeps its words");
+assert.equal(text(byGame.by), 'An outside program', "a game's program keeps its words");
 assert.equal(text(titled({ kind: 'talked', subjects: ['ines', 'teo'], said: [said(412, 'teo', 'ines', 'Morning, Ines.', { kind: 'person', model: null })] }).words), 'Teo spoke to Ines at the bench');
 // The first of them: a person playing spoke before the model answered.
 const twoLines = historyPath({ ...stand, runs: [], moments: [{ ...stand.moments[0], decider: { kind: 'routine', model: null }, branches: [],
   said: [said(412, 'teo', 'ines', 'Morning, Ines.', { kind: 'person', model: null }), said(413, 'ines', 'teo', 'Morning.', model('Nemotron 3 Super 120B'))] }] },
   names, partsOf, clock, now).items.find((item) => item.kind === 'moment');
-assert.equal(text(twoLines.by), 'By a person playing');
+assert.equal(text(twoLines.by), 'A person playing');
 // Only an answer that differs is a branch, the newest drawn; a same answer is one small line on the card.
 assert.deepEqual([text(met.branch.head), met.branch.outcome, met.same], ['Compared with Qwen3 235B', 'Teo would have gone to the market', null]);
 assert.deepEqual([asked.branch, text(asked.same)], [null, 'Qwen3 235B chose the same']);
@@ -143,7 +143,7 @@ assert.deepEqual([asked.branch, text(asked.same)], [null, 'Qwen3 235B chose the 
 assert.deepEqual(met.answers.map(text), ['Llama 4: Teo would have waited a minute', 'Qwen3 235B: Teo would have gone to the market']);
 assert.deepEqual(asked.answers.map(text), ['Qwen3 235B chose the same']);
 assert.deepEqual(path.spans.map((span) => [span.first, span.last, span.words, span.small, span.ended]), [
-  ['moment:m1', 'moment:m3', "Teo's and Ines's models were deciding · 06:00 to 07:15 · spent $0.0042", "Teo's and Ines's models were deciding · 06:00 to 07:15", null],
+  ['moment:m1', 'moment:m3', "Teo's and Ines's models were deciding · 06:00 to 07:15 · $0.0042", "Teo's and Ines's models were deciding · 06:00 to 07:15", null],
 ]);
 assert.equal(path.now.when, '07:15 · Day 1');
 // A run that did not end at its own time says why, in the opened moment only (H3).
@@ -456,8 +456,8 @@ for (const edit of fixtures) {
 assert.deepEqual([youPersonalityWords('Teo', 'wrote'), youPersonalityWords('Teo', 'changed'), youPersonalityWords('Teo', 'cleared')], ["You wrote Teo's personality", "You changed Teo's personality", "You cleared Teo's personality"]);
 assert.deepEqual([partsText(youModelParts("Teo's model", 'Qwen3 235B')), partsText(youModelParts("Teo's model", null))], ["You changed Teo's model to Qwen3 235B", "You changed Teo's model to routine"]);
 // Run brackets: one character, three or more, and a world without a clock.
-assert.equal(runSpanWords({ names: ['Teo'], from: '06:00', to: '07:15', spent: '0.0042' }), "Teo's model was deciding · 06:00 to 07:15 · spent $0.0042");
+assert.equal(runSpanWords({ names: ['Teo'], from: '06:00', to: '07:15', spent: '0.0042' }), "Teo's model was deciding · 06:00 to 07:15 · $0.0042");
 assert.equal(runSpanWords({ names: ['Teo', 'Ines', 'Marco'], from: '06:00', to: '07:15', spent: '0' }), "3 characters' models were deciding · 06:00 to 07:15");
-assert.equal(runSpanWords({ names: ['Teo', 'Ines'], from: null, to: null, worldMinutes: 75, spent: '0.0042' }), "Teo's and Ines's models were deciding · 75 minutes of world time · spent $0.0042");
+assert.equal(runSpanWords({ names: ['Teo', 'Ines'], from: null, to: null, worldMinutes: 75, spent: '0.0042' }), "Teo's and Ines's models were deciding · 75 minutes of world time · $0.0042");
 
 console.log('History checks passed: money and days, the GitHub line, the path from the moments read in r23\'s words and places, whole-item views, Now at its place, exchanges, same answers and branches, the "You" forms, a grouped dot\'s changes and their window, runs on and ended, a run\'s bracket partly in view.');

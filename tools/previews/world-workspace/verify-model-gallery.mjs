@@ -56,7 +56,7 @@ assert.equal(rowForKey(page, '9'), null);
 
 // The model in focus, each fact from the read; "about" with its sample once it has decided here, else "at most".
 const asked = galleryDetail({ read, row: rowForKey(page, '3'), who: sami });
-assert.deepEqual([asked.name, asked.by, asked.link], ['Qwen3 235B Instruct', 'By Qwen', models[0].card.source]);
+assert.deepEqual([asked.name, asked.by, asked.link], ['Qwen3 235B Instruct', 'Qwen', models[0].card.source]);
 assert.equal('mark' in asked, false);
 // No reasons the role restates and no heading over them; the maker's words with no line on where they come from.
 assert.deepEqual(asked.why, []);

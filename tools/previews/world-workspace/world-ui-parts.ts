@@ -143,7 +143,7 @@ if (view === 'creature-describe' || view === 'creature-making' || view === 'crea
   left.append(label('Run'));
   const run = add(div('wu-row'), left); run.style.gap = 'calc(20 * var(--u))';
   run.append(orb({ word: 'Run', onPress: press }));
-  const big = add(document.createElement('p'), run); big.className = 'wu-big'; big.textContent = '10 minutes · at most $0.05';
+  const big = add(document.createElement('p'), run); big.className = 'wu-big'; big.textContent = '10 minutes · At most $0.05';
   const field = add(document.createElement('textarea'), left); field.className = 'wu-field'; field.rows = 2; field.value = 'Quiet, kind, waits for friends by the bench.';
   const count = add(div('wu-count'), left); count.textContent = '43 of 300';
   right.append(label('Activity'));

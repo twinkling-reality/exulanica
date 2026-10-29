@@ -183,7 +183,7 @@ export function galleryDetail({ read, row, who = called({ name: null, kind: null
   facts.push(['Usage', decidedHere(read, hereOf(read, model), { sentence: true })]);
   return Object.freeze({
     name: model.name,
-    by: card ? `By ${card.maker}` : null, link: card?.source ?? null,
+    by: card ? card.maker : null, link: card?.source ?? null,
     why: Object.freeze(why),
     words: card ? Object.freeze({ said: cardWords(model).said }) : null,
     facts: Object.freeze(facts.map(([key, value]) => Object.freeze({ key, value }))),

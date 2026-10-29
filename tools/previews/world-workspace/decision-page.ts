@@ -182,7 +182,7 @@ function placeTold(told: HTMLElement, at: Flow['told']): void {
 function smallPrint(state: DecisionPageState): Parts {
   // An outside AI agent asked (AG1d 5): no answer, no usable answer, or a choice made too late.
   if (state.decider === 'agent' && state.unanswered) return agentUnansweredParts(state.unanswered.reason) as Parts;
-  if (state.decider === 'agent' && state.late) return [`Asked the outside AI agent · ${UNANSWERED_WORDS.late} · ${UNANSWERED_WORDS.routine}`];
+  if (state.decider === 'agent' && state.late) return [`${DECISION_FLOW_WORDS.decidedByAgent} · ${UNANSWERED_WORDS.late} · ${UNANSWERED_WORDS.routine}`];
   if (state.unanswered || state.late) return unansweredParts({ model: state.model, asks: state.unanswered?.asks ?? 1, late: state.late === true }) as Parts;
   return decidedByParts({ decider: state.decider ?? (state.model ? 'model' : null), model: state.model }) as Parts;
 }
@@ -192,7 +192,7 @@ function smallPrint(state: DecisionPageState): Parts {
 function paidPrint(state: DecisionPageState): string | null {
   if (state.unanswered) return state.unanswered.asks > 0 && state.decider !== 'agent' ? askedPrint(state.unanswered) as string : null;
   if (state.answered) return ringPrint(state.answered) as string | null;
-  return state.done ? `${state.done.charAt(0).toLowerCase()}${state.done.slice(1)}` : null;
+  return state.done ?? null;
 }
 
 /** The flow's lines: the bracket and its line into the ring, the ring, the dashed choices, the lit path, the dots. */

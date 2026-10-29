@@ -48,12 +48,12 @@ export const PEOPLE_WORDS = Object.freeze({
 
 /**
  * The top pill's people line where people live: "24 people live here", or for a minute after they
- * arrive, "24 people now live here, invented for this world" (DESIGN's K14: the pill alone says it,
+ * arrive, "24 people now live here" (DESIGN's K14: the pill alone says it,
  * with no note beside it); null for a count it cannot say.
  */
 export function peopleLine(count, { arrived = false } = {}) {
   if (!Number.isSafeInteger(count) || count <= 0) return null;
-  if (arrived) return `${count === 1 ? '1 person now lives' : `${count} people now live`} here, ${PEOPLE_WORDS.invented}`;
+  if (arrived) return `${count === 1 ? '1 person now lives' : `${count} people now live`} here`;
   return count === 1 ? '1 person lives here' : `${count} people live here`;
 }
 

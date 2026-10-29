@@ -31,15 +31,15 @@ assert.equal(decisionTitle({ chose: 'wait here a minute' }), 'Wait here a minute
 // verdict its own words.
 const record = { latencyMs: 912, costUsd: '0.00030000', costKnown: true };
 assert.deepEqual(resultLines({ verdict: { kind: 'applied', words: 'Applied in minute 53.' }, ...record }),
-  { done: 'Answered in 0.9 s · cost $0.0003', verdict: null });
+  { done: '0.9 s · $0.0003', verdict: null });
 assert.deepEqual(resultLines({ verdict: { kind: 'applied' } }), { done: null, verdict: null });
 assert.deepEqual(resultLines({ verdict: { kind: 'pending', words: 'Accepted; no minute has acted on it yet.' }, latencyMs: 1300, costUsd: '0.0014006', costKnown: false }),
-  { done: 'Answered in 1.3 s · cost at most $0.0014', verdict: 'Accepted; no minute has acted on it yet.' });
+  { done: '1.3 s · At most $0.0014', verdict: 'Accepted; no minute has acted on it yet.' });
 assert.deepEqual(resultLines({ verdict: { kind: 'awaiting_answer', words: 'No answer is recorded yet.' } }), { done: null, verdict: 'No answer is recorded yet.' });
-assert.equal(resultLines({ verdict: { kind: 'applied' }, costUsd: '0' }).done, 'Cost $0');
+assert.equal(resultLines({ verdict: { kind: 'applied' }, costUsd: '0' }).done, '$0');
 // A time under a tenth of a second (DESIGN's W5).
-assert.equal(resultLines({ verdict: { kind: 'applied' }, latencyMs: 13 }).done, 'Answered in under 0.1 s');
-assert.equal(resultLines({ verdict: { kind: 'applied' }, latencyMs: 100 }).done, 'Answered in 0.1 s');
+assert.equal(resultLines({ verdict: { kind: 'applied' }, latencyMs: 13 }).done, 'Under 0.1 s');
+assert.equal(resultLines({ verdict: { kind: 'applied' }, latencyMs: 100 }).done, '0.1 s');
 
 // The record page's words (r10): the column's label, the ring's count, the card's label and the head's small print,
 // who decided first (T7's words where no model did), then the answer's time and cost as resultLines says them.
@@ -47,21 +47,21 @@ assert.equal(choicesOver(teo), "Teo's Choices");
 // No newcomer's notes: what each part is goes unsaid (ROOT's sweep of 27 October).
 assert.doesNotMatch(repository('tools/previews/world-workspace/decision-words.mjs'), /export (const|function) (DECISION_NOTE_WORDS|decisionNotes|lateNotes|unansweredNotes)\b/u);
 assert.equal(choicesOver(resident), "The resident's Choices");
-assert.equal(choseOneOf(9), 'chose 1 of 9');
+assert.equal(choseOneOf(9), 'Chose 1 of 9');
 assert.equal(DECISION_FLOW_WORDS.whatHappened, 'Outcome');
 assert.equal(DECISION_WORDS.chosen, 'Chosen');
 assert.equal(toldLabel(teo), 'Context');
-assert.deepEqual([answeredIn(912), answeredIn(13), answeredIn(100), answeredIn(null)], ['answered in 0.9 s', 'answered in under 0.1 s', 'answered in 0.1 s', null]);
-assert.deepEqual([costWords('0.00030000'), costWords('0.0014006', false), costWords('0'), costWords(null), costWords('nonsense')], ['cost $0.0003', 'cost at most $0.0014', 'cost $0', null, null]);
+assert.deepEqual([answeredIn(912), answeredIn(13), answeredIn(100), answeredIn(null)], ['0.9 s', 'under 0.1 s', '0.1 s', null]);
+assert.deepEqual([costWords('0.00030000'), costWords('0.0014006', false), costWords('0'), costWords(null), costWords('nonsense')], ['$0.0003', 'At most $0.0014', '$0', null, null]);
 const partsText = parts => parts.map(part => typeof part === 'string' ? part : part.model).join('');
 // D5: the head names who decided only; the time and cost stand under the ring.
-assert.deepEqual(decidedByParts({ model: 'Nemotron 3 Nano 30B', ...record }), ['Decided by ', { model: 'Nemotron 3 Nano 30B' }]);
+assert.deepEqual(decidedByParts({ model: 'Nemotron 3 Nano 30B', ...record }), [{ model: 'Nemotron 3 Nano 30B' }]);
 assert.deepEqual([ringPrint(record), ringPrint({ latencyMs: 1300, costUsd: '0.0014006', costKnown: false }), ringPrint({ latencyMs: 1300 }), ringPrint({})],
-  ['answered in 0.9\u00a0s · $0.0003', 'answered in 1.3\u00a0s · at most $0.0014', 'answered in 1.3\u00a0s', null]);
-assert.deepEqual(decidedByParts({ decider: 'model', model: ' Nemotron 3 Nano 30B ' }), ['Decided by ', { model: 'Nemotron 3 Nano 30B' }]);
-assert.deepEqual(decidedByParts({ decider: 'person' }), ['Decided by a person playing']);
-assert.equal(partsText(decidedByParts({ decider: 'external', latencyMs: 1300 })), 'Decided by an outside program');
-assert.equal(partsText(decidedByParts({ decider: 'person', model: 'Nemotron 3 Nano 30B' })), 'Decided by a person playing');
+  ['0.9\u00a0s · $0.0003', '1.3\u00a0s · At most $0.0014', '1.3\u00a0s', null]);
+assert.deepEqual(decidedByParts({ decider: 'model', model: ' Nemotron 3 Nano 30B ' }), [{ model: 'Nemotron 3 Nano 30B' }]);
+assert.deepEqual(decidedByParts({ decider: 'person' }), ['A person playing']);
+assert.equal(partsText(decidedByParts({ decider: 'external', latencyMs: 1300 })), 'An outside program');
+assert.equal(partsText(decidedByParts({ decider: 'person', model: 'Nemotron 3 Nano 30B' })), 'A person playing');
 assert.deepEqual(decidedByParts({ latencyMs: 1300, costUsd: '0.0014006', costKnown: false }), []);
 assert.deepEqual(decidedByParts({}), []);
 assert.deepEqual(decidedByParts(), []);
@@ -156,22 +156,22 @@ for (const reason of grouped) assert.ok(stated.has(reason), reason);
 assert.equal(new Set(grouped).size, grouped.length);
 // The head, the model's name its own part: asked, not asked where nothing was sent, or a choice made too late.
 const ultra = 'Nemotron 3 Ultra 550B';
-assert.deepEqual(unansweredParts({ model: ultra, asks: 1 }), ['Asked ', { model: ultra }, ' · no usable answer · the routine acted']);
-assert.deepEqual(unansweredParts({ model: ultra, asks: 0 }), [{ model: ultra }, ' not asked · the routine acted']);
-assert.deepEqual(unansweredParts({ model: ultra, asks: 1, late: true }), ['Asked ', { model: ultra }, ' · chose too late · the routine acted']);
+assert.deepEqual(unansweredParts({ model: ultra, asks: 1 }), [{ model: ultra }, ' · No Usable Answer · Routine Fallback']);
+assert.deepEqual(unansweredParts({ model: ultra, asks: 0 }), [{ model: ultra }, ' · Not Asked · Routine Fallback']);
+assert.deepEqual(unansweredParts({ model: ultra, asks: 1, late: true }), [{ model: ultra }, ' · Chose Too Late · Routine Fallback']);
 assert.deepEqual(unansweredParts({ model: null, asks: 1 }), []);
 // Under the ring: what the asks sent took and cost, to the hundredth of a cent; nothing sent says why in four words at
 // most, or "not asked" alone.
-assert.equal(askedPrint({ asks: 1, latencyMs: 2100, costUsd: '0.01214400', costKnown: true }), 'asked once in 2.1 s · $0.0121');
-assert.equal(askedPrint({ asks: 2, latencyMs: 4300, costUsd: '0.02420000', costKnown: true }), 'asked twice in 4.3 s · $0.0242');
-assert.equal(askedPrint({ asks: 1, latencyMs: 20, costUsd: '0.0121', costKnown: false }), 'asked once in under 0.1 s · at most $0.0121');
+assert.equal(askedPrint({ asks: 1, latencyMs: 2100, costUsd: '0.01214400', costKnown: true }), 'Asked once in 2.1\u00a0s · $0.0121');
+assert.equal(askedPrint({ asks: 2, latencyMs: 4300, costUsd: '0.02420000', costKnown: true }), 'Asked twice in 4.3\u00a0s · $0.0242');
+assert.equal(askedPrint({ asks: 1, latencyMs: 20, costUsd: '0.0121', costKnown: false }), 'Asked once in under 0.1\u00a0s · At most $0.0121');
 // Under the ring where nothing was sent, why, where the line under the head does not say it; nothing for the money or
 // the time, which that line names, or a reason with no words.
 assert.equal(notAskedWhy('spending_limit_reached'), null);
 assert.equal(notAskedWhy('no_time_to_ask'), null);
-assert.equal(notAskedWhy('provider_credential_absent'), 'its service not connected');
+assert.equal(notAskedWhy('provider_credential_absent'), 'Its service not connected');
 assert.equal(notAskedWhy('line_out_of_bounds'), null);
-assert.equal(notAskedWhy('spending_unavailable'), 'spending check failed');
+assert.equal(notAskedWhy('spending_unavailable'), 'Spending check failed');
 for (const reason of stated) assert.ok((notAskedWhy(reason) ?? '').split(' ').filter(Boolean).length <= 4, reason);
 // Why the routine acted, by reason (DESIGN's list): the reason alone, with no "so the routine acted" after it (ROOT's
 // sweep of 27 October).
@@ -199,13 +199,13 @@ for (const reason of [...stated, null]) {
 }
 // An outside AI agent decided (AG1d 4, 5): who decided and nothing else; its told heading; its note; a turn it did not
 // answer read as U3 reads a model's, by its reason.
-assert.deepEqual(decidedByParts({ decider: 'agent' }), ['Decided by an outside AI agent']);
+assert.deepEqual(decidedByParts({ decider: 'agent' }), ['An outside AI agent']);
 assert.equal(toldLabel(called({ name: null, kind: 'visitor' }), 'agent'), 'Context');
 const visitor = called({ name: null, kind: 'visitor' });
 assert.deepEqual([...NO_ANSWER], ['no_answer_in_time', 'decider_disconnected']);
 for (const reason of NO_ANSWER) assert.ok(stated.has(reason), reason);
-assert.deepEqual(agentUnansweredParts('no_answer_in_time'), ['Asked the outside AI agent · no answer · the routine acted']);
-assert.deepEqual(agentUnansweredParts('answer_not_offered'), ['Asked the outside AI agent · no usable answer · the routine acted']);
+assert.deepEqual(agentUnansweredParts('no_answer_in_time'), ['An outside AI agent · No Answer · Routine Fallback']);
+assert.deepEqual(agentUnansweredParts('answer_not_offered'), ['An outside AI agent · No Usable Answer · Routine Fallback']);
 assert.equal(agentUnansweredWhy('no_answer_in_time'), 'It did not answer in time.');
 assert.equal(agentUnansweredWhy('decider_disconnected'), 'It was not connected.');
 assert.equal(agentUnansweredWhy('answer_not_offered'), 'Its answer could not be used.');

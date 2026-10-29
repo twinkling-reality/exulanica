@@ -145,7 +145,7 @@ describe('History', () => {
     expect(asked).toContain(`/world/versions/${VERSION}/history/moments?world_id=${encodeURIComponent(WORLD)}&story=true&recipe=${encodeURIComponent(await recipe())}`);
     // Only the characters the moments name are asked for, to be named as the tag and card name them (J20).
     expect(made.names).toHaveBeenCalledWith({ subjects: ['teo', 'ines', 'marco'], placed: [] });
-    expect(made.root.querySelector('.wu-hr-kept')?.textContent).toBe('Kept on GitHub in terraces-on-the-bay, private · up to date');
+    expect(made.root.querySelector('.wu-hr-kept')?.textContent).toBe('Kept on GitHub in terraces-on-the-bay · Private · Synced');
     expect(all(made.root, '.wu-hr-card .wu-hr-words')).toEqual(['Made from your words', 'Teo spoke to Ines at the bench', 'Marco asked Teo']);
     // The creation quotes the sentence the world was made from; a change is the person's, in History's "You" form.
     expect(made.root.querySelector('.wu-hr-card.first .wu-hr-said')?.textContent).toBe('“Glass terraces above the sea”');
@@ -154,11 +154,11 @@ describe('History', () => {
     const exchange = made.root.querySelector('.wu-hr-card[aria-current="true"]') as HTMLElement;
     expect(all(exchange, '.wu-hr-said')).toEqual(['Marco: “Did they bring in anything good?”', 'Teo: “Sardines, mostly.”']);
     expect(all(exchange, '.wu-hr-more')).toEqual(['1 more line']);
-    expect(all(exchange, '.wu-hr-who')).toEqual(['By a person playing', 'Qwen3 235B chose the same']);
+    expect(all(exchange, '.wu-hr-who')).toEqual(['A person playing', 'Qwen3 235B chose the same']);
     // A different answer hangs as a branch; a model's name never breaks.
     expect(all(made.root, '.wu-hr-ghost .wu-hr-text > div')).toEqual(['Compared with Qwen3 235B', 'Teo would have gone to the market']);
     expect(all(made.root, '.wu-hr-model')).toEqual(['Nemotron 3 Nano 30B', 'Qwen3 235B', 'Qwen3 235B']);
-    expect(made.root.querySelector('.wu-hr-run')?.textContent).toBe("Teo's model was deciding · 06:00 to 07:15 · spent $0.0042");
+    expect(made.root.querySelector('.wu-hr-run')?.textContent).toBe("Teo's model was deciding · 06:00 to 07:15 · $0.0042");
     expect(made.root.querySelector('.wu-hr-now')?.textContent).toBe('Now07:15 · Day 1');
     // A kept picture is read at its address; a missing one is the quiet tile, no words in it.
     await vi.waitFor(() => expect(made.root.querySelector('.wu-hr-card[aria-current="true"] .wu-hr-pic img')?.getAttribute('src')).toBe(`/world/pictures/${'f'.repeat(64)}?world_id=${encodeURIComponent(WORLD)}`));
@@ -193,9 +193,9 @@ describe('History', () => {
     expect(made.root.querySelector('.wu-history-r23')?.classList.contains('wu-hr-opened')).toBe(true);
     expect(opened.querySelector('.wu-hr-moment-title')?.textContent).toBe('Marco asked Teo');
     expect([...opened.querySelectorAll('.wu-hr-line')].map((line) => [line.querySelector('.wu-hr-speaker')?.textContent, line.querySelector('.wu-hr-line-said')?.textContent, line.querySelector('.wu-hr-who')?.textContent])).toEqual([
-      ['Marco', '“Did they bring in anything good?”', 'By a person playing'],
-      ['Teo', '“Sardines, mostly.”', 'By Nemotron 3 Nano 30B'],
-      ['Marco', '“Any for the hotel?”', 'By a person playing'],
+      ['Marco', '“Did they bring in anything good?”', 'A person playing'],
+      ['Teo', '“Sardines, mostly.”', 'Nemotron 3 Nano 30B'],
+      ['Marco', '“Any for the hotel?”', 'A person playing'],
     ]);
     expect(all(opened, '.wu-hr-answer')).toEqual(['Qwen3 235B chose the same']);
     // The run's small print, and why it ended where it did not end at its own time (H3).
@@ -361,7 +361,7 @@ describe('History', () => {
     // its words stand whole at the page's margin (80 at 1440) above it.
     expect(slide()).toBe('translateX(-796px)');
     expect(bracket()).toEqual(['M 796 254 L 1856 254 L 1856 262']);
-    expect([words()?.textContent, Number.parseFloat(words()!.style.left) - 796]).toEqual(["Teo's and Ines's models were deciding · 06:00 to 07:15 · spent $0.0042", 80]);
+    expect([words()?.textContent, Number.parseFloat(words()!.style.left) - 796]).toEqual(["Teo's and Ines's models were deciding · 06:00 to 07:15 · $0.0042", 80]);
     // Back at the start: the run goes on past the right edge, so the bracket runs to it with no leg there; its words
     // over its first dot.
     for (let step = 0; step < 4; step += 1) history.key(press('ArrowLeft'));
@@ -531,7 +531,7 @@ describe('History', () => {
       // The run ends: the next read says so, and once no run is open nothing more is read.
       running['closed'] = { end_tick: 437, reason: 'session_deadline', words: 'The run ended.' };
       await vi.advanceTimersByTimeAsync(10_000);
-      expect(run()).toBe("Teo's model was deciding · 06:00 to 07:17 · spent $0.0010");
+      expect(run()).toBe("Teo's model was deciding · 06:00 to 07:17 · $0.0010");
       const before = asked.length;
       await vi.advanceTimersByTimeAsync(60_000);
       expect(asked.length).toBe(before);
@@ -552,7 +552,7 @@ describe('History', () => {
     const made = host(reads({ '/world/github-projects': { projects: [gone] } }).read);
     await (await module()).mountHistory(made).open();
     const kept = made.root.querySelector('.wu-hr-kept');
-    expect([kept?.textContent, kept?.getAttribute('data-refused')]).toEqual(['Kept on GitHub in terraces-on-the-bay · sending has stopped. Your changes are kept on this computer.', 'true']);
+    expect([kept?.textContent, kept?.getAttribute('data-refused')]).toEqual(['Kept on GitHub in terraces-on-the-bay · Sending has stopped. Your changes are kept on this computer.', 'true']);
   });
 
   it("asks H12's question with G where the project is kept on this computer only, its keys alone in the row", async () => {

@@ -381,7 +381,7 @@ describe('a decision, filled', () => {
     expect([quiet.decider, quiet.unanswered?.reason, quiet.answered, quiet.choices.some((choice: Json) => choice.chosen)]).toEqual(['agent', 'no_answer_in_time', null, false]);
     expect(quiet.why).toBe('It did not answer in time.');
     // Its day page: its own words from its door entry.
-    expect(records.day(showing, agentView(showing.row), true).declared.map((part: Json) => part.words).join('')).toBe('In its own words: Scout, made by Harbour Lab.');
+    expect(records.day(showing, agentView(showing.row), true).declared.map((part: Json) => part.words).join('')).toBe('Scout · Harbour Lab');
   });
 
   it('names a speaker a kind names in its title form, the sentence around them as their tag does', async () => {

@@ -91,7 +91,7 @@ export function decisionTitle({ line = null, chose = null }) {
 }
 
 /**
- * Under the title: the answer's time and cost, "Answered in 0.9 s · cost $0.0003", and for a verdict
+ * Under the title: the answer's time and cost, "0.9 s · $0.0003", and for a verdict
  * other than done its own sentence. A done decision says nothing more: the head names the minute it
  * was done in, and the chosen mark what was done. `verdict` is the choice account's { kind, words };
  * a part not recorded is left out.
@@ -102,28 +102,28 @@ export function resultLines({ verdict, latencyMs = null, costUsd = null, costKno
 }
 
 /**
- * How long the answer took: "answered in 0.9 s"; under a tenth of a second has no figure of its own at one decimal,
- * "answered in under 0.1 s" (DESIGN's W5). Null where no time is recorded.
+ * How long the answer took: "0.9 s"; under a tenth of a second has no figure of its own at one decimal,
+ * "under 0.1 s" (DESIGN's W5). Null where no time is recorded.
  */
 export function answeredIn(latencyMs) {
   if (!Number.isFinite(latencyMs)) return null;
-  return latencyMs < 100 ? 'answered in under 0.1 s' : `answered in ${(latencyMs / 1000).toFixed(1)} s`;
+  return latencyMs < 100 ? 'under 0.1 s' : `${(latencyMs / 1000).toFixed(1)} s`;
 }
 
-/** What the answer cost: "cost $0.0003", or "cost at most $0.0014" where only its bound is known; null where unrecorded. */
+/** What the answer cost: "$0.0003", or "At most $0.0014" where only its bound is known; null where unrecorded. */
 export function costWords(costUsd, costKnown = true) {
   if (costUsd === null || costUsd === undefined || !amount(costUsd)) return null;
-  return `${costKnown ? 'cost' : 'cost at most'} ${amount(costUsd)}`;
+  return `${costKnown ? '' : 'At most '}${amount(costUsd)}`;
 }
 
 /** The record page's own words (DESIGN's r10): the moment card's label and who decided, T7's words where no model did. */
 export const DECISION_FLOW_WORDS = Object.freeze({
   whatHappened: 'Outcome',
-  decidedBy: 'Decided by ',
-  decidedByPerson: 'Decided by a person playing',
-  decidedByProgram: 'Decided by an outside program',
+  decidedBy: '',
+  decidedByPerson: 'A person playing',
+  decidedByProgram: 'An outside program',
   /** An outside AI agent at the door decided (AG1d 4): who decided and nothing else, as D5 holds for a model. */
-  decidedByAgent: 'Decided by an outside AI agent',
+  decidedByAgent: 'An outside AI agent',
 });
 
 /**
@@ -142,29 +142,29 @@ export const UNANSWERED_REASONS = Object.freeze({
 
 /** Such a decision's own words under the ring and in its head: no usable answer, or a choice the world moved past. */
 export const UNANSWERED_WORDS = Object.freeze({
-  none: 'no usable answer', late: 'chose too late', routine: 'the routine acted', notAsked: 'not asked',
+  none: 'No Usable Answer', late: 'Chose Too Late', routine: 'Routine Fallback', notAsked: 'Not Asked',
 });
 
 /** Why a model was not asked, in four words or fewer, by its receipt's reason; absent where the reason has none. */
 const NOT_ASKED = Object.freeze({
-  ...Object.fromEntries(UNANSWERED_REASONS.money.map(reason => [reason, 'over the money left'])),
-  ...Object.fromEntries(UNANSWERED_REASONS.noTime.map(reason => [reason, 'no time to ask'])),
-  spending_suspended: 'spending was paused',
-  ...Object.fromEntries(['spending_not_granted', 'spending_revoked', 'spending_expired', 'spending_scope_missing'].map(reason => [reason, 'spending was not open'])),
-  spending_unavailable: 'spending check failed',
-  provider_credential_absent: 'its service not connected',
-  provider_not_admitted: 'not allowed here',
-  model_no_longer_offered: 'no longer offered here',
-  model_unavailable: 'the model was unavailable',
-  model_call_failed: 'the call failed',
-  request_refused: 'refused before sending',
-  provider_configuration_changed: "the model's settings changed",
-  world_hour_decisions_spent: 'hourly limit reached',
-  decision_context_changed: 'the world moved on',
+  ...Object.fromEntries(UNANSWERED_REASONS.money.map(reason => [reason, 'Over the money left'])),
+  ...Object.fromEntries(UNANSWERED_REASONS.noTime.map(reason => [reason, 'No time to ask'])),
+  spending_suspended: 'Spending was paused',
+  ...Object.fromEntries(['spending_not_granted', 'spending_revoked', 'spending_expired', 'spending_scope_missing'].map(reason => [reason, 'Spending was not open'])),
+  spending_unavailable: 'Spending check failed',
+  provider_credential_absent: 'Its service not connected',
+  provider_not_admitted: 'Not allowed here',
+  model_no_longer_offered: 'No longer offered here',
+  model_unavailable: 'The model was unavailable',
+  model_call_failed: 'The call failed',
+  request_refused: 'Refused before sending',
+  provider_configuration_changed: "The model's settings changed",
+  world_hour_decisions_spent: 'Hourly limit reached',
+  decision_context_changed: 'The world moved on',
 });
 
 /**
- * Under the ring where nothing was sent, why, where the line under the head does not already say it: "spending was
+ * Under the ring where nothing was sent, why, where the line under the head does not already say it: "Spending was
  * paused"; null for the money and the time, which that line names, and for a reason with no words.
  */
 export function notAskedWhy(reason) {
@@ -173,27 +173,27 @@ export function notAskedWhy(reason) {
 }
 
 /**
- * The head's small print for a model's decision whose choice was not taken, the model's name its own part: "Asked
- * Nemotron 3 Ultra 550B · no usable answer · the routine acted"; where nothing was sent, "Nemotron 3 Ultra 550B not
- * asked · the routine acted"; a choice the world had moved past, "Asked Qwen3 235B · chose too late · the routine
- * acted". Nothing where no model is named.
+ * The head's small print for a model's decision whose choice was not taken, the model's name its own part:
+ * "Nemotron 3 Ultra 550B · No Usable Answer · Routine Fallback"; where nothing was sent, "Nemotron 3 Ultra 550B · Not
+ * Asked · Routine Fallback"; a choice the world had moved past, "Qwen3 235B · Chose Too Late · Routine
+ * Fallback". Nothing where no model is named.
  */
 export function unansweredParts({ model = null, asks = 0, late = false } = {}) {
   const name = plain(model);
   if (!name) return [];
-  if (!late && asks < 1) return [{ model: name }, ` ${UNANSWERED_WORDS.notAsked} · ${UNANSWERED_WORDS.routine}`];
-  return ['Asked ', { model: name }, ` · ${late ? UNANSWERED_WORDS.late : UNANSWERED_WORDS.none} · ${UNANSWERED_WORDS.routine}`];
+  if (!late && asks < 1) return [{ model: name }, ` · ${UNANSWERED_WORDS.notAsked} · ${UNANSWERED_WORDS.routine}`];
+  return [{ model: name }, ` · ${late ? UNANSWERED_WORDS.late : UNANSWERED_WORDS.none} · ${UNANSWERED_WORDS.routine}`];
 }
 
 /**
- * Under the ring for an asked decision with no usable answer, what the asks sent took and cost: "asked once in 2.1 s ·
- * $0.0121", "asked twice in 4.3 s · $0.0242", "at most" where only the bound is known.
+ * Under the ring for an asked decision with no usable answer, what the asks sent took and cost: "Asked once in 2.1 s ·
+ * $0.0121", "Asked twice in 4.3 s · $0.0242", "At most" where only the bound is known.
  */
 export function askedPrint({ asks = 1, latencyMs = null, costUsd = null, costKnown = true } = {}) {
   const times = asks === 1 ? 'once' : asks === 2 ? 'twice' : `${asks} times`;
   const took = !Number.isFinite(latencyMs) ? '' : latencyMs < 100 ? ' in under 0.1\u00a0s' : ` in ${(latencyMs / 1000).toFixed(1)}\u00a0s`;
-  const cost = costUsd === null || costUsd === undefined || !amount(costUsd) ? null : `${costKnown ? '' : 'at most '}${finer(costUsd)}`;
-  return [`asked ${times}${took}`, cost].filter(Boolean).join(' · ');
+  const cost = costUsd === null || costUsd === undefined || !amount(costUsd) ? null : `${costKnown ? '' : 'At most '}${finer(costUsd)}`;
+  return [`Asked ${times}${took}`, cost].filter(Boolean).join(' · ');
 }
 
 /**
@@ -219,11 +219,11 @@ export function unansweredWhy({ asks = 0, reason = null }) {
 /** A turn an outside program did not answer at all (AG1d 5): its program silent past the deadline, or not connected. */
 export const NO_ANSWER = Object.freeze(['no_answer_in_time', 'decider_disconnected']);
 
-/** The head's small print for an outside AI agent's turn whose choice was not taken (AG1d 5): "Asked the outside AI
- * agent · no answer · the routine acted"; one whose answer came back and could not be used, "... · no usable answer ·
+/** The head's small print for an outside AI agent's turn whose choice was not taken (AG1d 5): "An outside AI
+ * agent · No Answer · Routine Fallback"; one whose answer came back and could not be used, "... · No Usable Answer ·
  * ...". */
 export function agentUnansweredParts(reason) {
-  return [`Asked the outside AI agent · ${NO_ANSWER.includes(reason) ? 'no answer' : UNANSWERED_WORDS.none} · ${UNANSWERED_WORDS.routine}`];
+  return [`${DECISION_FLOW_WORDS.decidedByAgent} · ${NO_ANSWER.includes(reason) ? 'No Answer' : UNANSWERED_WORDS.none} · ${UNANSWERED_WORDS.routine}`];
 }
 
 /** Why the routine acted for such a turn (AG1d 5), under the head's small print: "It did not answer in time." */
@@ -235,28 +235,29 @@ export function agentUnansweredWhy(reason = null) {
 /** Over the column of choices (r10): "Teo's Choices", "The resident's Choices". */
 export const choicesOver = who => `${possessive(who.start)} Choices`;
 
-/** Under the decision's ring, after who decided (r10): "chose 1 of 9". */
-export const choseOneOf = count => `chose 1 of ${count}`;
+/** Under the decision's ring, after who decided (r10): "Chose 1 of 9". */
+export const choseOneOf = count => `Chose 1 of ${count}`;
 
 /**
  * The head's small print (r10) as parts, a model's name its own part ({ model }) so the page keeps it on one line: who
- * decided and nothing else (D5), "Decided by Nemotron 3 Nano 30B", "Decided by a person playing", "Decided by an outside
+ * decided and nothing else (D5), "Nemotron 3 Nano 30B", "A person playing", "An outside
  * program" (`decider` 'person' or 'external', T7); nothing where no one is named.
  */
 export function decidedByParts({ decider = null, model = null } = {}) {
   const who = decider === 'person' ? DECISION_FLOW_WORDS.decidedByPerson : decider === 'external' ? DECISION_FLOW_WORDS.decidedByProgram
     : decider === 'agent' ? DECISION_FLOW_WORDS.decidedByAgent : null;
-  return who ? [who] : plain(model) ? [DECISION_FLOW_WORDS.decidedBy, { model: plain(model) }] : [];
+  return who ? [who] : plain(model) ? [...(DECISION_FLOW_WORDS.decidedBy ? [DECISION_FLOW_WORDS.decidedBy] : []), { model: plain(model) }] : [];
 }
 
 /**
- * Under the ring, by the choice they paid for (D5): the answer's time and its cost, "answered in 0.1 s · $0.0001",
- * "answered in 1.3 s · at most $0.0014" where only its bound is known; a part not recorded is left out, null with neither.
+ * Under the ring, by the choice they paid for (D5): the answer's time and its cost, "0.1 s · $0.0001",
+ * "1.3 s · At most $0.0014" where only its bound is known; a part not recorded is left out, null with neither.
  */
 export function ringPrint({ latencyMs = null, costUsd = null, costKnown = true } = {}) {
-  const cost = costUsd === null || costUsd === undefined || !amount(costUsd) ? null : `${costKnown ? '' : 'at most '}${amount(costUsd)}`;
+  const cost = costWords(costUsd, costKnown);
   // A figure never breaks across lines under the ring (DESIGN 04:04): "0.1 s" keeps a no-break space.
-  const parts = [answeredIn(latencyMs)?.replace(/ s$/u, '\u00a0s'), cost].filter(Boolean);
+  const time = answeredIn(latencyMs)?.replace(/ s$/u, '\u00a0s');
+  const parts = [time ? capital(time) : null, cost].filter(Boolean);
   return parts.length ? parts.join(' · ') : null;
 }
 

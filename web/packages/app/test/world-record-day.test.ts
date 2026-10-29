@@ -39,8 +39,8 @@ function teoState(extra: State = {}): State {
   return {
     who: teo, sub: 'Resident · Terraces on the bay', assignable: true,
     model: { name: NEMOTRON, price: { input: '0.06', output: '0.24' } }, connected: true, runLine: null,
-    run: { open: false, big: '10 minutes · at most $0.05', busy: false, refusal: null },
-    did: rows(), didFocus: 2, canAsk: true, ask: null, lastRun: 'Last run 06:00 to 07:15 · 12 decisions · spent $0.0042',
+    run: { open: false, big: '10 minutes · At most $0.05', busy: false, refusal: null },
+    did: rows(), didFocus: 2, canAsk: true, ask: null, lastRun: 'Last run 06:00 to 07:15 · 12 decisions · $0.0042',
     personality: { character: { name: 'Teo', about: ABOUT }, shown: true }, editing: null, canCompare: true, compare: null,
     portrait: '/portraits/teo.png', doing: 'Waiting by the bench', decides: `${NEMOTRON} decides for Teo`,
     ...extra,
@@ -51,7 +51,7 @@ function teoState(extra: State = {}): State {
 function residentState(extra: State = {}): State {
   return {
     who: resident, sub: 'Terraces on the bay', assignable: false, model: null, connected: true, runLine: 'The resident follows a routine.',
-    run: { open: false, big: '10 minutes · at most $0.05', busy: false, refusal: null },
+    run: { open: false, big: '10 minutes · At most $0.05', busy: false, refusal: null },
     did: [], didFocus: null, canAsk: false, ask: null, lastRun: null,
     personality: { character: null, shown: true }, editing: null, canCompare: false, compare: null,
     decides: 'The resident follows a routine',
@@ -105,22 +105,22 @@ describe("Teo's day", () => {
     expect(one(who, '.wu-day-decides')).toBe(`${NEMOTRON} decides for Teo`);
     expect(who.querySelector('.wu-day-decides .wu-hr-tag')).toBeNull();
     expect(all(who, '.wu-day-small .wu-day-line')).toEqual([
-      '$0.06 in · $0.24 out per million tokens', 'Last run 06:00 to 07:15 · 12 decisions · spent $0.0042', '10 minutes · at most $0.05',
+      '$0.06 in · $0.24 out per million tokens', 'Last run 06:00 to 07:15 · 12 decisions · $0.0042', '10 minutes · At most $0.05',
     ]);
   });
 
   it('shows what Run would start, its length and most it may spend, before R starts it', async () => {
     const { root, act, page } = await open();
-    const run = { open: false, big: '10 minutes · at most $0.05', busy: false, refusal: null };
+    const run = { open: false, big: '10 minutes · At most $0.05', busy: false, refusal: null };
     page.draw(teoState({ lastRun: null, run }));
-    expect(all(root, '.wu-day-small .wu-day-line')).toEqual(['$0.06 in · $0.24 out per million tokens', '10 minutes · at most $0.05']);
+    expect(all(root, '.wu-day-small .wu-day-line')).toEqual(['$0.06 in · $0.24 out per million tokens', '10 minutes · At most $0.05']);
     // The figures wrap only between their parts (J9).
-    expect(all(root, '.wu-day-small .wu-nowrap')).toEqual(['10 minutes', 'at most $0.05']);
+    expect(all(root, '.wu-day-small .wu-nowrap')).toEqual(['10 minutes', 'At most $0.05']);
     keyNamed(root, 'Run').click();
     expect(act).toHaveBeenLastCalledWith('run');
     // While it starts, and when a refusal asks to press Run again, the limits it names stay on screen.
     page.draw(teoState({ lastRun: null, run: { ...run, busy: true, refusal: 'That run already started with other limits. Press Run again.' } }));
-    expect(all(root, '.wu-day-small .wu-day-line')).toContain('10 minutes · at most $0.05');
+    expect(all(root, '.wu-day-small .wu-day-line')).toContain('10 minutes · At most $0.05');
     expect(one(root, '.wu-day-who .wu-day-refused')).toBe('That run already started with other limits. Press Run again.');
     // Once it is on, the running line stands in its place; where no run is offered, there are no limits to show.
     page.draw(teoState({ lastRun: null, run: { ...run, open: true, big: '9:13 left · $0.0011 of $0.05' }, running: "Teo's model is deciding · 9:13 left" }));
@@ -213,7 +213,7 @@ describe("Teo's day", () => {
     expect(all(root, '.wu-day-item .wu-hr-time')).toEqual(['07:10 · Day 1', '07:09 · Day 1', '06:52 · Day 1', '06:31 · Day 1', '06:00 · Day 1']);
     // The line said in curly quotes, a line said to Teo with its speaker first; the who line under it.
     expect(all(root, '.wu-day-item .wu-hr-said')).toEqual(['“Sardines, mostly. Come down early tomorrow.”', 'Marco: “Did they bring in anything good?”', '“Morning, Ines. The boats are out early.”']);
-    expect(all(root, '.wu-day-decided')).toEqual([`By ${NEMOTRON} · 7 choices`, 'By a person playing', `By ${NEMOTRON} · 9 choices`, `By ${NEMOTRON} · 6 choices`, 'Routine']);
+    expect(all(root, '.wu-day-decided')).toEqual([`${NEMOTRON} · 7 choices`, 'A person playing', `${NEMOTRON} · 9 choices`, `${NEMOTRON} · 6 choices`, 'Routine']);
     // A model's name never breaks.
     expect(all(root, '.wu-day-item .wu-hr-model')).toEqual([NEMOTRON, NEMOTRON, NEMOTRON]);
     // A picture where one exists, the quiet tile where a moment's is still to come (no words in it).
@@ -272,7 +272,7 @@ describe("Teo's day", () => {
       { time: '07:11 · Day 1', what: 'Waited by the bench', sub: '', decision: true, model: NEMOTRON, choices: 9, unanswered: 'late' },
       { time: '07:10 · Day 1', what: 'Went to the lower pools', sub: '', decision: true, model: NEMOTRON, choices: 6 },
     ], didFocus: 0 }));
-    expect(all(root, '.wu-day-decided')).toEqual([`Routine · no usable answer from ${NEMOTRON}`, `Routine · ${NEMOTRON} chose too late`, `By ${NEMOTRON} · 6 choices`]);
+    expect(all(root, '.wu-day-decided')).toEqual([`Routine · ${NEMOTRON} · No Usable Answer`, `Routine · ${NEMOTRON} · Chose Too Late`, `${NEMOTRON} · 6 choices`]);
   });
 
   it("names an outside AI agent's rows as its, and the routine's where its turn brought no answer it could use (AG1d)", async () => {
@@ -283,16 +283,16 @@ describe("Teo's day", () => {
       { time: '07:10 · Day 1', what: 'Said to Juno Ford: “Evening.”', sub: '', decision: true, model: null, decider: 'agent' },
       { time: '07:09 · Day 1', what: 'Said to Juno Ford: “Morning.”', sub: '', decision: true, model: null, decider: 'external' },
     ], didFocus: 0 }));
-    expect(all(root, '.wu-day-decided')).toEqual(['Routine · no answer from the outside AI agent', 'Routine · no usable answer from the outside AI agent', 'By an outside AI agent', 'By an outside program']);
+    expect(all(root, '.wu-day-decided')).toEqual(['Routine · No Answer', 'Routine · No Usable Answer', 'An outside AI agent', 'An outside program']);
   });
 
   it('says an outside AI agent decides on its day page, in its own words, at no cost to this world, with no Model or Run (AG1d 6)', async () => {
     const { root, page } = await open();
     const visitor = { title: 'Visitor', start: 'The visitor', within: 'the visitor', named: false };
     page.draw(teoState({ who: visitor, model: null, decider: 'agent', assignable: false, connected: false, decides: 'An outside AI agent decides for the visitor.',
-      declared: [{ words: 'In its own words: ', declared: false }, { words: 'Scout', declared: true }, { words: '.', declared: false }], lastRun: null, did: [] }));
+      declared: [{ words: 'Scout', declared: true }], lastRun: null, did: [] }));
     expect(one(root, '.wu-day-decides')).toBe('An outside AI agent decides for the visitor.');
-    expect(one(root, '.wu-day-declared')).toBe('In its own words: Scout.It costs this world nothing.');
+    expect(one(root, '.wu-day-declared')).toBe('ScoutIt costs this world nothing.');
     expect(all(root, '.wu-day-declared-own')).toEqual(['Scout']);
     expect(keys(root).join(' ')).not.toMatch(/Model|Run/u);
   });
@@ -305,7 +305,7 @@ describe("Teo's day", () => {
     ], didFocus: 0 }));
     expect(all(root, '.wu-day-item .wu-hr-time')).toEqual(['Minute 10 to minute 33', 'Minute 9']);
     // The folded row counts its decisions; a single decision keeps its choices.
-    expect(all(root, '.wu-day-decided')).toEqual([`By ${NEMOTRON} · 23 decisions`, `By ${NEMOTRON} · 8 choices`]);
+    expect(all(root, '.wu-day-decided')).toEqual([`${NEMOTRON} · 23 decisions`, `${NEMOTRON} · 8 choices`]);
   });
 
   it('shows a routine character with no personality written: the line, [N] Personality, and nothing it cannot do', async () => {
@@ -427,7 +427,7 @@ describe("Teo's day keys", () => {
     const { root, page } = await open();
     page.draw(teoState({ canChange: false, assignable: false, canCompare: false, canAsk: false }));
     expect(keys(root)).toEqual(['↑↓Previous / Next', 'EscBack']);
-    expect(all(root, '.wu-day-small .wu-day-line')).toEqual(['$0.06 in · $0.24 out per million tokens', 'Last run 06:00 to 07:15 · 12 decisions · spent $0.0042']);
+    expect(all(root, '.wu-day-small .wu-day-line')).toEqual(['$0.06 in · $0.24 out per million tokens', 'Last run 06:00 to 07:15 · 12 decisions · $0.0042']);
   });
 
   it('offers each key only where it works and says what each asked', async () => {

@@ -35,8 +35,8 @@ assert.equal(recordFailed(called({ kind: 'resident' })), "The resident's record 
 assert.equal(rowSub({ model: 'Nemotron 3 Nano 30B', options: 7 }), 'Nemotron 3 Nano 30B · 7 choices');
 assert.equal(rowSub(null), 'Routine');
 assert.equal(routineBetween('Nemotron 3 Super 120B'), "Routine, between Nemotron 3 Super 120B's choices");
-assert.equal(lastRunLine({ from: '06:00', to: '07:15', decisions: 12, spent: '0.00420000' }), 'Last run 06:00 to 07:15 · 12 decisions · spent $0.0042');
-assert.equal(lastRunLine({ from: '06:00', to: '06:10', decisions: 1, spent: '0' }), 'Last run 06:00 to 06:10 · 1 decision · spent $0');
+assert.equal(lastRunLine({ from: '06:00', to: '07:15', decisions: 12, spent: '0.00420000' }), 'Last run 06:00 to 07:15 · 12 decisions · $0.0042');
+assert.equal(lastRunLine({ from: '06:00', to: '06:10', decisions: 1, spent: '0' }), 'Last run 06:00 to 06:10 · 1 decision · $0');
 
 // Money (WORDS.md rule 5 and DESIGN's K8): "Free" only for a price; "$0" for nothing spent.
 assert.equal(amount('0.05000000'), '$0.05');
@@ -172,6 +172,6 @@ assert.equal(decidesPrint(called({ name: null, kind: 'visitor' }), { decider: 'a
 assert.equal(chosenLine(called({ name: 'Teo' }), null, 'agent'), 'An outside AI agent chose this.');
 assert.equal(rowSub({ decider: 'agent' }), 'An outside AI agent');
 assert.equal(CHARACTER_WORDS.costsNothing, 'It costs this world nothing.');
-assert.equal(declaredParts({ name: 'Scout', maker: 'Harbour Lab', mind: null }).map(part => part.words).join(''), 'In its own words: Scout, made by Harbour Lab.');
+assert.equal(declaredParts({ name: 'Scout', maker: 'Harbour Lab', mind: null }).map(part => part.words).join(''), 'Scout · Harbour Lab');
 assert.equal(declaredParts({ name: '  ', maker: 'Harbour Lab', mind: 'x' }), null, 'no name, no line');
 console.log('Character words checks passed: names and kinds, the chosen line, the page lines, money and the model list.');

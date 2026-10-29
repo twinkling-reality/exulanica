@@ -62,7 +62,7 @@ const choices = (words: readonly string[], taken: number): Choice[] => words.map
 function teo(extra: Partial<DecisionPageState> = {}): DecisionPageState {
   return {
     over: '06:52 · Day 1 · Teo met Ines at the bench', title: '“Morning, Ines. The boats are out early.”', model: 'Nemotron 3 Nano 30B',
-    done: 'Answered in 0.9 s · cost $0.0003', verdict: null, toldLabel: 'Context',
+    done: '0.9 s · $0.0003', verdict: null, toldLabel: 'Context',
     told: [
       // As personalityRecordLines gives it: the name, then the words.
       { label: 'Personality', lines: ['Teo', 'A retired fisherman who walks the quay every morning and talks to anyone who will listen.'], apart: false },
@@ -123,7 +123,7 @@ describe('A decision (r10)', () => {
     expect(page.querySelector('.wu-rd-title')?.textContent).toBe('Teo spoke to Ines');
     expect(document.activeElement?.textContent).toBe('Teo spoke to Ines');
     // Who decided, and nothing else: the answer's time and cost stand under the ring (D5).
-    expect(page.querySelector('.wu-rd-by')?.textContent).toBe('Decided by Nemotron 3 Nano 30B');
+    expect(page.querySelector('.wu-rd-by')?.textContent).toBe('Nemotron 3 Nano 30B');
     expect(page.querySelector('.wu-rd-by .wu-hr-model')?.textContent).toBe('Nemotron 3 Nano 30B');
 
     // What the model was told, each section's name and words; the personality's name plain and its words as written, in
@@ -151,7 +151,7 @@ describe('A decision (r10)', () => {
     expect(lines.querySelectorAll('circle.end')).toHaveLength(9);
     expect([...lines.querySelectorAll('circle.end.lit')].map((dot) => [dot.getAttribute('cx'), dot.getAttribute('cy')])).toEqual([['852', '438']]);
     // Under the ring: how many choices it had and what the answer took; who decided is the head's alone.
-    expect(all(page, '.wu-rd-caption > span')).toEqual(['chose 1 of 9', 'answered in 0.9\u00a0s · $0.0003']);
+    expect(all(page, '.wu-rd-caption > span')).toEqual(['Chose 1 of 9', '0.9\u00a0s · $0.0003']);
     // What the model was told is the first heading after the title.
     expect(page.querySelector('.wu-rd-told > h2.wu-rd-told-heading')?.textContent).toBe('Context');
     expect(at(page.querySelector('.wu-rd-caption'))).toEqual(['740px', '650px']);
@@ -189,7 +189,7 @@ describe('A decision (r10)', () => {
     const { root, page } = await open(teo({ choices: choices(words, 1), choicesHeading: "Teo's choices" }));
     expect(numbers(root)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect([...root.querySelectorAll<HTMLElement>('.wu-rd-choice')].map((row) => Number.parseFloat(row.style.top))).toEqual(Array.from({ length: 12 }, (_, step) => 372 + 44 * step));
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 14', 'answered in 0.9\u00a0s · $0.0003']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['Chose 1 of 14', '0.9\u00a0s · $0.0003']);
     // Only the down arrow while more lie below; the up arrow once more lie above.
     expect(all(root, '.wu-rd-more')).toEqual(['↓']);
     expect(press('ArrowDown').defaultPrevented).toBe(true);
@@ -225,9 +225,9 @@ describe('A decision (r10)', () => {
       decided: 'Marco asked Teo', said: 'Marco: “Did they bring in anything good?”', portraits: [],
       choices: choices(['Say something to Teo', 'Wait a minute', 'Walk to the bench'], 0),
     }));
-    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Decided by a person playing');
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('A person playing');
     expect(root.querySelector('.wu-hr-model')).toBeNull();
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 3']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['Chose 1 of 3']);
     // Nothing told: no column of it and no bracket; the choices and the card stay.
     expect(root.querySelector('.wu-rd-told')).toBeNull();
     expect(root.querySelector('path.in')).toBeNull();
@@ -241,15 +241,15 @@ describe('A decision (r10)', () => {
   it("draws today's decision state before the host fills the record page's own parts", async () => {
     const { root } = await open({
       over: '06:52 · Day 1 · Teo said to Ines', title: 'Wait here a minute', model: 'Nemotron 3 Nano 30B',
-      done: 'Answered in 1.3 s · cost at most $0.0014', verdict: 'Accepted; no minute has acted on it yet.',
+      done: '1.3 s · At most $0.0014', verdict: 'Accepted; no minute has acted on it yet.',
       toldLabel: 'Context', told: [{ label: 'Location & Time', lines: ['On the glass terraces · 06:54 · Day 1'], apart: false }],
       choicesLabel: "Teo's Choices (3)", choices: choices(['Walking, 62 m away', 'Wait here a minute', 'At home, 35 m away'], 1),
       earlier: false, later: true, record: null, failure: null, canCompare: false,
     });
     expect(root.querySelector('.wu-rd-title')?.textContent).toBe('Wait here a minute');
-    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Decided by Nemotron 3 Nano 30B');
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Nemotron 3 Nano 30B');
     expect(root.querySelector('.wu-rd-over .wu-rd-label')?.textContent).toBe("Teo's Choices (3)");
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 3', 'answered in 1.3 s · cost at most $0.0014']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['Chose 1 of 3', '1.3 s · At most $0.0014']);
     // What happened: what came of it, the choice itself being the title already; the quiet tile where no picture exists.
     expect(root.querySelector('.wu-rd-moment .wu-rd-action')).toBeNull();
     expect(root.querySelector('.wu-rd-moment .wu-rd-verdict')?.textContent).toBe('Accepted; no minute has acted on it yet.');
@@ -386,10 +386,10 @@ describe('A decision (r10)', () => {
 describe('Under the ring, the answer and what it cost (D5)', () => {
   it("shows no cost line for an outside program's answer, and the figures keep their space unbroken", async () => {
     const { root } = await open(teo({ decider: 'external', model: null }));
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 9']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['Chose 1 of 9']);
     document.body.replaceChildren();
     const model = await open(teo());
-    expect(model.root.querySelector('.wu-rd-caption > .wu-rd-paid')?.textContent).toBe('answered in 0.9\u00a0s · $0.0003');
+    expect(model.root.querySelector('.wu-rd-caption > .wu-rd-paid')?.textContent).toBe('0.9\u00a0s · $0.0003');
     // The caption's words stand in a halo of the page's own ground, so the fan's curves break around them.
     const css = readFileSync(`${process.cwd()}/../tools/previews/world-workspace/world-ui-record-decision.css`, 'utf8');
     expect(css).toMatch(/\.wu-rd-caption > \* \{ text-shadow: [^}]*var\(--hr-ground\)/);
@@ -402,18 +402,18 @@ describe("A model's decision whose choice was not taken (U3)", () => {
 
   it('says the model was asked with no usable answer, what the ask took and cost, and marks no choice taken', async () => {
     const { root } = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, -1), answered: null, unanswered, why, canCompare: false }));
-    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Asked Nemotron 3 Nano 30B · no usable answer · the routine acted');
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Nemotron 3 Nano 30B · No Usable Answer · Routine Fallback');
     // Under the ring what the ask took and cost; how it ended is the head's. Why the routine acted, under the head, alone.
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['asked once in 2.1\u00a0s · $0.0121']);
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['Asked once in 2.1\u00a0s · $0.0121']);
     expect(all(root, '.wu-rd-hint')).toEqual([why]);
     expect(root.querySelector('.wu-rd-head .wu-rd-hint')?.textContent).toBe(why);
-    expect(root.textContent).not.toMatch(/Decided by|chose 1 of|Chosen|picked/u);
+    expect(root.textContent).not.toMatch(/Decided by|Chose 1 of|Chosen|picked/u);
   });
 
   it('says the model was not asked where nothing was sent, with why, and no cost or note under the ring', async () => {
     const { root } = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, -1), answered: null, canCompare: false,
       unanswered: { ...unanswered, asks: 0, latencyMs: null, costUsd: null }, why: 'Asking it would have gone over the money left.' }));
-    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Nemotron 3 Nano 30B not asked · the routine acted');
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Nemotron 3 Nano 30B · Not Asked · Routine Fallback');
     // The money is the line under the head's to say: nothing under the ring repeats it.
     expect(all(root, '.wu-rd-caption > span')).toEqual([]);
     expect(all(root, '.wu-rd-hint')).toEqual(['Asking it would have gone over the money left.']);
@@ -421,13 +421,13 @@ describe("A model's decision whose choice was not taken (U3)", () => {
     // A reason that line does not name stands under the ring, in four words or fewer.
     const paused = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, -1), answered: null, canCompare: false,
       unanswered: { ...unanswered, asks: 0, latencyMs: null, costUsd: null, reason: 'spending_suspended' }, why: 'It could not be asked just then.' }));
-    expect(all(paused.root, '.wu-rd-caption > span')).toEqual(['spending was paused']);
+    expect(all(paused.root, '.wu-rd-caption > span')).toEqual(['Spending was paused']);
   });
 
   it('says a choice the world had moved past was made too late: marked Not Applied, its answer under the ring', async () => {
     const { root } = await open(teo({ title: 'Walked to the quay', choices: choices(NINE, 4), late: true }));
-    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Asked Nemotron 3 Nano 30B · chose too late · the routine acted');
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 9', 'answered in 0.9\u00a0s · $0.0003']);
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Nemotron 3 Nano 30B · Chose Too Late · Routine Fallback');
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['Chose 1 of 9', '0.9\u00a0s · $0.0003']);
     expect(all(root, '.wu-rd-choice .wu-hr-tag')).toEqual(['Not Applied']);
   });
 });
@@ -435,16 +435,16 @@ describe("A model's decision whose choice was not taken (U3)", () => {
 describe('A decision an outside AI agent made (AG1d 4, 5)', () => {
   it("says it decided, and under the ring its choice of nine and its time, never a cost", async () => {
     const { root } = await open(teo({ decider: 'agent', model: null, answered: { latencyMs: 1600, costUsd: null, costKnown: true } }));
-    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Decided by an outside AI agent');
-    expect(all(root, '.wu-rd-caption > span')).toEqual(['chose 1 of 9', 'answered in 1.6\u00a0s']);
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('An outside AI agent');
+    expect(all(root, '.wu-rd-caption > span')).toEqual(['Chose 1 of 9', '1.6\u00a0s']);
   });
 
   it('says a turn it did not answer was asked with no answer, and the routine acted', async () => {
     const { root } = await open(teo({ decider: 'agent', model: null, title: 'Stood a while', choices: choices(NINE, -1), answered: null, canCompare: false,
       unanswered: { asks: 1, latencyMs: null, costUsd: null, costKnown: true, reason: 'no_answer_in_time' } }));
-    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('Asked the outside AI agent · no answer · the routine acted');
+    expect(root.querySelector('.wu-rd-by')?.textContent).toBe('An outside AI agent · No Answer · Routine Fallback');
     expect(all(root, '.wu-rd-caption > span')).toEqual([]);
-    expect(root.textContent).not.toMatch(/Chosen|chose 1 of/u);
+    expect(root.textContent).not.toMatch(/Chosen|Chose 1 of/u);
   });
 });
 

@@ -72,7 +72,7 @@ describe('Keep on GitHub, from History', () => {
     expect(card.element.querySelector('.wu-hr-keep-value')?.textContent).toBe('learner');
     expect([field(card).value, card.element.querySelector('.wu-hr-keep-count')?.textContent]).toEqual(['exulanica-terraces-on-the-bay', '29 of 100']);
     // What goes there, and nothing that explains the card (ROOT's sweep of 27 October).
-    expect(text(card)).toEqual(["What goes there: this world's kept changes, without names or the words people wrote."]);
+    expect(text(card)).toEqual(["This world's kept changes, without names or the words people wrote."]);
     expect(card.element.querySelector('.wu-hr-keep-question, .wu-hr-keep-once')).toBeNull();
     expect(card.keys().map((key) => `${key.keys.join('')} ${key.word}`)).toEqual(['Enter Create', 'Esc Back']);
     expect(card.key(new KeyboardEvent('keydown', { code: 'Enter', cancelable: true }))).toBe(true);

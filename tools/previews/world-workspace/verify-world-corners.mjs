@@ -101,8 +101,8 @@ for (const line of [PEOPLE_WORDS.nobodyYet, PEOPLE_WORDS.bringIn, PEOPLE_WORDS.b
 // The top pill's people line (R-WORLD-BUILD-SHEET section 2): the count, "now" for a minute after arrival.
 assert.equal(peopleLine(24), '24 people live here');
 assert.equal(peopleLine(1), '1 person lives here');
-assert.equal(peopleLine(24, { arrived: true }), '24 people now live here, invented for this world');
-assert.equal(peopleLine(1, { arrived: true }), '1 person now lives here, invented for this world');
+assert.equal(peopleLine(24, { arrived: true }), '24 people now live here');
+assert.equal(peopleLine(1, { arrived: true }), '1 person now lives here');
 for (const count of [0, -1, 1.5, null, undefined, NaN]) { assert.equal(peopleLine(count), null); assert.equal(peopleLine(count, { arrived: true }), null); }
 assert.equal(nowhereLine(), 'People need somewhere to rest or visit nearby');
 assert.equal(PEOPLE_TIMING.arrivedMs, 60_000);
@@ -147,9 +147,9 @@ const offer = { state: 'offer', keys: ['P'], word: 'Bring People In' };
   assert.deepEqual(notes, [], 'the pill says it; no note repeats it');
   assert.deepEqual(world.played, ['paused']);
   assert.equal(world.read.mode, 'playing');
-  assert.equal(people.line(), '24 people now live here, invented for this world');
+  assert.equal(people.line(), '24 people now live here');
   at += PEOPLE_TIMING.arrivedMs - 1;
-  assert.equal(people.line(), '24 people now live here, invented for this world');
+  assert.equal(people.line(), '24 people now live here');
   at += 1;
   assert.equal(people.line(), '24 people live here');
   assert.equal(changes, 2);
