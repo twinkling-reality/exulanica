@@ -1,76 +1,207 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="432" viewBox="0 0 1200 432" role="img" aria-labelledby="title desc">
-  <title id="title">Worlds for AI Agents</title>
-  <desc id="desc">Product direction. A world you build sits at the centre, and open models run the agents in it, each model in its own role. Swap the model behind a role, compare the two runs side by side and replay every decision. Hand building, photographs and imported content are ways to build the world.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">Exulanica System Architecture</title>
+  <desc id="desc">Top-down technical architecture of Exulanica: Co-habiting minds (frontier open models, local distilled models, external agents via The Door, and human players) interact with the authoritative world state through a five-stage deterministic causal execution pipeline, producing real-time 3D and neural-shaded views, causal audit logs, and verified SFT/DPO trajectories for model distillation.</desc>
   <defs>
-    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
-      <circle cx="1" cy="1" r="1" fill="#597365" opacity=".12"/>
-    </pattern>
-    <linearGradient id="world" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#234c43"/>
-      <stop offset="1" stop-color="#142c28"/>
-    </linearGradient>
+    <marker id="arrowSlate" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#2563eb"/>
+    </marker>
   </defs>
-  <rect width="1200" height="432" rx="18" fill="#f2f5ef"/>
-  <rect width="1200" height="432" rx="18" fill="url(#grid)"/>
-  <g font-family="Arial, Helvetica, sans-serif">
-    <text x="44" y="44" font-size="12" font-weight="700" letter-spacing="2.5" fill="#466756">EXULANICA / PRODUCT DIRECTION</text>
-    <text x="44" y="84" font-size="29" font-weight="600" fill="#203a32">Worlds for AI Agents.</text>
 
-    <text x="44" y="138" font-size="12" font-weight="700" letter-spacing="1.5" fill="#6d8577">WAYS TO BUILD</text>
-    <text x="900" y="138" font-size="12" font-weight="700" letter-spacing="1.5" fill="#6d8577">SEE THE DIFFERENCE</text>
+  <!-- Clean White Technical Canvas -->
+  <rect width="1200" height="680" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
 
-    <g fill="none" stroke="#9fb2a3" stroke-width="1.5">
-      <path d="M264 180H300V264H340M264 264H340M264 348H300V264"/>
-      <path d="M860 264H880V180H900M860 264H900M880 264V348H900"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Helvetica, Arial, sans-serif" fill="#0f172a">
+
+    <!-- ==================== HEADER ==================== -->
+    <text x="36" y="34" font-size="15" font-weight="700" fill="#0f172a">Exulanica Runtime Architecture</text>
+    <text x="278" y="34" font-size="13" fill="#64748b">Causal World Engine for Multi-Model and Human-AI Co-Habitation</text>
+    <line x1="36" y1="48" x2="1164" y2="48" stroke="#e2e8f0" stroke-width="1"/>
+
+    <!-- ==================== LAYER 1: CO-HABITING MINDS (TOP) ==================== -->
+    <g transform="translate(36, 62)">
+      <rect width="1128" height="122" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.2"/>
+      <text x="16" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="600" letter-spacing="1" fill="#475569">LAYER 1 &#183; CO-HABITING MINDS (PLUGGABLE DECISION PROPOSERS)</text>
+
+      <!-- Box 1: Frontier Open Models -->
+      <g transform="translate(16, 34)">
+        <rect width="260" height="74" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="14" y="21" font-size="13" font-weight="600" fill="#0f172a">Frontier Open Models</text>
+        <text x="14" y="40" font-size="11.5" fill="#475569">Nemotron 3 &#183; Qwen3 &#183; DeepSeek</text>
+        <text x="14" y="58" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#64748b">Hosted API &#183; Bounded Spend Envelope</text>
+      </g>
+
+      <!-- Box 2: Local & Distilled Policies -->
+      <g transform="translate(294, 34)">
+        <rect width="260" height="74" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="14" y="21" font-size="13" font-weight="600" fill="#0f172a">Local &amp; Distilled Models</text>
+        <text x="14" y="40" font-size="11.5" fill="#475569">1B&#8211;30B On-Device Weights &amp; Policies</text>
+        <text x="14" y="58" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#64748b">Zero Cost &#183; Zero Network Egress</text>
+      </g>
+
+      <!-- Box 3: External Agents & The Door -->
+      <g transform="translate(572, 34)">
+        <rect width="268" height="74" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="14" y="21" font-size="13" font-weight="600" fill="#0f172a">External Agents &amp; The Door</text>
+        <text x="14" y="40" font-size="11.5" fill="#475569">Python SDK &#183; MCP &#183; Cross-World Entities</text>
+        <text x="14" y="58" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#2563eb">exulanica.translation-manifest/v2</text>
+      </g>
+
+      <!-- Box 4: Human Inhabitants -->
+      <g transform="translate(858, 34)">
+        <rect width="254" height="74" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="14" y="21" font-size="13" font-weight="600" fill="#0f172a">Human Inhabitants</text>
+        <text x="14" y="40" font-size="11.5" fill="#475569">Direct First/Third-Person Embodiment</text>
+        <text x="14" y="58" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#64748b">Shared Rules &amp; Receipt Schema</text>
+      </g>
     </g>
 
-    <g fill="#fff" stroke="#d1dbce">
-      <rect x="44" y="152" width="220" height="56" rx="9"/>
-      <rect x="44" y="236" width="220" height="56" rx="9"/>
-      <rect x="44" y="320" width="220" height="56" rx="9"/>
-      <rect x="900" y="152" width="256" height="56" rx="9"/>
-      <rect x="900" y="236" width="256" height="56" rx="9"/>
-      <rect x="900" y="320" width="256" height="56" rx="9"/>
+    <!-- ==================== VERTICAL BUS: LAYER 1 <-> LAYER 2 ==================== -->
+    <g stroke="#475569" stroke-width="1.3" fill="none">
+      <!-- Upward Observation Bus (Left side) -->
+      <line x1="340" y1="226" x2="340" y2="188" marker-end="url(#arrowSlate)"/>
+      <!-- Downward Proposal Bus (Right side) -->
+      <line x1="860" y1="184" x2="860" y2="222" stroke="#2563eb" marker-end="url(#arrowBlue)"/>
     </g>
-    <g font-size="16" fill="#294438">
-      <text x="64" y="186">By hand, from catalogs</text>
-      <text x="64" y="270">From your photographs</text>
-      <text x="64" y="354">Imported, origin labelled</text>
-      <text x="920" y="186">Swap the model in a role</text>
-      <text x="920" y="270">Compare runs side by side</text>
-      <text x="920" y="354">Replay every decision</text>
+    <rect x="166" y="194" width="348" height="22" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="340" y="209" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" fill="#334155">Bounded Observation + Legal Affordance Schema</text>
+
+    <rect x="696" y="194" width="328" height="22" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1"/>
+    <text x="860" y="209" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="600" fill="#1d4ed8">Proposed Action / Forced Tool Call</text>
+
+    <!-- ==================== LAYER 2: CAUSAL EXECUTION PIPELINE ==================== -->
+    <g transform="translate(36, 226)">
+      <rect width="1128" height="106" rx="6" fill="#f0f7ff" stroke="#93c5fd" stroke-width="1.4"/>
+      <text x="16" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="600" letter-spacing="1" fill="#1e40af">LAYER 2 &#183; DETERMINISTIC CAUSAL BOUNDARY (MODEL PROPOSES &#8594; ENGINE VALIDATES)</text>
+
+      <!-- 5 Horizontal Pipeline Nodes -->
+      <!-- Stage 1 -->
+      <g transform="translate(16, 34)">
+        <rect width="198" height="58" rx="4" fill="#ffffff" stroke="#93c5fd" stroke-width="1"/>
+        <text x="12" y="19" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" font-weight="600" fill="#2563eb">1. World Snapshot</text>
+        <text x="12" y="36" font-size="11.5" font-weight="600" fill="#0f172a">Spatial &amp; Clock Read</text>
+        <text x="12" y="50" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#64748b">state_sha256 &#183; 8m reach</text>
+      </g>
+
+      <line x1="214" y1="63" x2="236" y2="63" stroke="#2563eb" stroke-width="1.3" marker-end="url(#arrowBlue)"/>
+
+      <!-- Stage 2 -->
+      <g transform="translate(240, 34)">
+        <rect width="198" height="58" rx="4" fill="#ffffff" stroke="#93c5fd" stroke-width="1"/>
+        <text x="12" y="19" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" font-weight="600" fill="#2563eb">2. Context Assembly</text>
+        <text x="12" y="36" font-size="11.5" font-weight="600" fill="#0f172a">Perception &amp; Memory</text>
+        <text x="12" y="50" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#64748b">Nearby &#183; Heard &#183; Options</text>
+      </g>
+
+      <line x1="438" y1="63" x2="460" y2="63" stroke="#2563eb" stroke-width="1.3" marker-end="url(#arrowBlue)"/>
+
+      <!-- Stage 3 -->
+      <g transform="translate(464, 34)">
+        <rect width="198" height="58" rx="4" fill="#ffffff" stroke="#93c5fd" stroke-width="1"/>
+        <text x="12" y="19" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" font-weight="600" fill="#2563eb">3. Mind Inference</text>
+        <text x="12" y="36" font-size="11.5" font-weight="600" fill="#0f172a">Structured Proposal</text>
+        <text x="12" y="50" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#64748b">Tool Call / JSON Schema</text>
+      </g>
+
+      <line x1="662" y1="63" x2="684" y2="63" stroke="#2563eb" stroke-width="1.3" marker-end="url(#arrowBlue)"/>
+
+      <!-- Stage 4 -->
+      <g transform="translate(688, 34)">
+        <rect width="204" height="58" rx="4" fill="#eff6ff" stroke="#2563eb" stroke-width="1.3"/>
+        <text x="12" y="19" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" font-weight="700" fill="#1d4ed8">4. Engine Rule Validator</text>
+        <text x="12" y="36" font-size="11.5" font-weight="600" fill="#0f172a">Spatial &amp; Policy Gate</text>
+        <text x="12" y="50" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#1e40af">Affordance &#183; Speech &#183; Rights</text>
+      </g>
+
+      <line x1="892" y1="63" x2="914" y2="63" stroke="#2563eb" stroke-width="1.3" marker-end="url(#arrowBlue)"/>
+
+      <!-- Stage 5 -->
+      <g transform="translate(918, 34)">
+        <rect width="194" height="58" rx="4" fill="#ffffff" stroke="#93c5fd" stroke-width="1"/>
+        <text x="12" y="19" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" font-weight="600" fill="#2563eb">5. State Commit</text>
+        <text x="12" y="36" font-size="11.5" font-weight="600" fill="#0f172a">Transition &amp; Receipt</text>
+        <text x="12" y="50" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#64748b">society-decision/v2</text>
+      </g>
     </g>
 
-    <rect x="340" y="122" width="520" height="284" rx="14" fill="url(#world)"/>
-    <text x="600" y="156" text-anchor="middle" font-size="22" font-weight="600" fill="#f5f8ef">Your world</text>
-    <text x="600" y="180" text-anchor="middle" font-size="14" fill="#b9cfc1">places, objects and the agents that act in them</text>
-
-    <g font-size="14" font-weight="600" text-anchor="middle">
-      <rect x="392" y="200" width="160" height="34" rx="17" fill="#ded88f"/>
-      <text x="472" y="222" fill="#2d3a1f">Open model A</text>
-      <rect x="648" y="200" width="160" height="34" rx="17" fill="#9fcfb0"/>
-      <text x="728" y="222" fill="#17352b">Open model B</text>
+    <!-- ==================== VERTICAL BUS: LAYER 2 <-> LAYER 3 ==================== -->
+    <g stroke="#475569" stroke-width="1.3" fill="none">
+      <line x1="600" y1="332" x2="600" y2="356" marker-end="url(#arrowSlate)"/>
     </g>
 
-    <g stroke-width="1.2" opacity=".85">
-      <path d="M472 234V256M430 256H514M430 256V272M472 256V272M514 256V272" fill="none" stroke="#ded88f"/>
-      <path d="M728 234V256M686 256H770M686 256V272M728 256V272M770 256V272" fill="none" stroke="#9fcfb0"/>
-    </g>
-    <g>
-      <circle cx="430" cy="282" r="9" fill="#ded88f"/>
-      <circle cx="472" cy="282" r="9" fill="#ded88f"/>
-      <circle cx="514" cy="282" r="9" fill="#ded88f"/>
-      <circle cx="686" cy="282" r="9" fill="#9fcfb0"/>
-      <circle cx="728" cy="282" r="9" fill="#9fcfb0"/>
-      <circle cx="770" cy="282" r="9" fill="#9fcfb0"/>
-    </g>
-    <g font-size="13" fill="#d8e5dc" text-anchor="middle">
-      <text x="472" y="314">people in one group</text>
-      <text x="728" y="314">people in another group</text>
+    <!-- ==================== LAYER 3: AUTHORITATIVE WORLD STATE & SIMULATION ==================== -->
+    <g transform="translate(36, 360)">
+      <rect width="1128" height="128" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.4"/>
+      <text x="16" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="600" letter-spacing="1" fill="#334155">LAYER 3 &#183; AUTHORITATIVE SYMBOLIC &amp; SPATIAL WORLD STATE (WORLD-AS-DATA)</text>
+
+      <!-- Sub-block 1: Canonical State -->
+      <g transform="translate(16, 34)">
+        <rect width="356" height="80" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="14" y="21" font-size="13" font-weight="600" fill="#0f172a">Content-Addressed World Graph</text>
+        <text x="14" y="40" font-size="11.5" fill="#475569">Integer millimetre coordinates (zero float drift)</text>
+        <text x="14" y="57" font-size="11.5" fill="#475569">Typed places, beings, body plans, and social memory</text>
+        <text x="14" y="72" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#2563eb">exulanica.world-kind/v2 &#183; exulanica.thing-kind/v1</text>
+      </g>
+
+      <!-- Sub-block 2: Inspectable Society Loop -->
+      <g transform="translate(386, 34)">
+        <rect width="356" height="80" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="14" y="21" font-size="13" font-weight="600" fill="#0f172a">Deterministic Society Horizon</text>
+        <text x="14" y="40" font-size="11.5" fill="#475569">Bit-exact historical replay without re-calling models</text>
+        <text x="14" y="57" font-size="11.5" fill="#475569">Paired multi-seed counterfactual model comparisons</text>
+        <text x="14" y="72" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#64748b">exulanica-society/v7 &#183; Versioned Lineage</text>
+      </g>
+
+      <!-- Sub-block 3: 20 Hz Real-Time Room -->
+      <g transform="translate(756, 34)">
+        <rect width="356" height="80" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="14" y="21" font-size="13" font-weight="600" fill="#0f172a">20 Hz Real-Time Spatial Runtime</text>
+        <text x="14" y="40" font-size="11.5" fill="#475569">Tier 0 collision/steering + Tier 1 instant local policy</text>
+        <text x="14" y="57" font-size="11.5" fill="#475569">Tier 2 async open-model planner + continuation check</text>
+        <text x="14" y="72" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#2563eb">256 Concurrent Beings @ 0.225 ms/tick Median</text>
+      </g>
     </g>
 
-    <path d="M372 336H828" stroke="#4f7466" stroke-width="1"/>
-    <text x="600" y="362" text-anchor="middle" font-size="14" fill="#f5f8ef">Each model does what it is good at. The engine checks every decision.</text>
-    <text x="600" y="386" text-anchor="middle" font-size="13" fill="#b9cfc1">Every decision is stored, so a run replays without calling a model.</text>
+    <!-- ==================== VERTICAL BUS: LAYER 3 -> LAYER 4 ==================== -->
+    <g stroke="#475569" stroke-width="1.3" fill="none">
+      <line x1="220" y1="488" x2="220" y2="512" marker-end="url(#arrowSlate)"/>
+      <line x1="600" y1="488" x2="600" y2="512" marker-end="url(#arrowSlate)"/>
+      <line x1="980" y1="488" x2="980" y2="512" marker-end="url(#arrowSlate)"/>
+    </g>
+
+    <!-- ==================== LAYER 4: DOWNSTREAM PROJECTIONS & FLYWHEEL ==================== -->
+    <g transform="translate(36, 516)">
+      <rect width="1128" height="132" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.2"/>
+      <text x="16" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10.5" font-weight="600" letter-spacing="1" fill="#475569">LAYER 4 &#183; VISUAL PROJECTIONS, OBSERVABILITY &amp; POST-TRAINING FLYWHEEL</text>
+
+      <!-- Projection 1: Rendering & Neural Shader -->
+      <g transform="translate(16, 34)">
+        <rect width="356" height="84" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="14" y="21" font-size="13" font-weight="600" fill="#0f172a">3D Scene, Semantic Data &amp; Neural Shader</text>
+        <text x="14" y="40" font-size="11.5" fill="#475569">60fps WebGL/WebGPU scene &lt;-&gt; semantic point clouds</text>
+        <text x="14" y="57" font-size="11.5" fill="#475569">Video/image world models conditioned on G-buffers:</text>
+        <text x="14" y="73" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#64748b">depth(u32) &#183; normal(i16) &#183; identity(u16) &#183; edges(u8)</text>
+      </g>
+
+      <!-- Projection 2: Causal Inspection -->
+      <g transform="translate(386, 34)">
+        <rect width="356" height="84" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="14" y="21" font-size="13" font-weight="600" fill="#0f172a">Causal Observability &amp; Counterfactuals</text>
+        <text x="14" y="40" font-size="11.5" fill="#475569">Full audit of context, legal choices, latency, and cost</text>
+        <text x="14" y="57" font-size="11.5" fill="#475569">Fork any historical state to compare alternative models</text>
+        <text x="14" y="73" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#64748b">Prompt Provenance &#183; Live Model Telemetry</text>
+      </g>
+
+      <!-- Projection 3: Synthetic Trajectories & Distillation -->
+      <g transform="translate(756, 34)">
+        <rect width="356" height="84" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="14" y="21" font-size="13" font-weight="600" fill="#0f172a">Verified Trajectories &amp; Model Distillation</text>
+        <text x="14" y="40" font-size="11.5" fill="#475569">Exports validated SFT traces &amp; DPO preference pairs</text>
+        <text x="14" y="57" font-size="11.5" fill="#475569">Distills 120B&#8211;550B teachers into 1B&#8211;8B local minds</text>
+        <text x="14" y="73" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#2563eb">exulanica.world-trajectory/v1 &#183; NeMo Gym / TRL</text>
+      </g>
+    </g>
   </g>
 </svg>
